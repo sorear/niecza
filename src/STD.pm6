@@ -5141,10 +5141,11 @@ method getsig {
             my $cl = $*CURLEX<!sub>.methodof;
             # XXX type checking against roles NYI
             if $cl && $cl.kind eq none <role prole> {
-                push @parms, ::Sig::Parameter.new(name => 'self', :invocant,
-                    tclass => $cl);
+                push @parms, ::Sig::Parameter.new(name => 'self',
+                    flags => $Sig::INVOCANT + $Sig::POSITIONAL, tclass => $cl);
             } else {
-                push @parms, ::Sig::Parameter.new(name => 'self', :invocant);
+                push @parms, ::Sig::Parameter.new(name => 'self',
+                    flags => $Sig::INVOCANT + $Sig::POSITIONAL);
             }
             $*CURLEX<!sub>.add_my_name('self', :noinit);
         }
@@ -5153,28 +5154,29 @@ method getsig {
             my $h_ = $pv.<%_>:delete;
             my $a_ = $pv.<@_>:delete;
             for (keys %$pv).sort({ substr($^a,1) leg substr($^b,1) }) -> $pn is copy {
-                my $positional = True;
+                my $positional = $Sig::POSITIONAL;
                 if substr($pn,0,1) eq ':' {
                     $pn = substr($pn,1);
-                    $positional = False;
+                    $positional = 0;
                 }
-                my $list = substr($pn,0,1) eq '@';
-                my $hash = substr($pn,0,1) eq '%';
-                push @parms, ::Sig::Parameter.new(slot => $pn, :$list, :$hash,
-                    name => $pn, :$positional, names => [ substr($pn,1) ]);
+                my $list = substr($pn,0,1) eq '@' ?? $Sig::IS_LIST !! 0;
+                my $hash = substr($pn,0,1) eq '%' ?? $Sig::IS_HASH !! 0;
+                push @parms, ::Sig::Parameter.new(slot => $pn,
+                    flags => $list + $hash + $positional,
+                    name => $pn, names => [ substr($pn,1) ]);
             }
             if $a_ {
                 push @parms, ::Sig::Parameter.new(slot => '@_', name => '*@_',
-                    :slurpypos, :list);
+                    flags => $Sig::SLURPY_POS + $Sig::IS_LIST);
             }
             if $h_ {
                 push @parms, ::Sig::Parameter.new(slot => '%_', name => '*%_',
-                    :slurpynam, :hash);
+                    flags => $Sig::SLURPY_NAM + $Sig::IS_HASH);
             }
         }
         else {
             push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
-                :defouter, :rwtrans);
+                flags => $Sig::DEFOUTER + $Sig::RWTRANS + $Sig::POSITIONAL);
             $*CURLEX<!sub>.parameterize_topic;
         }
         $*CURLEX<!sub>.set_signature(::GLOBAL::Sig.new(params => @parms));

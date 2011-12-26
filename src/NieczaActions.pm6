@@ -2069,11 +2069,11 @@ method named_param($/) {
             $/.CURSOR.sorry("Abbreviated named parameter must have a name");
         }
     }
-    %rt<positional> = False;
+    %rt<flags> +&= +^$Sig::POSITIONAL;
     make %rt;
 }
 
-# :: { list : Bool, hash : Bool, slot : Maybe[Str] }
+# :: { flags : Int, slot : Maybe[Str] }
 method param_var($/) {
     if $<signature> {
         $/.CURSOR.sorry('Sub-signatures NYI');
@@ -2109,31 +2109,29 @@ method param_var($/) {
             noinit => ?($*SIGNUM)) if defined($slot);
     });
 
-    make { :$list, :$hash, :$slot,
-        names => defined($name) ?? [ $name ] !! [] }
+    make { :$slot, names => defined($name) ?? [ $name ] !! [],
+        flags => ($list ?? $Sig::IS_LIST !! 0) + ($hash?? $Sig::IS_HASH !! 0) +
+            $Sig::POSITIONAL };
 }
 
 # :: Sig::Parameter
 method parameter($/) {
-    my $rw = ?( $*SIGNUM && $*CURLEX<!rw_lambda> );
-    my $copy = False;
-    my $sorry;
-    my $slurpypos = False;
-    my $slurpynam = False;
-    my $slurpycap = False;
-    my $optional = False;
-    my $rwt = False;
     my $type;
+    my $sorry;
+    my $p = $<param_var> // $<named_param>;
+    my $flags = $p.ast<flags>;
+
+    $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
 
     if $<type_constraint> {
         ($type) = self.process_name($<type_constraint>[0]<typename><longname>);
     }
 
     for @( $<trait> ) -> $trait {
-        if $trait.ast<rw> { $rw = True }
-        elsif $trait.ast<copy> { $copy = True }
-        elsif $trait.ast<parcel> { $rwt = True }
-        elsif $trait.ast<readonly> { $rw = False }
+        if $trait.ast<rw> { $flags +|= $Sig::READWRITE }
+        elsif $trait.ast<copy> { $flags +|= $Sig::IS_COPY }
+        elsif $trait.ast<parcel> { $flags +|= $Sig::RWTRANS }
+        elsif $trait.ast<readonly> { $flags +&= +^$Sig::READWRITE }
         else {
             $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
         }
@@ -2147,20 +2145,19 @@ method parameter($/) {
 
     my $default = $<default_value> ?? $<default_value>.ast !! Any;
     $default.set_name("$/ init") if $default;
-    my $p = $<param_var> // $<named_param>;
 
     my $tag = $<quant> ~ ':' ~ $<kind>;
     if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
-    elsif $tag eq '*:*'  { ($p.ast<hash> ?? $slurpynam !! $slurpypos) = True }
-    elsif $tag eq '|:*'  { $slurpycap = True }
-    elsif $tag eq '\\:!' { $rwt = True }
-    elsif $tag eq '\\:?' { $rwt = True; $optional = True }
+    elsif $tag eq '*:*'  { $flags +|= ($flags +& $Sig::IS_HASH) ?? $Sig::SLURPY_NAM !! $Sig::SLURPY_POS }
+    elsif $tag eq '|:*'  { $flags +|= $Sig::SLURPY_CAP }
+    elsif $tag eq '\\:!' { $flags +|= $Sig::RWTRANS }
+    elsif $tag eq '\\:?' { $flags +|= ($Sig::RWTRANS + $Sig::OPTIONAL) }
     elsif $tag eq ':!'   { }
-    elsif $tag eq ':*'   { $optional = True }
-    elsif $tag eq ':?'   { $optional = True }
-    elsif $tag eq '?:?'  { $optional = True }
+    elsif $tag eq ':*'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq ':?'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '?:?'  { $flags +|= $Sig::OPTIONAL }
     elsif $tag eq '!:!'  { }
-    elsif $tag eq '!:?'  { $optional = True }
+    elsif $tag eq '!:?'  { $flags +|= $Sig::OPTIONAL }
     elsif $tag eq '!:*'  { }
     else                 { $sorry = "Confusing parameters ($tag)" }
     if $sorry { $/.CURSOR.sorry($sorry); }
@@ -2170,8 +2167,7 @@ method parameter($/) {
     }
 
     make ::Sig::Parameter.new(name => ~$/, mdefault => $default,
-        :$optional, :$slurpypos, :$slurpynam, :$rw, tclass => $type,
-        :$slurpycap, rwtrans => $rwt, is_copy => $copy, |$p.ast);
+        tclass => $type, |$p.ast, :$flags);
 }
 
 # signatures exist in several syntactic contexts so just make an object for now
@@ -2181,9 +2177,9 @@ method signature($/) {
     }
 
     if $<param_var> {
+        $<param_var>.ast<flags> +|= $Sig::SLURPY_PCL;
         my $sig = Sig.new(params => [ ::Sig::Parameter.new(
-                name => ~$<param_var>, |$<param_var>.ast,
-                full_parcel => True) ]);
+                name => ~$<param_var>, |$<param_var>.ast) ]);
         $*CURLEX<!sub>.set_signature($sig) if $*SIGNUM;
         make $sig;
         return;
@@ -2193,12 +2189,12 @@ method signature($/) {
     my @ps = @( $<param_sep> );
     my $ign = False;
     loop (my $i = 0; $i < @p; $i++) {
-        @p[$i].multi_ignored = $ign;
+        @p[$i].flags +|= $Sig::MULTI_IGNORED if $ign;
         if $i >= @ps {
         } elsif defined @ps[$i].index(':') {
             $/.CURSOR.sorry('Only the first parameter may be invocant') if $i;
             $*CURLEX<!sub>.add_my_name('self', :noinit, |mnode($/));
-            @p[$i].invocant = True;
+            @p[$i].flags +|= $Sig::INVOCANT
         } elsif defined @ps[$i].index(';;') {
             $ign = True;
         } elsif !defined @ps[$i].index(',') {
@@ -2207,14 +2203,16 @@ method signature($/) {
     }
 
     state %mlike = (:Method, :Submethod, :Regex);
-    if $*SIGNUM && %mlike{$*CURLEX<!sub>.class} && (!@p || !@p[0].invocant) {
+    if $*SIGNUM && %mlike{$*CURLEX<!sub>.class} &&
+            (!@p || !(@p[0].flags +& $Sig::INVOCANT)) {
         $*CURLEX<!sub>.add_my_name('self', :noinit, |mnode($/));
-        unshift @p, ::Sig::Parameter.new(name => 'self', :invocant);
+        unshift @p, ::Sig::Parameter.new(name => 'self',
+            flags => $Sig::INVOCANT + $Sig::POSITIONAL);
     }
 
     for @p {
         if !defined(.tclass) && $*SIGNUM {
-            if .invocant && $*CURLEX<!sub>.methodof {
+            if (.flags +& $Sig::INVOCANT) && $*CURLEX<!sub>.methodof {
                 my $cl = $*CURLEX<!sub>.methodof;
                 # XXX type checking against roles NYI
                 if $cl.kind eq none <role prole> {
@@ -2469,8 +2467,8 @@ method declarator($/) {
             $sub.delete_lex($slot) if defined($slot);
             $slot //= self.gensym;
             $slot = self.gensym if $*SCOPE eq 'anon';
-            my $list = $param.list;
-            my $hash = $param.hash;
+            my $list = ?($param.flags +& $Sig::IS_LIST);
+            my $hash = ?($param.flags +& $Sig::IS_HASH);
             my $type = $param.tclass;
 
             if $*SCOPE eq 'state' {

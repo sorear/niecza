@@ -110,27 +110,7 @@ class StaticSub {
             return;
         }
         for @( $sig.params ) {
-            my $flags = 0;
-            # keep synced with SIG_F_ constants
-            if .rwtrans       { $flags +|= 8 }
-            if .rw            { $flags +|= 2 }
-
-            if .defouter      { $flags +|= 4096 }
-            if .invocant      { $flags +|= 8192 }
-            if .multi_ignored { $flags +|= 16384 }
-            if .is_copy       { $flags +|= 32768 }
-            if .list          { $flags +|= 65536 }
-            if .hash          { $flags +|= 131072 }
-            if .tclass        { $flags +|= 1 }
-            if .mdefault      { $flags +|= 32 }
-            if .optional      { $flags +|= 64 }
-            if .positional    { $flags +|= 128 }
-            if .slurpynam     { $flags +|= 512 }
-            if .slurpypos     { $flags +|= 256 }
-            if .slurpycap     { $flags +|= 1024 }
-            if .full_parcel   { $flags +|= 2048 }
-
-            push @args, $flags, .name, .slot, @( .names ), Str,
+            push @args, .flags, .name, .slot, @( .names ), Str,
                 .mdefault, .tclass;
         }
         downcall("set_signature", self, @args);
