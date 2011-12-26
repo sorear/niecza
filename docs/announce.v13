@@ -5,6 +5,11 @@ the last Monday of the month.  I'm on winter break now, which means lots
 of time for improvements.  Muahahaha.  A large portion of the improvements
 have been in regular expression support.
 
+Will Coleda and Solomon Foster are working on fudging spectests so they run on
+Niecza; between that and actual improvements, we've gained 5000+ working
+spectests since the last release.  See [4] for a dramatic visual.
+
+
 You can obtain a build of Niecza from [1].  This build contains a
 working compiler as a set of .exe and .dll files suitable for use with
 Mono or Microsoft .NET.  If you wish to follow latest developments,
@@ -144,6 +149,7 @@ My current priorities are:
  4. Figure out how modules and S11 stuff should work in Niecza.  Do it.
 
 
-[1] https://github.com/downloads/sorear/niecza/niecza-12.zip
+[1] https://github.com/downloads/sorear/niecza/niecza-13.zip
 [2] https://github.com/sorear/niecza
 [3] http://www.unicode.org/reports/tr18/
+[4] https://github.com/flussence/specgraphs/raw/master/impls.png
