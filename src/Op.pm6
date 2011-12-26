@@ -773,26 +773,6 @@ class GetBlock is Op {
 # These don't appear in source code, but are used by other ops to preserve
 # useful structure.
 
-# used after β-reductions
-class SigBind is Op {
-    has $.signature = die "SigBind.signature required"; # Sig
-    # positionals *really* should be a bunch of gensym Lexical's, or else
-    # you risk shadowing hell.  this needs to be handled at a different level
-    has $.positionals = die "SigBind.positionals required"; # Array of Op
-
-    method zyg() { @$.positionals }
-    method new(:$positionals, *%_) {
-        nextwith(self, positionals => [@$positionals], |%_);
-    }
-
-    method code($body) {
-        CgOp.prog(
-            $.signature.bind_inline($body,
-                map { $_.cgop($body) }, @$.positionals),
-            CgOp.null('var'));
-    }
-}
-
 class Assign is Op {
     has $.lhs = die "Assign.lhs required"; # Op
     has $.rhs = die "Assign.rhs required"; # Op
