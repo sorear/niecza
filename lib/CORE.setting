@@ -1637,13 +1637,13 @@ my grammar Cursor is Any {
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
     method CURSOR() { self }
     # definitions from UTS18
-    token alpha { <:Alphabetic> }
+    token alpha { <:Alphabetic + [_]> } # XXX: STD expects to include _
     token lower { <:Lowercase> }
     token upper { <:Uppercase> }
     token punct { <:Punctuation> }
     token digit { \d }
     token xdigit { <:Nd + :Hex_Digit> }
-    token alnum { <:Alphabetic + :Nd> }
+    token alnum { <:Alphabetic + :Nd + [_]> }
     token space { \s }
     token blank { \h }
     token cntrl { <:Control> }
