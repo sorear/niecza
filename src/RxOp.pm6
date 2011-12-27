@@ -558,7 +558,11 @@ class Statement is RxOp {
     method lad() { ['Null'] }
 }
 
-class ProtoRedis is RxOp {
+class ProtoRedis is RxOp::Capturing {
+    method clone(*%args) {
+        self.WHAT.new(captures => $.captures, |%args);
+    }
+
     method code($) {
         my $bt = self.label;
 
@@ -566,7 +570,7 @@ class ProtoRedis is RxOp {
         push @code, CgOp.rxcall("InitCursorList",
             CgOp.rxlprim('proto_dispatch', CgOp.scopedlex('Any')));
         push @code, CgOp.label($bt);
-        push @code, CgOp.rxincorpshift(['dispatch'], $bt);
+        push @code, CgOp.rxincorpshift($.captures, $bt);
         @code;
     }
 
@@ -634,13 +638,18 @@ class RxOp::StringCap is RxOp::Capturing {
     method lad() { $.zyg[0].lad }
 }
 
-class RxOp::ListPrim is RxOp {
+class RxOp::ListPrim is RxOp::Capturing {
     has Str $.name; # used for LTM cheatery
     has Str $.type;
-    has $.ops = die "RxOp::Variable.ops required"; # Op
+    has $.ops = die "RxOp::ListPrim.ops required"; # Op
 
     method ctxopzyg() { $!ops, 1 }
     method opzyg() { $!ops }
+
+    method clone(*%args) {
+        self.WHAT.new(captures => $.captures, name => $!name, type => $!type,
+            ops => $!ops, |%args);
+    }
 
     method code($body) {
         my $bt = self.label;
@@ -649,7 +658,7 @@ class RxOp::ListPrim is RxOp {
         push @code, CgOp.rxcall("InitCursorList",
             CgOp.rxlprim($!type, $!ops.cgop($body)));
         push @code, CgOp.label($bt);
-        push @code, CgOp.rxincorpshift([], $bt);
+        push @code, CgOp.rxincorpshift($.captures, $bt);
         @code;
     }
 

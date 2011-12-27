@@ -27,3 +27,10 @@ use Test;
     s/\d//;
     is ~$/, '5', 's/// resets $/';
 }
+
+{
+    my $hello = "'/'hello'/'(<-[\\\\/\\\\.]>+)";
+    my $reg  = / ^ <hello=$hello> $/;
+    "/hello/bug" ~~ $reg;
+    is $/<hello>[0], 'bug', '<foo=$bar> works';
+}
