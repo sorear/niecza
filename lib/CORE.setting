@@ -2126,6 +2126,7 @@ sub infix:<cmp> is equiv<leg> ($a, $b) {
     return $a - $b if $a ~~ Numeric && $b ~~ Numeric;
     return $a.WHAT leg $b.WHAT unless $a.WHAT === $b.WHAT;
     return $a leg $b if $a ~~ Str;
+    return $a.key cmp $b.key || $a.value cmp $b.value if $a ~~ Pair;
     return $a - $b;
 }
 sub infix:<eqv> is equiv<==> ($a, $b) { ($a cmp $b) == 0 }
