@@ -38,7 +38,7 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/Run.%.ser,$(srcunits)) src/ni
 .fetch-stamp: FETCH_URL
 	-rm -rf boot/
 	mkdir boot
-	wget -Oboot/niecza.zip $$(cat FETCH_URL)
+	wget --no-check-certificate -Oboot/niecza.zip $$(cat FETCH_URL)
 	cd boot && unzip niecza.zip
 	NIECZA_KEEP_IL=1 $(RUN_CLR) boot/run/Niecza.exe -C $(libunits)
 	$(CP) boot/run/Kernel.dll boot/obj/
