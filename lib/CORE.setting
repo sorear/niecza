@@ -1664,9 +1664,9 @@ my class Match is Cool {
     method Numeric() { self // nextsame; +(~self) }
 
     # yeah these could all be more efficient.
-    method kv() { @(self).kv, %(self).kv }
-    method keys() { @(self).keys, %(self).keys }
-    method values() { @(self), %(self).values }
+    method kv() { (@(self).kv, %(self).kv).flat }
+    method keys() { (@(self).keys, %(self).keys).flat }
+    method values() { (@(self), %(self).values).flat }
 
     method Capture () { Q:CgOp {
         (letn cap (obj_newblank (obj_llhow (@ {Capture})))
