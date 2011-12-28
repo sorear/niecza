@@ -38,6 +38,7 @@ S02-literals/array-interpolation.t
 S02-literals/autoref.t
 S02-literals/char-by-number.t
 S02-literals/hash-interpolation.t
+S02-literals/hex_chars.t
 S02-literals/listquote.t
 S02-literals/listquote-whitespace.t
 S02-literals/numeric.t
@@ -210,10 +211,12 @@ S04-statements/try.t
 S04-statements/unless.t
 S04-statements/until.t
 S04-statements/while.t
+S05-capture/caps.t
 S05-capture/match-object.t
 S05-capture/subrule.t
 S05-grammar/action-stubs.t
 S05-grammar/methods.t
+S05-grammar/parse_and_parsefile.t
 S05-grammar/protoregex.t
 S05-grammar/signatures.t
 S05-interpolation/lexicals.t
@@ -227,6 +230,7 @@ S05-mass/rx.t
 S05-mass/stdrules.t
 S05-match/arrayhash.t
 S05-match/blocks.t
+S05-match/make.t
 S05-match/non-capturing.t
 S05-match/positions.t
 S05-metachars/closure.t
