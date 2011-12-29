@@ -25,6 +25,20 @@ use STD;
 # }
 # }
 
+augment class RxOp::Capturing {
+    method used_caps() {
+        my %h = map { ($_ => $*in_quant ?? 2 !! 1) }, @$.captures;
+
+        for @$.zyg -> $k {
+            for $k.used_caps.pairs -> $p {
+                %h{$p.key} = (%h{$p.key} // 0) + $p.value;
+            }
+        }
+
+        %h
+    }
+}
+
 augment class Op::ImmedForLoop {
     method code_labelled($body, $l) {
         my $id = ::GLOBAL::NieczaActions.genid;

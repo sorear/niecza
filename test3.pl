@@ -34,3 +34,9 @@ use Test;
     "/hello/bug" ~~ $reg;
     is $/<hello>[0], 'bug', '<foo=$bar> works';
 }
+
+# http://irclog.perlgeek.de/perl6/2011-12-29#i_4894154
+{
+    "ab" ~~ / $<a>=[ <alpha>+ ] /;
+    is $<alpha>[1], "b", "<foo>+ inside string capture works";
+}
