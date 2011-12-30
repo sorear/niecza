@@ -1976,7 +1976,7 @@ noparams:
             if (protopad != null) {
                 li.Init(protopad);
 
-                int ix = name.IndexOf(':');
+                int ix = name.LastIndexOf(':');
                 LexInfo disp;
                 if (ix >= 0 && dylex.TryGetValue(name.Substring(0, ix),
                             out disp) && disp is LIDispatch) {
