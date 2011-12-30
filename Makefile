@@ -20,12 +20,13 @@ srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar OptRxSimple \
 	 OptBeta NieczaPathSearch NieczaBackendDotnet NieczaCompiler GetOptLong
 
 all: run/Niecza.exe obj/Run.Kernel.dll obj/Run.CORE.dll
-	@git describe --tags > VERSION
 
 $(patsubst %,boot/obj/Run.%.ser,$(srcunits)): boot/obj/Run.%.ser: .fetch-stamp src/%.pm6 boot/obj/Run.CORE.ser
 	cd src && NIECZA_KEEP_IL=1 $(RUN_CLR) ../boot/run/Niecza.exe -C $*
 
+# hack - put VERSION info in place so the setting build can embed it
 obj/Run.CORE.dll: run/Niecza.exe obj/Run.Kernel.dll lib/CORE.setting
+	@git describe --tags > VERSION
 	$(RUN_CLR) run/Niecza.exe -C CORE
 
 run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/Run.%.ser,$(srcunits)) src/niecza

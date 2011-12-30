@@ -4175,6 +4175,27 @@ dynamic:
                 if (n.outer != null && n.outer.unit == ru)
                     n.outer.children.Add(n);
                 ru.our_subs.Add(n);
+
+                if (outer == null) {
+                    /* Hack - embed build information */
+                    var li = new LIConstant();
+                    var info = new VarHash();
+                    info["name"] = Builtins.MakeStr("niecza");
+                    string vers = "(unknown)\n";
+                    try {
+                        vers = File.ReadAllText("VERSION");
+                    } catch (Exception) {
+                        // ignore
+                    }
+                    info["version"] = Builtins.MakeStr(
+                            vers.Substring(0, vers.Length - 1));
+                    info["build-time"] = Builtins.now();
+
+                    li.value = Kernel.BoxAnyMO(info, Kernel.HashMO);
+
+                    n.AddLexical("$?PERL", li);
+                }
+
                 return new Handle(n);
             } else if (cmd == "add_my_name") {
                 STable  type  = (STable)Handle.Unbox(args[6]);
