@@ -261,6 +261,7 @@ S06-currying/assuming-and-mmd.t
 S06-currying/named.t
 S06-multi/by-trait.t
 S06-multi/lexical-multis.t
+S06-operator-overloading/sub.t
 S06-other/anon-hashes-vs-blocks.t
 S06-other/main-eval.t
 S06-other/misc.t
