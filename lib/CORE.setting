@@ -1299,9 +1299,9 @@ my class Hash {
     method Str() { @(self).map(* ~ "\n").join }
 
     method invert() {
-        my %new;
-        for self.keys -> $k { %new{self{$k}} = $k }
-        %new
+        my @new;
+        for self.kv -> $k, $v { push @new, $v => $k }
+        @new
     }
 
     method !array-push(Str $key, Mu $value) {
