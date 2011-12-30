@@ -362,9 +362,11 @@ my class Cool {
     method cotanh() { Q:CgOp { (cotanh {self}) } }
     method acotanh() { Q:CgOp { (acotanh {self}) } }
     method atan2($x = 1) { Q:CgOp { (atan2 {self} {$x}) } }
+    method polar() { self.abs, atan2(0, self); }
     method unpolar($angle) { unpolar(self, $angle); }
     method cis() { cis(self); }
     method rand() { self * rand; }
+    method roots($n) { roots(self, $n); }
 
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
@@ -2527,6 +2529,18 @@ sub log10($x) { $x.log(10) }
 
 sub unpolar($mag, $angle) { Complex.new($mag * $angle.cos, $mag * $angle.sin); }
 sub cis($angle) { Complex.new($angle.cos, $angle.sin); }
+sub roots($x, $an) {
+    my $n = $an.Int;
+    return NaN if $n < 1;
+    return $x if $n == 1;
+    # for $!re, $!im {
+    #     return $NaN if $_ eq 'Inf' || $_ eq '-Inf' || $_ eq 'NaN';
+    # }
+
+    my ($mag, $angle) = $x.polar;
+    $mag **= 1e0 / $n;
+    (^$n).map: { $mag.unpolar( ($angle + $_ * 2e0 * pi) / $n) };
+}
 
 sub sin($x) { $x.sin }
 sub asin($x) { $x.asin }
