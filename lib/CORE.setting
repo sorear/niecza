@@ -1341,7 +1341,7 @@ my class Hash {
 
     method perl(\$self:) {
         $self // return $self.typename;
-        '{' ~ @($self).map(*.perl).join(', ') ~ '}' ~
+        '{' ~ (self{self.keys.sort}:p).map(*.perl).join(', ') ~ '}' ~
             ($self.flattens ?? ".hash" !! "")
     }
 }
