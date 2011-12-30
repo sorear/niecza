@@ -29,9 +29,11 @@ method cat_O($cat, $sym) {
 method function_O($name) {
     my @lex = self.lookup_lex($name);
 
-    if @lex[0] eq 'dispatch' {
+    if @lex && @lex[0] eq 'dispatch' {
         @lex = self.lookup_lex($name ~ ":(!proto)");
     }
+
+    return Any unless @lex;
 
     my $sub;
 
