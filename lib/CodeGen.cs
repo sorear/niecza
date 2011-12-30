@@ -4293,6 +4293,12 @@ dynamic:
                     s.outer.catch_ = s;
                 if (p == Kernel.PHASER_CONTROL)
                     s.outer.control = s;
+                if (p == Kernel.PHASER_INIT)
+                    Compartment.Top.init.Add(s, true);
+                if (p == Kernel.PHASER_CHECK)
+                    Compartment.Top.check.Add(s, true);
+                if (p == Kernel.PHASER_END)
+                    Compartment.Top.end.Add(s, true);
                 return null;
             } else if (cmd == "sub_set_extend") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
@@ -4334,6 +4340,8 @@ dynamic:
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
                 if (!ru.is_mainish && ru.bottom == null)
                     ru.RunMainline();
+                if (ru.is_mainish)
+                    Compartment.Top.check.Run();
                 ru.Save();
                 return null;
             } else if (cmd == "run_unit") {
@@ -4343,10 +4351,8 @@ dynamic:
                 Array.Copy(args, 3, Kernel.commandArgs, 0, args.Length - 3);
                 Kernel.currentGlobals = ru.globals;
                 ru.PrepareEval();
-                // If we're done with an eval but it's too late to be caught
-                // by the normal INIT process, run that now.
-                if (ru != ru.owner && ru.owner.inited)
-                    ru.InitTime();
+                Compartment.Top.check.Run();
+                Compartment.Top.init.Run();
                 if (!evalmode)
                     Kernel.RunMain(ru);
                 return null;
@@ -4356,8 +4362,9 @@ dynamic:
                 return null;
             } else if (cmd == "unit_replrun") {
                 RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                ru.InitTime();
                 Frame fret = null;
+                Compartment.Top.check.Run();
+                Compartment.Top.init.Run();
                 StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
                 b.Bind(Kernel.FalseV);
                 Frame ir = Kernel.GetInferiorRoot();

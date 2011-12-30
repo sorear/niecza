@@ -794,29 +794,6 @@ namespace Niecza {
             SetConstants(eu.Finish(), eu.constants);
         }
 
-        // InitTime is called:
-        //  * on MAIN when running a program
-        //  * on evals if global INIT time has already passed
-        //  * when linking units in an INITed container
-        public void InitTime() {
-            if (inited) return;
-            inited = true;
-
-            foreach (RuntimeUnit zu in subordinates)
-                zu.InitTime();
-            foreach (RuntimeUnit zu in depended_units)
-                zu.InitTime();
-
-            // XXX this is WRONG and will need to be changed with BEGIN
-            foreach (SubInfo z in our_subs) {
-                if ((z.special & SubInfo.UNSAFE) != 0)
-                    Kernel.CheckUnsafe(z);
-            }
-
-            Kernel.FirePhasers(this, Kernel.PHASER_UNIT_INIT, false);
-            Kernel.FirePhasers(this, Kernel.PHASER_INIT, false);
-        }
-
         internal void RunMainline() {
             RuntimeUnit csr = this;
             Builtins.setting_path = new Dictionary<string,SubInfo>();
@@ -845,6 +822,10 @@ namespace Niecza {
                 if (err != null) return err;
                 globals[gm.Key] = nse;
             }
+
+            Compartment.Top.check.RunNew();
+            Compartment.Top.init.RunNew();
+            Compartment.Top.end.RunNew();
 
             return null;
         }
@@ -2313,6 +2294,16 @@ noparams:
                         control = z;
                 }
             }
+
+            if (phaser == Kernel.PHASER_CHECK)
+                Compartment.Top.check.Add(this, false);
+            if (phaser == Kernel.PHASER_INIT)
+                Compartment.Top.init.Add(this, false);
+            if (phaser == Kernel.PHASER_END)
+                Compartment.Top.end.Add(this, false);
+
+            if ((special & UNSAFE) != 0)
+                Kernel.CheckUnsafe(this);
         }
     }
 
@@ -4206,6 +4197,10 @@ saveme:
         [TrueGlobal]
         public static Compartment Top = new Compartment();
 
+        public PhaserList check = new PhaserList(true);
+        public PhaserList init  = new PhaserList(false);
+        public PhaserList end   = new PhaserList(true);
+
         internal static void Push() {
             Compartment n = new Compartment();
             n.prev = Top;
@@ -4233,10 +4228,36 @@ saveme:
         }
     }
 
+    class PhaserList {
+        bool lifo;
+        bool state;
+        VarDeque to_run = new VarDeque();
+
+        public PhaserList(bool lifo) { this.lifo = lifo; }
+
+        public void Run() {
+            state = true;
+            while (to_run.Count() != 0) {
+                Variable next = lifo ? to_run.Pop() : to_run.Shift();
+                if (next == null) continue;
+                Kernel.RunInferior(next.Fetch().Invoke(
+                    Kernel.GetInferiorRoot(), Variable.None, null));
+            }
+        }
+
+        public void RunNew() { if (state) Run(); }
+
+        public void Add(SubInfo what, bool immed) {
+            to_run.Push(Kernel.NewROScalar(what.protosub));
+            if (immed && state)
+                Run();
+        }
+    }
+
     // A bunch of stuff which raises big circularity issues if done in the
     // setting itself.
     public class Kernel {
-        // not listed: BEGIN, CHECK (cannot be implemented in this model),
+        // not listed: BEGIN (cannot be implemented in this model),
         // START (desugared using state), FIRST, NEXT, LAST (use masak code)
         public const int PHASER_INIT = 0;
         public const int PHASER_END = 1;
@@ -4249,17 +4270,8 @@ saveme:
         public const int PHASER_POST = 8;
         public const int PHASER_CATCH = 9;
         public const int PHASER_CONTROL = 10;
-        public const int PHASER_TYPES = 11;
-
-        // XXX do lifo
-        public static void FirePhasers(RuntimeUnit ru, int i, bool lifo) {
-            foreach (SubInfo z in ru.our_subs) {
-                if (z.phaser == i && z.protosub != null) {
-                    RunInferior(z.protosub.Invoke(GetInferiorRoot(),
-                        Variable.None, null));
-                }
-            }
-        }
+        public const int PHASER_CHECK = 11;
+        public const int PHASER_TYPES = 12;
 
         public static void DoRequire(string name) {
             throw new NotImplementedException(); // TODO reimplement
@@ -5454,7 +5466,7 @@ slow:
 
         public static void RunMain(RuntimeUnit main_unit) {
             try {
-                main_unit.InitTime();
+                Compartment.Top.init.Run();
                 main_unit.RunMainline();
             } catch (Exception n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
@@ -6066,7 +6078,6 @@ slow:
             Kernel.containerRootUnit = ru;
             Kernel.currentGlobals = ru.globals;
 
-            ru.InitTime();
             RunMain(ru);
         }
 

@@ -7,7 +7,7 @@ has $.safemode = False;
 has $.obj_dir;
 has $.run_args = [];
 
-enum Phaser < INIT END UNIT_INIT KEEP UNDO LEAVE ENTER PRE POST CATCH CONTROL >;
+enum Phaser < INIT END UNIT_INIT KEEP UNDO LEAVE ENTER PRE POST CATCH CONTROL CHECK >;
 enum MultiMode ( only => 0, proto => 4, multi => 8 );
 enum SubVisibility ( normal => 0, private => 1, sub => 2 );
 
