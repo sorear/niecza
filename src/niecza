@@ -119,6 +119,7 @@ my $verb = 0;
 my @eval;
 my $cmod = False;
 my $comp = False;
+my $version = False;
 
 GetOptions(:!permute,
     "evaluate|e=s" => sub { push @eval, $_ },
@@ -127,7 +128,8 @@ GetOptions(:!permute,
     "language|L=s" => sub { $lang = $_ },
     "p" => sub { $lang = "CORP" },
     "n" => sub { $lang = "CORN" },
-    "verbose|v" => sub { $verb++ },
+    "verbose" => sub { $verb++ },
+    "version|v" => sub { $version = True },
     "compile|c" => sub { $comp = True },
     "safe" => sub { $safe = True },
     "include|I=s" => sub { unshift @lib, $_.IO.realpath },
@@ -156,6 +158,11 @@ my $c = NieczaCompiler.new(
     backend => $backend,
     verbose => $verb,
 );
+
+if $version {
+    $c.compile_string('say "This is Niecza Perl 6 {$?PERL<version>}"', True);
+    exit 0;
+}
 
 if $cmod {
     if @eval {
