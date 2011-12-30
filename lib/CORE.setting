@@ -14,6 +14,7 @@ my class List     { ... }
 my class Array    { ... }
 my class FatRat   { ... }
 my class Junction { ... }
+my class Enum     { ... }
 # }}}
 # Important inlinable definitions {{{
 sub infix:<+>($l,$r) is Niecza::builtin('plus',2,2) { $l + $r }
@@ -1301,6 +1302,33 @@ my class Hash {
         my %new;
         for self.keys -> $k { %new{self{$k}} = $k }
         %new
+    }
+
+    method !array-push(Str $key, Mu $value) {
+        if not self{$key}:exists {
+            self{$key} = $value;
+        } elsif self{$key} ~~ Array {
+            self{$key}.push: $value;
+        } else {
+            self{$key} = [self{$key}, $value];
+        }
+    }
+
+    method push(*@v) {
+        my Mu $previous;
+        my $has_previous;
+        for @v -> $e {
+            if $has_previous {
+                self!array-push($previous.Str, $e);
+                $has_previous = 0;
+            } elsif $e.^isa(Enum) {
+                self!array-push($e.key, $e.value);
+            } else {
+                $previous     = $e;
+                $has_previous = 1;
+            }
+        }
+        self;
     }
 
     # Rakudo extensions compatibility - DO NOT USE
