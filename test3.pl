@@ -57,25 +57,25 @@ use Test;
 }
 
 {
-    sub foo(Any:U $) { }
-    sub bar(Any:D $) { }
-    sub moo(Any:_ $) { }
-    sub cow(Any:T $) { }
+    sub foo(Any:U $) { } #OK
+    sub bar(Any:D $) { } #OK
+    sub moo(Any:_ $) { } #OK
+    sub cow(Any:T $) { } #OK
 
     multi qux(Any:U $) { "U" }
     multi qux(Any:D $) { "D" }
 
-    eval_lives_ok "foo(Int)", ":U allows type objects";
-    eval_dies_ok  "foo(5)",   ":U denies concrete objects";
+    lives_ok { eval "foo(Int)" }, ":U allows type objects";
+    dies_ok  { eval "foo(5)" },   ":U denies concrete objects";
 
-    eval_lives_ok "bar(5)",   ":D allows concrete objects";
-    eval_dies_ok  "bar(Int)", ":D denies type objects";
+    lives_ok { eval "bar(5)" },   ":D allows concrete objects";
+    dies_ok  { eval "bar(Int)" }, ":D denies type objects";
 
-    eval_lives_ok "moo(5)",   ":_ allows concrete objects";
-    eval_lives_ok "moo(Int)", ":_ allows type objects";
+    lives_ok { eval "moo(5)" },   ":_ allows concrete objects";
+    lives_ok { eval "moo(Int)" }, ":_ allows type objects";
 
-    eval_lives_ok "cow(Int)", ":T allows type objects";
-    eval_dies_ok  "cow(5)",   ":T denies concrete objects";
+    lives_ok { eval "cow(Int)" }, ":T allows type objects";
+    dies_ok  { eval "cow(5)" },   ":T denies concrete objects";
 
     is qux(Int), 'U', 'multi can discriminate on :U/:D (1)';
     is qux(5),   'D', 'multi can discriminate on :U/:D (2)';

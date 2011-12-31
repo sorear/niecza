@@ -1414,6 +1414,8 @@ namespace Niecza {
         public const int TYPE_ONLY  = 0x100000;
         public const int DEF_MASK   = 0x1C0000;
 
+        public const int DEF_SHIFT = 18;
+
         // Value binding
         public const int READWRITE  = 2;
         public const int RWTRANS    = 8;
@@ -1771,6 +1773,22 @@ get_default:
                 if (quiet) return null;
                 return Kernel.Die(th, "No value for parameter " + PName(param));
 gotit:
+                switch ((flags & Parameter.DEF_MASK) >> Parameter.DEF_SHIFT) {
+                    // TODO: Failure will make these cases different
+                    case Parameter.TYPE_ONLY >> Parameter.DEF_SHIFT:
+                    case Parameter.UNDEF_ONLY >> Parameter.DEF_SHIFT:
+                        if (!src.Fetch().IsDefined())
+                            break;
+                        if (quiet) return null;
+                        return Kernel.Die(th, "Parameter " + PName(param) + " requires an undefined argument");
+                    case Parameter.DEF_ONLY >> Parameter.DEF_SHIFT:
+                        if (src.Fetch().IsDefined())
+                            break;
+                        if (quiet) return null;
+                        return Kernel.Die(th, "Parameter " + PName(param) + " requires a defined argument");
+                    default:
+                        break;
+                }
                 if ((flags & Parameter.RWTRANS) != 0) {
                 } else if ((flags & Parameter.IS_COPY) != 0) {
                     if ((flags & Parameter.IS_HASH) != 0)
@@ -4619,6 +4637,12 @@ saveme:
                     p.required = ((flags & (Parameter.OPTIONAL | Parameter.HASDEFAULT)) == 0);
                     p.constrained = false;
                     p.type = pa.type;
+
+                    if ((flags & Parameter.DEF_MASK) != Parameter.ANY_DEF &&
+                            (flags & Parameter.DEF_MASK) != 0) {
+                        p.constrained = true;
+                        extra_constraints = true;
+                    }
 
                     // XXX The long name model does not represent the full
                     // diversity of Perl 6 parameters, instead restricting
