@@ -63,6 +63,61 @@ augment class Op::ImmedForLoop {
 }
 
 augment class NieczaActions {
+method parameter($/) {
+    my $type;
+    my $sorry;
+    my $p = $<param_var> // $<named_param>;
+    my $p_ast = $p ?? $p.ast !! { names => [], flags => $Sig::POSITIONAL };
+    my $flags = $p_ast<flags>;
+
+    $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
+
+    if $<type_constraint> {
+        ($type) = self.process_name($<type_constraint>[0]<typename><longname>);
+    }
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $flags +|= $Sig::READWRITE }
+        elsif $trait.ast<copy> { $flags +|= $Sig::IS_COPY }
+        elsif $trait.ast<parcel> { $flags +|= $Sig::RWTRANS }
+        elsif $trait.ast<readonly> { $flags +&= +^$Sig::READWRITE }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    if $<post_constraint> > 0 {
+        $/.sorry('Parameter post constraints NYI');
+        make ::Sig::Parameter.new;
+        return Nil;
+    }
+
+    my $default = $<default_value> ?? $<default_value>.ast !! Any;
+    $default.set_name("$/ init") if $default;
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $flags +|= ($flags +& $Sig::IS_HASH) ?? $Sig::SLURPY_NAM !! $Sig::SLURPY_POS }
+    elsif $tag eq '|:*'  { $flags +|= $Sig::SLURPY_CAP }
+    elsif $tag eq '\\:!' { $flags +|= $Sig::RWTRANS }
+    elsif $tag eq '\\:?' { $flags +|= ($Sig::RWTRANS + $Sig::OPTIONAL) }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq ':?'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '?:?'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+
+    if defined $p_ast<slot> {
+        # TODO: type constraint here
+    }
+
+    make ::Sig::Parameter.new(name => ~$/, mdefault => $default,
+        tclass => $type, |$p_ast, :$flags);
+}
 method post_backslash($/) {
     # XXX confine $/ resetting
     sub _isupper { $_ ~~ /^<[ A .. Z ]>/ }

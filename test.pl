@@ -1868,17 +1868,17 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
     ok "y" ~~ / :lang(G19) <foo> /, "can use multi regex without proto";
 
     my class C20 {
-        multi method b1(Bool $) { "bool" }
-        multi method b1(Str $) { "str" }
+        multi method b1(Bool) { "bool" }
+        multi method b1(Str) { "str" }
 
-        multi method b2(Bool $) { "bool" }
-        multi method b2(Any $) { "any" }
+        multi method b2(Bool) { "bool" }
+        multi method b2(Any) { "any" }
 
-        multi method b3(Any $) { "any" }
-        multi method b3(Bool $) { "bool" }
+        multi method b3(Any) { "any" }
+        multi method b3(Bool) { "bool" }
 
-        multi method b4(Bool $ , Any $) { "doom" }
-        multi method b4(Any $ , Bool $) { "doom" }
+        multi method b4(Bool, Any) { "doom" }
+        multi method b4(Any, Bool) { "doom" }
     }
 
     is C20.b1(True), "bool", "multimethods work (1)";
@@ -1894,25 +1894,25 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 }
 
 {
-    multi foo(Str $) { "str" }
-    multi foo(Bool $) { "bool" }
+    multi foo(Str) { "str" }
+    multi foo(Bool) { "bool" }
 
     is foo(True), "bool", "multisubs work (1)";
     is foo("abc"), "str", "multisubs work (2)";
 
     {
-        multi foo(Any $) { "any" }
+        multi foo(Any) { "any" }
         is foo(True), "bool", "augmenting multisubs works (1)";
         is foo(5), "any", "augmenting multisubs works (2)";
 
         {
             proto foo($) {*}
-            multi foo(Any $) { "any2" }
+            multi foo(Any) { "any2" }
             is foo(True), "any2", "proto-shadowing works";
         }
 
         {
-            sub foo(Any $) { "any3" }
+            sub foo(Any) { "any3" }
             is foo(True), "any3", "only-shadowing works";
         }
     }
@@ -1981,15 +1981,15 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 
 {
     my class A {
-        multi method foo(Str $, Any $) { "A" }
+        multi method foo(Str, Any) { "A" }
     }
     my class B is A {
-        multi method foo(Any $, Str $) { "B" }
+        multi method foo(Any, Str) { "B" }
     }
     is B.foo("x","y"), "B", "MRO used as tiebreaker";
-    multi bar(Str $, Any $) { "X" } #OK
+    multi bar(Str, Any) { "X" } #OK
     {
-        multi bar(Any $, Str $) { "Y" }
+        multi bar(Any, Str) { "Y" }
         is bar("a","b"), "Y", "depth used as tiebreaker";
     }
 
