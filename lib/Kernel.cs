@@ -4211,6 +4211,12 @@ saveme:
             }
 
             fieldsToSave = fields.ToArray();
+
+            AppDomain.CurrentDomain.ProcessExit +=
+                delegate (object sender, EventArgs args) {
+                    while (Top.prev != null) { Pop(); }
+                    Top.end.Run();
+                };
         }
 
         Compartment prev;
@@ -4239,6 +4245,8 @@ saveme:
         }
 
         internal static void Pop() {
+            Top.end.Run();
+
             for (int i = 0; i < fieldsToSave.Length; i++) {
                 fieldsToSave[i].SetValue(null, Top.saved_values[i]);
             }
