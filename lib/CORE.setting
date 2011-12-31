@@ -376,7 +376,7 @@ my class Cool {
         my @out;
         my $i = 0;
         my $last = 0;
-        my $limctr = $limit // Inf;
+        my $limctr = $limit ~~ Whatever ?? Inf !! $limit // Inf;
         my $M;
         while ($i <= chars $str) && ($limctr > 1) {
             $M = head($matchrx($C.cursor($i++)));
