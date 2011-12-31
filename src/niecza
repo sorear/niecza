@@ -42,9 +42,10 @@ method is_name($longname, $curlex = $*CURLEX) {
         self.deb("computed name gets a free pass") if $deb;
         return True;
     }
-    $longname := substr($longname, 0, chars($longname)-2)
-        if chars($longname) >= 2 && substr($longname, chars($longname)-2)
-            eq (':D' | ':U' | ':_' | ':T');
+    my $ch := chars($longname);
+    $longname := substr($longname, 0, $ch-2)
+        if $ch > 2 && substr($longname, $ch-2) eq (':D' | ':U' | ':_' | ':T') &&
+           substr($longname, $ch-3, 1) ne ':';
     my @parts = $longname.split('::');
     shift @parts if @parts[0] eq '';
     pop @parts if @parts && @parts[*-1] eq ''; # doesn't change ref validity
