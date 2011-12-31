@@ -40,3 +40,18 @@ use Test;
     "ab" ~~ / $<a>=[ <alpha>+ ] /;
     is $<alpha>[1], "b", "<foo>+ inside string capture works";
 }
+
+# the Rakudo-inherited algorithm failed on this one.
+{
+    my class A { }
+    my class B is A { }
+    my class C is B { }
+
+    multi foo(A $, A $) { "AA" }
+    multi foo(A $, B $) { "AB" }
+    multi foo(A $, C $) { "AC" }
+    multi foo(B $, A $) { "BA" }
+    multi foo(C $, A $) { "CA" }
+
+    dies_ok { foo(B, C) }, "hard case of catching ambiguous dispatch";
+}
