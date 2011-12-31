@@ -4522,10 +4522,14 @@ saveme:
             }
         }
 
-        public class MMDCandidateLongname {
+        internal class MMDCandidate : MultiCandidate {
             public P6any impl;
-            public int tien;
             public SubInfo info;
+            // group_n provides the ordering between groups of candidates,
+            // such as in a lexical nesting or override situation
+            // filter_n provides ordering within a group, for constrained
+            // candidates
+            public int group_n, filter_n;
 
             public List<MMDParameter> pos;
             public Dictionary<string,MMDParameter> nam;
@@ -4534,7 +4538,31 @@ saveme:
             public bool slurpy_nam;
             public bool extra_constraints;
 
-            public bool IsNarrowerThan(MMDCandidateLongname other) {
+            public override int Compare(int arity, MultiCandidate other) {
+                var o = other as MMDCandidate;
+                if (o.IsNarrowerThan(this))
+                    return -1;
+                if (this.IsNarrowerThan(o))
+                    return +1;
+                return 0;
+            }
+
+            public override int MinDispatchArity() { return pos.Count; }
+
+            public override bool AdmissableArity(int arity) {
+                return (arity == pos.Count || slurpy_pos && arity > pos.Count);
+            }
+
+            public override bool Admissable(Frame th, Variable[] pos, VarHash named) {
+                Frame   o  = (Frame)impl.GetSlot("outer");
+                if (info.Binder(th, o, impl, pos, named, true, null) == null) {
+                    return false;
+                } else {
+                    return true;
+                }
+            }
+
+            public bool IsNarrowerThan(MMDCandidate other) {
                 int narrower = 0;
 
                 for (int i = 0; ; i++) {
@@ -4560,15 +4588,21 @@ saveme:
                 if (slurpy_nam && !other.slurpy_nam) narrower |= 1;
                 if (!slurpy_nam && other.slurpy_nam) narrower |= 2;
 
-                if (narrower == 0 || narrower == 3)
-                    return tien < other.tien;
+                if (narrower == 0 || narrower == 3) {
+                    // are they the same except for constraints?
+                    if (narrower == 0 && extra_constraints)
+                        return filter_n < other.filter_n;
+
+                    return group_n < other.group_n;
+                }
 
                 return (narrower == 2);
             }
 
-            public MMDCandidateLongname(P6any impl, int tien) {
+            public MMDCandidate(P6any impl, int group_n, int filter_n) {
                 this.impl = impl;
-                this.tien = tien;
+                this.group_n  = group_n;
+                this.filter_n = filter_n;
                 info = (SubInfo) impl.GetSlot("info");
 
                 pos = new List<MMDParameter>();
@@ -4612,14 +4646,14 @@ saveme:
                 return Interlocked.Increment(ref unique);
             }
 
-            public string LongName() {
+            public override string ToString() {
                 List<string> bits = new List<string>();
 
                 foreach (MMDParameter p in pos) {
                     string n = p.type.name;
                     if (!p.required) n += "?";
                     if (p.constrained)
-                        n += " where { ... " + get_unique() + " }";
+                        n += " where { ... }";
                     bits.Add(n);
                 }
 
@@ -4632,84 +4666,16 @@ saveme:
                     string b = p.type.name + " :$" + nm;
                     if (p.required) b += "!";
                     if (p.constrained)
-                        b += " where { ... " + get_unique() + " }";
+                        b += " where { ... }";
                     bits.Add(b);
                 }
 
                 if (slurpy_nam) bits.Add("*%_");
                 string full = JoinS(", ", bits);
                 if (extra_constraints)
-                    full += ";; |$c where { ... " + get_unique() + " }";
+                    full += ";; |$c where { ... }";
                 return full;
             }
-        }
-
-        // This is a little odd.  Pending full understanding of the
-        // rules it aims more for Rakudo compatibility than anything
-        // else.
-        private static List<P6any> SortCandidates(P6any[] raw) {
-            int[] links = new int[raw.Length * raw.Length * 2];
-            int ap = 0;
-            int[] heads = new int[raw.Length * 2];
-            int[] orig = new int[raw.Length];
-            MMDCandidateLongname[] lns = new MMDCandidateLongname[raw.Length];
-            int nlns = 0;
-            int tien = 0;
-
-            for (int i = 0; i < raw.Length; i++) {
-                if (raw[i] == null) {
-                    tien++;
-                } else {
-                    lns[nlns] = new MMDCandidateLongname(raw[i], tien);
-                    orig[nlns] = i;
-                    heads[2*nlns] = -1;
-                    nlns++;
-                }
-            }
-
-            for (int i = 0; i < nlns; i++) {
-                for (int j = 0; j < nlns; j++) {
-                    if (lns[i].IsNarrowerThan(lns[j])) {
-                        //Console.WriteLine("{0} < {1}", lns[i].LongName(), lns[j].LongName());
-                        heads[2*j+1]++;
-                        links[ap] = heads[2*i];
-                        links[ap+1] = j;
-                        heads[2*i] = ap;
-                        ap += 2;
-                    }
-                }
-            }
-
-            List<P6any> outp = new List<P6any>();
-
-            int k = nlns;
-            while (k != 0) {
-                int d = 0;
-                for (int i = 0; i < nlns; i++) {
-                    if (heads[2*i+1] != 0) continue;
-                    heads[2*i+1] = -1;
-                    d++;
-                }
-                for (int i = 0; i < nlns; i++) {
-                    if (heads[2*i+1] != -1) continue;
-                    heads[2*i+1] = -2;
-
-                    for (int j = heads[2*i]; j >= 0; j = links[j]) {
-                        heads[2*links[j+1]+1]--;
-                    }
-                    // prevent constrained candidates from being part of a tie
-                    if (lns[i].extra_constraints) outp.Add(null);
-                    outp.Add(raw[orig[i]]);
-                    if (lns[i].extra_constraints) outp.Add(null);
-                    k--;
-                }
-                if (d == 0 && k != 0) {
-                    throw new NieczaException("Partial order wedged");
-                }
-                outp.Add(null);
-            }
-
-            return outp;
         }
 
         public static Frame TypeDispatcher(Frame th, bool tailcall) {
@@ -4718,46 +4684,19 @@ saveme:
                     (dth.info.param[0] as P6any[]) == null) dth = dth.outer;
 
             //Console.WriteLine("---");
-            DispatchEnt root = new DispatchEnt();
-            DispatchEnt ptr  = root;
-
-            List<P6any> sp = SortCandidates(dth.info.param[0] as P6any[]);
-
-            // XXX I think this is a harmless race
-            //MMDCandidate[] cs = dth.info.param1 as MMDCandidate[];
-            //if (cs == null)
-            //    dth.info.param1 = cs = MMDAnalyze(dth.info.param0 as P6any[]);
-            int tie_state = 0;
-            // 0: seen nothing  1: after first group  2: an item in first group
-            foreach (P6any p in sp) {
-                if (p == null) {
-                    if (tie_state == 2) tie_state = 1;
-                    //Console.WriteLine(".");
-                    continue;
-                }
-                //Console.WriteLine((new MMDCandidateLongname(p,0)).LongName());
-                SubInfo si = (SubInfo)p.GetSlot("info");
-                Frame   o  = (Frame)p.GetSlot("outer");
-                if (si.Binder(th, o, p, dth.pos, dth.named, true,
-                            null) == null ) {
-                    //Console.WriteLine("NOT BINDABLE");
-                } else {
-                    if (tie_state == 0) tie_state = 2;
-                    else if (tie_state == 2)
-                        return Kernel.Die(th, "Ambiguous dispatch for " + dth.info.name);
-                    //Console.WriteLine("BINDABLE");
-                    ptr.next = new DispatchEnt(null, p);
-                    ptr = ptr.next;
-                }
+            List<MultiCandidate> mc = new List<MultiCandidate>();
+            int filter_n = 0;
+            int group_n = 0;
+            foreach (P6any craw in dth.info.param[0] as P6any[]) {
+                if (craw == null) { group_n++; continue; }
+                mc.Add(new MMDCandidate(craw, group_n, filter_n++));
             }
+            CandidateSet cs = new CandidateSet(dth.info.name, mc.ToArray());
 
-            root = root.next;
-            if (root == null)
-                return Kernel.Die(th, "No matching candidates to dispatch for " + dth.info.name);
+            var cand = (MMDCandidate)cs.DoDispatch(th, dth.pos, dth.named);
 
             if (tailcall) th = th.Return();
-            return root.info.Binder(th, root.outer, root.ip6,
-                    dth.pos, dth.named, false, root);
+            return cand.impl.Invoke(th, dth.pos, dth.named);
         }
 
         internal static Frame StandardTypeProtoC(Frame th) {

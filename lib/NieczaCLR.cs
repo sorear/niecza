@@ -37,7 +37,7 @@ namespace Niecza {
     // of possible conflictors, values of $p < m$ for all $m$.
 
     abstract class MultiCandidate {
-        public abstract bool Admissable(Variable[] pos, VarHash named);
+        public abstract bool Admissable(Frame th, Variable[] pos, VarHash named);
         public abstract int  Compare(int arity, MultiCandidate other);
         public abstract bool AdmissableArity(int arity);
         public abstract int  MinDispatchArity();
@@ -76,12 +76,12 @@ namespace Niecza {
         }
 
         // throws on dispatch failure
-        public MultiCandidate DoDispatch(Variable[] pos, VarHash named) {
+        public MultiCandidate DoDispatch(Frame th, Variable[] pos, VarHash named) {
             MultiCandidate[] avail = GetCandidateList(pos.Length);
 
             int last_ix;
             for (last_ix = avail.Length - 1; last_ix >= 0; last_ix--)
-                if (avail[last_ix].Admissable(pos, named))
+                if (avail[last_ix].Admissable(th, pos, named))
                     break;
 
             if (last_ix < 0) {
@@ -91,11 +91,11 @@ namespace Niecza {
             }
 
             foreach (int ci in avail[last_ix].conflictors) {
-                if (avail[ci].Admissable(pos, named)) {
+                if (avail[ci].Admissable(th, pos, named)) {
                     List<MultiCandidate> matched = new List<MultiCandidate>();
 
                     foreach (MultiCandidate mc in avail)
-                        if (mc.Admissable(pos, named))
+                        if (mc.Admissable(th, pos, named))
                             matched.Add(mc);
 
                     throw new NieczaException("Ambiguous dispatch for " + name +
@@ -330,7 +330,7 @@ namespace Niecza {
             }
         }
 
-        public override bool Admissable(Variable[] pos, VarHash named) {
+        public override bool Admissable(Frame th, Variable[] pos, VarHash named) {
             if (named != null && named.IsNonEmpty)
                 return false;
             if (!AdmissableArity(pos.Length))
@@ -369,7 +369,7 @@ namespace Niecza {
                 if (param_array == null && other.param_array != null)
                     return 1;
                 if (param_array != null && other.param_array == null)
-                    return -11;
+                    return -1;
             }
 
             return 0;
@@ -479,7 +479,7 @@ namespace Niecza {
             Variable[] rpos = new Variable[th.pos.Length - 1];
             Array.Copy(th.pos, 1, rpos, 0, rpos.Length);
             OverloadCandidate oc = (OverloadCandidate)
-                (th.info.param[0] as CandidateSet).DoDispatch(rpos, th.named);
+                (th.info.param[0] as CandidateSet).DoDispatch(null, rpos, th.named);
             th.caller.resultSlot = oc.Invoke(Kernel.UnboxAny<object>(
                 th.pos[0].Fetch()), rpos, th.named);
             return th.caller;

@@ -423,9 +423,8 @@ next_method: ;
                     int k = mi.short_name.IndexOf(':');
                     if (k >= 0) mi.short_name = mi.short_name.Substring(0, k);
                 } else {
-                    // TODO this should use the real longname, but there
-                    // are currently order problems with that.
-                    mi.long_name += ":(" + Kernel.MMDCandidateLongname.get_unique() + ")";
+                    // TODO why are we installing a long name at all?
+                    mi.long_name += ":(" + Kernel.MMDCandidate.get_unique() + ")";
                 }
             }
             //Console.WriteLine("{0} {1} {2} {3}", this.name, flags, mi.short_name, mi.long_name);

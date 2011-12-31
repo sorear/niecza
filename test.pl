@@ -1131,7 +1131,7 @@ ok "abc" ~~ / :dba("foo") abc /, ":dba doesn't affect parsing";
     is keys(%bar), "c", "Hash.keys works";
     is values(%bar), "9", "Hash.values works";
     is (join "|", %bar.kv), "c|9", "Hash.kv works";
-    is (%bar.invert.<9>), "c", "Hash.invert works";
+    is (%(%bar.invert)<9>), "c", "Hash.invert works";
     ok %bar<c> :exists, ":exists works";
     is (%bar<c> :delete), "9", ":delete returns old";
     ok !(%bar<c> :exists), ":delete removes value";
