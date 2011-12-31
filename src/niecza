@@ -17,6 +17,14 @@ use RxOp;
 use Sig;
 use STD;
 
+augment class Sig {
+    our constant $ANY_DEF    =  0x40000; #OK
+    our constant $UNDEF_ONLY =  0x80000; #OK
+    our constant $DEF_ONLY   =  0xC0000; #OK
+    our constant $TYPE_ONLY  = 0x100000; #OK
+    our constant $DEF_MASK   = 0x1C0000; #OK
+}
+
 # augment class RxOp {
 # method oplift() {
 #     say "oplift: {self.typename}";
@@ -24,6 +32,99 @@ use STD;
 #     map { say $i++; .oplift }, @$!zyg
 # }
 # }
+
+augment class STD {
+my package DEBUG { our constant symtab = 0; }
+method is_name($longname, $curlex = $*CURLEX) {
+    my $deb = $*DEBUG +& DEBUG::symtab;
+    self.deb("is_name $longname") if $deb;
+    if defined($longname.index("::(")) {
+        self.deb("computed name gets a free pass") if $deb;
+        return True;
+    }
+    $longname := substr($longname, 0, chars($longname)-2)
+        if chars($longname) >= 2 && substr($longname, chars($longname)-2)
+            eq (':D' | ':U' | ':_' | ':T');
+    my @parts = $longname.split('::');
+    shift @parts if @parts[0] eq '';
+    pop @parts if @parts && @parts[*-1] eq ''; # doesn't change ref validity
+
+    @parts[*-1] = $/ ~ @parts[*-1] if @parts && @parts[0] ~~ s/^(\W\W?)//;
+
+    self.deb("reparsed: @parts.perl()") if $deb;
+    return True if !@parts;
+
+    my ($pkg, $sub);
+
+    given @parts[0] {
+        when 'OUR' {
+            $pkg = $curlex<!sub>.cur_pkg;
+            shift @parts;
+            goto "packagey";
+        }
+        when 'PROCESS' | 'GLOBAL' {
+            $pkg = $*unit.abs_pkg(shift @parts);
+            goto "packagey";
+        }
+        when 'MY'      { $sub = $curlex<!sub>;               goto "lexy"; }
+        when 'OUTER'   { $sub = $curlex<!sub>.outer;         goto "lexy"; }
+        when 'UNIT'    { $sub = $curlex<!sub>.to_unit;       goto "lexy"; }
+        when 'CORE'    { $sub = $curlex<!sub>.true_setting;  goto "lexy"; }
+        when 'SETTING' { $sub = $curlex<!sub>.to_unit.outer; goto "lexy"; }
+
+        when 'COMPILING' | 'DYNAMIC' | 'CALLER' | 'CLR' { return True }
+
+        default {
+            my @lexical = self.lookup_lex(@parts[0], $curlex);
+            if !@lexical || @parts[0] eq 'PARENT' {
+                return False if @parts == 1; # $x doesn't mean GLOBAL
+                $pkg = (@parts[0] ~~ /^\W/) ??
+                    $curlex<!sub>.cur_pkg !!
+                    $*unit.abs_pkg('GLOBAL');
+            } elsif @lexical[0] eq 'package' {
+                $pkg = @lexical[4];
+                shift @parts;
+            } else {
+                return @parts == 1;
+            }
+            goto "packagey";
+        }
+    }
+
+lexy:
+    shift @parts;
+    return False unless $sub;
+    return True unless @parts;
+    given @parts[0] {
+        when 'OUTER'   { $sub = $sub.outer;         goto "lexy"; }
+        when 'UNIT'    { $sub = $sub.to_unit;       goto "lexy"; }
+        when 'SETTING' { $sub = $sub.to_unit.outer; goto "lexy"; }
+        when 'CALLER'  { return True; }
+    }
+
+    my @lex = $sub.lookup_lex(@parts[0], $*FILE<name>, self.lineof(self.pos));
+    unless @lex {
+        self.deb("Lexical @parts[0] not found") if $deb;
+        return False;
+    }
+    if @lex[0] eq 'package' {
+        shift @parts;
+        $pkg = @lex[4];
+        goto "packagey";
+    }
+    else {
+        return @parts == 1;
+    }
+
+packagey:
+    for @parts {
+        return False if !$pkg || !$*unit.exists($pkg.who, $_);
+        $pkg = $*unit.get($pkg.who, $_);
+    }
+
+    return True;
+}
+}
 
 augment class RxOp::Capturing {
     method used_caps() {
@@ -63,7 +164,49 @@ augment class Op::ImmedForLoop {
 }
 
 augment class NieczaActions {
+sub qpvalue($ast) {
+    if $ast.^isa(::Op::SimpleParcel) {
+        join " ", map &qpvalue, @( $ast.items )
+    } elsif $ast.^isa(::Op::StringLiteral) {
+        $ast.text;
+    } elsif $ast.^isa(::Op::Paren) {
+        qpvalue($ast.inside);
+    } else {
+        "XXX"
+    }
+}
+
+method colonpair($/) {
+    my $n;
+    if $/ eq any <:_ :U :D :T> {
+        $n = "";
+    } elsif !$<v>.^isa(Match) {
+        $n = ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
+    } else {
+        $n = ":" ~ $<k> ~ "<" ~ qpvalue($<v>.ast // ~$<v>) ~ ">";
+    }
+    my $tv = $<v>.^isa(Match) ?? ($<v>.ast // ~$<v>) !!
+        ::Op::Lexical.new(name => $<v> ?? 'True' !! 'False');
+
+    if $tv ~~ Str {
+        if substr($<v>,1,1) eq '<' {
+            $tv = mkcall($/, '&postcircumfix:<{ }>',
+                ::Op::Lexical.new(name => '$/'),
+                ::Op::StringLiteral.new(text => ~$<k>));
+        } else {
+            $tv = self.do_variable_reference($/,
+                { sigil => ~$<v><sigil>,
+                    twigil => ($<v><twigil> ?? ~$<v><twigil> !! ''),
+                    name => $<k> });
+        }
+    }
+
+    make { ext => $n, term => ::Op::SimplePair.new(key => $<k>, value => $tv) };
+}
 method parameter($/) {
+    constant %masks = ':_' => $Sig::ANY_DEF, ':T' => $Sig::UNDEF_ONLY,
+        ':U' => $Sig::UNDEF_ONLY, ':D' => $Sig::DEF_ONLY;
+
     my $type;
     my $sorry;
     my $p = $<param_var> // $<named_param>;
@@ -73,7 +216,16 @@ method parameter($/) {
     $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
 
     if $<type_constraint> {
-        ($type) = self.process_name($<type_constraint>[0]<typename><longname>);
+        my $long = $<type_constraint>[0]<typename><longname>;
+        ($type) = self.process_name($long);
+
+        for @( $long<colonpair> ) -> $cp {
+            if %masks{$cp} -> $mask {
+                $/.CURSOR.sorry("You may only specify one of :_ :D :U :T")
+                    if $flags +& $Sig::DEF_MASK;
+                $flags +|= $mask;
+            }
+        }
     }
 
     for @( $<trait> ) -> $trait {

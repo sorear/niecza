@@ -1408,6 +1408,11 @@ namespace Niecza {
         // Value processing
         public const int HASTYPE    = 1; // else Kernel.AnyMO
         public const int MULTI_IGNORED = 16384;
+        public const int ANY_DEF    =  0x40000;
+        public const int UNDEF_ONLY =  0x80000;
+        public const int DEF_ONLY   =  0xC0000;
+        public const int TYPE_ONLY  = 0x100000;
+        public const int DEF_MASK   = 0x1C0000;
 
         // Value binding
         public const int READWRITE  = 2;
