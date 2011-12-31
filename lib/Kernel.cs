@@ -4567,6 +4567,7 @@ saveme:
 
             public bool slurpy_pos;
             public bool slurpy_nam;
+            public int min_arity;
             public bool extra_constraints;
 
             public override int Compare(int arity, MultiCandidate other) {
@@ -4578,10 +4579,10 @@ saveme:
                 return 0;
             }
 
-            public override int MinDispatchArity() { return pos.Count; }
+            public override int MinDispatchArity() { return min_arity; }
 
             public override bool AdmissableArity(int arity) {
-                return (arity == pos.Count || slurpy_pos && arity > pos.Count);
+                return arity >= min_arity && (slurpy_pos || arity <= pos.Count);
             }
 
             public override bool Admissable(Frame th, Variable[] pos, VarHash named) {
@@ -4675,6 +4676,8 @@ saveme:
                         pos.Add(p);
                     }
                 }
+                foreach (MMDParameter p in pos)
+                    if (p.required) min_arity++;
             }
 
             [TrueGlobal]
