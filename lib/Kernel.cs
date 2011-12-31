@@ -4683,16 +4683,18 @@ saveme:
             while (dth.info.param == null ||
                     (dth.info.param[0] as P6any[]) == null) dth = dth.outer;
 
-            //Console.WriteLine("---");
-            List<MultiCandidate> mc = new List<MultiCandidate>();
-            int filter_n = 0;
-            int group_n = 0;
-            foreach (P6any craw in dth.info.param[0] as P6any[]) {
-                if (craw == null) { group_n++; continue; }
-                mc.Add(new MMDCandidate(craw, group_n, filter_n++));
+            var cs = Thread.VolatileRead(ref dth.info.param[1]) as CandidateSet;
+            if (cs == null) {
+                List<MultiCandidate> mc = new List<MultiCandidate>();
+                int filter_n = 0;
+                int group_n = 0;
+                foreach (P6any craw in dth.info.param[0] as P6any[]) {
+                    if (craw == null) { group_n++; continue; }
+                    mc.Add(new MMDCandidate(craw, group_n, filter_n++));
+                }
+                cs = new CandidateSet(dth.info.name, mc.ToArray());
+                Interlocked.CompareExchange(ref dth.info.param[1], cs, null);
             }
-            CandidateSet cs = new CandidateSet(dth.info.name, mc.ToArray());
-
             var cand = (MMDCandidate)cs.DoDispatch(th, dth.pos, dth.named);
 
             if (tailcall) th = th.Return();
@@ -4719,6 +4721,7 @@ saveme:
             SubInfo si = (proto != null) ?
                 new SubInfo((SubInfo)proto.GetSlot("info")) :
                 new SubInfo(name, StandardTypeProtoC);
+
             si.param = new object[] { cands, null };
             return Kernel.MakeSub(si, proto == null ? null :
                     (Frame)proto.GetSlot("outer"));

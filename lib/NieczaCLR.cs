@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Reflection.Emit;
 using Niecza;
+using Niecza.Serialization;
 using System.Collections.Generic;
 using System.Threading;
 
@@ -45,8 +46,8 @@ namespace Niecza {
         internal int[] conflictors;
     }
 
-    class CandidateSet {
-        MultiCandidate[][] cands;
+    class CandidateSet : IFreeze {
+        object[] cands; // XXX no VolatileRead<T> ?
         MultiCandidate[] orig;
         string name;
 
@@ -58,20 +59,25 @@ namespace Niecza {
                 int mda = mc.MinDispatchArity();
                 if (mda > max_arity) max_arity = mda;
             }
-            cands = new MultiCandidate[max_arity+1][];
+            cands = new object[max_arity+1];
         }
 
         MultiCandidate[] GetCandidateList(int arity) {
             if (arity > cands.Length - 1)
                 arity = cands.Length - 1;
 
-            if (cands[arity] == null) {
+            // No, really, we need a volatile read here to avoid seeing
+            // stale data on systems like Alpha where "data-dependency fences"
+            // are used.  See the Linux RCU docs.
+            var list = (MultiCandidate[])Thread.VolatileRead(ref cands[arity]);
+
+            if (list == null) {
                 MultiCandidate[] n = SortCandidates(arity);
                 // this is needed to ensure memory write ordering IIUC
                 Interlocked.CompareExchange(ref cands[arity], n, null);
                 return n;
             } else {
-                return cands[arity];
+                return list;
             }
         }
 
@@ -169,6 +175,11 @@ namespace Niecza {
             }
 
             return ret;
+        }
+
+        void IFreeze.Freeze(FreezeBuffer fb) {
+            // anyone who holds a ref to one of these needs to recreate it.
+            fb.Byte((byte) SerializationCode.Null);
         }
     }
 
