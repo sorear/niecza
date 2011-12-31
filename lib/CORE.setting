@@ -607,7 +607,12 @@ my class Capture {
 }
 # }}}
 # Scalar types {{{
-my class Numeric is Cool { }
+my class Numeric is Cool {
+    method ACCEPTS(\$t) {
+        defined(self) ?? (self == self ?? self == $t !! $t != $t)
+            !! $t.^does(self)
+    }
+}
 my class Real is Numeric { }
 my class Integral is Real { }
 my class Num is Real {
@@ -618,7 +623,6 @@ my class Num is Real {
     method Num() { self }
     method FatRat() { self.Rat(0) }
     method perl() { defined(self) ?? ~self !! self.typename }
-    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 our constant pi = 3.14159_26535_89793_238e0;
 our constant e  = 2.71828_18284_59045_235e0;
@@ -630,13 +634,11 @@ my class Int is Integral {
     method Int() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
     method FatRat() { FatRat.new(self, 1) }
-    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
 }
 my class Rat is Real {
     method new($n,$d) { $n / $d }
     method perl() { defined(self) ?? self.numerator ~ "/" ~ self.denominator !! self.typename }
     method gist() { self // nextsame; self.Str }
-    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
     method numerator() { Q:CgOp { (rat_nu {self}) } }
     method denominator() { Q:CgOp { (rat_de {self}) } }
     method FatRat() { FatRat.new(self.numerator, self.denominator) }
@@ -645,7 +647,6 @@ my class Rat is Real {
 my class Complex is Numeric {
     method new($re,$im) { Q:CgOp { (complex_new {$re} {$im}) } }
     method perl() { defined(self) ?? ~self !! self.typename }
-    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
     method Complex() { self }
     method re() { Q:CgOp { (complex_re {self}) } }
     method im() { Q:CgOp { (complex_im {self}) } }
@@ -657,7 +658,6 @@ my class FatRat is Real {
     method perl() { defined(self) ?? self.numerator ~ "/" ~ self.denominator !! self.typename }
     method FatRat() { self }
     method gist() { self // nextsame; self.Str }
-    method ACCEPTS(\$t) { defined(self) ?? self == $t !! $t.^does(self) }
     method numerator() { Q:CgOp { (fatrat_nu {self}) } }
     method denominator() { Q:CgOp { (fatrat_de {self}) } }
     method nude() { [ self.numerator, self.denominator ] }
