@@ -2186,6 +2186,7 @@ namespace Niecza {
             if (TraceCalls)
                 Console.WriteLine("{0}\t{1}", this.info.name, info.name);
             reusable_child.ip = 0;
+            reusable_child.flags = 0;
             reusable_child.resultSlot = null;
             reusable_child.lexn = (info.nspill != 0) ? new object[info.nspill] : null;
             reusable_child.on_leave = null;
