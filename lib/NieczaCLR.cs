@@ -556,6 +556,7 @@ for $args (0..9) {
         }
 
         static Frame default_handler(Frame th) {
+            if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             // XXX there HAS to be a better way to do this.
             STable mo = ((Variable)th.lex0).Fetch().mo;
             object obj = Array.CreateInstance(mo.box_type, 1).GetValue(0);
@@ -565,6 +566,7 @@ for $args (0..9) {
         }
 
         static Frame marshal_handler(Frame th) {
+            if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             STable mo = ((Variable)th.lex0).Fetch().mo;
             object clr;
             if (!CoerceArgument(out clr, mo.box_type, (Variable)th.lex1))
@@ -575,12 +577,14 @@ for $args (0..9) {
         }
 
         static Frame unmarshal_handler(Frame th) {
+            if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             object o = Kernel.UnboxAny<object>(((Variable)th.lex0).Fetch());
             th.caller.resultSlot = BoxResult(o == null ? typeof(void) : o.GetType(), o);
             return th.caller;
         }
 
         static Frame dispose_handler(Frame th) {
+            if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             object o = Kernel.UnboxAny<object>(((Variable)th.lex0).Fetch());
             ((IDisposable)o).Dispose();
             th.caller.resultSlot = Kernel.NilP.mo.typeVar;
@@ -588,6 +592,7 @@ for $args (0..9) {
         }
 
         static Frame Str_handler(Frame th) {
+            if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             P6any ro = ((Variable)th.lex0).Fetch();
             object o = Kernel.UnboxAny<object>(ro);
             th.caller.resultSlot = Kernel.BoxAnyMO(o == null ? ro.mo.name : o.ToString(), Kernel.StrMO);

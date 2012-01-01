@@ -11,7 +11,7 @@ sub timethis($nr, $fun) {
 my $base1 = timethis(1000000, sub () {});
 my $base2 = timethis(1000000, sub () {});
 my $avg = ($base1 + $base2) / 2;
-say "null check: rd = {abs ($base1 - $base2) / $avg}  ($base1 $base2)";
+INIT { say "null check: rd = {abs ($base1 - $base2) / $avg}  ($base1 $base2)" };
 
 sub bench($name, $nr, $f) is export {
     my $time = timethis($nr, $f);

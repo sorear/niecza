@@ -494,12 +494,10 @@ my class Cool {
         Num; # XXX StrPos
     }
 
-    my $_char = /./;
-    method comb($matcher?, $limit?, :$match) {
+    method comb($matcher = /./, $limit?, :$match) {
         my $str = ~self;
         my $C = Cursor.cursor_start($str);
         my $i = 0;
-        $matcher := $matcher // $_char;
         my $limctr = $limit // Inf;
         my @out;
         while ($i < chars $str) && $limctr > 0 {

@@ -31,7 +31,7 @@ public sealed class GState {
             return th;
         }
 
-        return m.info.Binder(th, m.outer, m.ip6, pos, null, false, m);
+        return m.info.SetupCall(th, m.outer, m.ip6, pos, null, false, m);
     }
 
     public GState(string orig, P6any actions) {

@@ -469,6 +469,8 @@ namespace Niecza.CLRBackend {
             RuntimeUnit.GetMethod("LoadLADArr");
         public static readonly MethodInfo Frame_Return =
             Frame.GetMethod("Return");
+        public static readonly MethodInfo Frame_Binder =
+            Frame.GetMethod("Binder");
 
         public static readonly FieldInfo P6any_mo =
             P6any.GetField("mo");
@@ -2671,6 +2673,7 @@ dynamic:
                 return z[1] as CpsOp; };
             handlers["_newdispatch"] = delegate(NamProcessor th, object[] z) {
                 return th.MakeDispatch(JScalar.S(z[1])); };
+            thandlers["_binder"] = Methody(Tokens.Void, Tokens.Frame_Binder);
             handlers["class_ref"] = delegate(NamProcessor th, object[] z) {
                 string kind = FixStr(z[1]);
                 STable m;
@@ -3312,6 +3315,8 @@ dynamic:
                 }
             }
             foreach (object lf in latefrags) frags.Add(lf);
+
+            if (sub.sig != null) frags.Add(a(j("_binder")));
 
             // PRE
             foreach (SubInfo z in sub.GetPhasers(Kernel.PHASER_PRE)) {

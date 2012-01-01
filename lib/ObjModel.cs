@@ -35,7 +35,7 @@ namespace Niecza {
             DispatchEnt m;
             //Kernel.LogNameLookup(name);
             if (mo.mro_methods.TryGetValue(name, out m)) {
-                return m.info.Binder(caller, m.outer, m.ip6,
+                return m.info.SetupCall(caller, m.outer, m.ip6,
                         pos, named, false, m);
             }
             if (mo.mro_methods.TryGetValue("FALLBACK", out m)) {
@@ -43,7 +43,7 @@ namespace Niecza {
                 Array.Copy(pos, 1, npos, 2, pos.Length - 1);
                 npos[0] = pos[0];
                 npos[1] = Kernel.BoxAnyMO(name, Kernel.StrMO);
-                return m.info.Binder(caller, m.outer, m.ip6,
+                return m.info.SetupCall(caller, m.outer, m.ip6,
                         npos, named, false, m);
             }
             return Fail(caller, "Unable to resolve method " + name);

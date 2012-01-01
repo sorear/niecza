@@ -2221,7 +2221,7 @@ again:
             n = o.slots[1] as VarHash;
         }
 
-        return de.info.Binder(th, de.outer, de.ip6, p, n, false, de);
+        return de.info.SetupCall(th, de.outer, de.ip6, p, n, false, de);
     }
 
     public static bool obj_can(P6any obj, string mname) {

@@ -1645,10 +1645,10 @@ namespace Niecza {
             return r;
         }
 
-        private string PName(Parameter p) {
+        public string PName(Parameter p) {
             return p.name + " in " + name;
         }
-        public Frame Binder(Frame caller, Frame outer, P6any sub,
+        public Frame SetupCall(Frame caller, Frame outer, P6any sub,
                 Variable[] pos, VarHash named, bool quiet, DispatchEnt de) {
             Frame th;
             if ((special & RUN_ONCE) != 0) {
@@ -1667,237 +1667,7 @@ namespace Niecza {
             // runloop to not overwrite th, which it would if the top frame
             // stayed 'caller'.
             Kernel.SetTopFrame(th);
-            if (sig == null) return th;
-            Parameter[] pbuf = sig.parms;
-            int posc = 0;
-            HashSet<string> namedc = null;
-            int jun_pivot = -1;
-            string jun_pivot_n = null;
-            int jun_rank = int.MaxValue;
-            if (named != null)
-                namedc = new HashSet<string>(named.Keys);
-            int pend = pbuf.Length;
-            if (pend == 0) goto noparams;
-            int pix = 0;
-            int obj_src = -1;
-            string obj_src_n = null;
-
-            while (pix != pend) {
-                Parameter param = pbuf[pix++];
-                int flags = param.flags;
-                int slot = param.slot;
-                string[] names = param.names;
-                STable type = param.type;
-                obj_src = -1;
-
-                Variable src = null;
-                if ((flags & Parameter.SLURPY_PCL) != 0) {
-                    src = Kernel.BoxAnyMO(pos, Kernel.ParcelMO);
-                    posc  = pos.Length;
-                    goto gotit;
-                }
-                if ((flags & Parameter.SLURPY_CAP) != 0) {
-                    P6any nw = new P6opaque(Kernel.CaptureMO);
-                    nw.SetSlot("positionals", pos);
-                    nw.SetSlot("named", named);
-                    src = Kernel.NewROScalar(nw);
-                    named = null; namedc = null; posc = pos.Length;
-                    goto gotit;
-                }
-                if ((flags & Parameter.SLURPY_POS) != 0) {
-                    P6any l = new P6opaque(Kernel.ListMO);
-                    Kernel.IterToList(l, Kernel.IterFlatten(
-                                Kernel.SlurpyHelper(th, posc)));
-                    src = Kernel.NewRWListVar(l);
-                    posc = pos.Length;
-                    goto gotit;
-                }
-                if ((flags & Parameter.SLURPY_NAM) != 0) {
-                    VarHash nh = new VarHash();
-                    if (named != null) {
-                        foreach (KeyValuePair<string,Variable> kv in named)
-                            if (namedc.Contains(kv.Key))
-                                nh[kv.Key] = kv.Value;
-                        named = null;
-                        namedc = null;
-                    }
-                    src = Kernel.BoxAnyMO(nh, Kernel.HashMO);
-                    goto gotit;
-                }
-                if (names != null && named != null) {
-                    for (int ni = 0; ni < names.Length; ni++) {
-                        string n = names[ni];
-                        if (namedc.Contains(n)) {
-                            namedc.Remove(n);
-                            src = named[n];
-                            obj_src_n = n;
-                            obj_src = -2;
-                            goto gotit;
-                        }
-                    }
-                }
-                if ((flags & Parameter.POSITIONAL) != 0 && posc != pos.Length) {
-                    obj_src = posc;
-                    src = pos[posc++];
-                    goto gotit;
-                }
-get_default:
-                if ((flags & Parameter.HASDEFAULT) != 0) {
-                    Frame thn = Kernel.GetInferiorRoot()
-                        .MakeChild(th, param.def, Kernel.AnyP);
-                    src = Kernel.RunInferior(thn);
-                    if (src == null)
-                        throw new Exception("Improper null return from sub default for " + PName(param));
-                    goto gotit;
-                }
-                if ((flags & Parameter.DEFOUTER) != 0) {
-                    Frame f = th;
-                    if (outer_topic_key < 0) {
-                        src = Kernel.AnyMO.typeVar;
-                        goto gotit;
-                    }
-                    for (int i = 0; i < outer_topic_rank; i++) f = f.outer;
-                    src = (Variable)f.GetDynamic(outer_topic_key);
-                    goto gotit;
-                }
-                if ((flags & Parameter.OPTIONAL) != 0) {
-                    // Array is the "default" Positional -masak
-                    if ((flags & Parameter.IS_LIST) != 0)
-                        src = Kernel.CreateArray();
-                    else if ((flags & Parameter.IS_HASH) != 0)
-                        src = Kernel.CreateHash();
-                    else
-                        src = type.initVar;
-                    goto gotit;
-                }
-                if (quiet) return null;
-                return Kernel.Die(th, "No value for parameter " + PName(param));
-gotit:
-                switch ((flags & Parameter.DEF_MASK) >> Parameter.DEF_SHIFT) {
-                    // TODO: Failure will make these cases different
-                    case Parameter.TYPE_ONLY >> Parameter.DEF_SHIFT:
-                    case Parameter.UNDEF_ONLY >> Parameter.DEF_SHIFT:
-                        if (!src.Fetch().IsDefined())
-                            break;
-                        if (quiet) return null;
-                        return Kernel.Die(th, "Parameter " + PName(param) + " requires an undefined argument");
-                    case Parameter.DEF_ONLY >> Parameter.DEF_SHIFT:
-                        if (src.Fetch().IsDefined())
-                            break;
-                        if (quiet) return null;
-                        return Kernel.Die(th, "Parameter " + PName(param) + " requires a defined argument");
-                    default:
-                        break;
-                }
-                if ((flags & Parameter.RWTRANS) != 0) {
-                } else if ((flags & Parameter.IS_COPY) != 0) {
-                    if ((flags & Parameter.IS_HASH) != 0)
-                        src = Kernel.Assign(Kernel.CreateHash(),
-                            Kernel.NewRWListVar(src.Fetch()));
-                    else if ((flags & Parameter.IS_LIST) != 0)
-                        src = Kernel.Assign(Kernel.CreateArray(),
-                            Kernel.NewRWListVar(src.Fetch()));
-                    else
-                        src = Kernel.Assign(Kernel.NewTypedScalar(type), src);
-                } else {
-                    bool islist = ((flags & (Parameter.IS_HASH | Parameter.IS_LIST)) != 0);
-                    bool rw     = ((flags & Parameter.READWRITE) != 0) && !islist;
-                    P6any srco  = src.Fetch();
-
-                    // XXX: in order for calling methods on Nil to work,
-                    // self needs to be ignored here.
-                    if (srco == Kernel.NilP && obj_src != -1 &&
-                            (flags & Parameter.INVOCANT) == 0) {
-                        obj_src = -1;
-                        goto get_default;
-                    }
-                    if (!srco.Does(type)) {
-                        if (quiet) return null;
-                        if (srco.mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
-                            int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)srco).slots[0]) / 2;
-                            if (jrank < jun_rank) {
-                                jun_rank = jrank;
-                                jun_pivot = obj_src;
-                                jun_pivot_n = obj_src_n;
-                            }
-                            continue;
-                        }
-                        return Kernel.Die(th, "Nominal type check failed in binding " + PName(param) + "; got " + srco.mo.name + ", needed " + type.name);
-                    }
-
-                    if (rw) {
-                        if (src.rw) {
-                            // this will be a functional RW binding
-                            if (src.whence != null)
-                                Kernel.Vivify(src);
-                            goto bound;
-                        } else {
-                            if (quiet) return null;
-                            return Kernel.Die(th, "Binding " + PName(param) + ", cannot bind read-only value to is rw parameter");
-                        }
-                    }
-                    else {
-                        if (!src.rw && islist == src.islist)
-                            goto bound;
-                        src = new SimpleVariable(islist, srco);
-                    }
-bound: ;
-                }
-                if ((flags & Parameter.INVOCANT) != 0 && self_key >= 0)
-                    th.SetDynamic(self_key, src);
-                switch (slot + 1) {
-                    case 0: break;
-                    case 1:  th.lex0 = src; break;
-                    case 2:  th.lex1 = src; break;
-                    case 3:  th.lex2 = src; break;
-                    case 4:  th.lex3 = src; break;
-                    case 5:  th.lex4 = src; break;
-                    case 6:  th.lex5 = src; break;
-                    case 7:  th.lex6 = src; break;
-                    case 8:  th.lex7 = src; break;
-                    case 9:  th.lex8 = src; break;
-                    case 10: th.lex9 = src; break;
-                    default: th.lexn[slot - 10] = src; break;
-                }
-            }
-noparams:
-
-            if (posc != pos.Length || namedc != null && namedc.Count != 0) {
-                if (quiet) return null;
-                string m = "Excess arguments to " + name;
-                if (posc != pos.Length)
-                    m += string.Format(", used {0} of {1} positionals",
-                            posc, pos.Length);
-                if (namedc != null && namedc.Count != 0)
-                    m += ", unused named " + Kernel.JoinS(", ", namedc);
-                return Kernel.Die(th, m);
-            }
-
-            if (jun_pivot != -1 && !quiet) {
-                Variable jct = (jun_pivot == -2 ? named[jun_pivot_n] :
-                        pos[jun_pivot]);
-                th = caller.MakeChild(null, Kernel.AutoThreadSubSI, Kernel.AnyP);
-
-                P6opaque jo  = (P6opaque) jct.Fetch();
-
-                th.named = named;
-                th.pos = pos;
-                th.lex1 = this;
-                th.lex2 = jun_pivot_n;
-                th.lex3 = jo.slots[0];
-                th.lex4 = Kernel.UnboxAny<Variable[]>((P6any)jo.slots[1]);
-                th.lex5 = outer;
-                th.lex6 = sub;
-                th.lex7 = de;
-                th.lex8 = new Variable[((Variable[])th.lex4).Length];
-                th.lex9 = jct;
-
-                th.lexi0 = jun_pivot;
-                th.lexi1 = 0;
-
-                return th;
-            }
-
+            if (quiet) th.flags |= Frame.CHECK_ONLY;
             return th;
         }
 
@@ -1930,7 +1700,7 @@ noparams:
             else
                 th.pos[th.lexi0] = src[th.lexi1++];
 
-            return ((SubInfo)th.lex1).Binder(th, (Frame)th.lex5, (P6any)th.lex6,
+            return ((SubInfo)th.lex1).SetupCall(th, (Frame)th.lex5, (P6any)th.lex6,
                 th.pos, th.named, false, (DispatchEnt)th.lex7);
         }
 
@@ -2385,6 +2155,7 @@ noparams:
 
         // after MakeSub, GatherHelper
         public const int SHARED = 1;
+        public const int CHECK_ONLY = 2;
         public int flags;
 
         public Frame(Frame caller_, Frame outer_,
@@ -2435,6 +2206,8 @@ noparams:
             reusable_child.info = info;
             reusable_child.sub = sub;
             reusable_child.code = info.code;
+            reusable_child.pos = null;
+            reusable_child.named = null;
             reusable_child.rx = null;
             return reusable_child;
         }
@@ -2599,6 +2372,257 @@ noparams:
             throw new NieczaException("cannot bind " + name + " in " + info.name);
         }
 
+        public static Frame Binder(Frame th) {
+            if (th.info.sig == null || th.pos == null) return th;
+
+            Parameter[] pbuf = th.info.sig.parms;
+            int posc = 0;
+            HashSet<string> namedc = null;
+            int jun_pivot = -1;
+            string jun_pivot_n = null;
+            int jun_rank = int.MaxValue;
+            bool quiet = (th.flags & CHECK_ONLY) != 0;
+            VarHash named_copy = th.named;
+            if (named_copy != null)
+                namedc = new HashSet<string>(named_copy.Keys);
+            int pend = pbuf.Length;
+            if (pend == 0) goto noparams;
+            int pix = 0;
+            int obj_src = -1;
+            string obj_src_n = null;
+
+            while (pix != pend) {
+                Parameter param = pbuf[pix++];
+                int flags = param.flags;
+                int slot = param.slot;
+                string[] names = param.names;
+                STable type = param.type;
+                obj_src = -1;
+
+                Variable src = null;
+                if ((flags & Parameter.SLURPY_PCL) != 0) {
+                    src = Kernel.BoxAnyMO(th.pos, Kernel.ParcelMO);
+                    posc  = th.pos.Length;
+                    goto gotit;
+                }
+                if ((flags & Parameter.SLURPY_CAP) != 0) {
+                    P6any nw = new P6opaque(Kernel.CaptureMO);
+                    nw.SetSlot("positionals", th.pos);
+                    nw.SetSlot("named", named_copy);
+                    src = Kernel.NewROScalar(nw);
+                    named_copy = null; namedc = null; posc = th.pos.Length;
+                    goto gotit;
+                }
+                if ((flags & Parameter.SLURPY_POS) != 0) {
+                    P6any l = new P6opaque(Kernel.ListMO);
+                    Kernel.IterToList(l, Kernel.IterFlatten(
+                                Kernel.SlurpyHelper(th, posc)));
+                    src = Kernel.NewRWListVar(l);
+                    posc = th.pos.Length;
+                    goto gotit;
+                }
+                if ((flags & Parameter.SLURPY_NAM) != 0) {
+                    VarHash nh = new VarHash();
+                    if (named_copy != null) {
+                        foreach (KeyValuePair<string,Variable> kv in named_copy)
+                            if (namedc.Contains(kv.Key))
+                                nh[kv.Key] = kv.Value;
+                        named_copy = null;
+                        namedc = null;
+                    }
+                    src = Kernel.BoxAnyMO(nh, Kernel.HashMO);
+                    goto gotit;
+                }
+                if (names != null && named_copy != null) {
+                    for (int ni = 0; ni < names.Length; ni++) {
+                        string n = names[ni];
+                        if (namedc.Contains(n)) {
+                            namedc.Remove(n);
+                            src = named_copy[n];
+                            obj_src_n = n;
+                            obj_src = -2;
+                            goto gotit;
+                        }
+                    }
+                }
+                if ((flags & Parameter.POSITIONAL) != 0 && posc != th.pos.Length) {
+                    obj_src = posc;
+                    src = th.pos[posc++];
+                    goto gotit;
+                }
+get_default:
+                if ((flags & Parameter.HASDEFAULT) != 0) {
+                    Frame thn = Kernel.GetInferiorRoot()
+                        .MakeChild(th, param.def, Kernel.AnyP);
+                    src = Kernel.RunInferior(thn);
+                    if (src == null)
+                        throw new Exception("Improper null return from sub default for " + th.info.PName(param));
+                    goto gotit;
+                }
+                if ((flags & Parameter.DEFOUTER) != 0) {
+                    Frame f = th;
+                    if (th.info.outer_topic_key < 0) {
+                        src = Kernel.AnyMO.typeVar;
+                        goto gotit;
+                    }
+                    for (int i = 0; i < th.info.outer_topic_rank; i++) f = f.outer;
+                    src = (Variable)f.GetDynamic(th.info.outer_topic_key);
+                    goto gotit;
+                }
+                if ((flags & Parameter.OPTIONAL) != 0) {
+                    // Array is the "default" Positional -masak
+                    if ((flags & Parameter.IS_LIST) != 0)
+                        src = Kernel.CreateArray();
+                    else if ((flags & Parameter.IS_HASH) != 0)
+                        src = Kernel.CreateHash();
+                    else
+                        src = type.initVar;
+                    goto gotit;
+                }
+                if (quiet) goto quiet_fail;
+                return Kernel.Die(th, "No value for parameter " + th.info.PName(param));
+gotit:
+                switch ((flags & Parameter.DEF_MASK) >> Parameter.DEF_SHIFT) {
+                    // TODO: Failure will make these cases different
+                    case Parameter.TYPE_ONLY >> Parameter.DEF_SHIFT:
+                    case Parameter.UNDEF_ONLY >> Parameter.DEF_SHIFT:
+                        if (!src.Fetch().IsDefined())
+                            break;
+                        if (quiet) goto quiet_fail;
+                        return Kernel.Die(th, "Parameter " + th.info.PName(param) + " requires an undefined argument");
+                    case Parameter.DEF_ONLY >> Parameter.DEF_SHIFT:
+                        if (src.Fetch().IsDefined())
+                            break;
+                        if (quiet) goto quiet_fail;
+                        return Kernel.Die(th, "Parameter " + th.info.PName(param) + " requires a defined argument");
+                    default:
+                        break;
+                }
+                if ((flags & Parameter.RWTRANS) != 0) {
+                } else if ((flags & Parameter.IS_COPY) != 0) {
+                    if ((flags & Parameter.IS_HASH) != 0)
+                        src = Kernel.Assign(Kernel.CreateHash(),
+                            Kernel.NewRWListVar(src.Fetch()));
+                    else if ((flags & Parameter.IS_LIST) != 0)
+                        src = Kernel.Assign(Kernel.CreateArray(),
+                            Kernel.NewRWListVar(src.Fetch()));
+                    else
+                        src = Kernel.Assign(Kernel.NewTypedScalar(type), src);
+                } else {
+                    bool islist = ((flags & (Parameter.IS_HASH | Parameter.IS_LIST)) != 0);
+                    bool rw     = ((flags & Parameter.READWRITE) != 0) && !islist;
+                    P6any srco  = src.Fetch();
+
+                    // XXX: in order for calling methods on Nil to work,
+                    // self needs to be ignored here.
+                    if (srco == Kernel.NilP && obj_src != -1 &&
+                            (flags & Parameter.INVOCANT) == 0) {
+                        obj_src = -1;
+                        goto get_default;
+                    }
+                    if (!srco.Does(type)) {
+                        if (quiet) goto quiet_fail;
+                        if (srco.mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
+                            int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)srco).slots[0]) / 2;
+                            if (jrank < jun_rank) {
+                                jun_rank = jrank;
+                                jun_pivot = obj_src;
+                                jun_pivot_n = obj_src_n;
+                            }
+                            continue;
+                        }
+                        return Kernel.Die(th, "Nominal type check failed in binding " + th.info.PName(param) + "; got " + srco.mo.name + ", needed " + type.name);
+                    }
+
+                    if (rw) {
+                        if (src.rw) {
+                            // th will be a functional RW binding
+                            if (src.whence != null)
+                                Kernel.Vivify(src);
+                            goto bound;
+                        } else {
+                            if (quiet) goto quiet_fail;
+                            return Kernel.Die(th, "Binding " + th.info.PName(param) + ", cannot bind read-only value to is rw parameter");
+                        }
+                    }
+                    else {
+                        if (!src.rw && islist == src.islist)
+                            goto bound;
+                        src = new SimpleVariable(islist, srco);
+                    }
+bound: ;
+                }
+                if ((flags & Parameter.INVOCANT) != 0 && th.info.self_key >= 0)
+                    th.SetDynamic(th.info.self_key, src);
+                switch (slot + 1) {
+                    case 0: break;
+                    case 1:  th.lex0 = src; break;
+                    case 2:  th.lex1 = src; break;
+                    case 3:  th.lex2 = src; break;
+                    case 4:  th.lex3 = src; break;
+                    case 5:  th.lex4 = src; break;
+                    case 6:  th.lex5 = src; break;
+                    case 7:  th.lex6 = src; break;
+                    case 8:  th.lex7 = src; break;
+                    case 9:  th.lex8 = src; break;
+                    case 10: th.lex9 = src; break;
+                    default: th.lexn[slot - 10] = src; break;
+                }
+            }
+noparams:
+
+            if (posc != th.pos.Length || namedc != null && namedc.Count != 0) {
+                if (quiet) goto quiet_fail;
+                string m = "Excess arguments to " + th.info.name;
+                if (posc != th.pos.Length)
+                    m += string.Format(", used {0} of {1} positionals",
+                            posc, th.pos.Length);
+                if (namedc != null && namedc.Count != 0)
+                    m += ", unused named " + Kernel.JoinS(", ", namedc);
+                return Kernel.Die(th, m);
+            }
+
+            if (jun_pivot != -1 && !quiet) {
+                Variable jct = (jun_pivot == -2 ? named_copy[jun_pivot_n] :
+                        th.pos[jun_pivot]);
+                var sav_named = th.named;
+                var sav_pos = th.pos;
+                var sav_info = th.info;
+                var sav_outer = th.outer;
+                var sav_sub = th.sub;
+                var sav_disp = th.curDisp;
+                Frame nth = th.Return().MakeChild(null, Kernel.AutoThreadSubSI, Kernel.AnyP);
+
+                P6opaque jo  = (P6opaque) jct.Fetch();
+
+                nth.named = sav_named;
+                nth.pos = sav_pos;
+                nth.lex1 = sav_info;
+                nth.lex2 = jun_pivot_n;
+                nth.lex3 = jo.slots[0];
+                nth.lex4 = Kernel.UnboxAny<Variable[]>((P6any)jo.slots[1]);
+                nth.lex5 = sav_outer;
+                nth.lex6 = sav_sub;
+                nth.lex7 = sav_disp;
+                nth.lex8 = new Variable[((Variable[])nth.lex4).Length];
+                nth.lex9 = jct;
+
+                nth.lexi0 = jun_pivot;
+                nth.lexi1 = 0;
+
+                return nth;
+            }
+
+            if (quiet) {
+                th.caller.resultSlot = Kernel.TrueV;
+                return th.Return();
+            }
+
+            return th;
+quiet_fail:
+            th.caller.resultSlot = Kernel.FalseV;
+            return th.Return();
+        }
         public void PushLeave(int type, P6any thunk) {
             LeaveHook l = new LeaveHook();
             l.next = on_leave; on_leave = l;
@@ -2762,7 +2786,7 @@ noparams:
             Frame outer = (Frame) dyo.slots[0];
             SubInfo info = (SubInfo) dyo.slots[1];
 
-            return info.Binder(caller, outer, th, pos, named, false, null);
+            return info.SetupCall(caller, outer, th, pos, named, false, null);
         }
     }
 
@@ -4586,12 +4610,11 @@ saveme:
             }
 
             public override bool Admissable(Frame th, Variable[] pos, VarHash named) {
-                Frame   o  = (Frame)impl.GetSlot("outer");
-                if (info.Binder(th, o, impl, pos, named, true, null) == null) {
-                    return false;
-                } else {
-                    return true;
-                }
+                Frame   o = (Frame)impl.GetSlot("outer");
+                // XXX sucks a bit to have an inf runloop here
+                var res = Kernel.RunInferior(info.SetupCall(
+                    Kernel.GetInferiorRoot(), o, impl, pos, named, true, null));
+                return (res == Kernel.TrueV);
             }
 
             public bool IsNarrowerThan(MMDCandidate other) {
@@ -5227,6 +5250,7 @@ slow:
         }
 
         static Frame WrapHandler0cb(Frame th) {
+            if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             th.caller.resultSlot = ((ContextHandler<Variable>)
                     th.info.param[1]).Get((Variable)th.lex0);
             return th.Return();
@@ -5242,6 +5266,7 @@ slow:
         }
 
         static Frame WrapHandler1cb(Frame th) {
+            if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             IndexHandler fcv = (IndexHandler) th.info.param[1];
             th.caller.resultSlot = fcv.Get((Variable)th.lex0,
                     (Variable)th.lex1);
@@ -5258,6 +5283,7 @@ slow:
         }
 
         static Frame WrapPushycb(Frame th) {
+            if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             PushyHandler fcv = (PushyHandler) th.info.param[1];
             Variable[] fullpc = UnboxAny<Variable[]>(
                     ((Variable)th.lex1).Fetch());
@@ -5278,6 +5304,7 @@ slow:
         }
 
         private static Frame DispIndexy(Frame th) {
+            if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             object[] p     = th.info.param;
             VarHash  n     = th.named;
             Variable self  = (Variable)th.lex0;
@@ -5912,7 +5939,7 @@ slow:
                 }
 
                 if (type == SubInfo.ON_DIE && csr.info.catch_ != null) {
-                    Frame nfr = Kernel.RunCATCH_I.Binder(
+                    Frame nfr = Kernel.RunCATCH_I.SetupCall(
                         Kernel.GetInferiorRoot(), null, null, null, null,
                         false, null);
                     nfr.lex0 = Kernel.MakeSub(csr.info.catch_, csr);
@@ -5930,7 +5957,7 @@ slow:
 
                 if (type != SubInfo.ON_DIE && csr.info.control != null) {
                     P6any sub = Kernel.MakeSub(csr.info.control, csr);
-                    Frame nfr = csr.info.control.Binder(
+                    Frame nfr = csr.info.control.SetupCall(
                         Kernel.GetInferiorRoot(), csr, sub,
                         new Variable[] {
                             Builtins.MakeParcel(Builtins.MakeInt(type),
@@ -6029,7 +6056,7 @@ slow:
                         p = (Variable[]) o.slots[0];
                         n = o.slots[1] as VarHash;
                     }
-                    return de.info.Binder(tf.caller, de.outer, de.ip6, p, n,
+                    return de.info.SetupCall(tf.caller, de.outer, de.ip6, p, n,
                             false, de);
                 } else {
                     tf.caller.resultSlot = AnyMO.typeVar;
