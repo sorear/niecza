@@ -3846,7 +3846,7 @@ dynamic:
                     r = new object[] { "simple",null,null,null, lsimp.flags, Handle.Wrap(lsimp.type) };
                 var ldisp  = li as LIDispatch;
                 if (ldisp != null)
-                    r = new object[] { "dispatch",null,null,null };
+                    r = new object[] { "dispatch",null,null,null, Handle.Wrap(csr) };
                 var llab   = li as LILabel;
                 if (llab != null)
                     r = new object[] { "label",null,null,null };

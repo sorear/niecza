@@ -135,7 +135,11 @@ sub run_optree($body, $op, $nv) {
     return $op unless $inv.^isa(::Op::Lexical);
     my $invname = $inv.name;
     my @inv_lex = $body.lookup_lex($invname);
-    return $op unless @inv_lex && @inv_lex[0] eq 'sub';
+    return $op unless @inv_lex;
+    @inv_lex = $body.lookup_lex($invname ~ ':(!proto)')
+        if @inv_lex[0] eq 'dispatch' &&
+            @inv_lex[4].has_lexical($invname ~ ':(!proto)');
+    return $op unless @inv_lex[0] eq 'sub';
 
     if @inv_lex[4].get_extend('builtin') -> $B {
         return $op unless defined my $args = no_named_params($op);
