@@ -182,11 +182,16 @@ S04-declarations/multiple.t
 S04-declarations/my.t
 S04-declarations/state.t
 S04-exceptions/control_across_runloop.t
+S04-phasers/ascending-order.t
 S04-phasers/begin.t
+S04-phasers/descending-order.t
 S04-phasers/end.t
 S04-phasers/enter-leave.t
+S04-phasers/init.t
 S04-phasers/keep-undo.t
+S04-phasers/multiple.t
 S04-phasers/pre-post.t
+S04-phasers/rvalue.t
 S04-phasers/start.t
 S04-statement-modifiers/for.t
 S04-statement-modifiers/given.t
@@ -265,6 +270,7 @@ S06-currying/assuming-and-mmd.t
 S06-currying/named.t
 S06-multi/by-trait.t
 S06-multi/lexical-multis.t
+S06-multi/positional-vs-named.t
 S06-operator-overloading/sub.t
 S06-other/anon-hashes-vs-blocks.t
 S06-other/main-eval.t
