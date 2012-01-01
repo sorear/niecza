@@ -4746,11 +4746,6 @@ saveme:
         }
 
         public static P6any MakeDispatcher(string name, P6any proto, P6any[] cands) {
-            //string s1 = "Dispatch";
-            //foreach (P6any s in cands)
-            //    s1 += ", " + ((SubInfo)s.GetSlot("info")).name;
-            //Console.WriteLine("MakeDispatcher: {0}", s1);
-
             if (proto != null && proto.mo.name == "Regex") goto ltm;
             for (int i = 0; i < cands.Length; i++) {
                 if (cands[i] == null) continue;
@@ -4758,7 +4753,17 @@ saveme:
                 break;
             }
 
-            SubInfo si = (proto != null) ?
+            SubInfo si;
+            if (cands.Length == 1 && cands[0] != null && proto != null) {
+                si = proto.GetSlot("info") as SubInfo;
+                // minor hack...
+                if (si != null && si.extend != null &&
+                        si.extend.ContainsKey("builtin")) {
+                    return cands[0];
+                }
+            }
+
+            si = (proto != null) ?
                 new SubInfo((SubInfo)proto.GetSlot("info")) :
                 new SubInfo(name, StandardTypeProtoC);
 
