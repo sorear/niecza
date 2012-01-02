@@ -1513,7 +1513,19 @@ sub values(%h) { %h.values }
 
 sub kv($p) { $p.kv }
 
-sub sort(*@bits) { @bits.sort }
+sub sort(*@values) {
+    if @values {
+        if @values[0] ~~ Callable {
+            my $cmp = @values.shift;
+            @values.sort($cmp);
+        } else {
+            @values.sort;
+        }
+    } else {
+        @values;
+    }
+    @values.sort;
+}
 
 sub first(Mu $test, *@bits) { @bits.first($test) }
 
