@@ -2413,4 +2413,8 @@ again:
         thr.Start();
         return thr;
     }
+
+    public static void sleep(double secs) {
+        Thread.Sleep((int)(secs * 1000.0));
+    }
 }
