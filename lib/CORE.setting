@@ -1850,10 +1850,13 @@ my class Range is Cool {
     has $.excludes_min = False;
     has $.excludes_max = False;
 
-    method new($min, $max, :$excludes_min = False, :$excludes_max = False) {
-        unitem(self.bless(*, min => ($min.^isa(Whatever) ?? -Inf !! $min),
-            max => ($max.^isa(Whatever) ?? Inf !! $max),
-            :$excludes_min, :$excludes_max));
+    method new($min is copy, $max is copy, :$excludes_min = False, :$excludes_max = False) {
+        $max = Inf if $max.^isa(Whatever);
+        if $min ~~ Numeric && $max !~~ Numeric {
+            $max = +$max;
+        }
+        $min = -Inf if $min.^isa(Whatever);
+        unitem(self.bless(*, :$min, :$max, :$excludes_min, :$excludes_max));
     }
 
     method list() { self.iterator.list }
