@@ -68,6 +68,7 @@ S02-names/our.t
 S02-names/pseudo.t
 S02-names/symbolic-deref.t
 S02-one-pass-parsing/less-than.t
+S02-types/anon_block.t
 S02-types/array.t
 S02-types/array_extending.t
 S02-types/assigning-refs.t
