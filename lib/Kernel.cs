@@ -4937,7 +4937,8 @@ ltm:
             Array.Sort(tmp, delegate (Variable v1, Variable v2) {
                 Variable v = RunInferior(cb.Invoke(GetInferiorRoot(),
                         new Variable[] { v1, v2 }, null));
-                return (int)v.Fetch().mo.mro_raw_Numeric.Get(v);
+                double rv = v.Fetch().mo.mro_raw_Numeric.Get(v);
+                return (rv > 0 ? +1 : rv < 0 ? -1 : 0);
             });
             return new VarDeque(tmp);
         }
