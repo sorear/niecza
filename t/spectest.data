@@ -156,6 +156,7 @@ S03-operators/ternary.t
 S03-operators/value_equivalence.t
 S03-sequence/arity0.t
 S03-sequence/basic.t
+S03-sequence/nonnumeric.t
 S03-smartmatch/any-any.t
 S03-smartmatch/any-array-slice.t
 S03-smartmatch/any-array.t
