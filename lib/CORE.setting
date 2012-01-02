@@ -1524,7 +1524,6 @@ sub sort(*@values) {
     } else {
         @values;
     }
-    @values.sort;
 }
 
 sub first(Mu $test, *@bits) { @bits.first($test) }
