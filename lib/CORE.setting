@@ -1160,7 +1160,7 @@ my class List is Cool {
     }
 
     method Str()  { defined(self) ?? self.join(" ") !! nextsame }
-    method gist() { defined(self) ?? self.join(" ") !! nextsame }
+    method gist() { defined(self) ?? self.map(*.gist).join(" ") !! nextsame }
 
     method sort($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;

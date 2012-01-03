@@ -5882,8 +5882,10 @@ slow:
                 return "Illegal control operator: " +
                     SubInfo.DescribeControl(type, tgt, name);
             try {
-                Variable v = (Variable) payload;
-                return v.Fetch().mo.mro_raw_Str.Get(v);
+                Variable v1 = (Variable) payload;
+                Variable v2 = RunInferior(v1.Fetch().InvokeMethod(
+                    GetInferiorRoot(), "gist", new Variable[] { v1 }, null));
+                return v2.Fetch().mo.mro_raw_Str.Get(v2);
             } catch (Exception ex) {
                 return "(stringificiation failed: " + ex + ")";
             }
