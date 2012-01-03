@@ -1514,15 +1514,11 @@ sub values(%h) { %h.values }
 sub kv($p) { $p.kv }
 
 sub sort(*@values) {
-    if @values {
-        if @values[0] ~~ Callable {
-            my $cmp = @values.shift;
-            @values.sort($cmp);
-        } else {
-            @values.sort;
-        }
+    if @values && @values[0] ~~ Callable {
+        my $cmp = @values.shift;
+        @values.sort($cmp);
     } else {
-        @values;
+        @values.sort;
     }
 }
 
