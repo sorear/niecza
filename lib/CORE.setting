@@ -15,6 +15,7 @@ my class Array    { ... }
 my class FatRat   { ... }
 my class Junction { ... }
 my class Enum     { ... }
+my class Range    { ... }
 # }}}
 # Important inlinable definitions {{{
 sub infix:<+>($l,$r) is Niecza::builtin('plus',2,2) { $l + $r }
@@ -1244,6 +1245,22 @@ my class Array is List {
     method perl(\$self:) {
         $self // return $self.typename;
         "[" ~ $self.map(*.perl).join(', ') ~ "]" ~ ($self.flattens ?? ".list" !! "");
+    }
+
+    method delete(*@indices) {
+        my @result;
+        my @i = @indices.map({
+            when Range { $_.iterator.list }
+            when Callable { $_(+self) }
+            when * < 0 { die "Negative index not allowed, please use WhateverCode" }
+            $_;
+        });
+        for @i -> $i {
+            @result.push(self[$i]);
+            self[$i] = Any;
+        }
+        self.pop while ?self && !defined self[*-1];
+        return @result;
     }
 }
 
