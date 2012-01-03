@@ -6019,10 +6019,10 @@ slow:
         public static Frame Unwind(Frame th, int type, Frame tf, int tip,
                 object td, Frame tgt, string name, string bt) {
             Frame csr = th;
-            if (th.info == null)
+            if (tf != null && tf.info == null)
                 Panic("Catching frame has no info?");
-            if (th.caller == null)
-                Panic("Catching frame has no caller?" + th.info.name);
+            if (tf != null && tf.caller == null)
+                Panic("Catching frame has no caller?" + tf.info.name);
             while (csr != tf) {
                 if (csr == null) Panic("Unwinding into null frame");
                 if (csr.info == null) Panic("Null SubInfo?");
@@ -6036,6 +6036,8 @@ slow:
                     return csr;
                 }
                 if (csr.DynamicCaller() != csr.caller) {
+                    // Return can't be used in this case, and the other
+                    // stuff is just to make LEAVE/UNDO/KEEP work right
                     csr = csr.DynamicCaller();
                 } else {
                     if (csr.caller == null) Panic(csr.info.name + " has no caller?");
