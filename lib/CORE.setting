@@ -2166,6 +2166,14 @@ sub infix:« <=> » is equiv<leg> ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 
 # XXX polymorphic equality
 sub infix:<cmp> is equiv<leg> ($a, $b) {
     return $a - $b if $a ~~ Numeric && $b ~~ Numeric;
+    if $a ~~ Numeric {
+        return -1 if $a == -Inf;
+        return +1 if $a == Inf;
+    }
+    if $b ~~ Numeric {
+        return -1 if $b == Inf;
+        return +1 if $b == -Inf;
+    }
     return ($a ~~ Numeric ?? "Numeric" !! $a.WHAT.gist) leg
            ($b ~~ Numeric ?? "Numeric" !! $b.WHAT.gist)
                 unless $a.WHAT === $b.WHAT;
