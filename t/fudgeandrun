@@ -4,5 +4,15 @@ use warnings;
 
 my @OPTS = ('--keep-exit-code', 'niecza');
 
+if (@ARGV) {
+    my $file = $ARGV[0];
+    if (! -e $file) {
+        my $spec = "t/spec/$file";
+        if (-e $spec) {
+            $ARGV[0] = $spec;
+        }
+    }
+}
+
 my $nt = `t/spec/fudge @OPTS @ARGV`;
 system("mono", "./run/Niecza.exe", split ' ', $nt);
