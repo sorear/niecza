@@ -113,6 +113,9 @@ namespace Niecza {
             data[head] = vr;
         }
 
+        public void Shift_UnshiftN(Variable[] vrs) { Shift(); UnshiftN(vrs); }
+        public void Shift_UnshiftD(VarDeque vrs) { Shift(); UnshiftD(vrs); }
+
         public void UnshiftN(Variable[] vrs) {
             for (int i = vrs.Length - 1; i >= 0; i--)
                 Unshift(vrs[i]);

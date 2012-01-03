@@ -5140,15 +5140,18 @@ again:
                 if (iter.Count() == 0)
                     return false;
                 Variable i0 = iter[0];
+                if (i0 == null) {
+                    throw new NieczaException("Circular data dependency in list iteration, or last fetch threw exception");
+                }
                 if (i0.islist && flat) {
-                    iter.Shift();
-                    iter.UnshiftD(i0.Fetch().mo.mro_raw_iterator.Get(i0));
+                    iter[0] = null;
+                    iter.Shift_UnshiftD(i0.Fetch().mo.mro_raw_iterator.Get(i0));
                     continue;
                 }
                 P6any i0v = i0.Fetch();
                 if (i0v.mo.HasMRO(IterCursorMO)) {
-                    iter.Shift();
-                    iter.UnshiftN(i0v.mo.mro_raw_reify.Get(i0));
+                    iter[0] = null;
+                    iter.Shift_UnshiftN(i0v.mo.mro_raw_reify.Get(i0));
                     continue;
                 }
 
