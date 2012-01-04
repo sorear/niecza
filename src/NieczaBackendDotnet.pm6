@@ -199,6 +199,7 @@ class StaticSub {
 
     method finish($ops) {
         $ops := NieczaPassSimplifier.invoke_incr(self, $ops);
+        self.set_extend('onlystub', True) if $ops.onlystub;
         Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.Finish {self} {$ops.cgop(self)}) }
     }
 

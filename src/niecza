@@ -33,6 +33,18 @@ augment class Sig {
 # }
 # }
 
+augment class Op {
+method onlystub() { False }
+}
+
+augment class Op::StatementList {
+method onlystub() { $!children && $!children[0].onlystub }
+}
+
+augment class Op::Yada {
+method onlystub() { True }
+}
+
 augment class STD {
 my package DEBUG { our constant symtab = 0; }
 method is_name($longname, $curlex = $*CURLEX) {
