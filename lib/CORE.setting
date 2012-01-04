@@ -2188,17 +2188,17 @@ my class Order is IntBasedEnum is Int {
 sub infix:« <=> » is equiv<leg> ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
 sub infix:<cmp> is equiv<leg> ($a, $b) {
-    return ($a - $b).sign if $a ~~ Numeric && $b ~~ Numeric;
-    if $a ~~ Numeric {
+    return ($a - $b).sign if $a ~~ Real && $b ~~ Real;
+    if $a ~~ Real {
         return -1 if $a == -Inf;
         return +1 if $a == Inf;
     }
-    if $b ~~ Numeric {
+    if $b ~~ Real {
         return -1 if $b == Inf;
         return +1 if $b == -Inf;
     }
-    return ($a ~~ Numeric ?? "Numeric" !! $a.WHAT.gist) leg
-           ($b ~~ Numeric ?? "Numeric" !! $b.WHAT.gist)
+    return ($a ~~ Real ?? "Real" !! $a.WHAT.gist) leg
+           ($b ~~ Real ?? "Real" !! $b.WHAT.gist)
                 unless $a.WHAT === $b.WHAT;
     return $a leg $b if $a ~~ Str;
     return $a.key cmp $b.key || $a.value cmp $b.value if $a ~~ Pair;
