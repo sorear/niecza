@@ -34,6 +34,7 @@ namespace Niecza {
             this.outer = (Frame) d.slots[0];
             this.info = (SubInfo) d.slots[1];
         }
+        public DispatchEnt(DispatchEnt next) { this.next = next; }
 
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.DispatchEnt);

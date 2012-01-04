@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Niecza.Serialization;
 
 namespace Niecza {
@@ -34,7 +35,7 @@ namespace Niecza {
                 Variable[] pos, VarHash named) {
             DispatchEnt m;
             //Kernel.LogNameLookup(name);
-            if (mo.mro_methods.TryGetValue(name, out m)) {
+            if ((m = mo.FindMethod(name)) != null) {
                 return m.info.SetupCall(caller, m.outer, m.ip6,
                         pos, named, false, m);
             }
@@ -146,6 +147,7 @@ namespace Niecza {
         public P6any subsetWhereThunk; // SUBSET only
         public Variable subsetFilter; // SUBSET only
         public Variable[] curriedArgs; // CURRIED_ROLE only
+        public object rolePun; // all roles
 
         public List<MethodInfo> lmethods = new List<MethodInfo>();
         public List<AttrInfo> local_attr = new List<AttrInfo>();
@@ -287,17 +289,17 @@ next_method: ;
             if (mro == null)
                 return;
 
-            var type_buf = new List<STable>();
             type_set.Clear();
             foreach (STable s in mro) {
                 type_set.Add(s);
-                type_buf.Add(s);
                 foreach (STable s2 in s.mo.role_typecheck_list) {
                     type_set.Add(s2);
-                    type_buf.Add(s2);
                 }
             }
-            type_list = type_buf.ToArray();
+            foreach (STable s2 in role_typecheck_list) {
+                type_set.Add(s2);
+            }
+            type_list = new List<STable>(type_set).ToArray();
 
             if (type == ROLE || type == PARAMETRIZED_ROLE || type == CURRIED_ROLE)
                 return;
@@ -651,6 +653,20 @@ next_method: ;
             return null;
         }
 
+        public STable PunRole() {
+            STable n = new STable(stable.name);
+
+            n.how = Kernel.BoxAnyMO<STable>(n, Kernel.ClassHOWMO).Fetch();
+            n.typeObject = n.initObject = new P6opaque(n);
+            n.typeVar = n.initVar = Kernel.NewROScalar(n.typeObject);
+            ((P6opaque)n.typeObject).slots = null;
+
+            n.mo.local_roles.Add(stable);
+            n.mo.Compose();
+
+            return n;
+        }
+
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.P6how);
             fb.ObjRef(stable);
@@ -660,6 +676,7 @@ next_method: ;
             fb.ObjRef(subsetWhereThunk);
             fb.ObjRef(subsetFilter);
             fb.Refs(curriedArgs);
+            fb.ObjRef(rolePun);
 
             // local_does not yet used
             fb.Int(lmethods.Count);
@@ -708,6 +725,7 @@ next_method: ;
             n.subsetWhereThunk = (P6any)tb.ObjRef();
             n.subsetFilter = (Variable)tb.ObjRef();
             n.curriedArgs = tb.RefsA<Variable>();
+            n.rolePun = tb.ObjRef();
 
             int mcount = tb.Int();
             while (mcount-- > 0) {
@@ -942,6 +960,28 @@ next_method: ;
                 }
                 return false;
             }
+        }
+
+        public DispatchEnt FindMethod(string name) {
+            DispatchEnt de;
+            if (mro_methods.TryGetValue(name, out de))
+                return de;
+            if (mo.type == P6how.ROLE || mo.type == P6how.CURRIED_ROLE ||
+                    mo.type == P6how.PARAMETRIZED_ROLE) {
+                if (name == "ACCEPTS" || name == "defined")
+                    return Kernel.MuMO.FindMethod(name);
+                var pun = Thread.VolatileRead(ref mo.rolePun) as STable;
+                if (pun == null) {
+                    pun = mo.PunRole();
+                    Thread.VolatileWrite(ref mo.rolePun, pun);
+                }
+                var punfunc = Kernel.GetVar("::GLOBAL::Niecza", "&autopun").v;
+                var clone = Kernel.RunInferior(punfunc.Fetch().Invoke(
+                    Kernel.GetInferiorRoot(), new Variable[] { pun.typeVar,
+                        Builtins.MakeStr(name) }, null));
+                return new DispatchEnt(null, clone.Fetch());
+            }
+            return null;
         }
 
         public P6any GetPrivateMethod(string name) {

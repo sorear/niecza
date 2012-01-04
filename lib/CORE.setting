@@ -320,6 +320,10 @@ my class Any is Mu {
     }
 }
 
+sub Niecza::autopun($pun, $name) {
+    -> |$ { Q:CgOp { (rnull (pun_helper {$pun} {$name} (callframe))) }; nextsame }
+}
+
 my class Cool {
     method FatRat () { ::Niecza::NumSyntax.str2num(~self, :fatrat) }
     method Rat($eps = 1e-6) { Q:CgOp { (rat_approx {self} {$eps}) } }

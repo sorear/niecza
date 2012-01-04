@@ -2420,7 +2420,13 @@ again:
         stopwatch.Start();
         Thread.Sleep((int)(secs * 1000.0));
         stopwatch.Stop();
- 
+
         return MakeFloat(stopwatch.Elapsed.TotalSeconds);
+    }
+
+    public static void pun_helper(Variable pun, Variable vname, Frame fr) {
+        string name = vname.Fetch().mo.mro_raw_Str.Get(vname);
+        fr.pos[0] = pun;
+        fr.curDisp = new DispatchEnt(pun.Fetch().mo.FindMethod(name));
     }
 }
