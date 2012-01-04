@@ -5379,6 +5379,7 @@ slow:
             r.mo.type  = P6how.CURRIED_ROLE;
             r.mo.rtype = "crole";
             r.mo.role_typecheck_list = prole.mo.role_typecheck_list;
+            r.mo.local_roles = prole.mo.local_roles;
             r.typeObject = r.initObject = new P6opaque(r);
             r.typeVar = r.initVar = NewROScalar(r.typeObject);
             foreach (var mi in prole.mo.lmethods)
