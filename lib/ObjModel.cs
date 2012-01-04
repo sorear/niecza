@@ -504,7 +504,7 @@ next_method: ;
 
         public void FillRole(STable[] superclasses, STable[] cronies) {
             this.superclasses = new List<STable>(superclasses);
-            local_roles = new List<STable>(cronies);
+            local_roles = new List<STable>(cronies ?? new STable[0]);
             type = ROLE; rtype = "role";
             SetMRO(Kernel.AnyMO.mo.mro);
         }
@@ -600,6 +600,11 @@ next_method: ;
                 Revalidate();
                 stable.SetupVTables();
                 return null;
+            }
+
+            if (local_roles.Count == 1) {
+                // TODO: RoleToRoleApplier
+                Kernel.ApplyRoleToClass(stable, local_roles[0]);
             }
 
             if (superclasses.Count == 0 && stable != Kernel.MuMO) {

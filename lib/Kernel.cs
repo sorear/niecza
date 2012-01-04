@@ -5430,30 +5430,30 @@ slow:
             }
         }
 
+        public static void ApplyRoleToClass(STable cls, STable role) {
+            // TODO: collision checking, requirement checking
+            if (cls.mo.type != P6how.CLASS && cls.mo.type != P6how.ROLE)
+                throw new NieczaException("Cannot compose a role into a " + cls.mo.rtype);
+            role = ToComposable(role, cls);
+            foreach (P6how.MethodInfo mi in role.mo.lmethods)
+                cls.mo.lmethods.Add(mi);
+            foreach (P6how.AttrInfo ai in role.mo.local_attr)
+                cls.mo.local_attr.Add(ai);
+            foreach (STable su in role.mo.superclasses)
+                cls.mo.superclasses.Add(su);
+        }
+
         public static STable RoleApply(STable b, STable role) {
             STable n = new STable(b.name + " but " + role.name);
-
-            STable[] nmro = new STable[b.mo.mro.Length + 1];
-            Array.Copy(b.mo.mro, 0, nmro, 1, b.mo.mro.Length);
-            nmro[0] = n;
-            n.FillClass(b.all_slot, new STable[] { b }, nmro);
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
             n.typeObject = n.initObject = new P6opaque(n);
             n.typeVar = n.initVar = NewROScalar(n.typeObject);
             ((P6opaque)n.typeObject).slots = null;
 
-            role = ToComposable(role, n);
-
-            if (role.mo.local_attr.Count != 0)
-                throw new NieczaException("RoleApply with attributes NYI");
-            if (role.mo.superclasses.Count != 0)
-                throw new NieczaException("RoleApply with superclasses NYI");
-            foreach (P6how.MethodInfo mi in role.mo.lmethods)
-                n.mo.lmethods.Add(mi);
-            foreach (P6how.AttrInfo ai in role.mo.local_attr)
-                n.mo.local_attr.Add(ai);
-            n.mo.Invalidate();
+            n.mo.superclasses.Add(b);
+            n.mo.local_roles.Add(role);
+            n.mo.Compose();
 
             return n;
         }
