@@ -2502,8 +2502,9 @@ my class TextReader {
         };
     }
 
-    method lines() {
-        gather take my $l while ($l = self.get).defined;
+    method lines($given-limit = *) {
+        my $limit = $given-limit ~~ Whatever ?? Inf !! $given-limit;
+        gather take my $l while $limit-- > 0 && ($l = self.get).defined;
     }
 
     method close() {
@@ -2566,7 +2567,8 @@ sub mkdir($filename) is unsafe {
     True; # is there a way to actually detect problems with File.Delete?
 }
 
-multi sub open($filename, :$w?, :$a?) is unsafe {
+multi sub open($filename, :$w?, :$a?, :$r?, :$rw?) is unsafe {
+    die "Not yet able to open both :r and :w" if ($r && $w) || $rw;
     if $a {
         Q:CgOp { (box TextWriter (twriter_append (obj_getstr {$filename}) (obj_getbool {True}))) }
     } elsif $w {
@@ -2582,7 +2584,7 @@ sub close($file) {
 
 # TODO $*ARGFILES, multi
 sub get($handle = $*IN) { $handle.get }
-sub lines($filehandle = $*IN) { $filehandle.lines }
+sub lines($filehandle = $*IN, $limit = *) { $filehandle.lines($limit) }
 sub prompt($msg) { print $msg; $*IN.get }
 sub getc($handle) { $handle.getc }
 
