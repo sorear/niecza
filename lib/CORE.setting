@@ -845,7 +845,7 @@ sub infix:<x> is Niecza::absprec<s=> ($str, $ct) {
 }
 
 sub infix:<leg> is Niecza::absprec<n=> is assoc<non> ($s1, $s2) {
-    Q:CgOp { (box Num (cast num (strcmp (obj_getstr {$s1}) (obj_getstr {$s2})))) }
+    (Q:CgOp { (box Num (cast num (strcmp (obj_getstr {$s1}) (obj_getstr {$s2})))) }).sign
 }
 
 sub lc($string)    { (~$string).lc }
@@ -2174,11 +2174,21 @@ sub truncate($x) { $x.Int }
 sub sign($x) { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
 multi sub exp($x) { $x.exp }
 multi sub exp($x, $base) { $base ** $x }
-# XXX 'Order' type
+
+# 'Order' type
+my class Order is IntBasedEnum is Int {
+    our $_enums;
+    method enums() { $_enums }
+    our constant Increase = -1;
+    our constant Same = 0;
+    our constant Decrease = 1;
+    # method ACCEPTS(\$t) { defined(self) ?? self !! $t.^does(self) }
+}
+
 sub infix:« <=> » is equiv<leg> ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
 sub infix:<cmp> is equiv<leg> ($a, $b) {
-    return $a - $b if $a ~~ Numeric && $b ~~ Numeric;
+    return ($a - $b).sign if $a ~~ Numeric && $b ~~ Numeric;
     if $a ~~ Numeric {
         return -1 if $a == -Inf;
         return +1 if $a == Inf;
@@ -2192,7 +2202,7 @@ sub infix:<cmp> is equiv<leg> ($a, $b) {
                 unless $a.WHAT === $b.WHAT;
     return $a leg $b if $a ~~ Str;
     return $a.key cmp $b.key || $a.value cmp $b.value if $a ~~ Pair;
-    return $a - $b;
+    return ($a - $b).sign;
 }
 sub infix:<eqv> is equiv<==> ($a, $b) { ($a cmp $b) == 0 }
 sub infix:<before> ($a, $b) is equiv<==> { ($a cmp $b) < 0 }
