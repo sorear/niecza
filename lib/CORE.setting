@@ -499,7 +499,7 @@ my class Cool {
         my $str = ~self;
         my $C = Cursor.cursor_start($str);
         my $i = 0;
-        my $limctr = $limit // Inf;
+        my $limctr = $limit ~~ Whatever ?? Inf !! $limit // Inf;
         my @out;
         while ($i < chars $str) && $limctr > 0 {
             my $M = head($matcher($C.cursor($i++)));
@@ -512,7 +512,7 @@ my class Cool {
         @out
     }
 
-    method lines($limit = 1_000_000_000) {
+    method lines($limit = *) {
         self.comb(/ ^^ \N* /, $limit);
     }
 
