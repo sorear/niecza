@@ -4017,7 +4017,7 @@ dynamic:
             } else if (cmd == "type_CAN") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 //string meth = (string)args[2];
-                return (st.mo.rtype != "package" && st.mo.rtype != "module");
+                return (st.mo.type != P6how.PACKAGE && st.mo.type != P6how.MODULE);
             } else if (cmd == "type_add_super") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 STable su = (STable)Handle.Unbox(args[2]);
@@ -4137,9 +4137,17 @@ dynamic:
                 nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
                 nst.how        = Kernel.BoxRaw<STable>(nst, Kernel.ClassHOWMO);
                 nst.mo.rtype   = type;
-                nst.mo.isPackage = (type == "package");
-                nst.mo.isRole    = (type == "role" || type == "prole");
-                nst.mo.isSubset  = (type == "subset");
+                nst.mo.type =
+                    type == "package" ? P6how.PACKAGE :
+                    type == "module" ? P6how.MODULE :
+                    type == "class" ? P6how.CLASS :
+                    type == "grammar" ? P6how.GRAMMAR :
+                    type == "role" ? P6how.ROLE :
+                    type == "prole" ? P6how.PARAMETRIZED_ROLE :
+                    type == "subset" ? P6how.SUBSET :
+                    -1;
+                if (nst.mo.type < 0)
+                    return new Exception(type);
 
                 return new Handle(nst);
             } else if (cmd == "type_set_basetype") {

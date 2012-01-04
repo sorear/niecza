@@ -881,12 +881,12 @@ namespace Niecza {
             // packages are observationally identical barring &infix:<does>
             // (mis)use
             if (ose.constant && !oseod && nse.constant && !nseod &&
-                    (oseo.mo.mo.isPackage || nseo.mo.mo.isPackage) &&
+                    (oseo.mo.mo.type == P6how.PACKAGE || nseo.mo.mo.type == P6how.PACKAGE) &&
                     oseo.mo.who.Isa(Kernel.StashMO) &&
                     nseo.mo.who.Isa(Kernel.StashMO) &&
                     Kernel.UnboxAny<string>(oseo.mo.who) ==
                         Kernel.UnboxAny<string>(nseo.mo.who)) {
-                if (nseo.mo.mo.isPackage)
+                if (nseo.mo.mo.type == P6how.PACKAGE)
                     nse = ose;
                 return null;
             }
@@ -3880,7 +3880,7 @@ tryagain:
             st.typeObject = st.initObject = new P6opaque(st, 0);
             ((P6opaque)st.typeObject).slots = null;
             st.typeVar = st.initVar = Kernel.NewROScalar(st.typeObject);
-            st.mo.isPackage = true;
+            st.mo.type  = P6how.PACKAGE;
             st.mo.rtype = "package";
             // XXX should be PackageHOW
             st.how = new BoxObject<STable>(st, Kernel.ClassHOWMO, 0);
@@ -5203,8 +5203,8 @@ slow:
             if (oo == nn) return o;
 
             if (!oo.IsDefined() && !nn.IsDefined() && oo.mo.who == nn.mo.who) {
-                if (oo.mo.mo.isPackage) return n;
-                if (nn.mo.mo.isPackage) return o;
+                if (oo.mo.mo.type == P6how.PACKAGE) return n;
+                if (nn.mo.mo.type == P6how.PACKAGE) return o;
             }
 
             throw new NieczaException("Funny merge failure " + d1 + "::" + d2 +
@@ -5398,6 +5398,7 @@ slow:
                         Invoke(GetInferiorRoot(), to_pass, null)).Fetch();
 
                     r = new STable(prole.name + "[...]");
+                    r.mo.type  = P6how.ROLE;
                     r.mo.rtype = "role";
                     r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
                     r.typeObject = r.initObject = new P6opaque(r);

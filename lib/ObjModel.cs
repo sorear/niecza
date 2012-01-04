@@ -130,8 +130,17 @@ namespace Niecza {
         // true primitive data {{{
         public STable stable;
 
-        public bool isRole, isSubset, isPackage, isComposed, isComposing;
+        public const int PACKAGE = 0;
+        public const int MODULE  = 1;
+        public const int CLASS   = 2;
+        public const int GRAMMAR = 3;
+        public const int ROLE    = 4;
+        public const int PARAMETRIZED_ROLE = 5;
+        public const int SUBSET  = 6;
+
+        public bool isComposed, isComposing;
         public string rtype = "class"; // XXX used for compiler's inspection
+        public int type = CLASS;
         public P6any roleFactory;
         public P6any subsetWhereThunk;
         public Variable subsetFilter;
@@ -276,7 +285,7 @@ next_method: ;
 
             if (mro == null)
                 return;
-            if (isRole)
+            if (type == ROLE || type == PARAMETRIZED_ROLE)
                 return;
 
             CollectMMDs();
@@ -461,7 +470,8 @@ next_method: ;
         }
 
         public void FillSubset(STable super) {
-            isSubset = stable.isSubset = true;
+            stable.isSubset = true;
+            type = SUBSET; rtype = "subset";
             STable[] mro = new STable[super.mo.mro.Length + 1];
             Array.Copy(super.mo.mro, 0, mro, 1, mro.Length - 1);
             mro[0] = stable;
@@ -497,12 +507,12 @@ next_method: ;
         public void FillRole(STable[] superclasses, STable[] cronies) {
             this.superclasses = new List<STable>(superclasses);
             local_does = cronies;
-            isRole = true;
+            type = ROLE; rtype = "role";
             SetMRO(Kernel.AnyMO.mo.mro);
         }
 
         public void FillParametricRole(P6any factory) {
-            isRole = true;
+            type = PARAMETRIZED_ROLE; rtype = "prole";
             roleFactory = factory;
             SetMRO(Kernel.AnyMO.mo.mro);
         }
@@ -573,7 +583,7 @@ next_method: ;
         }
 
         public string Compose() {
-            if (isComposed || rtype == "package" || rtype == "module") {
+            if (isComposed || type == PACKAGE || type == MODULE) {
                 isComposed = true;
                 return null;
             }
@@ -587,8 +597,7 @@ next_method: ;
             }
             isComposed = true;
 
-            if (rtype == "role" || rtype == "prole") {
-                isRole = true;
+            if (type == ROLE || type == PARAMETRIZED_ROLE) {
                 SetMRO(Kernel.AnyMO.mo.mro);
                 Revalidate();
                 stable.SetupVTables();
@@ -596,7 +605,7 @@ next_method: ;
             }
 
             if (superclasses.Count == 0 && stable != Kernel.MuMO) {
-                superclasses.Add(rtype == "grammar" ? Kernel.GrammarMO :
+                superclasses.Add(type == GRAMMAR ? Kernel.GrammarMO :
                         Kernel.AnyMO);
             }
 
@@ -668,9 +677,15 @@ next_method: ;
             n.isComposing = state >= 1;
             n.isComposed  = state >= 2;
             n.rtype = tb.String();
-            n.isRole = n.rtype == "role" || n.rtype == "prole";
-            n.isSubset = n.rtype == "subset";
-            n.isPackage = n.rtype == "package";
+            n.type =
+                n.rtype == "package" ? P6how.PACKAGE :
+                n.rtype == "module" ? P6how.MODULE :
+                n.rtype == "class" ? P6how.CLASS :
+                n.rtype == "grammar" ? P6how.GRAMMAR :
+                n.rtype == "role" ? P6how.ROLE :
+                n.rtype == "prole" ? P6how.PARAMETRIZED_ROLE :
+                n.rtype == "subset" ? P6how.SUBSET :
+                -1;
             n.roleFactory = (P6any)tb.ObjRef();
             n.subsetWhereThunk = (P6any)tb.ObjRef();
             n.subsetFilter = (Variable)tb.ObjRef();
