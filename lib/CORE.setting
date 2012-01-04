@@ -802,8 +802,8 @@ sub infix:<~> is Niecza::absprec<r=> is assoc<list> (\|$bits) { Q:CgOp {
       [box Str (strbuf_seal (l buf))])
 } }
 
-sub infix:<max>($a,$b) is Niecza::absprec<k=> is assoc<list> { $a < $b ?? $b !! $a }
-sub infix:<min>($a,$b) is Niecza::absprec<k=> is assoc<list> { $a > $b ?? $b !! $a }
+sub infix:<max>(*@values) is Niecza::absprec<k=> is assoc<list> { @values.max }
+sub infix:<min>(*@values) is Niecza::absprec<k=> is assoc<list> { @values.min }
 
 sub warn($str) { Q:CgOp { (control 11 (null frame) (int -1) (obj_getstr {$str}) (null obj)) } }
 
