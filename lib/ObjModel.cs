@@ -142,9 +142,10 @@ namespace Niecza {
         public bool isComposed, isComposing;
         public string rtype = "class"; // XXX used for compiler's inspection
         public int type = CLASS;
-        public P6any roleFactory;
-        public P6any subsetWhereThunk;
-        public Variable subsetFilter;
+        public P6any roleFactory; // PARAMETRIZED_ROLE + CURRIED_ROLE only
+        public P6any subsetWhereThunk; // SUBSET only
+        public Variable subsetFilter; // SUBSET only
+        public Variable[] curriedArgs; // CURRIED_ROLE only
 
         public STable[] local_does;
 
@@ -644,6 +645,7 @@ next_method: ;
             fb.ObjRef(roleFactory);
             fb.ObjRef(subsetWhereThunk);
             fb.ObjRef(subsetFilter);
+            fb.Refs(curriedArgs);
 
             // local_does not yet used
             fb.Int(lmethods.Count);
@@ -689,6 +691,7 @@ next_method: ;
             n.roleFactory = (P6any)tb.ObjRef();
             n.subsetWhereThunk = (P6any)tb.ObjRef();
             n.subsetFilter = (Variable)tb.ObjRef();
+            n.curriedArgs = tb.RefsA<Variable>();
 
             // local_does not yet used
             int mcount = tb.Int();

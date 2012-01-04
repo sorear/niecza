@@ -5368,47 +5368,62 @@ slow:
             Variable[] args = argv.mo == Kernel.ParcelMO ?
                 UnboxAny<Variable[]>(argv) : new Variable[] { pcl[1] };
 
-            Variable[] to_pass = new Variable[args.Length];
-            // calculate cache key; we only cache all-Str instantiations for
-            // now
-            for (int i = 0; i < args.Length; i++) {
-                P6any obj = args[i].Fetch();
-                to_pass[i] = NewROScalar(obj);
-            }
-
-            STable r;
-            Frame ifr = (Frame)RunInferior(prole.mo.roleFactory.
-                Invoke(GetInferiorRoot(), to_pass, null)).Fetch();
-
-            r = new STable(prole.name + "[...]");
-            r.mo.type  = P6how.ROLE;
-            r.mo.rtype = "role";
+            STable r = new STable(prole.name + "[curried]");
+            r.mo.roleFactory = prole.mo.roleFactory;
+            r.mo.curriedArgs = args;
             r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
+            r.mo.type  = P6how.CURRIED_ROLE;
+            r.mo.rtype = "crole";
             r.typeObject = r.initObject = new P6opaque(r);
             r.typeVar = r.initVar = NewROScalar(r.typeObject);
-            // Hack - reseat role to this closure-clone of methods
-            foreach (var mi in prole.mo.lmethods) {
-                var nmi = mi;
-                SubInfo orig = (SubInfo) nmi.impl.GetSlot("info");
-                nmi.impl = ((Variable)ifr.info.dylex[orig.outervar].
-                        Get(ifr)).Fetch();
-                r.mo.lmethods.Add(nmi);
-            }
-            foreach (var ai in prole.mo.local_attr) {
-                var nai = ai;
-                if (nai.init != null) {
-                    SubInfo orig = (SubInfo) nai.init.GetSlot("info");
-                    nai.init = ((Variable)ifr.info.
-                        dylex[orig.outervar].Get(ifr)).Fetch();
-                }
-                r.mo.local_attr.Add(nai);
-            }
+            foreach (var mi in prole.mo.lmethods)
+                r.mo.lmethods.Add(mi);
+            foreach (var ai in prole.mo.local_attr)
+                r.mo.local_attr.Add(ai);
             r.mo.Invalidate();
             th.resultSlot = r.typeVar;
             return th;
         }
 
+        static STable ToComposable(STable arg) {
+            if (arg.mo.type == P6how.CURRIED_ROLE) {
+                STable r;
+                Frame ifr = (Frame)RunInferior(arg.mo.roleFactory.
+                    Invoke(GetInferiorRoot(), arg.mo.curriedArgs, null)).Fetch();
+
+                r = new STable(arg.name + "[...]");
+                r.mo.FillRole(arg.mo.superclasses.ToArray(), null);
+                r.mo.type  = P6how.ROLE;
+                r.mo.rtype = "role";
+                r.typeObject = r.initObject = new P6opaque(r);
+                r.typeVar = r.initVar = NewROScalar(r.typeObject);
+                // Hack - reseat role to this closure-clone of methods
+                foreach (var mi in arg.mo.lmethods) {
+                    var nmi = mi;
+                    SubInfo orig = (SubInfo) nmi.impl.GetSlot("info");
+                    nmi.impl = ((Variable)ifr.info.dylex[orig.outervar].
+                            Get(ifr)).Fetch();
+                    r.mo.lmethods.Add(nmi);
+                }
+                foreach (var ai in arg.mo.local_attr) {
+                    var nai = ai;
+                    if (nai.init != null) {
+                        SubInfo orig = (SubInfo) nai.init.GetSlot("info");
+                        nai.init = ((Variable)ifr.info.
+                            dylex[orig.outervar].Get(ifr)).Fetch();
+                    }
+                    r.mo.local_attr.Add(nai);
+                }
+                r.mo.Invalidate();
+                return r;
+            }
+
+            return arg;
+        }
+
         public static STable RoleApply(STable b, STable role) {
+            role = ToComposable(role);
+
             STable n = new STable(b.name + " but " + role.name);
             if (role.mo.local_attr.Count != 0)
                 throw new NieczaException("RoleApply with attributes NYI");
