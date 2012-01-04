@@ -5361,12 +5361,15 @@ slow:
         }
 
         public static Frame InstantiateRole(Frame th, Variable[] pcl) {
-            STable prole = pcl[0].Fetch().mo;
+            th.resultSlot = DoInstantiateRole(pcl[0].Fetch().mo,pcl[1]).typeVar;
+            return th;
+        }
 
+        public static STable DoInstantiateRole(STable prole, Variable alist) {
             // get argument list - TODO make this saner
-            P6any argv = pcl[1].Fetch();
+            P6any argv = alist.Fetch();
             Variable[] args = argv.mo == Kernel.ParcelMO ?
-                UnboxAny<Variable[]>(argv) : new Variable[] { pcl[1] };
+                UnboxAny<Variable[]>(argv) : new Variable[] { alist };
 
             STable r = new STable(prole.name + "[curried]");
             r.mo.roleFactory = prole.mo.roleFactory;
@@ -5381,8 +5384,7 @@ slow:
             foreach (var ai in prole.mo.local_attr)
                 r.mo.local_attr.Add(ai);
             r.mo.Invalidate();
-            th.resultSlot = r.typeVar;
-            return th;
+            return r;
         }
 
         static STable ToComposable(STable arg) {
@@ -5416,9 +5418,13 @@ slow:
                 }
                 r.mo.Invalidate();
                 return r;
+            } else if (arg.mo.type == P6how.PARAMETRIZED_ROLE) {
+                return ToComposable(DoInstantiateRole(arg, Builtins.MakeParcel()));
+            } else if (arg.mo.type == P6how.ROLE) {
+                return arg;
+            } else {
+                throw new NieczaException("Cannot compose a type of category " + arg.mo.rtype);
             }
-
-            return arg;
         }
 
         public static STable RoleApply(STable b, STable role) {
