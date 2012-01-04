@@ -137,6 +137,7 @@ namespace Niecza {
         public const int ROLE    = 4;
         public const int PARAMETRIZED_ROLE = 5;
         public const int SUBSET  = 6;
+        public const int CURRIED_ROLE = 7;
 
         public bool isComposed, isComposing;
         public string rtype = "class"; // XXX used for compiler's inspection
@@ -285,7 +286,7 @@ next_method: ;
 
             if (mro == null)
                 return;
-            if (type == ROLE || type == PARAMETRIZED_ROLE)
+            if (type == ROLE || type == PARAMETRIZED_ROLE || type == CURRIED_ROLE)
                 return;
 
             CollectMMDs();
@@ -597,7 +598,7 @@ next_method: ;
             }
             isComposed = true;
 
-            if (type == ROLE || type == PARAMETRIZED_ROLE) {
+            if (type == ROLE || type == PARAMETRIZED_ROLE || type == CURRIED_ROLE) {
                 SetMRO(Kernel.AnyMO.mo.mro);
                 Revalidate();
                 stable.SetupVTables();
@@ -685,6 +686,7 @@ next_method: ;
                 n.rtype == "role" ? P6how.ROLE :
                 n.rtype == "prole" ? P6how.PARAMETRIZED_ROLE :
                 n.rtype == "subset" ? P6how.SUBSET :
+                n.rtype == "crole" ? P6how.CURRIED_ROLE :
                 -1;
             n.roleFactory = (P6any)tb.ObjRef();
             n.subsetWhereThunk = (P6any)tb.ObjRef();
