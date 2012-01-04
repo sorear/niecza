@@ -2523,7 +2523,7 @@ gotit:
                     }
                     if (!srco.Does(type)) {
                         if (quiet) goto quiet_fail;
-                        if (srco.mo.HasMRO(Kernel.JunctionMO) && obj_src != -1) {
+                        if (srco.mo.HasType(Kernel.JunctionMO) && obj_src != -1) {
                             int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)srco).slots[0]) / 2;
                             if (jrank < jun_rank) {
                                 jun_rank = jrank;
@@ -2851,21 +2851,21 @@ quiet_fail:
         public override double Get(Variable obj) {
             Variable v = method == null ? obj : Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
             P6any o = v.Fetch();
-            if (o.mo.HasMRO(Kernel.NumMO)) {
+            if (o.mo.HasType(Kernel.NumMO)) {
                 return Kernel.UnboxAny<double>(o);
-            } else if (o.mo.HasMRO(Kernel.IntMO)) {
+            } else if (o.mo.HasType(Kernel.IntMO)) {
                 if (o is BoxObject<int>) {
                     return (double)Kernel.UnboxAny<int>(o);
                 } else {
                     return (double)Kernel.UnboxAny<BigInteger>(o);
                 }
-            } else if (o.mo.HasMRO(Kernel.RatMO)) {
+            } else if (o.mo.HasType(Kernel.RatMO)) {
                 Rat r = Kernel.UnboxAny<Rat>(o);
                 return (double)r.num / (double)r.den;
-            } else if (o.mo.HasMRO(Kernel.FatRatMO)) {
+            } else if (o.mo.HasType(Kernel.FatRatMO)) {
                 FatRat r = Kernel.UnboxAny<FatRat>(o);
                 return (double)r.num / (double)r.den;
-            } else if (o.mo.HasMRO(Kernel.ComplexMO)) {
+            } else if (o.mo.HasType(Kernel.ComplexMO)) {
                 Complex r = Kernel.UnboxAny<Complex>(o);
                 if (r.im != 0)
                     throw new NieczaException("coercion would discard nonzero imaginary part");
@@ -3143,12 +3143,12 @@ quiet_fail:
             bool first = true;
             while (Kernel.IterHasFlat(iter, true)) {
                 P6any elt = iter.Shift().Fetch();
-                if (first && elt.mo.HasMRO(Kernel.HashMO)) {
+                if (first && elt.mo.HasType(Kernel.HashMO)) {
                     foreach(KeyValuePair<string,Variable> kv in
                             Kernel.UnboxAny<VarHash>(elt)) {
                         into[kv.Key] = kv.Value;
                     }
-                } else if (elt.mo.HasMRO(Kernel.PairMO)) {
+                } else if (elt.mo.HasType(Kernel.PairMO)) {
                     Variable k = (Variable) elt.GetSlot("key");
                     Variable v = (Variable) elt.GetSlot("value");
                     into[k.Fetch().mo.mro_raw_Str.Get(k)] =
@@ -3600,7 +3600,7 @@ tryagain:
 
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             switch (mode) {
@@ -3614,7 +3614,7 @@ tryagain:
     class IxAnyDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
@@ -3627,7 +3627,7 @@ tryagain:
     class IxAnyExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
@@ -3660,7 +3660,7 @@ tryagain:
     class IxAnyAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
@@ -3673,13 +3673,13 @@ tryagain:
     class IxAnyAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviArray(obj, key);
-            if (ks.mo != Kernel.IntMO && ks.mo.HasMRO(Kernel.CodeMO)) {
+            if (ks.mo != Kernel.IntMO && ks.mo.HasType(Kernel.CodeMO)) {
                 Variable elts = Kernel.RunInferior(os.InvokeMethod(
                         Kernel.GetInferiorRoot(), "elems",
                         new Variable[] { obj }, null));
@@ -3696,7 +3696,7 @@ tryagain:
     class IxCursorAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             P6any o = obj.Fetch();
             if (!o.IsDefined())
@@ -3709,7 +3709,7 @@ tryagain:
     class IxCursorAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             P6any o = obj.Fetch();
@@ -3736,7 +3736,7 @@ tryagain:
     class IxHashAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
@@ -3754,7 +3754,7 @@ tryagain:
     class IxHashExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             P6any os = obj.Fetch();
             if (!os.IsDefined()) return Kernel.FalseV;
@@ -3766,7 +3766,7 @@ tryagain:
     class IxHashDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             P6any os = obj.Fetch();
             if (!os.IsDefined()) return Kernel.AnyMO.typeVar;
@@ -3791,7 +3791,7 @@ tryagain:
 
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasMRO(Kernel.JunctionMO))
+            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
@@ -3802,7 +3802,7 @@ tryagain:
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
 
-            if (ks.mo != Kernel.IntMO && ks.mo.HasMRO(Kernel.CodeMO)) {
+            if (ks.mo != Kernel.IntMO && ks.mo.HasType(Kernel.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 return Get(obj, Kernel.RunInferior(ks.Invoke(
                     Kernel.GetInferiorRoot(),
@@ -3838,7 +3838,7 @@ tryagain:
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
 
-            if (ks.mo != Kernel.IntMO && ks.mo.HasMRO(Kernel.CodeMO)) {
+            if (ks.mo != Kernel.IntMO && ks.mo.HasType(Kernel.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 key = Kernel.RunInferior(ks.Invoke(Kernel.GetInferiorRoot(),
                     new Variable[] { nr }, null));
@@ -4566,8 +4566,8 @@ saveme:
                 if (this == TOP) return 1;
                 if (this == BOTTOM) return 2;
 
-                bool k1 = type.HasMRO(other.type);
-                bool k2 = other.type.HasMRO(type);
+                bool k1 = type.HasType(other.type);
+                bool k2 = other.type.HasType(type);
                 if (k1 && !k2) return 2;
                 if (k2 && !k1) return 1;
 
@@ -5065,7 +5065,7 @@ value:      vx = (Variable) th.resultSlot;
                 return th;
             }
             P6any o = v.Fetch();
-            if (o.mo.HasMRO(Kernel.ListMO)) {
+            if (o.mo.HasType(Kernel.ListMO)) {
                 th.resultSlot = v;
                 return th;
             }
@@ -5086,7 +5086,7 @@ value:      vx = (Variable) th.resultSlot;
             P6any item;
             while (iter.Count() != 0) {
                 item = iter[0].Fetch();
-                if (item.mo.HasMRO(IterCursorMO)) {
+                if (item.mo.HasType(IterCursorMO)) {
                     break;
                 } else {
                     items.Push(iter.Shift());
@@ -5111,7 +5111,7 @@ again:
                 inq.UnshiftD(inq0.mo.mro_raw_iterator.Get(inq0v));
                 goto again;
             }
-            if (inq0.mo.HasMRO(IterCursorMO)) {
+            if (inq0.mo.HasType(IterCursorMO)) {
                 Frame th = new Frame(null, null, IF_SI, Kernel.AnyP);
                 th.lex0 = inq;
                 P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
@@ -5149,7 +5149,7 @@ again:
                     continue;
                 }
                 P6any i0v = i0.Fetch();
-                if (i0v.mo.HasMRO(IterCursorMO)) {
+                if (i0v.mo.HasType(IterCursorMO)) {
                     iter[0] = null;
                     iter.Shift_UnshiftN(i0v.mo.mro_raw_reify.Get(i0));
                     continue;
@@ -5377,13 +5377,14 @@ slow:
             r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
             r.mo.type  = P6how.CURRIED_ROLE;
             r.mo.rtype = "crole";
+            r.mo.role_typecheck_list = prole.mo.role_typecheck_list;
             r.typeObject = r.initObject = new P6opaque(r);
             r.typeVar = r.initVar = NewROScalar(r.typeObject);
             foreach (var mi in prole.mo.lmethods)
                 r.mo.lmethods.Add(mi);
             foreach (var ai in prole.mo.local_attr)
                 r.mo.local_attr.Add(ai);
-            r.mo.Invalidate();
+            r.mo.Revalidate();
             return r;
         }
 
@@ -5400,6 +5401,7 @@ slow:
                 r.mo.FillRole(arg.mo.superclasses.ToArray(), null);
                 r.mo.type  = P6how.ROLE;
                 r.mo.rtype = "role";
+                r.mo.role_typecheck_list = arg.mo.role_typecheck_list;
                 r.typeObject = r.initObject = new P6opaque(r);
                 r.typeVar = r.initVar = NewROScalar(r.typeObject);
                 // Hack - reseat role to this closure-clone of methods
@@ -5421,7 +5423,7 @@ slow:
                 }
                 foreach (var r2 in arg.mo.local_roles)
                     ApplyRoleToRole(r, ToComposable(r2, cls));
-                r.mo.Invalidate();
+                r.mo.Revalidate();
                 return r;
             } else if (arg.mo.type == P6how.PARAMETRIZED_ROLE) {
                 return ToComposable(DoInstantiateRole(arg, Builtins.MakeParcel()), cls);
@@ -5443,6 +5445,8 @@ slow:
                 into.mo.local_attr.Add(ai);
             foreach (STable su in role.mo.superclasses)
                 into.mo.superclasses.Add(su);
+            foreach (STable su in role.mo.role_typecheck_list)
+                into.mo.role_typecheck_list.Add(su);
         }
 
         static string MethodSlot(Prod<int,string> arg) {
@@ -5514,9 +5518,12 @@ slow:
                 throw new NieczaException(MethodSlot(name.Key) + " must be implemented by '" + cls.name + "' because it is required by role '" + name.Value + "'");
             }
 
-            foreach (STable role in roles)
+            foreach (STable role in roles) {
                 foreach (STable su in role.mo.superclasses)
                     cls.mo.superclasses.Add(su);
+                foreach (STable su in role.mo.role_typecheck_list)
+                    cls.mo.role_typecheck_list.Add(su);
+            }
         }
 
         public static STable RoleApply(STable b, STable role) {

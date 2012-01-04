@@ -59,12 +59,12 @@ namespace Niecza {
 
         public bool Isa(STable mo) {
             return mo.isSubset ? mo.mo.CheckSubset(this) :
-                this.mo.HasMRO(mo);
+                this.mo.HasType(mo);
         }
 
         public bool Does(STable mo) {
             return mo.isSubset ? mo.mo.CheckSubset(this) :
-                this.mo.HasMRO(mo);
+                this.mo.HasType(mo);
         }
 
         public Frame Invoke(Frame c, Variable[] p, VarHash n) {
@@ -108,7 +108,7 @@ namespace Niecza {
         }
 
         protected Variable Slice(Variable obj, Variable key) {
-            if (key.Fetch().mo.HasMRO(Kernel.JunctionMO)) {
+            if (key.Fetch().mo.HasType(Kernel.JunctionMO)) {
                 return Builtins.AutoThread(key.Fetch(), delegate (Variable v) {
                     return Get(obj, v); });
             }
@@ -152,6 +152,7 @@ namespace Niecza {
 
         public List<STable> superclasses = new List<STable>();
         public List<STable> local_roles = new List<STable>();
+        public List<STable> role_typecheck_list = new List<STable>();
         // }}}
         // calculated at compose time {{{
         public STable[] mro = new STable[0];
@@ -163,7 +164,8 @@ namespace Niecza {
         public List<DispatchSet> here_protos;
         public Dictionary<DispatchSet, List<MethodInfo>> multimethods;
 
-        public HashSet<STable> isa = new HashSet<STable>();
+        public STable[] type_list = new STable[0];
+        public HashSet<STable> type_set = new HashSet<STable>();
         internal SubscriberSet subclasses = new SubscriberSet();
         Subscription[] mro_sub;
         // role type objects have an empty MRO cache so no methods can be
@@ -284,6 +286,19 @@ next_method: ;
 
             if (mro == null)
                 return;
+
+            var type_buf = new List<STable>();
+            type_set.Clear();
+            foreach (STable s in mro) {
+                type_set.Add(s);
+                type_buf.Add(s);
+                foreach (STable s2 in s.mo.role_typecheck_list) {
+                    type_set.Add(s2);
+                    type_buf.Add(s2);
+                }
+            }
+            type_list = type_buf.ToArray();
+
             if (type == ROLE || type == PARAMETRIZED_ROLE || type == CURRIED_ROLE)
                 return;
 
@@ -383,9 +398,6 @@ next_method: ;
             for (int i = 0; i < arr.Length; i++)
                 mro_sub[i] = new Subscription(stable, arr[i].mo.subclasses);
             mro = arr;
-            isa.Clear();
-            foreach (STable k in arr)
-                isa.Add(k);
         }
 
         // invariant: if a class is dirty, so are all subclasses
@@ -596,6 +608,7 @@ next_method: ;
             isComposed = true;
 
             if (type == ROLE || type == PARAMETRIZED_ROLE || type == CURRIED_ROLE) {
+                role_typecheck_list.Add(stable);
                 SetMRO(Kernel.AnyMO.mo.mro);
                 Revalidate();
                 stable.SetupVTables();
@@ -669,6 +682,7 @@ next_method: ;
 
             fb.Refs<STable>(superclasses);
             fb.Refs<STable>(local_roles);
+            fb.Refs<STable>(role_typecheck_list);
             fb.Refs<STable>(mro);
         }
 
@@ -717,6 +731,7 @@ next_method: ;
 
             n.superclasses = tb.RefsL<STable>();
             n.local_roles = tb.RefsL<STable>();
+            n.role_typecheck_list = tb.RefsL<STable>();
             n.mro = tb.RefsA<STable>();
             tb.PushFixup(n);
             return n;
@@ -889,20 +904,20 @@ next_method: ;
             mro_succ = _GetVTU("succ") as ContextHandler<P6any> ?? CallSucc;
             mro_to_clr = _GetVT("to-clr") as ContextHandler<object>;
 
-            if (Kernel.ComplexMO != null && HasMRO(Kernel.ComplexMO))
+            if (Kernel.ComplexMO != null && HasType(Kernel.ComplexMO))
                 num_rank = Builtins.NR_COMPLEX;
-            else if (Kernel.NumMO != null && HasMRO(Kernel.NumMO))
+            else if (Kernel.NumMO != null && HasType(Kernel.NumMO))
                 num_rank = Builtins.NR_FLOAT;
-            else if (Kernel.FatRatMO != null && HasMRO(Kernel.FatRatMO))
+            else if (Kernel.FatRatMO != null && HasType(Kernel.FatRatMO))
                 num_rank = Builtins.NR_FATRAT;
-            else if (Kernel.RatMO != null && HasMRO(Kernel.RatMO))
+            else if (Kernel.RatMO != null && HasType(Kernel.RatMO))
                 num_rank = Builtins.NR_FIXRAT;
-            else if (Kernel.IntMO != null && HasMRO(Kernel.IntMO))
+            else if (Kernel.IntMO != null && HasType(Kernel.IntMO))
                 num_rank = Builtins.NR_FIXINT;
             else
                 num_rank = -1;
 
-            is_any = Kernel.AnyMO != null && HasMRO(Kernel.AnyMO);
+            is_any = Kernel.AnyMO != null && HasType(Kernel.AnyMO);
         }
 
         private object _GetVT(string name) { return _GetVTi(name, 1); }
@@ -916,14 +931,14 @@ next_method: ;
 
         public void Invalidate() { mo.Invalidate(); }
 
-        // XXX Need jnthn to come up with a good type cache thing.
-        public bool HasMRO(STable m) {
-            int k = mo.mro.Length;
+        // Only call these if m.isSubset is false
+        public bool HasType(STable m) {
+            int k = mo.type_list.Length;
             if (k >= 20) {
-                return mo.isa.Contains(m);
+                return mo.type_set.Contains(m);
             } else {
                 while (k != 0) {
-                    if (mo.mro[--k] == m) return true;
+                    if (mo.type_list[--k] == m) return true;
                 }
                 return false;
             }
@@ -999,6 +1014,8 @@ next_method: ;
             tb.PushRevalidate(n);
             return n;
         }
+
+        public override string ToString() { return name; }
     }
 
     // This is quite similar to DynFrame and I wonder if I can unify them.

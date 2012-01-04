@@ -3377,7 +3377,7 @@ dynamic:
                 handlers.Add(kv.Key);
                 handlers.Add("goto_" + kv.Key);
             }
-            if (sub.mo.HasMRO(Kernel.RoutineMO) &&
+            if (sub.mo.HasType(Kernel.RoutineMO) &&
                     (sub.special & SubInfo.RETURN_PASS) == 0) {
                 handlers.Add("4");
                 handlers.Add("");
@@ -3907,10 +3907,10 @@ dynamic:
                 return Handle.Unbox(args[1]) == Handle.Unbox(args[2]);
             } else if (cmd == "sub_is_routine") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                return s.mo.HasMRO(Kernel.RoutineMO);
+                return s.mo.HasType(Kernel.RoutineMO);
             } else if (cmd == "sub_is_regex") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                return s.mo.HasMRO(Kernel.RegexMO);
+                return s.mo.HasType(Kernel.RegexMO);
             } else if (cmd == "sub_has_lexical") {
                 SubInfo s = (SubInfo)Handle.Unbox(args[1]);
                 return s.dylex.ContainsKey((string)args[2]);

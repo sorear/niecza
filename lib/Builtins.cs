@@ -171,7 +171,7 @@ public partial class Builtins {
     // that doesn't handle junctions, not often used.
     public static P6any NominalCheck(string name, STable mo, Variable v) {
         P6any r = v.Fetch();
-        if (!r.mo.HasMRO(mo))
+        if (!r.mo.HasType(mo))
             throw new NieczaException("Nominal type check failed for " + name +
                     " needed " + mo.name + " got " + r.mo.name);
         return r;
@@ -183,7 +183,7 @@ public partial class Builtins {
             P6any val) {
         if (val.mo.is_any) {
             // fine as is
-        } else if (val.mo.HasMRO(Kernel.JunctionMO)) {
+        } else if (val.mo.HasType(Kernel.JunctionMO)) {
             int jtype = Kernel.UnboxAny<int>((P6any)(val as P6opaque).slots[0]) / 2;
             if ((uint)jtype < rank) {
                 rank = (uint)jtype;
@@ -1877,7 +1877,7 @@ again:
                 if (items.Count() == 0) return -1;
                 Variable v = items[0];
                 P6any i = v.Fetch();
-                if (i.mo.HasMRO(Kernel.IterCursorMO))
+                if (i.mo.HasType(Kernel.IterCursorMO))
                     return 0;
                 if (v.islist) {
                     items.Shift();
@@ -2137,7 +2137,7 @@ again:
                         if (!Kernel.IterHasFlat(src, false)) break;
                     } else {
                         if (src.Count() == 0) break;
-                        if (src[0].Fetch().mo.HasMRO(Kernel.IterCursorMO)) {
+                        if (src[0].Fetch().mo.HasType(Kernel.IterCursorMO)) {
                             P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
                             th.coro_return = th;
                             th.MarkSharedChain();
