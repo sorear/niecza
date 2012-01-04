@@ -5387,11 +5387,14 @@ slow:
             return r;
         }
 
-        static STable ToComposable(STable arg) {
+        static STable ToComposable(STable arg, STable cls) {
             if (arg.mo.type == P6how.CURRIED_ROLE) {
                 STable r;
+                Variable[] pass = new Variable[arg.mo.curriedArgs.Length+1];
+                pass[0] = cls.typeVar;
+                Array.Copy(arg.mo.curriedArgs, 0, pass, 1, pass.Length-1);
                 Frame ifr = (Frame)RunInferior(arg.mo.roleFactory.
-                    Invoke(GetInferiorRoot(), arg.mo.curriedArgs, null)).Fetch();
+                    Invoke(GetInferiorRoot(), pass, null)).Fetch();
 
                 r = new STable(arg.name + "[...]");
                 r.mo.FillRole(arg.mo.superclasses.ToArray(), null);
@@ -5419,7 +5422,7 @@ slow:
                 r.mo.Invalidate();
                 return r;
             } else if (arg.mo.type == P6how.PARAMETRIZED_ROLE) {
-                return ToComposable(DoInstantiateRole(arg, Builtins.MakeParcel()));
+                return ToComposable(DoInstantiateRole(arg, Builtins.MakeParcel()), cls);
             } else if (arg.mo.type == P6how.ROLE) {
                 return arg;
             } else {
@@ -5428,27 +5431,29 @@ slow:
         }
 
         public static STable RoleApply(STable b, STable role) {
-            role = ToComposable(role);
-
             STable n = new STable(b.name + " but " + role.name);
-            if (role.mo.local_attr.Count != 0)
-                throw new NieczaException("RoleApply with attributes NYI");
-            if (role.mo.superclasses.Count != 0)
-                throw new NieczaException("RoleApply with superclasses NYI");
+
             STable[] nmro = new STable[b.mo.mro.Length + 1];
             Array.Copy(b.mo.mro, 0, nmro, 1, b.mo.mro.Length);
             nmro[0] = n;
             n.FillClass(b.all_slot, new STable[] { b }, nmro);
-            foreach (P6how.MethodInfo mi in role.mo.lmethods)
-                n.mo.lmethods.Add(mi);
-            foreach (P6how.AttrInfo ai in role.mo.local_attr)
-                n.mo.local_attr.Add(ai);
-            n.mo.Invalidate();
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
             n.typeObject = n.initObject = new P6opaque(n);
             n.typeVar = n.initVar = NewROScalar(n.typeObject);
             ((P6opaque)n.typeObject).slots = null;
+
+            role = ToComposable(role, n);
+
+            if (role.mo.local_attr.Count != 0)
+                throw new NieczaException("RoleApply with attributes NYI");
+            if (role.mo.superclasses.Count != 0)
+                throw new NieczaException("RoleApply with superclasses NYI");
+            foreach (P6how.MethodInfo mi in role.mo.lmethods)
+                n.mo.lmethods.Add(mi);
+            foreach (P6how.AttrInfo ai in role.mo.local_attr)
+                n.mo.local_attr.Add(ai);
+            n.mo.Invalidate();
 
             return n;
         }

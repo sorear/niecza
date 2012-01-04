@@ -165,6 +165,50 @@ augment class Op::ImmedForLoop {
 }
 
 augment class NieczaActions {
+method open_package_def($, $/ = $*cursor) {
+    my $sub = $*CURLEX<!sub>;
+
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+
+    if $*SCOPE eq 'augment' {
+        my ($obj) = self.process_name($<longname>, :clean);
+        $*AUGMENT_BUFFER = [];
+
+        $/.CURSOR.trymop({
+            die "Augment requires a target" unless $obj;
+            die "Illegal augment of a role" if $obj.kind eq 'role' | 'prole';
+
+            $sub.set_body_of($obj);
+            $sub.set_in_class($obj);
+            $sub.set_cur_pkg($obj);
+            $sub.set_name("augment-$obj.name()");
+        });
+    } else {
+        my $class = $*PKGDECL;
+        if $class eq 'role' {
+            my $sig = $<signature> ?? $<signature>.ast !! Sig.simple();
+            unshift $sig.params, ::Sig::Parameter.simple('$?CLASS');
+            $sub.add_my_name('$?CLASS', :noinit);
+            $sub.set_signature($sig);
+            $class = 'prole';
+        }
+
+        $/.CURSOR.trymop({
+            my ($lexvar, $obj) = self.do_new_package($/, sub => $sub.outer,
+                :$class, name => $<longname>, scope => $*SCOPE);
+
+            $sub.set_outervar($lexvar);
+            $sub.set_body_of($obj);
+            $sub.set_in_class($obj);
+            $sub.set_cur_pkg($obj);
+
+            self.process_block_traits($/, $<trait>);
+            $sub.set_name($*PKGDECL ~ "-" ~ $obj.name);
+        });
+    }
+}
 sub qpvalue($ast) {
     if $ast.^isa(::Op::SimpleParcel) {
         join " ", map &qpvalue, @( $ast.items )
