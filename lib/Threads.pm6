@@ -61,10 +61,5 @@ class Thread is export {
         Q:CgOp { (rnull (rawcall Join (unbox clr:System.Threading.Thread (@ {self})))) }
     }
 
-    method sleep($time) {
-        my $t = $time * 1000;
-        Q:CgOp { (rnull (rawscall System.Threading.Thread.Sleep (cast int (unbox num (@ {$t}))))) }
-    }
+    method sleep($time) { sleep $time }
 }
-
-sub sleep($time) is export { Thread.sleep($time) }
