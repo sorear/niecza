@@ -2414,7 +2414,13 @@ again:
         return thr;
     }
 
-    public static void sleep(double secs) {
+    public static Variable sleep(double secs) {
+        Stopwatch stopwatch = new Stopwatch();
+
+        stopwatch.Start();
         Thread.Sleep((int)(secs * 1000.0));
+        stopwatch.Stop();
+ 
+        return MakeFloat(stopwatch.Elapsed.TotalSeconds);
     }
 }
