@@ -5419,6 +5419,8 @@ slow:
                     }
                     r.mo.local_attr.Add(nai);
                 }
+                foreach (var r2 in arg.mo.local_roles)
+                    ApplyRoleToRole(r, ToComposable(r2, cls));
                 r.mo.Invalidate();
                 return r;
             } else if (arg.mo.type == P6how.PARAMETRIZED_ROLE) {
@@ -5430,17 +5432,91 @@ slow:
             }
         }
 
-        public static void ApplyRoleToClass(STable cls, STable role) {
-            // TODO: collision checking, requirement checking
-            if (cls.mo.type != P6how.CLASS && cls.mo.type != P6how.ROLE)
-                throw new NieczaException("Cannot compose a role into a " + cls.mo.rtype);
-            role = ToComposable(role, cls);
+        public static void ApplyRoleToRole(STable into, STable role) {
+            if (into.mo.type != P6how.ROLE)
+                throw new NieczaException("Composing into a non-concrete role should have been deferred");
+            if (role.mo.type != P6how.ROLE)
+                throw new NieczaException("Trying to compose a non-concrete-role into a role");
             foreach (P6how.MethodInfo mi in role.mo.lmethods)
-                cls.mo.lmethods.Add(mi);
+                into.mo.lmethods.Add(mi);
             foreach (P6how.AttrInfo ai in role.mo.local_attr)
-                cls.mo.local_attr.Add(ai);
+                into.mo.local_attr.Add(ai);
             foreach (STable su in role.mo.superclasses)
-                cls.mo.superclasses.Add(su);
+                into.mo.superclasses.Add(su);
+        }
+
+        static string MethodSlot(Prod<int,string> arg) {
+            return (arg.v1 == P6how.V_SUBMETHOD ? "Submethod '" :
+                    arg.v1 == P6how.V_PRIVATE   ? "Private method '" :
+                    "Method '") + arg.v2 + "'";
+        }
+
+        public static void ApplyRoleToClass(STable cls, params STable[] roles) {
+            if (cls.mo.type != P6how.CLASS && cls.mo.type != P6how.GRAMMAR)
+                throw new NieczaException("Cannot compose a role into a " + cls.mo.rtype);
+            for (int i = 0; i < roles.Length; i++)
+                roles[i] = ToComposable(roles[i], cls);
+
+            // check attribute merging
+            var attrs   = new Dictionary<string,string>();
+            foreach (P6how.AttrInfo ai in cls.mo.local_attr)
+                attrs[ai.name] = null;
+            foreach (STable r in roles) {
+                foreach (P6how.AttrInfo ai in r.mo.local_attr) {
+                    if (attrs.ContainsKey(ai.name)) {
+                        string o = attrs[ai.name];
+                        if (o == null) {
+                            throw new NieczaException("Attribute '" + ai.name + "' already exists in the class '" + cls.name + "', but a role also wishes to compose it");
+                        } else {
+                            throw new NieczaException("Attribute '" + ai.name + "' is provided by both '" + attrs[ai.name] + "' and '" + r.name + "'");
+                        }
+                    }
+                    cls.mo.local_attr.Add(ai);
+                    attrs[ai.name] = r.name;
+                }
+            }
+
+            // now methods, these are a lot harder
+            var class_methods = new HashSet<Prod<int,string>>();
+            var role_methods  = new Dictionary<Prod<int,string>,string>();
+            var requirements  = new Dictionary<Prod<int,string>,string>();
+
+            foreach (P6how.MethodInfo mi in cls.mo.lmethods) {
+                class_methods.Add(Prod.C(mi.flags & P6how.V_MASK, mi.short_name));
+            }
+
+            foreach (STable r in roles) {
+                foreach (P6how.MethodInfo mi in r.mo.lmethods) {
+                    var name = Prod.C(mi.flags & P6how.V_MASK, mi.short_name);
+                    SubInfo info = mi.impl.Isa(CodeMO) ?
+                        ((SubInfo)mi.impl.GetSlot("info")) : null;
+                    if ((mi.flags & P6how.M_MASK) != P6how.M_ONLY) {
+                        // multi methods from roles are not suppressed and
+                        // never used as requirements
+                    } else {
+                        if (class_methods.Contains(name)) continue;
+                        if (info != null && info.extend != null &&
+                                info.extend.ContainsKey("onlystub")) {
+                            requirements[name] = r.name;
+                            continue;
+                        }
+                        if (role_methods.ContainsKey(name)) {
+                            throw new NieczaException(MethodSlot(name) + " must be resolved by class '" + cls.name + "' because it exists in roles '" + role_methods[name] + "' and '" + r.name + "'");
+                        }
+                        role_methods[name] = r.name;
+                    }
+                    cls.mo.lmethods.Add(mi);
+                }
+            }
+
+            foreach (var name in requirements) {
+                if (role_methods.ContainsKey(name.Key) || class_methods.Contains(name.Key)) continue;
+                throw new NieczaException(MethodSlot(name.Key) + " must be implemented by '" + cls.name + "' because it is required by role '" + name.Value + "'");
+            }
+
+            foreach (STable role in roles)
+                foreach (STable su in role.mo.superclasses)
+                    cls.mo.superclasses.Add(su);
         }
 
         public static STable RoleApply(STable b, STable role) {

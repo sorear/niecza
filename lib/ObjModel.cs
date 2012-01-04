@@ -602,9 +602,8 @@ next_method: ;
                 return null;
             }
 
-            if (local_roles.Count == 1) {
-                // TODO: RoleToRoleApplier
-                Kernel.ApplyRoleToClass(stable, local_roles[0]);
+            if (local_roles.Count > 0) {
+                Kernel.ApplyRoleToClass(stable, local_roles.ToArray());
             }
 
             if (superclasses.Count == 0 && stable != Kernel.MuMO) {

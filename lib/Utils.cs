@@ -12,8 +12,8 @@ namespace Niecza {
         public static Prod<T1,T2> C<T1,T2>(T1 v1, T2 v2) { return new Prod<T1,T2>(v1, v2); }
     }
     public class Prod<T1,T2> {
-        T1 v1;
-        T2 v2;
+        public T1 v1;
+        public T2 v2;
         public Prod(T1 v1, T2 v2) {
             this.v1 = v1;
             this.v2 = v2;
