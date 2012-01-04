@@ -1222,7 +1222,7 @@ public partial class Builtins {
             BigInteger rem;
             BigInteger red = BigInteger.DivRem(c1, c2, out rem);
             if (c2.Sign > 0 && rem.Sign < 0) red--;
-            if (c2.Sign < 0 && rem.Sign > 0) red++;
+            if (c2.Sign < 0 && rem.Sign > 0) red--;
 
             return MakeFatRat(c1 - red*cd, cd);
         }
@@ -1237,7 +1237,7 @@ public partial class Builtins {
             BigInteger rem;
             BigInteger red = BigInteger.DivRem(c1, c2, out rem);
             if (c2.Sign > 0 && rem.Sign < 0) red--;
-            if (c2.Sign < 0 && rem.Sign > 0) red++;
+            if (c2.Sign < 0 && rem.Sign > 0) red--;
 
             return MakeFixRat(c1 - red*c2, cd);
         }
@@ -1247,7 +1247,7 @@ public partial class Builtins {
             BigInteger rem;
             BigInteger red = BigInteger.DivRem(v1, v2, out rem);
             if (v2.Sign > 0 && rem.Sign < 0) red--;
-            if (v2.Sign < 0 && rem.Sign > 0) red++;
+            if (v2.Sign < 0 && rem.Sign > 0) red--;
             return MakeInt(v1 - v2*red);
         }
         {
@@ -1256,7 +1256,7 @@ public partial class Builtins {
             long rem;
             long red = Math.DivRem(v1, v2, out rem);
             if (v2 > 0 && rem < 0) red--;
-            if (v2 < 0 && rem > 0) red++;
+            if (v2 < 0 && rem > 0) red--;
             return MakeInt(v1 - v2*red);
         }
     }
@@ -1297,8 +1297,8 @@ public partial class Builtins {
                 rem += big2;
             }
             if (opc >= 4 && big2.Sign < 0 && rem.Sign > 0) {
-                red++;
-                rem -= big2;
+                red--;
+                rem += big2;
             }
             switch (opc & 3) {
                 case 0: return MakeInt(red);
@@ -1313,8 +1313,8 @@ public partial class Builtins {
                 rem += small2;
             }
             if (opc >= 4 && small2 < 0 && rem > 0) {
-                red++;
-                rem -= small2;
+                red--;
+                rem += small2;
             }
             switch (opc & 3) {
                 case 0: return MakeInt(red);
