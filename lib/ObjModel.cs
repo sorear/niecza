@@ -166,8 +166,6 @@ namespace Niecza {
         public HashSet<STable> isa = new HashSet<STable>();
         internal SubscriberSet subclasses = new SubscriberSet();
         Subscription[] mro_sub;
-        public Dictionary<string, STable> instCache;
-        public Dictionary<STable, STable> butCache;
         // role type objects have an empty MRO cache so no methods can be
         // called against them; the fallback (NYI) is to pun.
         // }}}

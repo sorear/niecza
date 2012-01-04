@@ -5363,9 +5363,6 @@ slow:
         public static Frame InstantiateRole(Frame th, Variable[] pcl) {
             STable prole = pcl[0].Fetch().mo;
 
-            string cache_key = "";
-            bool cache_ok = true;
-
             // get argument list - TODO make this saner
             P6any argv = pcl[1].Fetch();
             Variable[] args = argv.mo == Kernel.ParcelMO ?
@@ -5377,60 +5374,41 @@ slow:
             for (int i = 0; i < args.Length; i++) {
                 P6any obj = args[i].Fetch();
                 to_pass[i] = NewROScalar(obj);
-                if (obj.mo == StrMO) {
-                    string p = UnboxAny<string>(obj);
-                    cache_key += new string((char)p.Length, 1);
-                    cache_key += p;
-                } else {
-                    cache_ok = false;
-                }
             }
 
-            lock (prole) {
-                if (prole.mo.instCache == null)
-                    prole.mo.instCache = new Dictionary<string,STable>();
-                STable r;
-                if (cache_ok &&
-                        prole.mo.instCache.TryGetValue(cache_key, out r)) {
-                }
-                else {
-                    Frame ifr = (Frame)RunInferior(prole.mo.roleFactory.
-                        Invoke(GetInferiorRoot(), to_pass, null)).Fetch();
+            STable r;
+            Frame ifr = (Frame)RunInferior(prole.mo.roleFactory.
+                Invoke(GetInferiorRoot(), to_pass, null)).Fetch();
 
-                    r = new STable(prole.name + "[...]");
-                    r.mo.type  = P6how.ROLE;
-                    r.mo.rtype = "role";
-                    r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
-                    r.typeObject = r.initObject = new P6opaque(r);
-                    r.typeVar = r.initVar = NewROScalar(r.typeObject);
-                    // Hack - reseat role to this closure-clone of methods
-                    foreach (var mi in prole.mo.lmethods) {
-                        var nmi = mi;
-                        SubInfo orig = (SubInfo) nmi.impl.GetSlot("info");
-                        nmi.impl = ((Variable)ifr.info.dylex[orig.outervar].
-                                Get(ifr)).Fetch();
-                        r.mo.lmethods.Add(nmi);
-                    }
-                    foreach (var ai in prole.mo.local_attr) {
-                        var nai = ai;
-                        if (nai.init != null) {
-                            SubInfo orig = (SubInfo) nai.init.GetSlot("info");
-                            nai.init = ((Variable)ifr.info.
-                                dylex[orig.outervar].Get(ifr)).Fetch();
-                        }
-                        r.mo.local_attr.Add(nai);
-                    }
-                    r.mo.Invalidate();
-                    if (cache_ok)
-                        prole.mo.instCache[cache_key] = r;
-                }
-                th.resultSlot = r.typeVar;
-                return th;
+            r = new STable(prole.name + "[...]");
+            r.mo.type  = P6how.ROLE;
+            r.mo.rtype = "role";
+            r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
+            r.typeObject = r.initObject = new P6opaque(r);
+            r.typeVar = r.initVar = NewROScalar(r.typeObject);
+            // Hack - reseat role to this closure-clone of methods
+            foreach (var mi in prole.mo.lmethods) {
+                var nmi = mi;
+                SubInfo orig = (SubInfo) nmi.impl.GetSlot("info");
+                nmi.impl = ((Variable)ifr.info.dylex[orig.outervar].
+                        Get(ifr)).Fetch();
+                r.mo.lmethods.Add(nmi);
             }
+            foreach (var ai in prole.mo.local_attr) {
+                var nai = ai;
+                if (nai.init != null) {
+                    SubInfo orig = (SubInfo) nai.init.GetSlot("info");
+                    nai.init = ((Variable)ifr.info.
+                        dylex[orig.outervar].Get(ifr)).Fetch();
+                }
+                r.mo.local_attr.Add(nai);
+            }
+            r.mo.Invalidate();
+            th.resultSlot = r.typeVar;
+            return th;
         }
 
-        private static STable DoRoleApply(STable b,
-                STable role) {
+        public static STable RoleApply(STable b, STable role) {
             STable n = new STable(b.name + " but " + role.name);
             if (role.mo.local_attr.Count != 0)
                 throw new NieczaException("RoleApply with attributes NYI");
@@ -5452,18 +5430,6 @@ slow:
             ((P6opaque)n.typeObject).slots = null;
 
             return n;
-        }
-
-        public static STable RoleApply(STable b,
-                STable role) {
-            lock (b) {
-                STable rs;
-                if (b.mo.butCache == null)
-                    b.mo.butCache = new Dictionary<STable,STable>();
-                if (b.mo.butCache.TryGetValue(role, out rs))
-                    return rs;
-                return b.mo.butCache[role] = DoRoleApply(b, role);
-            }
         }
 
         internal static void SetTrace() {
