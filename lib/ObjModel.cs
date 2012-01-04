@@ -147,12 +147,11 @@ namespace Niecza {
         public Variable subsetFilter; // SUBSET only
         public Variable[] curriedArgs; // CURRIED_ROLE only
 
-        public STable[] local_does;
-
         public List<MethodInfo> lmethods = new List<MethodInfo>();
         public List<AttrInfo> local_attr = new List<AttrInfo>();
 
         public List<STable> superclasses = new List<STable>();
+        public List<STable> local_roles = new List<STable>();
         // }}}
         // calculated at compose time {{{
         public STable[] mro = new STable[0];
@@ -496,7 +495,6 @@ next_method: ;
             this.superclasses = new List<STable>(superclasses);
             SetMRO(mro);
             stable.all_slot = all_slot;
-            local_does = new STable[0];
 
             stable.nslots = 0;
             foreach (string an in all_slot) {
@@ -506,7 +504,7 @@ next_method: ;
 
         public void FillRole(STable[] superclasses, STable[] cronies) {
             this.superclasses = new List<STable>(superclasses);
-            local_does = cronies;
+            local_roles = new List<STable>(cronies);
             type = ROLE; rtype = "role";
             SetMRO(Kernel.AnyMO.mo.mro);
         }
@@ -626,7 +624,6 @@ next_method: ;
                 foreach (AttrInfo ai in m.mo.local_attr)
                     all_slot_l.Add(ai.name);
             stable.all_slot = all_slot_l.ToArray();
-            local_does = new STable[0];
 
             stable.nslots = 0;
             foreach (string an in stable.all_slot) {
@@ -667,6 +664,7 @@ next_method: ;
             }
 
             fb.Refs<STable>(superclasses);
+            fb.Refs<STable>(local_roles);
             fb.Refs<STable>(mro);
         }
 
@@ -693,7 +691,6 @@ next_method: ;
             n.subsetFilter = (Variable)tb.ObjRef();
             n.curriedArgs = tb.RefsA<Variable>();
 
-            // local_does not yet used
             int mcount = tb.Int();
             while (mcount-- > 0) {
                 MethodInfo mi = default(MethodInfo);
@@ -715,6 +712,7 @@ next_method: ;
             }
 
             n.superclasses = tb.RefsL<STable>();
+            n.local_roles = tb.RefsL<STable>();
             n.mro = tb.RefsA<STable>();
             tb.PushFixup(n);
             return n;

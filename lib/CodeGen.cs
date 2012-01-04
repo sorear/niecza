@@ -4023,6 +4023,11 @@ dynamic:
                 STable su = (STable)Handle.Unbox(args[2]);
                 st.mo.superclasses.Add(su);
                 return null;
+            } else if (cmd == "type_add_role") {
+                STable st = (STable)Handle.Unbox(args[1]);
+                STable su = (STable)Handle.Unbox(args[2]);
+                st.mo.local_roles.Add(su);
+                return null;
             } else if (cmd == "type_add_attribute") {
                 STable  add_to = (STable)Handle.Unbox(args[1]);
                 string  name   = (string)args[2];
