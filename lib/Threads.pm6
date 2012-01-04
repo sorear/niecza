@@ -34,17 +34,20 @@ sub lock($m,$f) is export { $m.lock($f); }
 class ObjectPipe {
     has $!lock = Monitor.new;
     has $!queue = [];
+    has $!max_buffer_size = 50;
 
     method get() {
         $!lock.enter;
         $!lock.wait until $!queue;
         my $value = shift $!queue;
+        $!lock.pulse;
         $!lock.exit;
         $value;
     }
 
     method put($x) {
         $!lock.enter;
+        $!lock.wait while $!queue.elems >= $!max_buffer_size;
         push $!queue, $x;
         $!lock.pulse;
         $!lock.exit;
