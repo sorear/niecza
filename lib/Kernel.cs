@@ -4362,7 +4362,7 @@ saveme:
             while (c != null && c.coro_return == null)
                 c = c.caller;
             if (c.coro_return != c)
-                return Kernel.Die(th, "Attempted to re-enter abnormally exitted or running coroutine");
+                return Kernel.Die(th, "Attempted to re-enter abnormally exited or running coroutine");
             c.coro_return = th;
 
             return from;
