@@ -45,6 +45,41 @@ augment class Op::Yada {
 method onlystub() { True }
 }
 
+augment class Op::CallMethod {
+    method code($body) {
+        my $name = ($.name ~~ Op) ?? CgOp.obj_getstr($.name.cgop($body))
+            !! CgOp.str($.name);
+        my $meta = $!ismeta // '';
+        if $.private {
+            my $kl = CgOp.class_ref('mo', $!pclass);
+            if $!pclass.kind eq 'prole' {
+                $kl = CgOp.obj_llhow(CgOp.fetch(CgOp.scopedlex('$?CLASS')));
+            }
+            CgOp.subcall(CgOp.stab_privatemethod($kl, $name),
+                $.receiver.cgop($body), self.argblock($body));
+        } elsif $meta eq '^' {
+            CgOp.let($.receiver.cgop($body), -> $r {
+                CgOp.methodcall(CgOp.newscalar(CgOp.how(CgOp.fetch($r))),
+                    $name, $r, self.argblock($body))});
+        } elsif $meta eq '?' {
+            # TODO maybe use a lower-level check
+            CgOp.let($.receiver.cgop($body), -> $r { CgOp.let($name, -> $n {
+                CgOp.ternary(
+                    CgOp.obj_getbool(CgOp.methodcall(CgOp.newscalar(CgOp.how(
+                        CgOp.fetch($r))), "can", $r, CgOp.box('Str',$n))),
+                    CgOp.methodcall($r, $n, self.argblock($body)),
+                    CgOp.scopedlex('Nil'))})});
+        } elsif $!pclass {
+            CgOp.methodcall($.receiver.cgop($body), 'dispatch:<::>',
+                CgOp.class_ref('typeVar', $!pclass), CgOp.box("Str",$name),
+                self.argblock($body));
+        } else {
+            CgOp.methodcall($.receiver.cgop($body),
+                $name, self.argblock($body));
+        }
+    }
+}
+
 augment class STD {
 my package DEBUG { our constant symtab = 0; }
 method getsig {
