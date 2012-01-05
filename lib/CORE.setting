@@ -577,6 +577,10 @@ my class Cool {
     method trim-leading () { self.subst(/^ \s+/, "") };
     method trim-trailing() { self.subst(/\s+ $/, "") };
     method trim         () { self.trim-leading.trim-trailing };
+
+    method fmt(Str $format = '%s') {
+        sprintf($format, self)
+    }
 }
 
 my role Positional { Any }
@@ -1160,6 +1164,10 @@ my class Parcel is Cool does Positional {
         }
         @tok.join(" ");
     }
+
+    method fmt($format = '%s', $separator = ' ') { # duplicates version in List
+        self.map({ .fmt($format) }).join($separator);
+    }
 }
 
 my class List is Cool does Positional {
@@ -1322,6 +1330,10 @@ my class List is Cool does Positional {
     method kv() { my $i = 0; self.map({ $i++, $_ }) }
 
     method at_pos($p) { self[$p] }
+
+    method fmt($format = '%s', $separator = ' ') {
+        self.map({ .fmt($format) }).join($separator);
+    }
 }
 
 my class Array is List {
@@ -1442,6 +1454,10 @@ my class Hash does Associative {
         '{' ~ (self{self.keys.sort}:p).map(*.perl).join(', ') ~ '}' ~
             ($self.flattens ?? ".hash" !! "")
     }
+
+    method fmt($format = "%s\t%s", $sep = "\n") {
+         self.pairs.map({ .fmt($format) }).join($sep)
+    }
 }
 
 my class Enum is Cool {
@@ -1482,6 +1498,9 @@ my class Pair is Enum {
     }
     method invert() {
         $.value => $.key
+    }
+    method fmt(Str $format = "%s\t%s") {
+        return sprintf($format, $.key, $.value);
     }
 }
 
@@ -2016,6 +2035,10 @@ my class Range is Cool does Positional {
 
     method !min_test($topic) {
         $.min before $topic || (!$.excludes_min && !($.min after $topic));
+    }
+
+    method fmt($format = '%s', $separator = ' ') {
+        self.list.fmt($format, $separator);
     }
 }
 
