@@ -894,6 +894,7 @@ sub infix:<~> is Niecza::absprec<r=> is assoc<list> (\|$bits) { Q:CgOp {
 
 sub infix:<max>(*@values) is Niecza::absprec<k=> is assoc<list> { @values.max }
 sub infix:<min>(*@values) is Niecza::absprec<k=> is assoc<list> { @values.min }
+sub infix:<minmax>(*@values) is Niecza::absprec<k=> is assoc<list> { @values.minmax }
 
 sub warn($str) { Q:CgOp { (control 11 (null frame) (int -1) (obj_getstr {$str}) (null obj)) } }
 
@@ -2331,7 +2332,6 @@ sub prefix:<||> (\|$args) { die "Slicels NYI" } #OK
 sub postfix:<i> is Niecza::absprec<y=> ($item) { $item ~~ Complex ?? $item * i !! Complex.new(0, $item) }
 sub prefix:<sleep> ($x) { Q:CgOp { (sleep (obj_getnum {$x})) } }
 sub infix:<does> ($obj, \$roles) { die "Retyping NYI" } #OK
-sub infix:<minmax> is equiv<X> (\|$args) { die "minmax NYI" } #OK
 sub infix:<...> is equiv<X> (\|$lists) { &Niecza::series-listop($lists, False) }
 sub infix:<...^> is equiv<X> (\|$lists) { &Niecza::series-listop($lists, True) }
 sub infix:« ==> »(\|$args) { die "Feed ops NYI" } #OK
