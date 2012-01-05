@@ -2178,7 +2178,7 @@ our sub Niecza::generate-series(@lhs, $rhs, :$exclude-limit) {
             my $i = 0;
             # Take all items from the LHS except for terminal Codes
             # (ordered this way to avoid overeager evaluation)
-            while @lhs[$i] !~~ Code || @lhs[$i+1].defined {
+            while (@lhs[$i].defined && @lhs[$i] !~~ Code) || @lhs[$i+1].defined {
                 take @lhs[$i]; $i++;
             }
 
