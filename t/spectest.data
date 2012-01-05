@@ -345,7 +345,9 @@ S13-overloading/metaoperators.t
 S13-type-casting/methods.t
 S14-roles/attributes.t
 S14-roles/composition.t
+S14-roles/crony.t
 S14-roles/lexical.t
+S14-roles/namespaced.t
 S14-roles/stubs.t
 S14-roles/submethods.t
 S16-filehandles/filetest.t
