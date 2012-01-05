@@ -152,6 +152,9 @@ sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) {
 
 # not actually inlined but needed for constant i
 sub sqrt($x) { Q:CgOp { (sqrt {$x}) } }
+sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
+sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
+
 # }}}
 # Fundamental types {{{
 my class Mu {
@@ -575,7 +578,10 @@ my class Cool {
     method trim         () { self.trim-leading.trim-trailing };
 }
 
-my class Capture {
+my role Positional { Any }
+my role Associative { Any }
+
+my class Capture does Positional does Associative {
     has $!positionals;
     has $!named;
 
@@ -610,15 +616,15 @@ my class Capture {
 }
 # }}}
 # Scalar types {{{
-my class Numeric is Cool {
+my role Numeric is Cool {
     method ACCEPTS(\$t) {
         defined(self) ?? (self == self ?? self == $t !! $t != $t)
             !! $t.^does(self)
     }
 }
-my class Real is Numeric { }
-my class Integral is Real { }
-my class Num is Real {
+my role Real does Numeric { Any }
+my role Integral does Real { Any }
+my class Num does Real {
     method new() { 0e0 }
     our constant pi = 3.14159_26535_89793_238e0;
     our constant e  = 2.71828_18284_59045_235e0;
@@ -630,7 +636,7 @@ my class Num is Real {
 our constant pi = 3.14159_26535_89793_238e0;
 our constant e  = 2.71828_18284_59045_235e0;
 our constant i  = Num::i;
-my class Int is Integral {
+my class Int does Integral {
     method new() { 0 }
     method niecza_quantifier_max() { self }
     method niecza_quantifier_min() { self }
@@ -638,7 +644,7 @@ my class Int is Integral {
     method perl() { defined(self) ?? ~self !! self.typename }
     method FatRat() { FatRat.new(self, 1) }
 }
-my class Rat is Real {
+my class Rat does Real {
     method new($n,$d) { $n / $d }
     method perl() { defined(self) ?? self.numerator ~ "/" ~ self.denominator !! self.typename }
     method gist() { self // nextsame; self.Str }
@@ -647,7 +653,7 @@ my class Rat is Real {
     method FatRat() { FatRat.new(self.numerator, self.denominator) }
     method nude() { [ self.numerator, self.denominator ] }
 }
-my class Complex is Numeric {
+my class Complex does Numeric {
     method new($re,$im) { Q:CgOp { (complex_new {$re} {$im}) } }
     method perl() { defined(self) ?? ~self !! self.typename }
     method Complex() { self }
@@ -656,7 +662,7 @@ my class Complex is Numeric {
     method conjugate() { self.re - (self.im)i }
     method polar() { self.abs, atan2(self.im, self.re); }
 }
-my class FatRat is Real {
+my class FatRat does Real {
     method new($n,$d) { FatRat.succ * $n / $d }
     method perl() { defined(self) ?? self.numerator ~ "/" ~ self.denominator !! self.typename }
     method FatRat() { self }
@@ -688,8 +694,9 @@ my class Str is Cool {
 my class Scalar {
 }
 
-my class Callable { }
-my class Code is Callable {
+# just a tag
+my role Callable { Any }
+my class Code does Callable {
     has $!outer;
     has $!info;
 
@@ -721,7 +728,7 @@ my class ClassHOW {
     method isa(\$obj, \$type) { Q:CgOp {
         (box Bool (obj_isa (@ {$obj}) (obj_llhow (@ {$type}))))
     } }
-    method does(\$obj, \$role) { self.isa($obj, $role) } #no roles yet
+    method does(\$obj, \$role) { self.isa($obj, $role) }
     method can(\$obj, $name) { Q:CgOp {
         (box Bool (obj_can (@ {$obj}) (obj_getstr {$name})))
     } }
@@ -919,9 +926,6 @@ my class CallFrame {
         (obj_getstr {$var})) } }
 }
 
-sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
-sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
-
 sub die($msg = "Died") { Q:CgOp { (die (@ {$msg})) } }
 
 my class Label {
@@ -1026,7 +1030,7 @@ my class Nil is Cool {
     method Bool   () { False }
 }
 
-my class Parcel is Cool {
+my class Parcel is Cool does Positional {
     method ACCEPTS(\$what) { defined(self) ?? self.flat.ACCEPTS($what) !! nextsame }
     method flat() { self.iterator.flat }
     method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
@@ -1083,7 +1087,7 @@ my class Parcel is Cool {
     }
 }
 
-my class List is Cool {
+my class List is Cool does Positional {
     has @!items;
     has @!rest;
     has $!flat;
@@ -1270,7 +1274,7 @@ my class Array is List {
 
 # Not connected to Hash because Stash contains bvalues while Hash
 # holds values directly.
-my class Stash {
+my class Stash does Associative {
     method at_key($key)        {
         Q:CgOp { (stash_at_key (@ {self}) (obj_getstr {$key})) } }
     method bind_key($key, \$to) {
@@ -1281,7 +1285,7 @@ my class Stash {
         Q:CgOp { (stash_exists_key (@ {self}) (obj_getstr {$key})) } }
 }
 
-my class PseudoStash {
+my class PseudoStash does Associative {
     has $.name;
 
     method at_key($key)        {
@@ -1290,7 +1294,7 @@ my class PseudoStash {
         Q:CgOp { (pstash_bind_key (@ {self}) (obj_getstr {$key}) {$to}) } }
 }
 
-my class Hash {
+my class Hash does Associative {
     method new() { unitem(Q:CgOp { (box Hash (varhash_new)) }) }
 
     method any() { any self.keys }
@@ -1407,7 +1411,7 @@ my class Pair is Enum {
 }
 
 # XXX This ought to be more read-only
-my class EnumMap {
+my class EnumMap does Associative {
     has %!by-key;
     has %!by-value;
     has @!values;
@@ -1649,7 +1653,7 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
 }
 # }}}
 # Regular expression support {{{
-my grammar Cursor is Any {
+my grammar Cursor is Any does Associative does Positional {
     method at_key($k) { self.{$k} }
     method at_pos($k) { self.[$k] }
     method suppose($rx) {
@@ -1709,7 +1713,7 @@ my grammar Cursor is Any {
     token ident { <.alpha> \w* }
 }
 
-my class Match is Cool {
+my class Match is Cool does Associative does Positional {
     method at_key($k) { self.{$k} }
     method at_pos($k) { self.[$k] }
     method ACCEPTS($) { self // nextsame }
@@ -1872,7 +1876,7 @@ my class RangeIter is IterCursor {
     }
 }
 
-my class Range is Cool {
+my class Range is Cool does Positional {
     has $.min;
     has $.max;
     has $.excludes_min = False;

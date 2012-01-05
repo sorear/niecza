@@ -4513,6 +4513,8 @@ saveme:
         [CORESaved] public static STable ClassHOWMO;
         [CORESaved] public static STable PseudoStashMO;
         [CORESaved] public static STable GrammarMO;
+        [CORESaved] public static STable PositionalMO;
+        [CORESaved] public static STable AssociativeMO;
         [CORESaved] public static STable CodeMO;
         [CORESaved] public static STable WhateverCodeMO;
         [CORESaved] public static STable RoutineMO;
