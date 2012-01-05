@@ -5533,7 +5533,7 @@ slow:
             }
 
             foreach (var name in requirements) {
-                if (role_methods.ContainsKey(name.Key) || class_methods.Contains(name.Key)) continue;
+                if (role_methods.ContainsKey(name.Key) || class_methods.Contains(name.Key) || (name.Key.v1 == 0 && cls.FindMethod(name.Key.v2) != null)) continue;
                 throw new NieczaException(MethodSlot(name.Key) + " must be implemented by '" + cls.name + "' because it is required by role '" + name.Value + "'");
             }
 

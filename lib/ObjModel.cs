@@ -594,6 +594,22 @@ next_method: ;
             }
         }
 
+        string ComputeMRO() {
+            string err;
+            STable[][] lists = new STable[superclasses.Count + 2][];
+            lists[0] = new STable[] { stable };
+            lists[superclasses.Count + 1] = superclasses.ToArray();
+            for (int i = 0; i < superclasses.Count; i++)
+                lists[i+1] = superclasses[i].mo.mro;
+
+            List<STable> nmro = new List<STable>();
+            err = C3Merge(nmro, lists);
+            if (err != null)
+                return "C3 MRO generation failed for " + stable.name + ": " + err;
+            SetMRO(nmro.ToArray());
+            return null;
+        }
+
         public string Compose() {
             if (isComposed || type == PACKAGE || type == MODULE) {
                 isComposed = true;
@@ -621,6 +637,8 @@ next_method: ;
             }
 
             if (local_roles.Count > 0) {
+                if ((err = ComputeMRO()) != null) return err;
+                Revalidate();
                 Kernel.ApplyRoleToClass(stable, local_roles.ToArray());
             }
 
@@ -629,17 +647,7 @@ next_method: ;
                         Kernel.AnyMO);
             }
 
-            STable[][] lists = new STable[superclasses.Count + 2][];
-            lists[0] = new STable[] { stable };
-            lists[superclasses.Count + 1] = superclasses.ToArray();
-            for (int i = 0; i < superclasses.Count; i++)
-                lists[i+1] = superclasses[i].mo.mro;
-
-            List<STable> nmro = new List<STable>();
-            err = C3Merge(nmro, lists);
-            if (err != null)
-                return "C3 MRO generation failed for " + stable.name + ": " + err;
-            SetMRO(nmro.ToArray());
+            if ((err = ComputeMRO()) != null) return err;
 
             List<string> all_slot_l = new List<string>();
             foreach (STable m in mro)
