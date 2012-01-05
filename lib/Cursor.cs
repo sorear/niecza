@@ -976,7 +976,7 @@ public partial class Builtins {
         VarDeque dq = new VarDeque();
 
         for (CapInfo it = c.captures; it != null; it = it.prev) {
-            if (it.names[0] == null)
+            if (it.names[0] == null || it.cap == null)
                 continue; // special node
             if (!it.cap.Fetch().Isa(Kernel.MatchMO))
                 continue;
