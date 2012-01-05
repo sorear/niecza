@@ -2452,4 +2452,11 @@ again:
                     from.name);
         }
     }
+
+    public static void exit(int code) {
+        // Hack - at least some versions of Mono don't fire ProcessExit
+        // on an explicit Exit() call
+        Compartment.BeforeExit(null, null);
+        Environment.Exit(code);
+    }
 }

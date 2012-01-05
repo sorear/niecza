@@ -4242,11 +4242,15 @@ saveme:
 
             fieldsToSave = fields.ToArray();
 
-            AppDomain.CurrentDomain.ProcessExit +=
-                delegate (object sender, EventArgs args) {
-                    while (Top.prev != null) { Pop(); }
-                    Top.end.Run();
-                };
+            AppDomain.CurrentDomain.ProcessExit += BeforeExit;
+        }
+
+        [TrueGlobal] internal static bool disable_end;
+        internal static void BeforeExit(object sender, EventArgs args) {
+            if (disable_end) return;
+            disable_end = true;
+            while (Top.prev != null) { Pop(); }
+            Top.end.Run();
         }
 
         Compartment prev;
@@ -5584,7 +5588,7 @@ slow:
                 main_unit.RunMainline();
             } catch (Exception n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
-                Environment.Exit(1);
+                Builtins.exit(1);
             }
         }
 
@@ -6111,6 +6115,7 @@ slow:
         // let's try to avoid looping failure
         static void Panic(string str) {
             Console.Error.WriteLine("Internal error in exception dispatch: " + str);
+            Compartment.disable_end = true;
             Environment.Exit(1);
         }
 

@@ -3042,7 +3042,6 @@ dynamic:
             thandlers["strbuf_seal"] = Methody(null, Tokens.Object_ToString);
             thandlers["say"] = Methody(null, Tokens.Console_WriteLine);
             thandlers["print"] = Methody(null, Tokens.Console_Write);
-            thandlers["exit"] = Methody(null, Tokens.Environment_Exit);
             thandlers["slurp"] = Methody(null, typeof(File).GetMethod("ReadAllText", new Type[] { Tokens.String }));
             thandlers["spew"] = Methody(null, typeof(File).GetMethod("WriteAllText", new Type[] { Tokens.String, Tokens.String }));
             thandlers["vvarlist_to_fvarlist"] = Methody(null, Tokens.VVarList.GetMethod("CopyAsArray"));
