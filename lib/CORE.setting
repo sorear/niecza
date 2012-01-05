@@ -1608,8 +1608,8 @@ sub end($a) { $a.end }
 sub join($tween = "", *@stuff) { @stuff.join($tween) }
 
 sub invert(%h) { %h.invert }
-sub keys(%h) { %h.keys }
-sub values(%h) { %h.values }
+sub keys($h) { $h.keys }
+sub values($h) { $h.values }
 
 sub kv($p) { $p.kv }
 
