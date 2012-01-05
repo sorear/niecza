@@ -1,11 +1,9 @@
 use Threads;
 my ($read, $write) = objectpipe;
-{
-    Threads::Thread.new({
-        for 1..200 -> $i { $write.put($i~'-'~time); };
-        CATCH { when Str { .say } }
-    });
-}
+my $t = Threads::Thread.new({
+    for 1..200 -> $i { $write.put($i~'-'~time); };
+    CATCH { default { say "pipe closed..." } }
+});
 {
     for 1..5 {
         say $read.get() for 1..20;
@@ -14,3 +12,4 @@ my ($read, $write) = objectpipe;
     $read.DESTROY();
     $read = Nil;
 }
+$t.join();
