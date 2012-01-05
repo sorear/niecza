@@ -2522,6 +2522,10 @@ gotit:
                         obj_src = -1;
                         goto get_default;
                     }
+                    if ((flags & Parameter.IS_LIST) != 0)
+                        type = Kernel.PositionalMO;
+                    if ((flags & Parameter.IS_HASH) != 0)
+                        type = Kernel.AssociativeMO;
                     if (!srco.Does(type)) {
                         if (quiet) goto quiet_fail;
                         if (srco.mo.HasType(Kernel.JunctionMO) && obj_src != -1) {

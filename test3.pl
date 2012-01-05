@@ -80,3 +80,8 @@ use Test;
     is qux(Int), 'U', 'multi can discriminate on :U/:D (1)';
     is qux(5),   'D', 'multi can discriminate on :U/:D (2)';
 }
+
+{
+    sub foo(%x) { } #OK
+    dies_ok { foo(3) }, '%x needs Associative';
+}
