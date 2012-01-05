@@ -3400,7 +3400,11 @@ dynamic:
                 MethodInfo mi = Tokens.Builtins.GetMethod(tag);
                 if (mi == null)
                     throw new Exception("Unhandled nam operator " + tag);
-                handlers[tag] = handler = MakeTotalHandler(Methody(null, mi));
+                handlers[tag] = handler = (mi.ReturnType == Tokens.Frame &&
+                        mi.GetParameters().Length >= 1 &&
+                        mi.GetParameters()[0].ParameterType == Tokens.Frame)
+                    ? MakeTotalHandler(Methody(Tokens.Variable, mi))
+                    : MakeTotalHandler(Methody(null, mi));
             }
             if (Config.CGVerbose > 1)
                 Console.WriteLine("enter " + tag);

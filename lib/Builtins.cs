@@ -2429,4 +2429,27 @@ again:
         fr.pos[0] = pun;
         fr.curDisp = new DispatchEnt(pun.Fetch().mo.FindMethod(name));
     }
+
+    public static Frame dispatch_fromtype(Frame th) {
+        Variable[] npos = new Variable[th.pos.Length - 2];
+        STable from = th.pos[1].Fetch().mo;
+        string name = th.pos[2].Fetch().mo.mro_raw_Str.Get(th.pos[2]);
+        npos[0] = th.pos[0];
+        Array.Copy(th.pos, 3, npos, 1, npos.Length - 1);
+
+        if (!npos[0].Fetch().Does(from)) {
+            return Kernel.Die(th, "Cannot dispatch to a method on " +
+                from.name + " because it is not inherited or done by " +
+                npos[0].Fetch().mo.name);
+        }
+
+        var de = from.FindMethod(name);
+        if (de != null) {
+            return de.info.SetupCall(th.Return(), de.outer, de.ip6,
+                        npos, th.named, false, de);
+        } else {
+            return Kernel.Die(th, "Unable to resolve method " + name + " via " +
+                    from.name);
+        }
+    }
 }

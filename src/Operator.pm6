@@ -107,9 +107,6 @@ class Method is Operator {
             ::Op::Interrogative.new(|node($/), receiver => @args[0],
                 name => $.name);
         } else {
-            if defined($!package) && !$!private {
-                $/.CURSOR.sorry("Qualified references to non-private methods NYI");
-            }
             $*CURLEX<!sub>.noninlinable if $!name eq 'eval';
             my $pclass;
             if $.private {
@@ -120,6 +117,8 @@ class Method is Operator {
                 } else {
                     $/.CURSOR.sorry("Cannot resolve class for private method");
                 }
+            } else {
+                $pclass = $.package;
             }
             ::Op::CallMethod.new(|node($/),
                 receiver => @args[0],

@@ -184,6 +184,10 @@ class CallMethod is CallLike {
                         CgOp.fetch($r))), "can", $r, CgOp.box('Str',$n))),
                     CgOp.methodcall($r, $n, self.argblock($body)),
                     CgOp.scopedlex('Nil'))})});
+        } elsif $!pclass {
+            CgOp.methodcall($.receiver.cgop($body), 'dispatch:<::>',
+                CgOp.class_ref('typeVar', $!pclass), CgOp.box("Str",$name),
+                self.argblock($body));
         } else {
             CgOp.methodcall($.receiver.cgop($body),
                 $name, self.argblock($body));
