@@ -1,9 +1,16 @@
 use Threads;
-my $a = Threads::ObjectPipe.new();
-Threads::Thread.new({ 
-    for 1..100 -> $i { $a.put($i~'-'~time) }
-});
-for 1..5 -> $i {
-    say $a.get() for 1..20;
-    sleep 1
+my ($read, $write) = objectpipe;
+{
+    Threads::Thread.new({
+        for 1..200 -> $i { $write.put($i~'-'~time); };
+        CATCH { when Str { .say } }
+    });
+}
+{
+    for 1..5 {
+        say $read.get() for 1..20;
+        sleep 1
+    }
+    $read.DESTROY();
+    $read = Nil;
 }

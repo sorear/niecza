@@ -31,14 +31,78 @@ class Monitor is export {
 
 sub lock($m,$f) is export { $m.lock($f); }
 
+my class ObjectPipeWriteHandle {
+    has $.op;
+    method put($x) {
+        $.op.put($x);
+    }
+    method dup {
+        return $!op.write_handle();
+    }
+    method DESTROY {
+        $!op.writer_closed(self);
+    }
+}
+
+my class ObjectPipeReadHandle {
+    has $.op = 0;
+    method get() {
+        $.op.get();
+    }
+    method dup {
+        return $!op.read_handle();
+    }
+    method DESTROY {
+        $!op.reader_closed(self);
+    }
+}
+
 class ObjectPipe {
     has $!lock = Monitor.new;
     has $!queue = [];
-    has $!max_buffer_size = 50;
+    has $!max_buffer_size = 10;
+    has $!writers = 0;
+    has $!readers = 0;
+    has $!eod = False;
+
+    method read_handle {
+        $!readers++;
+        my $read = ObjectPipeReadHandle.new();
+        $read.op = self;
+        return $read;
+    }
+
+    method reader_closed {
+        $!readers--;
+        sleep 0.1;
+        $!lock.enter;
+        $!lock.pulse;
+        $!lock.exit;
+    }
+
+    method write_handle {
+        $!writers++;
+        my $write = ObjectPipeWriteHandle.new();
+        $write.op = self;
+        return $write;
+    }
+
+    method writer_closed {
+        $!writers--;
+        $!lock.enter;
+        $!lock.pulse;
+        $!lock.exit;
+    }
 
     method get() {
+        return EMPTY if $!eod;
         $!lock.enter;
-        $!lock.wait until $!queue;
+        while (!$!queue && $!writers) {
+            $!lock.wait;
+        }
+        if (!($!queue || $!writers)) {
+            die "Object Pipe closed";
+        }
         my $value = shift $!queue;
         $!lock.pulse;
         $!lock.exit;
@@ -47,11 +111,21 @@ class ObjectPipe {
 
     method put($x) {
         $!lock.enter;
-        $!lock.wait while $!queue.elems >= $!max_buffer_size;
+        while (($!queue.elems >= $!max_buffer_size) && $!readers) {
+            $!lock.try_wait(0.1);
+        }
+        if ($!readers < 1) {
+            die "Object Pipe closed";
+        }
         push $!queue, $x;
         $!lock.pulse;
         $!lock.exit;
     }
+}
+
+sub objectpipe is export {
+    my $op = ObjectPipe.new();
+    return $op.read_handle(), $op.write_handle();
 }
 
 class Thread is export {
