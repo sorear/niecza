@@ -343,6 +343,8 @@ S12-methods/typed-attributes.t
 S12-methods/what.t
 S13-overloading/metaoperators.t
 S13-type-casting/methods.t
+S14-roles/attributes.t
+S14-roles/lexical.t
 S16-filehandles/filetest.t
 S16-filehandles/io.t
 S16-filehandles/io_in_for_loops.t
