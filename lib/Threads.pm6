@@ -63,45 +63,46 @@ class ObjectPipe {
     has $!max_buffer_size = 10;
     has $!writers = 0;
     has $!readers = 0;
-    has $!eod = False;
 
     method read_handle {
+        $!lock.enter;
         $!readers++;
         my $read = ObjectPipeReadHandle.new();
         $read.op = self;
+        $!lock.exit;
         return $read;
     }
 
     method reader_closed {
-        $!readers--;
-        sleep 0.1;
         $!lock.enter;
+        $!readers--;
         $!lock.pulse;
         $!lock.exit;
     }
 
     method write_handle {
+        $!lock.enter;
         $!writers++;
         my $write = ObjectPipeWriteHandle.new();
         $write.op = self;
+        $!lock.exit;
         return $write;
     }
 
     method writer_closed {
-        $!writers--;
         $!lock.enter;
+        $!writers--;
         $!lock.pulse;
         $!lock.exit;
     }
 
     method get() {
-        return EMPTY if $!eod;
         $!lock.enter;
         while (!$!queue && $!writers) {
             $!lock.wait;
         }
         if (!($!queue || $!writers)) {
-            die "Object Pipe closed";
+            return EMPTY;
         }
         my $value = shift $!queue;
         $!lock.pulse;
@@ -112,7 +113,7 @@ class ObjectPipe {
     method put($x) {
         $!lock.enter;
         while (($!queue.elems >= $!max_buffer_size) && $!readers) {
-            $!lock.try_wait(0.1);
+            $!lock.wait;
         }
         if ($!readers < 1) {
             die "Object Pipe closed";
