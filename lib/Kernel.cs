@@ -5463,8 +5463,9 @@ slow:
                 into.mo.local_attr.Add(ai);
             foreach (STable su in role.mo.superclasses)
                 into.mo.superclasses.Add(su);
-            foreach (STable su in role.mo.role_typecheck_list)
-                into.mo.role_typecheck_list.Add(su);
+            // This is handled earlier, at parametric role compose time
+            //foreach (STable su in role.mo.role_typecheck_list)
+            //    into.mo.role_typecheck_list.Add(su);
         }
 
         static string MethodSlot(Prod<int,string> arg) {

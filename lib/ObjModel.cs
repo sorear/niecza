@@ -611,6 +611,9 @@ next_method: ;
 
             if (type == ROLE || type == PARAMETRIZED_ROLE || type == CURRIED_ROLE) {
                 role_typecheck_list.Add(stable);
+                foreach (STable s2 in local_roles)
+                    foreach (STable s3 in s2.mo.role_typecheck_list)
+                        role_typecheck_list.Add(s3);
                 SetMRO(Kernel.AnyMO.mo.mro);
                 Revalidate();
                 stable.SetupVTables();
