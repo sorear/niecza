@@ -5490,7 +5490,7 @@ slow:
 
             // now methods, these are a lot harder
             var class_methods = new HashSet<Prod<int,string>>();
-            var role_methods  = new Dictionary<Prod<int,string>,string>();
+            var role_methods  = new Dictionary<Prod<int,string>,Prod<string,object>>();
             var requirements  = new Dictionary<Prod<int,string>,string>();
 
             foreach (P6how.MethodInfo mi in cls.mo.lmethods) {
@@ -5512,10 +5512,10 @@ slow:
                             requirements[name] = r.name;
                             continue;
                         }
-                        if (role_methods.ContainsKey(name)) {
-                            throw new NieczaException(MethodSlot(name) + " must be resolved by class '" + cls.name + "' because it exists in roles '" + role_methods[name] + "' and '" + r.name + "'");
+                        if (role_methods.ContainsKey(name) && role_methods[name].v2 != mi.impl.GetSlot("info")) {
+                            throw new NieczaException(MethodSlot(name) + " must be resolved by class '" + cls.name + "' because it exists in roles '" + role_methods[name].v1 + "' and '" + r.name + "'");
                         }
-                        role_methods[name] = r.name;
+                        role_methods[name] = Prod.C(r.name, mi.impl.GetSlot("info"));
                     }
                     cls.mo.lmethods.Add(mi);
                 }
