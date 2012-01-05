@@ -177,6 +177,26 @@ augment class Op::ImmedForLoop {
 }
 
 augment class NieczaActions {
+method nibbler($/, $prefix?) {
+    sub iscclass($cur) {
+        # XXX XXX
+        ?$cur.^can('ccstate');
+    }
+    if $/.CURSOR.^isa(::STD::Regex) {
+        make $<EXPR>.ast;
+    } elsif $/.CURSOR.^isa(::NieczaGrammar::CgOp) {
+        if $*SAFEMODE {
+            $/.CURSOR.sorry('Q:CgOp not allowed in safe mode');
+            make ::Op::StatementList.new;
+            return Nil;
+        }
+        make ::Op::CgOp.new(|node($/), optree => $<cgexp>.ast);
+    } elsif iscclass($/.CURSOR) {
+        make self.process_tribble($<nibbles>);
+    } else {
+        make self.process_nibble($/, $<nibbles>, $prefix);
+    }
+}
 method trait_mod:does ($/) {
     make { does => self.process_name($<typename><longname>) };
 }
