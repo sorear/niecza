@@ -5396,6 +5396,16 @@ slow:
             return r;
         }
 
+        internal static STable ToInheritable(STable arg) {
+            if (arg.mo.type == P6how.ROLE || arg.mo.type == P6how.CURRIED_ROLE || arg.mo.type == P6how.PARAMETRIZED_ROLE) {
+                return arg.mo.PunRole();
+            }
+            if (arg.mo.type == P6how.CLASS || arg.mo.type == P6how.GRAMMAR) {
+                return arg;
+            }
+            throw new NieczaException("Cannot inherit from " + arg.name + " (" + arg.mo.rtype + ")");
+        }
+
         static STable ToComposable(STable arg, STable cls) {
             if (arg.mo.type == P6how.CURRIED_ROLE) {
                 STable r;

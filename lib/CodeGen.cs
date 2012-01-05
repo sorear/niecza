@@ -4025,7 +4025,7 @@ dynamic:
             } else if (cmd == "type_add_super") {
                 STable st = (STable)Handle.Unbox(args[1]);
                 STable su = (STable)Handle.Unbox(args[2]);
-                st.mo.superclasses.Add(su);
+                st.mo.superclasses.Add(Kernel.ToInheritable(su));
                 return null;
             } else if (cmd == "type_add_role") {
                 STable st = (STable)Handle.Unbox(args[1]);

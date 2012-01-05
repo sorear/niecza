@@ -654,6 +654,8 @@ next_method: ;
         }
 
         public STable PunRole() {
+            var pun = Thread.VolatileRead(ref rolePun) as STable;
+            if (pun != null) return pun;
             STable n = new STable(stable.name);
 
             n.how = Kernel.BoxAnyMO<STable>(n, Kernel.ClassHOWMO).Fetch();
@@ -664,6 +666,7 @@ next_method: ;
             n.mo.local_roles.Add(stable);
             n.mo.Compose();
 
+            Thread.VolatileWrite(ref rolePun, n);
             return n;
         }
 
@@ -970,11 +973,7 @@ next_method: ;
                     mo.type == P6how.PARAMETRIZED_ROLE) {
                 if (name == "ACCEPTS" || name == "defined")
                     return Kernel.MuMO.FindMethod(name);
-                var pun = Thread.VolatileRead(ref mo.rolePun) as STable;
-                if (pun == null) {
-                    pun = mo.PunRole();
-                    Thread.VolatileWrite(ref mo.rolePun, pun);
-                }
+                var pun = mo.PunRole();
                 var punfunc = Kernel.GetVar("::GLOBAL::Niecza", "&autopun").v;
                 var clone = Kernel.RunInferior(punfunc.Fetch().Invoke(
                     Kernel.GetInferiorRoot(), new Variable[] { pun.typeVar,
