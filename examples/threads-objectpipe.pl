@@ -5,6 +5,7 @@ my $t = Threads::Thread.new({
     for 1..200 -> $i { $write.put($i~'-'~time); $last = $i; };
     CATCH { default { say "pipe closed... sent $last items" } }
 });
+$read.thread = $t;
 {
     for 1..5 {
         say $read.get() for 1..20;
@@ -13,5 +14,4 @@ my $t = Threads::Thread.new({
     $read.DESTROY();
     $read = Nil;
 }
-$t.join();
 say "compare the number of the last consumed item, with the last sent item."

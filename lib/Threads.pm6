@@ -46,6 +46,7 @@ my class ObjectPipeWriteHandle {
 
 my class ObjectPipeReadHandle {
     has $.op = 0;
+    has $.thread;
     method get() {
         $.op.get();
     }
@@ -54,6 +55,14 @@ my class ObjectPipeReadHandle {
     }
     method DESTROY {
         $!op.reader_closed(self);
+        $!thread.join if $!thread;
+    }
+}
+
+my class ObjectPipeReadHandleIter is IterCursor {
+    has $.read;
+    method reify {
+       ($!read.get(),);
     }
 }
 
@@ -126,7 +135,9 @@ class ObjectPipe {
 
 sub objectpipe is export {
     my $op = ObjectPipe.new();
-    return $op.read_handle(), $op.write_handle();
+    my $read = $op.read_handle();
+    my $write = $op.write_handle();
+    return ($read, $write);
 }
 
 class Thread is export {
@@ -141,3 +152,17 @@ class Thread is export {
 
     method sleep($time) { sleep $time }
 }
+
+sub infix:« <== »(\$output, \$input) is export {
+    my ($read, $write) = objectpipe();
+    $output = ObjectPipeReadHandleIter.new();
+    $output.read = $read;
+    $read.thread = Thread.new({
+        for $input -> $val {
+            $write.put($val);
+        }
+        $write.DESTROY;
+    });
+    return $output;
+}
+
