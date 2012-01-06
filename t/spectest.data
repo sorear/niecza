@@ -318,6 +318,7 @@ S09-autovivification/autovivification.t
 S09-subscript/slice.t
 S10-packages/basic.t
 S12-attributes/augment-and-initialization.t
+S12-attributes/clone.t
 S12-attributes/instance.t
 S12-class/anonymous.t
 S12-class/attributes.t
