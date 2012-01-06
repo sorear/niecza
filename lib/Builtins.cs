@@ -2495,7 +2495,6 @@ again:
         n.mo.Compose();
 
         if (obj.IsDefined()) {
-            obj = obj.ReprClone();
             obj.ChangeType(n);
 
             BuildMostDerived(obj);

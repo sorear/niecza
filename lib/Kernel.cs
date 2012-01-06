@@ -5446,7 +5446,7 @@ slow:
             } else if (arg.mo.type == P6how.ROLE) {
                 return arg;
             } else {
-                throw new NieczaException("Cannot compose a type of category " + arg.mo.rtype);
+                throw new NieczaException("Cannot compose a type of category " + arg.mo.rtype + " (" + arg.name + ")");
             }
         }
 
