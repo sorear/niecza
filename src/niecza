@@ -273,6 +273,43 @@ augment class Op::ImmedForLoop {
 }
 
 augment class NieczaActions {
+method check_type_args($/) {
+    if $<postcircumfix> -> $pc {
+        make mkcall($/, '&_param_role_inst', $/.ast, @( $pc.ast.args ));
+    }
+}
+method term:identifier ($/) {
+    my $id  = ~$<identifier>;
+    my $sal = $<args> ?? ($<args>.ast // []) !! [];
+    # TODO: support zero-D slicels
+
+    if $sal > 1 {
+        $/.CURSOR.sorry("Slicel lists are NYI");
+        make ::Op::StatementList.new;
+        return;
+    }
+
+    if self.is_pseudo_pkg($id) {
+        make Op::IndirectVar.new(|node($/),
+            name => Op::StringLiteral.new(text => $id));
+        self.check_type_args($/);
+        return;
+    }
+    my $is_name = $/.CURSOR.is_name(~$<identifier>);
+
+    if $is_name && $<args>.chars == 0 {
+        make mklex($/, $id);
+        self.check_type_args($/);
+        return;
+    }
+
+    my $args = $sal[0] // [];
+
+    make mklex($/, $is_name ?? $id !! '&' ~ $id);
+    self.check_type_args($/);
+    make ::Op::CallSub.new(|node($/), invocant => $/.ast, :$args);
+}
+
 method nibbler($/, $prefix?) {
     sub iscclass($cur) {
         # XXX XXX

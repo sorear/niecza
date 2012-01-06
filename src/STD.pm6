@@ -3893,6 +3893,11 @@ grammar P6 is STD {
             $isname = $¢.is_name($name);
             $¢.check_nodecl($name) if $isname;
         }
+
+        # parametric type?
+        :dba('type parameter')
+        <.unsp>? [ <?{ $isname }> <?before '['> <postcircumfix> ]?
+
         <args($isname)>
         { self.add_mystery($<identifier>,$pos,substr(self.orig,$pos,1)) unless $<args><invocant>; }
         {
