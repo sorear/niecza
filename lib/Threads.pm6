@@ -62,7 +62,12 @@ my class ObjectPipeReadHandle {
 my class ObjectPipeReadHandleIter is IterCursor {
     has $.read;
     method reify {
-       ($!read.get(),);
+       my $r = $!read.get();
+       if ($r === EMPTY) {
+         ($r,);
+       } else {
+         ($r, self);
+       }
     }
 }
 
