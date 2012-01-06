@@ -323,6 +323,8 @@ my class Any is Mu {
             }
         }
     }
+
+    method rotate($n = 1) { @(self).rotate($n) }
 }
 
 sub Niecza::autopun($pun, $name) {
@@ -1366,6 +1368,11 @@ my class List is Cool does Positional {
 
     method fmt($format = '%s', $separator = ' ') {
         self.map({ .fmt($format) }).join($separator);
+    }
+
+    method rotate($n = 1) {
+        my $k = $n % self.elems;
+        self[$k .. self.elems-1, 0 .. $k-1];
     }
 }
 
@@ -2785,6 +2792,7 @@ sub atan2($y, $x = 1) { $y.atan2($x) }
 
 sub pick($num, *@values) { @values.pick($num) }
 sub roll($num, *@values) { @values.roll($num) }
+sub rotate(@array, $n = 1) { @array.rotate($n) }
 
 INIT {
     $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
