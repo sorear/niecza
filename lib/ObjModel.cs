@@ -23,6 +23,10 @@ namespace Niecza {
 
         public abstract string ReprName();
 
+        public virtual void ChangeType(STable to) {
+            throw new NieczaException("Representation " + ReprName() + " does not support mixins");
+        }
+
         public virtual P6any ReprClone() {
             throw new NieczaException("Representation " + ReprName() + " does not support cloning");
         }
@@ -1118,6 +1122,20 @@ next_method: ;
                 Array.Copy(slots, to.slots, slots.Length);
             }
             to.mo = mo;
+        }
+
+        public override void ChangeType(STable to) {
+            if (to.nslots == 0) { mo = to; slots = null; return; }
+            object[] old_slots = slots;
+            slots = new object[to.nslots];
+
+            for (int i = 0; i < to.nslots; i++) {
+                int old;
+                if (mo.slotMap.TryGetValue(to.all_slot[i], out old))
+                    slots[i] = old_slots[old];
+            }
+
+            mo = to;
         }
 
         public override P6any ReprClone() {

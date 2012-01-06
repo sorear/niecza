@@ -966,9 +966,40 @@ sub _param_role_inst(\|$t) {
     Q:CgOp { (instrole (unbox fvarlist (@ {$t}))) }
 }
 
-sub infix:<but>($obj, $role) is equiv<leg> { Q:CgOp {
-    (ns (stab_what (role_apply (obj_llhow (@ {$obj})) (obj_llhow (@ {$role})))))
-} }
+proto infix:<does>(|$) { * }
+multi infix:<does>(Mu:D \$obj, Mu:U \$role) is rw {
+    # XXX Mutability check.
+    Q:CgOp { (mixin (@ {$obj}) {$role}) }
+}
+multi infix:<does>(Mu:U \$obj, Mu:U \$role) is rw { #OK not used
+    die "Cannot use 'does' operator with a type object"
+}
+multi infix:<does>(Mu:D \$obj, @roles) is rw {
+    # XXX Mutability check.
+    Q:CgOp { (mixin (@ {$obj}) {@roles}) }
+}
+multi infix:<does>(Mu:U \$obj, @roles) is rw { #OK not used
+    die "Cannot use 'does' operator with a type object"
+}
+
+proto infix:<but>(|$) { * }
+multi infix:<but>(Mu:D \$obj, Mu:U \$role) {
+    Q:CgOp { (mixin (@ {$obj.clone}) {$role}) }
+}
+multi infix:<but>(Mu:U \$obj, Mu:U \$role) {
+    Q:CgOp { (mixin (@ {$obj}) {$role}) }
+}
+multi infix:<but>(Mu \$obj, Mu:D $val) is rw {
+    my $meth := method () { $val };
+    my $role := Q:CgOp { (enum_mixin_role (obj_getstr {$val.typename}) (@ {$meth})) };
+    Q:CgOp { (mixin (@ {$obj}) {$role}) }
+}
+multi infix:<but>(Mu:D \$obj, @roles) {
+    Q:CgOp { (mixin (@ {$obj.clone}) {@roles}) }
+}
+multi infix:<but>(Mu:U \$obj, @roles) {
+    Q:CgOp { (mixin (@ {$obj}) {@roles}) }
+}
 
 sub infix:<~~>($t,$m) is equiv<==> { $m.ACCEPTS($t) }
 
@@ -2332,7 +2363,6 @@ sub prefix:<~^> ($x) { die "Buffer bitops NYI"; } #OK
 sub prefix:<||> (\|$args) { die "Slicels NYI" } #OK
 sub postfix:<i> is Niecza::absprec<y=> ($item) { $item ~~ Complex ?? $item * i !! Complex.new(0, $item) }
 sub prefix:<sleep> ($x) { Q:CgOp { (sleep (obj_getnum {$x})) } }
-sub infix:<does> ($obj, \$roles) { die "Retyping NYI" } #OK
 sub infix:<...> is equiv<X> (\|$lists) { &Niecza::series-listop($lists, False) }
 sub infix:<...^> is equiv<X> (\|$lists) { &Niecza::series-listop($lists, True) }
 sub infix:« ==> »(\|$args) { die "Feed ops NYI" } #OK

@@ -5055,19 +5055,7 @@ value:      vx = (Variable) th.resultSlot;
                 goto again;
             }
 
-            if ((prog[i].flags & P6how.A_TYPE) == P6how.A_SCALAR) {
-                if (prog[i].type == null)
-                    n.SetSlot(prog[i].name, NewMuScalar(
-                        vx != null ? vx.Fetch() : AnyMO.typeObject));
-                else
-                    n.SetSlot(prog[i].name, NewRWScalar(prog[i].type,
-                        vx != null ? vx.Fetch() : prog[i].type.initObject));
-            } else {
-                Variable obj = (prog[i].flags & P6how.A_HASH) != 0 ?
-                    CreateHash() : CreateArray();
-                if (vx != null) Assign(obj, vx);
-                n.SetSlot(prog[i].name, obj);
-            }
+            Builtins.EstablishSlot(n, prog[i], vx);
 
             i++;
             goto again;

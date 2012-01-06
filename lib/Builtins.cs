@@ -2464,24 +2464,94 @@ again:
         obj = obj.ReprClone();
         if (!mods.IsNonEmpty) return obj;
 
+        Variable arg;
         foreach (STable m in obj.mo.mo.mro) {
             foreach (P6how.AttrInfo ai in m.mo.local_attr) {
                 if ((ai.flags & P6how.A_PUBLIC) == 0) continue;
-                Variable val, arg;
                 if (!mods.TryGetValue(ai.name, out arg)) continue;
 
-                if ((ai.flags & P6how.A_TYPE) == P6how.A_SCALAR) {
-                    val = (ai.type == null) ? Kernel.NewMuScalar(arg.Fetch()) :
-                        Kernel.NewRWScalar(ai.type, arg.Fetch());
-                } else {
-                    val = (ai.flags & P6how.A_HASH) != 0 ?
-                        Kernel.CreateHash() : Kernel.CreateArray();
-                    Kernel.Assign(val, arg);
-                }
-                obj.SetSlot(ai.name, val);
+                EstablishSlot(obj, ai, arg);
             }
         }
 
         return obj;
+    }
+
+    public static Variable mixin(P6any obj, Variable role_list) {
+        VarDeque iter = start_iter(role_list);
+        List<STable> roles = new List<STable>();
+        while (Kernel.IterHasFlat(iter, true))
+            roles.Add(iter.Shift().Fetch().mo);
+
+        STable n = new STable(obj.mo.name + "+" + Kernel.JoinS(",", roles));
+
+        n.how = Kernel.BoxAny<STable>(n, obj.mo.how).Fetch();
+        n.typeObject = n.initObject = new P6opaque(n);
+        n.typeVar = n.initVar = Kernel.NewROScalar(n.typeObject);
+        ((P6opaque)n.typeObject).slots = null;
+
+        n.mo.superclasses.Add(obj.mo);
+        n.mo.local_roles = roles;
+        n.mo.Compose();
+
+        if (obj.IsDefined()) {
+            obj = obj.ReprClone();
+            obj.ChangeType(n);
+
+            BuildMostDerived(obj);
+            return Kernel.NewROScalar(obj);
+        } else {
+            return n.typeVar;
+        }
+    }
+
+    public static void EstablishSlot(P6any n, P6how.AttrInfo ai,
+            Variable vx) {
+        Variable obj;
+        if ((ai.flags & P6how.A_TYPE) == P6how.A_SCALAR) {
+            if (ai.type == null)
+                obj = Kernel.NewMuScalar(
+                    vx != null ? vx.Fetch() : Kernel.AnyMO.typeObject);
+            else
+                obj = Kernel.NewRWScalar(ai.type,
+                    vx != null ? vx.Fetch() : ai.type.initObject);
+        } else {
+            obj = (ai.flags & P6how.A_HASH) != 0 ?
+                Kernel.CreateHash() : Kernel.CreateArray();
+            if (vx != null) Kernel.Assign(obj, vx);
+        }
+        n.SetSlot(ai.name, obj);
+    }
+
+
+    static void BuildMostDerived(P6any obj) {
+        P6any build = null;
+        foreach (P6how.MethodInfo m in obj.mo.mo.lmethods) {
+            if (m.Name() == "BUILD" && m.flags == P6how.V_SUBMETHOD)
+                build = m.impl;
+        }
+
+        foreach (P6how.AttrInfo ai in obj.mo.mo.local_attr) {
+            Variable vx = null;
+            if (ai.init != null) {
+                vx = Kernel.RunInferior(ai.init.Invoke(Kernel.GetInferiorRoot(),
+                            Variable.None, null));
+            }
+            EstablishSlot(obj, ai, vx);
+        }
+
+        if (build != null)
+            Kernel.RunInferior(build.Invoke(Kernel.GetInferiorRoot(),
+                new Variable[] { Kernel.NewROScalar(obj) }, null));
+    }
+
+    public static Variable enum_mixin_role(string name, P6any meth) {
+        STable r = new STable("ANON");
+        r.mo.FillRole(new STable[0], null);
+        r.typeObject = r.initObject = new P6opaque(r);
+        r.typeVar = r.initVar = Kernel.NewROScalar(r.typeObject);
+        r.mo.AddMethod(0, name, meth);
+        r.mo.Revalidate();
+        return r.typeVar;
     }
 }
