@@ -651,6 +651,20 @@ my class Int does Integral {
     method Int() { self }
     method perl() { defined(self) ?? ~self !! self.typename }
     method FatRat() { FatRat.new(self, 1) }
+    method base(Cool $base) {
+        my $intBase = $base;
+        die("base must be between 2 and 36, got $base")
+            unless 2 <= $intBase <= 36;
+        my @conversion = 0..9, 'A' .. 'Z';
+        my @res;
+        my $n = self.abs;
+        repeat {
+            push @res, @conversion[$n % $intBase];
+            $n div= $intBase;
+        } while $n > 0;
+        push @res, '-' if self < 0;
+        join '', @res.reverse;
+    }
 }
 my class Rat does Real {
     method new($n,$d) { $n / $d }
