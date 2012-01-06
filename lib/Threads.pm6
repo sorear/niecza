@@ -64,7 +64,7 @@ my class ObjectPipeReadHandleIter is IterCursor {
     method reify {
        my $r = $!read.get();
        if ($r === EMPTY) {
-         ($r,);
+         ();
        } else {
          ($r, self);
        }
@@ -160,14 +160,18 @@ class Thread is export {
 
 sub infix:« <== »(\$output, \$input) is export {
     my ($read, $write) = objectpipe();
-    $output = ObjectPipeReadHandleIter.new();
-    $output.read = $read;
+    my $it = ObjectPipeReadHandleIter.new();
+    $it.read = $read;
     $read.thread = Thread.new({
         for $input -> $val {
             $write.put($val);
         }
         $write.DESTROY;
     });
-    return $output;
+    if ($output ~~ Code) {
+      return $output.(@$it);
+    } else {
+      return $output = $it;
+    }
 }
 
