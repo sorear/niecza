@@ -325,6 +325,9 @@ my class Any is Mu {
     }
 
     method rotate($n = 1) { @(self).rotate($n) }
+    method min($cmp = &infix:<cmp>) { @(self).min($cmp) }
+    method max($cmp = &infix:<cmp>) { @(self).max($cmp) }
+    method minmax($cmp = &infix:<cmp>) { @(self).minmax($cmp) }
 }
 
 sub Niecza::autopun($pun, $name) {
