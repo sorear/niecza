@@ -186,6 +186,7 @@ my class Mu {
     method bless($, *%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
     method CREATE() { Q:CgOp { (ns (obj_newblank (obj_llhow (@ {self})))) } }
     method new(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
+    method clone(*%_) { Q:CgOp { (ns (repr_clone (@ {self}) (unbox varhash (@ {%_})))) } }
     method dispatch:<::>(|$) { Q:CgOp { (dispatch_fromtype) } }
 }
 

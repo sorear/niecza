@@ -2459,4 +2459,29 @@ again:
         Compartment.BeforeExit(null, null);
         Environment.Exit(code);
     }
+
+    public static P6any repr_clone(P6any obj, VarHash mods) {
+        obj = obj.ReprClone();
+        if (!mods.IsNonEmpty) return obj;
+
+        foreach (STable m in obj.mo.mo.mro) {
+            foreach (P6how.AttrInfo ai in m.mo.local_attr) {
+                if ((ai.flags & P6how.A_PUBLIC) == 0) continue;
+                Variable val, arg;
+                if (!mods.TryGetValue(ai.name, out arg)) continue;
+
+                if ((ai.flags & P6how.A_TYPE) == P6how.A_SCALAR) {
+                    val = (ai.type == null) ? Kernel.NewMuScalar(arg.Fetch()) :
+                        Kernel.NewRWScalar(ai.type, arg.Fetch());
+                } else {
+                    val = (ai.flags & P6how.A_HASH) != 0 ?
+                        Kernel.CreateHash() : Kernel.CreateArray();
+                    Kernel.Assign(val, arg);
+                }
+                obj.SetSlot(ai.name, val);
+            }
+        }
+
+        return obj;
+    }
 }

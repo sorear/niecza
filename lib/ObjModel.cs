@@ -10,15 +10,21 @@ namespace Niecza {
         public abstract void Freeze(FreezeBuffer fb);
 
         public virtual object GetSlot(string name) {
-            throw new InvalidOperationException("no slots in this repr");
+            throw new NieczaException("Representation " + ReprName() + " does not support attributes");
         }
 
         public virtual void SetSlot(string name, object v) {
-            throw new InvalidOperationException("no slots in this repr");
+            throw new NieczaException("Representation " + ReprName() + " does not support attributes");
         }
 
         protected Frame Fail(Frame caller, string msg) {
             return Kernel.Die(caller, msg + " in class " + mo.name);
+        }
+
+        public abstract string ReprName();
+
+        public virtual P6any ReprClone() {
+            throw new NieczaException("Representation " + ReprName() + " does not support cloning");
         }
 
         // Most reprs won't have a concept of type objects
@@ -187,6 +193,8 @@ namespace Niecza {
         public const int A_PUBLIC = 1;
         public const int A_ARRAY  = 2;
         public const int A_HASH   = 4;
+        public const int A_TYPE   = 6;
+        public const int A_SCALAR = 0;
 
         // 0 must be public only
         public const int V_PUBLIC    = 0;
@@ -1075,6 +1083,8 @@ next_method: ;
         // containers are objects now
         public object[] slots;
 
+        public override string ReprName() { return "P6opaque"; }
+
         internal P6opaque() { }
         public P6opaque(STable klass) {
             this.mo = klass;
@@ -1099,6 +1109,22 @@ next_method: ;
                 throw new NieczaException("Attempted to access slot " + name +
                         " of type object for " + mo.name);
             return slots[mo.FindSlot(name)];
+        }
+
+        protected void CopyTo(P6opaque to) {
+            if (slots == null) { to.slots = null; }
+            else {
+                to.slots = new object[slots.Length];
+                Array.Copy(slots, to.slots, slots.Length);
+            }
+            to.mo = mo;
+        }
+
+        public override P6any ReprClone() {
+            if (!IsDefined()) return this;
+            var res = new P6opaque(mo);
+            CopyTo(res);
+            return res;
         }
 
         public override bool IsDefined() {
@@ -1151,6 +1177,15 @@ next_method: ;
         public override void Freeze(FreezeBuffer fb) {
             FreezeSelf(fb, typeof(T));
             fb.ObjRef(value);
+        }
+
+        public override string ReprName() { return "P6box[" + typeof(T).Name + "]"; }
+
+        public override P6any ReprClone() {
+            if (!IsDefined()) return this;
+            var res = new BoxObject<T>(value, mo);
+            CopyTo(res);
+            return res;
         }
     }
 }

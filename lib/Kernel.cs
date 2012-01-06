@@ -1384,6 +1384,8 @@ namespace Niecza {
         public SubInfo  def;
         public STable   type;
 
+        public override string ReprName() { return "P6parameter"; }
+
         private Parameter() { }
         public Parameter(int flags, int slot, string name,
                 string[] names, SubInfo def, STable type) {
@@ -1466,6 +1468,8 @@ namespace Niecza {
 
     public class Signature : P6any, IFixup {
         public Parameter[] parms;
+
+        public override string ReprName() { return "P6sig"; }
 
         public Signature(params Parameter[] parms) { this.mo = Kernel.SignatureMO; this.parms = parms; }
         private Signature() { }
@@ -2178,6 +2182,8 @@ namespace Niecza {
             Environment.GetEnvironmentVariable("NIECZA_VERBOSE_EXCEPTIONS") != null;
         public static readonly bool AllExceptions =
             Environment.GetEnvironmentVariable("NIECZA_ALL_EXCEPTIONS") != null;
+
+        public override string ReprName() { return "P6frame"; }
 
         public Frame MakeChild(Frame outer, SubInfo info, P6any sub) {
             if (reusable_child == null) {
@@ -5049,7 +5055,7 @@ value:      vx = (Variable) th.resultSlot;
                 goto again;
             }
 
-            if ((prog[i].flags & ~P6how.A_PUBLIC) == 0) {
+            if ((prog[i].flags & P6how.A_TYPE) == P6how.A_SCALAR) {
                 if (prog[i].type == null)
                     n.SetSlot(prog[i].name, NewMuScalar(
                         vx != null ? vx.Fetch() : AnyMO.typeObject));

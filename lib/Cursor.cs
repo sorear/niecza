@@ -795,6 +795,8 @@ public class Cursor : P6any {
     public CapInfo captures;
     public STable save_klass;
 
+    public override string ReprName() { return "P6cursor"; }
+
     public override void Freeze(FreezeBuffer fb) { throw new NotImplementedException(); }
     public string GetBacking() { return global.orig_s; }
 
