@@ -848,6 +848,9 @@ my class CommonEnum {
     method postcircumfix:<( )> ($key) {
         self.from-index(self.enums._lookup($key));
     }
+
+    method pick($count = 1) { self.enums.map({ self.($_.key) }).pick($count) }
+    method roll($count = 1) { self.enums.map({ self.($_.key) }).roll($count) }
 }
 
 my class IntBasedEnum is CommonEnum {
