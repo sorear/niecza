@@ -25,7 +25,22 @@ use STD;
 # }
 # }
 
+my constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
+augment grammar STD::P6 {
+    rule post_constraint {
+        :my $*IN_DECL = '';
+        :dba('constraint')
+        [
+        | '[' ~ ']' <signature> $<bracket>={1}
+        | '(' ~ ')' <signature>
+        | where <EXPR(item %item_assignment)>
+        ]
+    }
+}
+
 augment class NieczaActions {
+method post_constraint($/) { }
+
 method parameter($/) {
     constant %masks = ':_' => $Sig::ANY_DEF, ':T' => $Sig::UNDEF_ONLY,
         ':U' => $Sig::UNDEF_ONLY, ':D' => $Sig::DEF_ONLY;
@@ -61,12 +76,6 @@ method parameter($/) {
         }
     }
 
-    if $<post_constraint> > 0 {
-        $/.sorry('Parameter post constraints NYI');
-        make ::Sig::Parameter.new;
-        return Nil;
-    }
-
     my $default = $<default_value> ?? $<default_value>.ast !! Any;
     $default.set_name("$/ init") if $default;
 
@@ -92,6 +101,22 @@ method parameter($/) {
 
     make ::Sig::Parameter.new(name => ~$/, mdefault => $default,
         tclass => $type, |$p_ast, :$flags);
+
+    for @<post_constraint> -> $pc {
+        # XXX this doesn't seem to be specced anywhere, but it's
+        # Rakudo-compatible and shouldn't hurt
+        if $pc<bracket> {
+            $/.ast.flags +&= +^$Sig::IS_HASH;
+            $/.ast.flags +|= $Sig::IS_LIST;
+        }
+
+        if $pc<signature> -> $ssig {
+            $ssig.CURSOR.sorry('Cannot have more than one sub-signature for a pparameter') if $/.ast.subsig;
+            $/.ast.subsig = $pc<signature>.ast;
+        } else {
+            push ($/.ast.where //= []), self.thunk_sub($pc<EXPR>.ast);
+        }
+    }
 }
 }
 

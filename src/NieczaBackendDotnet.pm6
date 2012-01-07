@@ -109,17 +109,23 @@ class StaticSub {
     method unit() { downcall("sub_get_unit", self) }
     method is($o) { downcall("equal_handles", self, $o) }
 
-    method set_signature($sig) {
+    method !signature($sig) {
         my @args;
+        for @( $sig.params ) {
+            push @args, downcall("param_new", self, .flags, .name, .slot,
+                @( .names ), Str, .mdefault, .tclass);
+            @args[*-1].subsig(self!signature(.subsig)) if .subsig;
+            @args[*-1].constraints(@(.where)) if .where;
+        }
+        @args;
+    }
+
+    method set_signature($sig) {
         if !$sig {
             downcall("sub_no_signature", self);
             return;
         }
-        for @( $sig.params ) {
-            push @args, downcall("param_new", self, .flags, .name, .slot,
-                @( .names ), Str, .mdefault, .tclass);
-        }
-        downcall("set_signature", self, @args);
+        downcall("set_signature", self, self!signature($sig));
     }
 
     method add_exports($name, $obj, $tags) {
