@@ -1086,8 +1086,8 @@ method mod_internal:p6adv ($/) {
 method backslash:qq ($/) { make $<quote>.ast }
 method post_backslash($/) {
     # XXX confine $/ resetting
-    sub _isupper { $_ ~~ /^<[ A .. Z ]>$/ }
-    sub _islower { $_ ~~ /^<[ a .. z ]>$/ }
+    sub _isupper { $_ ~~ /^<[ A .. Z ]>/ }
+    sub _islower { $_ ~~ /^<[ a .. z ]>/ }
     if $/.ast.^isa(CClass) {
         make self.cclass_cc($/.ast);
     }
@@ -1246,11 +1246,8 @@ method process_tribble(@bits) {
 
 method nibbler($/, $prefix?) {
     sub iscclass($cur) {
-        my $*CCSTATE = '';
-        my $ok = False;
         # XXX XXX
-        try { $cur.ccstate(".."); $ok = True };
-        $ok
+        ?$cur.^can('ccstate');
     }
     if $/.CURSOR.^isa(::STD::Regex) {
         make $<EXPR>.ast;
@@ -1684,7 +1681,9 @@ sub qpvalue($ast) {
 
 method colonpair($/) {
     my $n;
-    if !$<v>.^isa(Match) {
+    if $/ eq any <:_ :U :D :T> {
+        $n = "";
+    } elsif !$<v>.^isa(Match) {
         $n = ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
     } else {
         $n = ":" ~ $<k> ~ "<" ~ qpvalue($<v>.ast // ~$<v>) ~ ">";
@@ -1815,6 +1814,11 @@ method term:name ($/) {
     }
 }
 
+method check_type_args($/) {
+    if $<postcircumfix> -> $pc {
+        make mkcall($/, '&_param_role_inst', $/.ast, @( $pc.ast.args ));
+    }
+}
 method term:identifier ($/) {
     my $id  = ~$<identifier>;
     my $sal = $<args> ?? ($<args>.ast // []) !! [];
@@ -1829,20 +1833,22 @@ method term:identifier ($/) {
     if self.is_pseudo_pkg($id) {
         make Op::IndirectVar.new(|node($/),
             name => Op::StringLiteral.new(text => $id));
+        self.check_type_args($/);
         return;
     }
     my $is_name = $/.CURSOR.is_name(~$<identifier>);
 
     if $is_name && $<args>.chars == 0 {
         make mklex($/, $id);
+        self.check_type_args($/);
         return;
     }
 
     my $args = $sal[0] // [];
 
-    make ::Op::CallSub.new(|node($/),
-        invocant => mklex($/, $is_name ?? $id !! '&' ~ $id),
-        args => $args);
+    make mklex($/, $is_name ?? $id !! '&' ~ $id);
+    self.check_type_args($/);
+    make ::Op::CallSub.new(|node($/), invocant => $/.ast, :$args);
 }
 
 method term:sym<self> ($/) { make mklex($/, 'self') }
@@ -2872,6 +2878,19 @@ method process_block_traits($/, @tr) {
             $T.CURSOR.trymop({
                 $pack.add_super($super);
             });
+        } elsif $pack && $tr<does> {
+            my $role = $tr<does>;
+
+            $T.CURSOR.sorry("role $role.name() used outside of any class"), next
+                unless $sub.body_of;
+            $T.CURSOR.sorry("role $role.name() used in an augment"),
+                next if defined $*AUGMENT_BUFFER;
+            $T.CURSOR.sorry("cannot use a role in this kind of package"),
+                next if !$pack.CAN('add_role');
+
+            $T.CURSOR.trymop({
+                $pack.add_role($role);
+            });
         } elsif $pack && $tr<export> {
             my @exports = @( $tr<export> );
             $sub.outer.add_exports($pack.name, $pack, @exports);
@@ -3297,8 +3316,11 @@ method open_package_def($, $/ = $*cursor) {
         });
     } else {
         my $class = $*PKGDECL;
-        if $class eq 'role' && $<signature> {
-            $sub.set_signature($<signature>.ast);
+        if $class eq 'role' {
+            my $sig = $<signature> ?? $<signature>.ast !! Sig.simple();
+            unshift $sig.params, ::Sig::Parameter.simple('$?CLASS');
+            $sub.add_my_name('$?CLASS', :noinit);
+            $sub.set_signature($sig);
             $class = 'prole';
         }
 
@@ -3415,6 +3437,10 @@ method trait_mod:is ($/) {
     if $noparm && $<circumfix> {
         $/.CURSOR.sorry($noparm);
     }
+}
+
+method trait_mod:does ($/) {
+    make { does => self.process_name($<typename><longname>) };
 }
 
 method trait_mod:of ($/) {

@@ -5144,14 +5144,8 @@ method getsig {
         my @parms;
         if %method{$*CURLEX<!sub>.class} {
             my $cl = $*CURLEX<!sub>.methodof;
-            # XXX type checking against roles NYI
-            if $cl && $cl.kind eq none <role prole> {
-                push @parms, ::Sig::Parameter.new(name => 'self',
-                    flags => $Sig::INVOCANT + $Sig::POSITIONAL, tclass => $cl);
-            } else {
-                push @parms, ::Sig::Parameter.new(name => 'self',
-                    flags => $Sig::INVOCANT + $Sig::POSITIONAL);
-            }
+            push @parms, ::Sig::Parameter.new(name => 'self',
+                flags => $Sig::INVOCANT + $Sig::POSITIONAL, tclass => $cl);
             $*CURLEX<!sub>.add_my_name('self', :noinit);
         }
 
@@ -5223,6 +5217,10 @@ method is_name($longname, $curlex = $*CURLEX) {
         self.deb("computed name gets a free pass") if $deb;
         return True;
     }
+    my $ch := chars($longname);
+    $longname := substr($longname, 0, $ch-2)
+        if $ch > 2 && substr($longname, $ch-2) eq (':D' | ':U' | ':_' | ':T') &&
+           substr($longname, $ch-3, 1) ne ':';
     my @parts = $longname.split('::');
     shift @parts if @parts[0] eq '';
     pop @parts if @parts && @parts[*-1] eq ''; # doesn't change ref validity

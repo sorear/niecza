@@ -32,6 +32,13 @@ class Capturing is RxOp {
 
     method used_caps() {
         my %h = map { ($_ => $*in_quant ?? 2 !! 1) }, @$.captures;
+
+        for @$.zyg -> $k {
+            for $k.used_caps.pairs -> $p {
+                %h{$p.key} = (%h{$p.key} // 0) + $p.value;
+            }
+        }
+
         %h
     }
 }
@@ -419,11 +426,6 @@ class Subrule is Capturing {
 
     method ctxopzyg() { defined($!regex) ?? ($!regex, 1) !! () }
     method opzyg() { $!regex // Nil }
-
-    method used_caps() {
-        my %h = map { ($_ => $*in_quant ?? 2 !! 1) }, @$.captures;
-        %h
-    }
 
     method code($body) {
         my $callf = $!regex ?? $!regex.cgop($body) !!

@@ -36,6 +36,7 @@ method cgop_labelled($body, $label) {
 method code_labelled($body, $label) { self.code($body) } #OK not used
 
 method statement_level() { self }
+method onlystub() { False }
 
 { class CgOp is Op {
     has $.op;
@@ -77,6 +78,7 @@ class StatementList is Op {
         map { $_, (($i++) ?? 0 !! $f) }, @$.children;
     }
 
+    method onlystub() { $!children && $!children[0].onlystub }
     method code($body) {
         my @ch = map { $_.cgop($body) }, @$.children;
         my $end = @ch ?? pop(@ch) !! CgOp.corelex('Nil');
@@ -169,8 +171,11 @@ class CallMethod is CallLike {
             !! CgOp.str($.name);
         my $meta = $!ismeta // '';
         if $.private {
-            CgOp.subcall(CgOp.stab_privatemethod(
-                    CgOp.class_ref('mo', $!pclass), $name),
+            my $kl = CgOp.class_ref('mo', $!pclass);
+            if $!pclass.kind eq 'prole' {
+                $kl = CgOp.obj_llhow(CgOp.fetch(CgOp.scopedlex('$?CLASS')));
+            }
+            CgOp.subcall(CgOp.stab_privatemethod($kl, $name),
                 $.receiver.cgop($body), self.argblock($body));
         } elsif $meta eq '^' {
             CgOp.let($.receiver.cgop($body), -> $r {
@@ -273,6 +278,7 @@ class HereStub is Op {
 class Yada is Op {
     has $.kind = die "Yada.kind required"; #Str
 
+    method onlystub() { True }
     method code($ ) { CgOp.die(">>>Stub code executed") }
 }
 
@@ -469,16 +475,18 @@ class ImmedForLoop is Op {
         CgOp.rnull(CgOp.letn(
             "!iter$id", CgOp.start_iter($.source.cgop($body)),
             (map { $_, CgOp.null('var') }, @$.var),
-            CgOp.whileloop(0, 0,
-                CgOp.iter_hasflat(CgOp.letvar("!iter$id")),
-                CgOp.prog(
-                    (map { CgOp.letvar($_,
-                        CgOp.vvarlist_shift(CgOp.letvar("!iter$id")))},@$.var),
-                    CgOp.sink(CgOp.xspan("redo$id", "next$id", 0,
-                        $.sink.cgop($body),
-                        1, $l, "next$id",
-                        2, $l, "last$id",
-                        3, $l, "redo$id")))),
+            CgOp.label("again$id"),
+            (map {
+                CgOp.ncgoto("last$id",
+                    CgOp.iter_hasflat(CgOp.letvar("!iter$id"))),
+                CgOp.letvar($_, CgOp.vvarlist_shift(CgOp.letvar("!iter$id")))
+            }, @$.var),
+            CgOp.sink(CgOp.xspan("redo$id", "next$id", 0,
+                $.sink.cgop($body),
+                1, $l, "next$id",
+                2, $l, "last$id",
+                3, $l, "redo$id")),
+            CgOp.goto("again$id"),
             CgOp.label("last$id")));
     }
 }

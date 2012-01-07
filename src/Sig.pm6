@@ -5,6 +5,11 @@ use CgOp;
 # Value processing
 our constant $HASTYPE    = 1; #OK not used
 our constant $MULTI_IGNORED = 16384; #OK not used
+our constant $ANY_DEF    =  0x40000; #OK
+our constant $UNDEF_ONLY =  0x80000; #OK
+our constant $DEF_ONLY   =  0xC0000; #OK
+our constant $TYPE_ONLY  = 0x100000; #OK
+our constant $DEF_MASK   = 0x1C0000; #OK
 
 # Value binding
 our constant $READWRITE  = 2; #OK not used
@@ -26,11 +31,15 @@ our constant $SLURPY_PCL = 2048; #OK not used
 
 class Parameter {
     has Str $.slot;
-    has Int $.flags = $POSITIONAL;
+    has Int $.flags is rw = $POSITIONAL;
     has $.mdefault; # Xref
     has $.names = []; # Array of Str
     has Str $.name;
-    has $.tclass; # is rw; Xref
+    has $.tclass is rw; # Type
+
+    has $.where is rw; # List of (Type | StaticSub); lazily created
+    has Sig $.subsig is rw;
+    has $.typecap is rw; # List of Str; lazily created
 
     method simple($n) { self.new(name => $n, slot => $n, flags => $RWTRANS + $POSITIONAL) }
 }
