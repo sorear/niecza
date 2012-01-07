@@ -946,6 +946,7 @@ sub comb($matcher,$str,$limit?,:$match) { (~$str).comb($matcher,$limit,:$match) 
 sub split($matcher,$str,$limit?,:$all) { (~$str).split($matcher,$limit,:$all) }
 
 sub item(Mu $x) { $x }
+sub list(*@x) { @x.list }
 
 sub prefix:<not> is Niecza::absprec<h=> (\$x) { not($x) }
 
