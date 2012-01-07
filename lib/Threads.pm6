@@ -158,12 +158,12 @@ class Thread is export {
     method sleep($time) { sleep $time }
 }
 
-sub infix:« <== »(\$output, \$input) is export {
+sub infix:« <== »(\$output, @input) is Niecza::absprec<f=> is export {
     my ($read, $write) = objectpipe();
     my $it = ObjectPipeReadHandleIter.new();
     $it.read = $read;
     $read.thread = Thread.new({
-        for $input -> $val {
+        for @input -> $val {
             $write.put($val);
         }
         $write.DESTROY;
