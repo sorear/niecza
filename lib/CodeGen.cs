@@ -3611,7 +3611,8 @@ dynamic:
             if (cmd == "gettype") {
                 object o = Handle.Unbox(args[1]);
                 return (o is SubInfo) ? "sub" : (o is RuntimeUnit) ? "unit" :
-                    (o is STable) ? "type" : (o is Frame) ? "frame" : "unknown";
+                    (o is STable) ? "type" : (o is Frame) ? "frame" :
+                    (o is Parameter) ? "param" : "unknown";
             } else if (cmd == "set_binding") {
                 if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
                     Kernel.TraceFlags = Kernel.TRACE_CUR;
@@ -4272,31 +4273,33 @@ dynamic:
                 SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
                 tgt.sig = null;
                 return null;
+            } else if (cmd == "param_new") {
+                SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
+                int ix = 2;
+                List<string> names = new List<string>();
+                int    flags = (int)   args[ix++];
+                string name  = (string)args[ix++];
+                string slot  = (string)args[ix++];
+                while(true) {
+                    string a_name = (string)args[ix++];
+                    if (a_name == null) break;
+                    names.Add(a_name);
+                }
+                SubInfo deflt = (SubInfo)Handle.Unbox(args[ix++]);
+                STable  type  = (STable)Handle.Unbox(args[ix++]);
+                if (deflt != null) flags |= Parameter.HASDEFAULT;
+                if (type != null) flags |= Parameter.HASTYPE;
+
+                return Handle.Wrap(new Parameter(flags,
+                    (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
+                    name, (names.Count == 0 ? null : names.ToArray()),
+                    deflt, type ?? Kernel.AnyMO));
             } else if (cmd == "set_signature") {
                 SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
                 int ix = 2;
                 List<Parameter> sig = new List<Parameter>();
-                List<string> names = new List<string>();
-                while (ix != args.Length) {
-                    int    flags = (int)   args[ix++];
-                    string name  = (string)args[ix++];
-                    string slot  = (string)args[ix++];
-                    names.Clear();
-                    while(true) {
-                        string a_name = (string)args[ix++];
-                        if (a_name == null) break;
-                        names.Add(a_name);
-                    }
-                    SubInfo deflt = (SubInfo)Handle.Unbox(args[ix++]);
-                    STable  type  = (STable)Handle.Unbox(args[ix++]);
-                    if (deflt != null) flags |= Parameter.HASDEFAULT;
-                    if (type != null) flags |= Parameter.HASTYPE;
-
-                    sig.Add(new Parameter(flags,
-                        (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
-                        name, (names.Count == 0 ? null : names.ToArray()),
-                        deflt, type ?? Kernel.AnyMO));
-                }
+                while (ix != args.Length)
+                    sig.Add((Parameter)Handle.Unbox(args[ix++]));
                 tgt.sig = new Signature(sig.ToArray());
                 return null;
             } else if (cmd == "sub_contains_phaser") {

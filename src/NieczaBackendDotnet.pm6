@@ -57,13 +57,14 @@ sub upcalled(*@args) {
     }
 }
 
+class Param { ... }
 class Unit { ... }
 class StaticSub { ... }
 class Type { ... }
 
 method new(*%_) {
     my $self = callsame;
-    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled} {Unit} {StaticSub} {Type})) };
+    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled} {Unit} {StaticSub} {Type} {Param})) };
     downcall("safemode") if $self.safemode;
     $self;
 }
@@ -90,6 +91,11 @@ method accept($unit, :$filename, :$run, :$evalmode, :$repl) {
     $*repl_outer = $unit.mainline if $repl;
 }
 
+class Param {
+    method kind { "param" }
+    method FALLBACK($name, *@args) { downcall("param_$name", self, @args) }
+}
+
 class StaticSub {
     method kind { "sub" }
     method FALLBACK($name, *@args) { downcall("sub_$name", self, @args) }
@@ -110,8 +116,8 @@ class StaticSub {
             return;
         }
         for @( $sig.params ) {
-            push @args, .flags, .name, .slot, @( .names ), Str,
-                .mdefault, .tclass;
+            push @args, downcall("param_new", self, .flags, .name, .slot,
+                @( .names ), Str, .mdefault, .tclass);
         }
         downcall("set_signature", self, @args);
     }

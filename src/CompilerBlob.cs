@@ -48,7 +48,7 @@ namespace Niecza {
     public class Downcaller {
         internal static Variable upcall_cb;
         static IDictionary responder;
-        static P6any UnitP, StaticSubP, TypeP;
+        static P6any UnitP, StaticSubP, TypeP, ParamP;
         static string obj_dir;
 
         // let the CLR load assemblies from obj/ too
@@ -64,12 +64,13 @@ namespace Niecza {
         }
         // Better, but still fudgy.  Relies too much on path structure.
         public static void InitSlave(Variable cb, Variable unit,
-                Variable staticSub, Variable type) {
+                Variable staticSub, Variable type, Variable param) {
             if (responder != null) return;
 
             UnitP = unit.Fetch();
             StaticSubP = staticSub.Fetch();
             TypeP = type.Fetch();
+            ParamP = param.Fetch();
 
             obj_dir = Path.GetFullPath(Path.Combine(
                         AppDomain.CurrentDomain.BaseDirectory,
@@ -131,6 +132,7 @@ namespace Niecza {
                 string t = (string)RawDowncall("gettype", r);
                 P6any pr = (t == "type") ? TypeP :
                     (t == "sub") ? StaticSubP :
+                    (t == "param") ? ParamP :
                     (t == "unit") ? UnitP : Kernel.AnyP;
                 return Kernel.BoxAnyMO(r, pr.mo);
             }
