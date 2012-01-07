@@ -155,6 +155,7 @@ sub sqrt($x) { Q:CgOp { (sqrt {$x}) } }
 sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
 sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
 
+sub Niecza::toggle_mono_trace() { Q:CgOp { (prog (raise (s "SIGUSR2")) {0}) } }
 # }}}
 # Fundamental types {{{
 my class Mu {

@@ -19,7 +19,7 @@ namespace Niecza {
     // Of course actually trying to use the POSIX stuff on Windows will die.
     class PosixWrapper {
         static readonly Assembly Mono_Posix;
-        static readonly Type Syscall, AccessModes, Stat;
+        static readonly Type Syscall, AccessModes, Stat, Signum, Stdlib;
 
         // copied from Mono.Posix.dll; constant values are part of the
         // stable ABI so these can't change
@@ -33,7 +33,7 @@ namespace Niecza {
         public readonly static Func<uint,uint,int> setreuid, setregid;
 
         // methods and fields that must be used through wrappers
-        static readonly MethodInfo m_stat, m_access;
+        static readonly MethodInfo m_stat, m_access, m_raise;
         static readonly FieldInfo  f_dev, f_ino, f_mode, f_nlink, f_uid, f_gid,
             f_rdev, f_size, f_blksize, f_blocks, f_atime, f_mtime, f_ctime;
 
@@ -42,6 +42,10 @@ namespace Niecza {
         public static int access(string pathname, int mode) {
             return (int) m_access.Invoke(null, new object[] {
                 pathname, Enum.ToObject(AccessModes, mode) });
+        }
+
+        public static void raise(string sig) {
+            m_raise.Invoke(null, new object[] { Enum.Parse(Signum, sig) });
         }
 
         public static long[] stat(string pathname) {
@@ -71,6 +75,8 @@ namespace Niecza {
             Syscall = Mono_Posix.GetType("Mono.Unix.Native.Syscall", true);
             AccessModes = Mono_Posix.GetType("Mono.Unix.Native.AccessModes", true);
             Stat = Mono_Posix.GetType("Mono.Unix.Native.Stat", true);
+            Signum = Mono_Posix.GetType("Mono.Unix.Native.Signum", true);
+            Stdlib = Mono_Posix.GetType("Mono.Unix.Native.Stdlib", true);
 
             getuid = (Func<uint>)Delegate.CreateDelegate(typeof(Func<uint>),
                     Syscall.GetMethod("getuid"));
@@ -88,6 +94,7 @@ namespace Niecza {
 
             m_stat = Syscall.GetMethod("stat");
             m_access = Syscall.GetMethod("access");
+            m_raise = Stdlib.GetMethod("raise", new Type[] { Signum });
 
             f_dev = Stat.GetField("st_dev");
             f_ino = Stat.GetField("st_ino");
@@ -2553,4 +2560,6 @@ again:
         r.mo.Revalidate();
         return r.typeVar;
     }
+
+    public static void raise(string sig) { PosixWrapper.raise(sig); }
 }
