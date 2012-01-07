@@ -3352,7 +3352,8 @@ quiet_fail:
             P6any o = obj.Fetch();
             if (!o.IsDefined()) { return o.mo.name + "()"; }
             Complex r = Kernel.UnboxAny<Complex>(o);
-            return Utils.N2S(r.re) + (r.im < 0 ? " - " : " + ") + Utils.N2S(Math.Abs(r.im)) + "i";
+            var sb = Utils.N2S(r.re) + (r.im < 0 ? "-" : "+") + Utils.N2S(Math.Abs(r.im));
+            return char.IsLetter(sb[sb.Length-1]) ? sb + "\\i" : sb + "i";
         }
     }
     class CtxComplexBool : ContextHandler<bool> {

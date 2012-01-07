@@ -671,7 +671,7 @@ my class Int does Integral {
 }
 my class Rat does Real {
     method new($n,$d) { $n / $d }
-    method perl() { defined(self) ?? self.numerator ~ "/" ~ self.denominator !! self.typename }
+    method perl() { defined(self) ?? "<" ~ self.numerator ~ "/" ~ self.denominator ~ ">" !! self.typename }
     method gist() { self // nextsame; self.Str }
     method numerator() { Q:CgOp { (rat_nu {self}) } }
     method denominator() { Q:CgOp { (rat_de {self}) } }
@@ -680,7 +680,8 @@ my class Rat does Real {
 }
 my class Complex does Numeric {
     method new($re,$im) { Q:CgOp { (complex_new {$re} {$im}) } }
-    method perl() { defined(self) ?? ~self !! self.typename }
+    method perl() { defined(self) ?? "<" ~ self ~ ">" !! self.typename }
+    method gist() { self // nextsame; self.Str }
     method Complex() { self }
     method re() { Q:CgOp { (complex_re {self}) } }
     method im() { Q:CgOp { (complex_im {self}) } }
@@ -689,7 +690,7 @@ my class Complex does Numeric {
 }
 my class FatRat does Real {
     method new($n,$d) { FatRat.succ * $n / $d }
-    method perl() { defined(self) ?? self.numerator ~ "/" ~ self.denominator !! self.typename }
+    method perl() { defined(self) ?? "FatRat.new({self.numerator}, {self.denominator})" !! self.typename }
     method FatRat() { self }
     method gist() { self // nextsame; self.Str }
     method numerator() { Q:CgOp { (fatrat_nu {self}) } }
