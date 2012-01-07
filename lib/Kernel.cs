@@ -3897,6 +3897,7 @@ tryagain:
             // XXX should be PackageHOW
             st.how = new BoxObject<STable>(st, Kernel.ClassHOWMO, 0);
             st.mo.Revalidate();
+            st.SetupVTables();
             return st.typeVar;
         }
 
@@ -5381,9 +5382,12 @@ slow:
             r.mo.roleFactory = prole.mo.roleFactory;
             r.mo.curriedArgs = args;
             r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
+            r.how = new BoxObject<STable>(r, Kernel.ClassHOWMO, 0);
             r.mo.type  = P6how.CURRIED_ROLE;
             r.mo.rtype = "crole";
-            r.mo.role_typecheck_list = prole.mo.role_typecheck_list;
+            r.useAcceptsType = true;
+            r.mo.role_typecheck_list = new List<STable>(prole.mo.role_typecheck_list);
+            r.mo.role_typecheck_list.Add(r);
             r.mo.local_roles = prole.mo.local_roles;
             r.typeObject = r.initObject = new P6opaque(r);
             r.typeVar = r.initVar = NewROScalar(r.typeObject);
@@ -5392,6 +5396,7 @@ slow:
             foreach (var ai in prole.mo.local_attr)
                 r.mo.local_attr.Add(ai);
             r.mo.Revalidate();
+            r.SetupVTables();
             return r;
         }
 
@@ -5416,6 +5421,7 @@ slow:
 
                 r = new STable(arg.name + "[...]");
                 r.mo.FillRole(arg.mo.superclasses.ToArray(), null);
+                r.how = new BoxObject<STable>(r, Kernel.ClassHOWMO, 0);
                 r.mo.type  = P6how.ROLE;
                 r.mo.rtype = "role";
                 r.mo.role_typecheck_list = arg.mo.role_typecheck_list;
@@ -5441,6 +5447,7 @@ slow:
                 foreach (var r2 in arg.mo.local_roles)
                     ApplyRoleToRole(r, ToComposable(r2, cls));
                 r.mo.Revalidate();
+                r.SetupVTables();
                 return r;
             } else if (arg.mo.type == P6how.PARAMETRIZED_ROLE) {
                 return ToComposable(DoInstantiateRole(arg, Builtins.MakeParcel()), cls);

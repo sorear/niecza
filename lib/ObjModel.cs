@@ -69,12 +69,12 @@ namespace Niecza {
         }
 
         public bool Isa(STable mo) {
-            return mo.isSubset ? mo.mo.CheckSubset(this) :
+            return mo.useAcceptsType ? mo.mo.AcceptsType(this) :
                 this.mo.HasType(mo);
         }
 
         public bool Does(STable mo) {
-            return mo.isSubset ? mo.mo.CheckSubset(this) :
+            return mo.useAcceptsType ? mo.mo.AcceptsType(this) :
                 this.mo.HasType(mo);
         }
 
@@ -495,7 +495,7 @@ next_method: ;
         }
 
         public void FillSubset(STable super) {
-            stable.isSubset = true;
+            stable.useAcceptsType = true;
             type = SUBSET; rtype = "subset";
             STable[] mro = new STable[super.mo.mro.Length + 1];
             Array.Copy(super.mo.mro, 0, mro, 1, mro.Length - 1);
@@ -503,17 +503,44 @@ next_method: ;
             FillClass(super.all_slot, new STable[] { super }, mro);
         }
 
-        public bool CheckSubset(P6any obj) {
-            if (!obj.Does(superclasses[0]))
-                return false;
-            if (subsetFilter == null)
-                subsetFilter = Kernel.RunInferior(subsetWhereThunk.Invoke(
-                    Kernel.GetInferiorRoot(), Variable.None, null));
-            Variable ret = Kernel.RunInferior(subsetFilter.Fetch().
+        static bool ACCEPTS(Variable obj, Variable filter) {
+            Variable ret = Kernel.RunInferior(filter.Fetch().
                 InvokeMethod(Kernel.GetInferiorRoot(), "ACCEPTS",
-                    new Variable[] { subsetFilter, Kernel.NewROScalar(obj) },
-                    null));
+                    new Variable[] { filter, obj }, null));
             return ret.Fetch().mo.mro_raw_Bool.Get(ret);
+        }
+
+        public bool AcceptsType(P6any obj) {
+            if (type == SUBSET) {
+                if (!obj.Does(superclasses[0]))
+                    return false;
+                if (subsetFilter == null)
+                    subsetFilter = Kernel.RunInferior(subsetWhereThunk.Invoke(
+                        Kernel.GetInferiorRoot(), Variable.None, null));
+                return ACCEPTS(Kernel.NewROScalar(obj), subsetFilter);
+            }
+            if (type == CURRIED_ROLE) {
+                foreach (STable cand in obj.mo.mo.type_list) {
+                    if (cand.mo.type != CURRIED_ROLE)
+                        continue;
+                    if (cand.mo.roleFactory != roleFactory)
+                        continue;
+                    if (cand.mo.curriedArgs.Length != curriedArgs.Length)
+                        continue;
+
+                    bool ok = true;
+                    for (int i = 0; i < curriedArgs.Length; i++) {
+                        if (!ACCEPTS(cand.mo.curriedArgs[i], curriedArgs[i])) {
+                            ok = false;
+                            break;
+                        }
+                    }
+                    if (!ok) continue;
+                    return true;
+                }
+                return false;
+            }
+            throw new NieczaException("accepts_type unimplemented for " + rtype);
         }
 
         public void FillClass(string[] all_slot, STable[] superclasses,
@@ -858,7 +885,7 @@ next_method: ;
         public P6any typeObject, initObject;
         public Variable typeVar, initVar;
         public string name;
-        public bool isSubset;
+        public bool useAcceptsType;
 
         public Type box_type;
         /// }}}
@@ -975,7 +1002,7 @@ next_method: ;
 
         public void Invalidate() { mo.Invalidate(); }
 
-        // Only call these if m.isSubset is false
+        // Only call these if m.useAcceptsType is false
         public bool HasType(STable m) {
             int k = mo.type_list.Length;
             if (k >= 20) {
@@ -1048,7 +1075,7 @@ next_method: ;
             fb.ObjRef(typeVar);
             fb.ObjRef(initVar);
             fb.String(name);
-            fb.Byte((byte)(isSubset ? 1 : 0));
+            fb.Byte((byte)(useAcceptsType ? 1 : 0));
             fb.String(box_type == null ? null : box_type.AssemblyQualifiedName);
             fb.Strings(all_slot);
         }
@@ -1064,7 +1091,7 @@ next_method: ;
             n.typeVar = (Variable)tb.ObjRef();
             n.initVar = (Variable)tb.ObjRef();
             n.name = tb.String();
-            n.isSubset = tb.Byte() != 0;
+            n.useAcceptsType = tb.Byte() != 0;
             string box_type = tb.String();
             n.box_type = box_type == null ? null : Type.GetType(box_type,true);
             n.all_slot = tb.Strings();
