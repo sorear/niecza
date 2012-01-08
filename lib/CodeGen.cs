@@ -3476,7 +3476,7 @@ dynamic:
         }
         static readonly bool TraceDown = Environment.GetEnvironmentVariable("NIECZA_TRACE_DOWNCALLS") != null;
 
-        object AddLexical(object[] args, LexInfo li) {
+        static object AddLexical(object[] args, LexInfo li) {
             li.owner = (SubInfo)Handle.Unbox(args[1]);
             li.name  = (string)args[2];
             li.file  = (string)args[3];
@@ -3500,7 +3500,7 @@ dynamic:
             return new object[] { "" };
         }
 
-        STable ResolveSubClass(string cls) {
+        static STable ResolveSubClass(string cls) {
             // this happens before lexicals are created, so we can't
             // use lexicals.
             STable rcls = (cls == "Sub") ? Kernel.SubMO :
@@ -3594,7 +3594,7 @@ dynamic:
             }
         }
 
-        void ShowCall(object[] args) {
+        static void ShowCall(object[] args) {
             StringBuilder sb = new StringBuilder();
             foreach(object a in args) {
                 char ch = (a is int) ? 'i' : (a is Handle) ? 'h' :
@@ -3605,829 +3605,948 @@ dynamic:
             Console.WriteLine(sb.ToString());
         }
 
+        Dictionary<string, Func<object[],object>> methods;
+
+        public DowncallReceiver() {
+            methods = new Dictionary<string, Func<object[],object>>();
+            foreach (MethodInfo mi in typeof(DowncallReceiver).GetMethods()) {
+                if (mi.ReturnType != typeof(object))
+                    continue;
+                var pis = mi.GetParameters();
+                if (pis.Length != 1 || pis[0].ParameterType != typeof(object[]))
+                    continue;
+                methods[mi.Name] = (Func<object[],object>) Delegate.CreateDelegate(typeof(Func<object[],object>), mi);
+            }
+        }
+
         object Call(object[] args) {
             if (TraceDown) ShowCall(args);
             string cmd = (string) args[0];
-            if (cmd == "gettype") {
-                object o = Handle.Unbox(args[1]);
-                return (o is SubInfo) ? "sub" : (o is RuntimeUnit) ? "unit" :
-                    (o is STable) ? "type" : (o is Frame) ? "frame" :
-                    (o is Parameter) ? "param" : "unknown";
-            } else if (cmd == "set_binding") {
-                if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
-                    Kernel.TraceFlags = Kernel.TRACE_CUR;
-                    Kernel.TraceCount = Kernel.TraceFreq = 1;
-                }
-                Kernel.SetTrace();
-                Backend.obj_dir = (string)args[1];
-                Builtins.upcall_receiver = (System.Collections.IDictionary)args[2];
-                return null;
-            } else if (cmd == "push_compartment") {
-                Compartment.Push();
-                return null;
-            } else if (cmd == "pop_compartment") {
-                Compartment.Pop();
-                return null;
-            } else if (cmd == "new_unit") {
-                RuntimeUnit ru = new RuntimeUnit((string)args[1],
-                        (string)args[2], (string)args[3],
-                        (bool)args[4], (bool)args[5]);
-
-                if (Kernel.containerRootUnit == null) {
-                    // this is a module unit
-                    Kernel.InitCompartment();
-                    Kernel.containerRootUnit = ru;
-                    ru.owner = ru;
-                    ru.globals = Kernel.currentGlobals =
-                        new Dictionary<string,StashEnt>();
-                } else {
-                    // needs to use the same globals as the other units in
-                    // this serialization unit
-                    ru.globals = Kernel.currentGlobals;
-                    ru.owner = Kernel.containerRootUnit;
-                    ru.owner.subordinates.Add(ru);
-                }
-                return new Handle(ru);
-            } else if (cmd == "unit_need_unit") {
-                // LinkUnit state is owned by the root
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                string oname   = (string)args[2];
-
-                RuntimeUnit tg;
-                try {
-                    tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
-                } catch (Exception ex) {
-                    if (Config.SerFailInfo)
-                        Console.WriteLine("Thaw {0} failed: >>>{1}<<<", oname, ex);
-                    // assume stale at first
-                    object r1 = Builtins.UpCall(new object[] {
-                        "compile_unit", oname });
-                    if (r1 != null)
-                        return r1;
-                    tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
-                }
-                string err = ru.owner.LinkUnit(tg);
-                return err == null ? (object)new Handle(tg) : new Exception(err);
-            } else if (cmd == "unit_anon_stash") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                return ru.name + ":" + (ru.nextid++);
-            } else if (cmd == "unit_set_bottom") {
-                ((RuntimeUnit)Handle.Unbox(args[1])).bottom =
-                    (SubInfo)Handle.Unbox(args[2]);
-                return null;
-            } else if (cmd == "unit_bottom") {
-                return Handle.Wrap(((RuntimeUnit)Handle.Unbox(args[1])).bottom);
-            } else if (cmd == "unit_mainline") {
-                return Handle.Wrap(((RuntimeUnit)Handle.Unbox(args[1])).mainline);
-            } else if (cmd == "unit_set_mainline") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                ru.mainline = (SubInfo)Handle.Unbox(args[2]);
-                ru.mainline.special |= SubInfo.MAINLINE;
-                return null;
-            } else if (cmd == "sub_set_ltm") {
-                ((SubInfo)Handle.Unbox(args[1])).ltm =
-                    BuildLad((object[])args[2]);
-                return null;
-            } else if (cmd == "sub_create_static_pad") {
-                ((SubInfo)Handle.Unbox(args[1])).CreateProtopad(null);
-                return null;
-            } else if (cmd == "sub_noninlinable") {
-                ((SubInfo)Handle.Unbox(args[1])).special |=
-                    SubInfo.CANNOT_INLINE;
-                return null;
-            } else if (cmd == "sub_set_return_pass") {
-                ((SubInfo)Handle.Unbox(args[1])).special |=
-                    SubInfo.RETURN_PASS;
-                return null;
-            } else if (cmd == "sub_set_transparent") {
-                ((SubInfo)Handle.Unbox(args[1])).special |=
-                    SubInfo.TRANSPARENT;
-                return null;
-            } else if (cmd == "sub_set_run_once") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                if ((s.outer.special & SubInfo.RUN_ONCE) != 0) {
-                    s.CreateProtopad(null);
-                    s.special |= SubInfo.RUN_ONCE;
-                }
-                return null;
-            } else if (cmd == "sub_set_unsafe") {
-                ((SubInfo)Handle.Unbox(args[1])).special |=
-                    SubInfo.UNSAFE;
-                return null;
-            } else if (cmd == "sub_is_inlinable") {
-                return ((SubInfo)Handle.Unbox(args[1])).IsInlinable();
-            } else if (cmd == "sub_topicalizer") {
-                return ((SubInfo)Handle.Unbox(args[1])).IsTopicalizer();
-            } else if (cmd == "sub_count") {
-                return Builtins.get_count((SubInfo)Handle.Unbox(args[1]));
-            } else if (cmd == "sub_set_inlined") {
-                ((SubInfo)Handle.Unbox(args[1])).SetInlined();
-                return null;
-            } else if (cmd == "sub_run_BEGIN_CC") {
-                SubInfo  si = (SubInfo)Handle.Unbox(args[1]);
-                Variable v  = si.RunBEGIN();
-                // no really this is a horrible hack... we need a way for
-                // the compiler to directly manipulate MOP values
-                return Niecza.UCD.DataSet.CompileCClass(v);
-            } else if (cmd == "sub_run_BEGIN") {
-                SubInfo  si = (SubInfo)Handle.Unbox(args[1]);
-                Variable v  = si.RunBEGIN();
-                string   cn = (string)args[2];
-                while (si != null && !si.dylex.ContainsKey(cn)) si = si.outer;
-                LexInfo li = si == null ? null : si.dylex[cn];
-                if (li is LIConstant) {
-                    ((LIConstant)li).value = v;
-                } else if (li is LICommon) {
-                    StashEnt hkey = Kernel.currentGlobals[((LICommon)li).hkey];
-                    hkey.constant = true;
-                    hkey.v = v;
-                } else {
-                    return new Exception("cannot bind constant value");
-                }
-                return null;
-            } else if (cmd == "sub_get_unit") {
-                return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);
-            } else if (cmd == "sub_run_once") {
-                return (((SubInfo)Handle.Unbox(args[1])).special &
-                        SubInfo.RUN_ONCE) != 0;
-            } else if (cmd == "sub_transparent") {
-                return (((SubInfo)Handle.Unbox(args[1])).special &
-                        SubInfo.TRANSPARENT) != 0;
-            } else if (cmd == "sub_outervar") {
-                return ((SubInfo)Handle.Unbox(args[1])).outervar;
-            } else if (cmd == "sub_name") {
-                return ((SubInfo)Handle.Unbox(args[1])).name;
-            } else if (cmd == "sub_methodof") {
-                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).methodof);
-            } else if (cmd == "sub_outer") {
-                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).outer);
-            } else if (cmd == "sub_class") {
-                return ((SubInfo)Handle.Unbox(args[1])).mo.name;
-            } else if (cmd == "sub_body_of") {
-                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).body_of);
-            } else if (cmd == "sub_in_class") {
-                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).in_class);
-            } else if (cmd == "sub_cur_pkg") {
-                return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).cur_pkg);
-            } else if (cmd == "sub_set_methodof") {
-                ((SubInfo)Handle.Unbox(args[1])).methodof =
-                    (STable)Handle.Unbox(args[2]);
-                return null;
-            } else if (cmd == "sub_set_body_of") {
-                ((SubInfo)Handle.Unbox(args[1])).body_of =
-                    (STable)Handle.Unbox(args[2]);
-                return null;
-            } else if (cmd == "sub_set_cur_pkg") {
-                ((SubInfo)Handle.Unbox(args[1])).cur_pkg =
-                    (STable)Handle.Unbox(args[2]);
-                return null;
-            } else if (cmd == "sub_set_in_class") {
-                ((SubInfo)Handle.Unbox(args[1])).in_class =
-                    (STable)Handle.Unbox(args[2]);
-                return null;
-            } else if (cmd == "sub_set_outervar") {
-                ((SubInfo)Handle.Unbox(args[1])).outervar = (string)args[2];
-                return null;
-            } else if (cmd == "sub_set_name") {
-                ((SubInfo)Handle.Unbox(args[1])).name = (string)args[2];
-                return null;
-            } else if (cmd == "sub_set_class") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                STable  c = ResolveSubClass((string)args[2]);
-                s.mo = c;
-                if (s.protosub != null)
-                    s.protosub.mo = c;
-                return null;
-            } else if (cmd == "sub_delete_lex") {
-                // XXX This leaves a gap in the lexical/number mapping.
-                // Don't use it too much.
-                SubInfo from = (SubInfo)Handle.Unbox(args[1]);
-                string  lkey = (string)args[2];
-                from.dylex.Remove(lkey);
-                return null;
-            } else if (cmd == "sub_lookup_lex") {
-                SubInfo from = (SubInfo)Handle.Unbox(args[1]);
-                string  lkey = (string)args[2];
-                string  file = (string)args[3];
-                int     line = (int)args[4];
-
-                SubInfo csr;
-                int levels = 0;
-                for (csr = from; csr != null; csr = csr.outer, levels++)
-                    if (csr.dylex.ContainsKey(lkey))
-                        break;
-
-                if (csr == null)
-                    return new object[0];
-                LexInfo li = csr.dylex[lkey];
-
-                if (file != null) {
-                    for (SubInfo csr2 = from;
-                            csr2.used_in_scope != null && // modify only open units
-                            !csr2.used_in_scope.ContainsKey(lkey);
-                            csr2 = csr2.outer, levels--) {
-
-                        var uisi = new SubInfo.UsedInScopeInfo();
-                        uisi.orig_file = li.file;
-                        uisi.orig_line = li.line;
-                        uisi.file = file;
-                        uisi.line = line;
-                        uisi.levels = levels;
-                        csr2.used_in_scope[lkey] = uisi;
-                        if (csr == csr2)
-                            break; // stop *after* reaching defined scope
-                    }
-                }
-
-
-                object[] r = null;
-                var lalias = li as LIAlias;
-                if (lalias != null)
-                    r = new object[] { "alias",null,null,null, lalias.to };
-                var lsub   = li as LISub;
-                if (lsub != null)
-                    r = new object[] { "sub",null,null,null, new Handle(lsub.def) };
-                var lpkg   = li as LIPackage;
-                if (lpkg != null)
-                    r = new object[] { "package",null,null,null, new Handle(lpkg.pkg) };
-                var lsimp  = li as LISimple;
-                if (lsimp != null)
-                    r = new object[] { "simple",null,null,null, lsimp.flags, Handle.Wrap(lsimp.type) };
-                var ldisp  = li as LIDispatch;
-                if (ldisp != null)
-                    r = new object[] { "dispatch",null,null,null, Handle.Wrap(csr) };
-                var llab   = li as LILabel;
-                if (llab != null)
-                    r = new object[] { "label",null,null,null };
-                var lhint  = li as LIConstant;
-                if (lhint != null)
-                    r = new object[] { "hint",null,null,null };
-                var lcomm  = li as LICommon;
-                if (lcomm != null)
-                    r = new object[] { "common",null,null,null, lcomm.Stash(), lcomm.VarName() };
-
-                r[1] = li.file;
-                r[2] = li.line;
-                r[3] = li.pos;
-
-                return r;
-            } else if (cmd == "lex_names") {
-                List<object> ret = new List<object>();
-                foreach (string k in ((SubInfo)Handle.Unbox(args[1])).dylex.Keys)
-                    ret.Add(k);
-                return ret.ToArray();
-            } else if (cmd == "unused_lexicals") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                List<object> ret = new List<object>();
-                foreach (KeyValuePair<string,LexInfo> kv in s.dylex) {
-                    if (s.used_in_scope.ContainsKey(kv.Key))
-                        continue;
-                    ret.Add(kv.Key);
-                    ret.Add(kv.Value.pos);
-                }
-                return ret.ToArray();
-            } else if (cmd == "unit_stubbed_stashes") {
-                RuntimeUnit u = (RuntimeUnit)Handle.Unbox(args[1]);
-                List<object> ret = new List<object>();
-                foreach (KeyValuePair<int,STable> kv in u.stubbed_stashes) {
-                    ret.Add(kv.Key);
-                    ret.Add(new Handle(kv.Value));
-                }
-                return ret.ToArray();
-            } else if (cmd == "unit_stub_stash") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                int    pos = (int)args[2];
-                STable type = (STable)Handle.Unbox(args[3]);
-                ru.stubbed_stashes.Add(new KeyValuePair<int,STable>(pos,type));
-                return null;
-            } else if (cmd == "unit_name") {
-                return ((RuntimeUnit)Handle.Unbox(args[1])).name;
-            } else if (cmd == "sub_to_unit") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                while ((s.special & SubInfo.MAINLINE) == 0)
-                    s = s.outer;
-                return new Handle(s);
-            } else if (cmd == "equal_handles") {
-                return Handle.Unbox(args[1]) == Handle.Unbox(args[2]);
-            } else if (cmd == "sub_is_routine") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                return s.mo.HasType(Kernel.RoutineMO);
-            } else if (cmd == "sub_is_regex") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                return s.mo.HasType(Kernel.RegexMO);
-            } else if (cmd == "sub_has_lexical") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                return s.dylex.ContainsKey((string)args[2]);
-            } else if (cmd == "sub_lexical_used") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                return s.used_in_scope.ContainsKey((string)args[2]);
-            } else if (cmd == "sub_parameterize_topic") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                LISimple li = (LISimple)s.dylex["$_"];
-                li.flags = LISimple.NOINIT;
-                return null;
-            } else if (cmd == "unit_rel_pkg") {
-                RuntimeUnit c = (RuntimeUnit)Handle.Unbox(args[1]);
-                bool auto     = (bool)args[2];
-                STable pkg    = args[3] == null ? null :
-                    (STable)Handle.Unbox(args[3]);
-
-                for (int i = 4; i < args.Length; i++) {
-                    string key = (string) args[i];
-                    string who = "";
-                    if (pkg != null) {
-                        if (!pkg.who.Isa(Kernel.StashMO))
-                            return new Exception(pkg.name + " fails to name a standard package");
-                        who = Kernel.UnboxAny<string>(pkg.who);
-                    }
-                    StashEnt v;
-                    string hkey = (char)who.Length + who + key;
-                    if (c.globals.TryGetValue(hkey, out v)) {
-                        if (v.v.rw || v.v.Fetch().IsDefined())
-                            return new Exception((who + "::" + key).Substring(2) + " names a non-package");
-                        pkg = v.v.Fetch().mo;
-                    } else if (!auto) {
-                        return new Exception((who + "::" + key).Substring(2) + " does not name any package");
-                    } else {
-                        c.globals[hkey] = v = new StashEnt();
-                        v.constant = true;
-                        v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, Kernel.StashMO));
-                        pkg = v.v.Fetch().mo;
-                    }
-                }
-                return new Handle(pkg);
-            } else if (cmd == "unit_list_stash") {
-                RuntimeUnit c = (RuntimeUnit) Handle.Unbox(args[1]);
-                string who = (string)args[2];
-                var r = new List<object>();
-                string filter = ((char)who.Length) + who;
-
-                foreach (KeyValuePair<string,StashEnt> kv in c.globals) {
-                    if (!Utils.StartsWithInvariant(filter, kv.Key))
-                        continue;
-                    r.Add(kv.Key.Substring(filter.Length));
-                    StashEnt b = kv.Value;
-
-                    if (!b.v.rw && !b.v.Fetch().IsDefined()) {
-                        r.Add(new Handle(b.v.Fetch().mo));
-                    } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
-                        r.Add(new Handle(b.v.Fetch().GetSlot("info")));
-                    } else {
-                        r.Add(null);
-                    }
-                }
-                return r.ToArray();
-            } else if (cmd == "unit_get") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                string who  = (string)args[2];
-                string key  = (string)args[3];
-                string hkey = (char)who.Length + who + key;
-                StashEnt b;
-                if (ru.globals.TryGetValue(hkey, out b)) {
-                    if (!b.v.rw && !b.v.Fetch().IsDefined()) {
-                        return new Handle(b.v.Fetch().mo);
-                    } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
-                        return new Handle(b.v.Fetch().GetSlot("info"));
-                    } else return null;
-                } else {
-                    return null;
-                }
-            } else if (cmd == "unit_exists") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                string who  = (string)args[2];
-                string key  = (string)args[3];
-                string hkey = (char)who.Length + who + key;
-                return ru.globals.ContainsKey(hkey);
-            } else if (cmd == "unit_bind") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                string who  = (string)args[2];
-                string name = (string)args[3];
-                object item = Handle.Unbox(args[4]);
-                string file = (string)args[5];
-                int    line = (int)args[6];
-
-                Variable vitm = null;
-                if (item is STable)
-                    vitm = ((STable)item).typeVar;
-                else if (item is SubInfo)
-                    vitm = Kernel.NewROScalar(((SubInfo)item).protosub);
-                else if (item == null)
-                    vitm = null;
-                else
-                    return new Exception("weird thing to bind");
-
-                string err = ru.NsBind(who, name, vitm, file, line);
-                return err == null ? null : new Exception(err);
-            } else if (cmd == "type_CAN") {
-                STable st = (STable)Handle.Unbox(args[1]);
-                //string meth = (string)args[2];
-                return (st.mo.type != P6how.PACKAGE && st.mo.type != P6how.MODULE);
-            } else if (cmd == "type_add_super") {
-                STable st = (STable)Handle.Unbox(args[1]);
-                STable su = (STable)Handle.Unbox(args[2]);
-                st.mo.superclasses.Add(Kernel.ToInheritable(su));
-                return null;
-            } else if (cmd == "type_add_role") {
-                STable st = (STable)Handle.Unbox(args[1]);
-                STable su = (STable)Handle.Unbox(args[2]);
-                st.mo.local_roles.Add(su);
-                return null;
-            } else if (cmd == "type_add_attribute") {
-                STable  add_to = (STable)Handle.Unbox(args[1]);
-                string  name   = (string)args[2];
-                string  sigil  = (string)args[3];
-                bool    access = (bool)args[4];
-                STable  type   = (STable)Handle.Unbox(args[5]);
-                string  file   = (string)args[6];
-                int     line   = (int)args[7];
-
-                foreach (P6how.AttrInfo ai in add_to.mo.local_attr)
-                    if (ai.name == name)
-                        return new Exception("Two definitions of attribute " + name + Backend.LocStr(ai.file, ai.line, file, line));
-
-                int flags = (sigil == "@") ? P6how.A_ARRAY :
-                    (sigil == "%") ? P6how.A_HASH : 0;
-                if (access) flags |= P6how.A_PUBLIC;
-
-                add_to.mo.AddAttributePos(name, flags, null, type, file, line);
-                return null;
-            } else if (cmd == "type_add_initializer") {
-                STable  add_to = (STable)Handle.Unbox(args[1]);
-                string  name   = (string)args[2];
-                SubInfo init   = (SubInfo)Handle.Unbox(args[3]);
-                for (int i = 0; i < add_to.mo.local_attr.Count; i++) {
-                    var ai = add_to.mo.local_attr[i];
-                    if (ai.name == name) {
-                        ai.init = init.protosub;
-                        add_to.mo.local_attr[i] = ai;
-                        break;
-                    }
-                }
-                return null;
-            } else if (cmd == "type_add_method") {
-                STable  add_to = (STable)Handle.Unbox(args[1]);
-                int     mode   = (int)args[2];
-                string  name   = (string)args[3];
-                SubInfo sub    = (SubInfo)Handle.Unbox(args[4]);
-                string  file   = (string)args[5];
-                int     line   = (int)args[6];
-                //int   pos    = (int)args[7];
-
-                if ((mode & P6how.M_MASK) == P6how.M_ONLY) {
-                    foreach (P6how.MethodInfo mi in add_to.mo.lmethods) {
-                        if (mi.Name() == name &&
-                                ((mi.flags ^ mode) & P6how.V_MASK) == 0) {
-                            return new Exception("Two definitions of method " +
-                                    name + Backend.LocStr(mi.file, mi.line, file, line));
-                        }
-                    }
-                }
-
-                add_to.mo.AddMethodPos(mode, name, sub.protosub, file, line);
-                return null;
-            } else if (cmd == "type_set_instantiation_block") {
-                STable  add_to = (STable)Handle.Unbox(args[1]);
-                SubInfo block  = (SubInfo)Handle.Unbox(args[2]);
-                add_to.mo.roleFactory = block.protosub;
-                return null;
-            } else if (cmd == "type_closed") {
-                STable st = (STable)Handle.Unbox(args[1]);
-                return st.mo.isComposed;
-            } else if (cmd == "type_close") {
-                STable st = (STable)Handle.Unbox(args[1]);
-                string err = st.mo.Compose();
-                if (err != null)
-                    return new Exception(err);
-                return null;
-            } else if (cmd == "type_kind") {
-                STable st = (STable)Handle.Unbox(args[1]);
-                return st.mo.rtype;
-            } else if (cmd == "type_name") {
-                STable st = (STable)Handle.Unbox(args[1]);
-                return st.name;
-            } else if (cmd == "type_who") {
-                STable st = (STable)Handle.Unbox(args[1]);
-                return Kernel.UnboxAny<string>(st.who);
-            } else if (cmd == "type_create") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                string name = (string)args[2];
-                string type = (string)args[3];
-                string who  = (string)args[4];
-
-                FieldInfo mof = ru.name == "CORE" ?
-                    typeof(Kernel).GetField(name + "MO") : null;
-                FieldInfo pf = ru.name == "CORE" ?
-                    typeof(Kernel).GetField(name + "P") : null;
-
-                STable nst = mof == null ? null : (STable)mof.GetValue(null);
-                if (nst == null) { // not all FooMO are initialized by kernel
-                    nst = new STable(name);
-                    if (mof != null) mof.SetValue(null, nst);
-                }
-                // Hack - we don't clear the MRO here, because we might need
-                // to call methods on the type in the process of defining the
-                // type itself.
-                nst.mo.superclasses.Clear();
-                if (nst.typeObject == null) // AnyMO.typeObject is set up early
-                    nst.typeObject = new P6opaque(nst, 0);
-                ((P6opaque)nst.typeObject).slots = null;
-                nst.typeVar = Kernel.NewROScalar(nst.typeObject);
-
-                if (ru.name == "CORE" && name == "Nil") {
-                    // this anomalous type object is iterable
-                    nst.typeVar = Kernel.NewRWListVar(nst.typeObject);
-                }
-
-                if (pf != null)
-                    pf.SetValue(null, nst.typeObject);
-
-                nst.initVar    = nst.typeVar;
-                nst.initObject = nst.typeObject;
-                nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
-                nst.how        = Kernel.BoxRaw<STable>(nst, Kernel.ClassHOWMO);
-                nst.mo.rtype   = type;
-                nst.mo.type =
-                    type == "package" ? P6how.PACKAGE :
-                    type == "module" ? P6how.MODULE :
-                    type == "class" ? P6how.CLASS :
-                    type == "grammar" ? P6how.GRAMMAR :
-                    type == "role" ? P6how.ROLE :
-                    type == "prole" ? P6how.PARAMETRIZED_ROLE :
-                    type == "subset" ? P6how.SUBSET :
-                    -1;
-                if (nst.mo.type < 0)
-                    return new Exception(type);
-
-                return new Handle(nst);
-            } else if (cmd == "type_set_basetype") {
-                STable subset = (STable)Handle.Unbox(args[1]);
-                STable basety = (STable)Handle.Unbox(args[2]);
-
-                subset.mo.FillSubset(basety);
-                subset.initObject = basety.initObject;
-                subset.initVar = basety.initVar;
-                return null;
-            } else if (cmd == "type_set_where") {
-                STable  subset = (STable)Handle.Unbox(args[1]);
-                SubInfo where  = (SubInfo)Handle.Unbox(args[2]);
-                subset.mo.subsetWhereThunk = where.protosub;
-                return null;
-            } else if (cmd == "create_sub") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                string name = (string)args[2];
-                SubInfo outer = (SubInfo)Handle.Unbox(args[3]);
-                string cls = (string)args[4];
-                STable pkg = (STable)Handle.Unbox(args[5]);
-                STable icl = (STable)Handle.Unbox(args[6]);
-                bool once = (bool)args[7];
-                Frame outer_frame = (Frame)Handle.Unbox(args[8]);
-
-                if (outer_frame != null && outer_frame.info != outer) {
-                    Console.WriteLine("MISMATCHED OUTER FRAME!!!");
-                    outer_frame = null;
-                }
-
-                STable rcls = ResolveSubClass(cls);
-                if (rcls == null)
-                    return new Exception("sub-class lookup fail for " + cls);
-
-                SubInfo n = new SubInfo(ru, name, outer, rcls, pkg, once,
-                        outer_frame);
-                n.in_class = icl;
-                if (n.outer != null && n.outer.unit == ru)
-                    n.outer.children.Add(n);
-                ru.our_subs.Add(n);
-
-                if (outer == null) {
-                    /* Hack - embed build information */
-                    var li = new LIConstant();
-                    var info = new VarHash();
-                    info["name"] = Builtins.MakeStr("niecza");
-                    string vers = "(unknown)\n";
-                    try {
-                        vers = File.ReadAllText("VERSION");
-                    } catch (Exception) {
-                        // ignore
-                    }
-                    info["version"] = Builtins.MakeStr(
-                            vers.Substring(0, vers.Length - 1));
-                    info["build-time"] = Builtins.now();
-
-                    li.value = Kernel.BoxAnyMO(info, Kernel.HashMO);
-
-                    n.AddLexical("$?PERL", li);
-                }
-
-                return new Handle(n);
-            } else if (cmd == "add_my_name") {
-                STable  type  = (STable)Handle.Unbox(args[6]);
-                int     flags = (int)   args[7];
-
-                return AddLexical(args, new LISimple(flags, type));
-            } else if (cmd == "add_hint") {
-                return AddLexical(args, new LIConstant());
-            } else if (cmd == "add_label") {
-                return AddLexical(args, new LILabel());
-            } else if (cmd == "add_dispatcher") {
-                return AddLexical(args, new LIDispatch());
-            } else if (cmd == "add_common_name") {
-                SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
-                STable  pkg   = (STable)Handle.Unbox(args[6]);
-                string  pname = (string)args[7];
-                if (!pkg.who.Isa(Kernel.StashMO))
-                    return new Exception("NYI usage of a nonstandard package");
-                string  who   = Kernel.UnboxAny<string>(pkg.who);
-
-                string err = sub.unit.NsBind(who, pname, null,
-                        (string)args[3], (int)args[4]);
-                if (err != null) return new Exception(err);
-                return AddLexical(args, new LICommon((char)who.Length + who + pname));
-            } else if (cmd == "add_state_name") {
-                SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
-                SubInfo outer = (sub.special & SubInfo.MAINLINE) != 0 ?
-                    sub : sub.outer;
-                STable  type  = (STable)Handle.Unbox(args[6]);
-                int     flags = (int)   args[7];
-                string  back  = (string)args[8];
-                string  name  = (string)args[2];
-
-                args[1] = Handle.Wrap(outer);
-                args[2] = back;
-                AddLexical(args, new LISimple(flags, type));
-                if (name != null) {
-                    args[1] = Handle.Wrap(sub);
-                    args[2] = name;
-                    return AddLexical(args, new LIAlias(back));
-                } else {
-                    return new object[] { "" };
-                }
-            } else if (cmd == "add_my_stash") {
-                STable  type  = (STable)Handle.Unbox(args[6]);
-
-                return AddLexical(args, new LIPackage(type));
-            } else if (cmd == "add_my_sub") {
-                SubInfo body  = (SubInfo)Handle.Unbox(args[6]);
-
-                return AddLexical(args, new LISub(body));
-            } else if (cmd == "sub_no_signature") {
-                SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
-                tgt.sig = null;
-                return null;
-            } else if (cmd == "param_new") {
-                SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
-                int ix = 2;
-                List<string> names = new List<string>();
-                int    flags = (int)   args[ix++];
-                string name  = (string)args[ix++];
-                string slot  = (string)args[ix++];
-                while(true) {
-                    string a_name = (string)args[ix++];
-                    if (a_name == null) break;
-                    names.Add(a_name);
-                }
-                SubInfo deflt = (SubInfo)Handle.Unbox(args[ix++]);
-                STable  type  = (STable)Handle.Unbox(args[ix++]);
-                if (deflt != null) flags |= Parameter.HASDEFAULT;
-                if (type != null) flags |= Parameter.HASTYPE;
-
-                return Handle.Wrap(new Parameter(flags,
-                    (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
-                    name, (names.Count == 0 ? null : names.ToArray()),
-                    deflt, type ?? Kernel.AnyMO));
-            } else if (cmd == "param_constraints") {
-                Parameter tgt = (Parameter)Handle.Unbox(args[1]);
-                tgt.post_constraints = new object[args.Length - 2];
-                for (int ix = 2; ix != args.Length; ix++)
-                    tgt.post_constraints[ix-2] = Handle.Unbox(args[ix]);
-                return null;
-            } else if (cmd == "param_subsig") {
-                Parameter tgt = (Parameter)Handle.Unbox(args[1]);
-                int ix = 2;
-                List<Parameter> sig = new List<Parameter>();
-                while (ix != args.Length)
-                    sig.Add((Parameter)Handle.Unbox(args[ix++]));
-                object[] pc = tgt.post_constraints;
-                Array.Resize(ref pc, pc == null ? 1 : pc.Length + 1);
-                pc[pc.Length - 1] = new Signature(sig.ToArray());
-                tgt.post_constraints = pc;
-                return null;
-            } else if (cmd == "set_signature") {
-                SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
-                int ix = 2;
-                List<Parameter> sig = new List<Parameter>();
-                while (ix != args.Length)
-                    sig.Add((Parameter)Handle.Unbox(args[ix++]));
-                tgt.sig = new Signature(sig.ToArray());
-                return null;
-            } else if (cmd == "sub_contains_phaser") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                int     p = (int)args[2];
-                foreach (SubInfo z in s.children)
-                    if (z.phaser == p)
-                        return true;
-                return false;
-            } else if (cmd == "sub_set_phaser") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                int     p = (int)args[2];
-                s.phaser = p;
-                if (p == Kernel.PHASER_CATCH)
-                    s.outer.catch_ = s;
-                if (p == Kernel.PHASER_CONTROL)
-                    s.outer.control = s;
-                if (p == Kernel.PHASER_INIT)
-                    Compartment.Top.init.Add(s, true);
-                if (p == Kernel.PHASER_CHECK)
-                    Compartment.Top.check.Add(s, true);
-                if (p == Kernel.PHASER_END)
-                    Compartment.Top.end.Add(s, true);
-                return null;
-            } else if (cmd == "sub_set_extend") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                object[] val = new object[args.Length - 3];
-                Array.Copy(args, 3, val, 0, val.Length);
-                if (s.extend == null)
-                    s.extend = new Dictionary<string,object[]>();
-                s.extend[(string)args[2]] = val;
-                return null;
-            } else if (cmd == "sub_get_extend") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                object[] ret = null;
-                if (s.extend != null)
-                    s.extend.TryGetValue((string)args[2], out ret);
-                return ret ?? new object[0];
-            } else if (cmd == "sub_finish") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                s.nam_str = (string)args[2];
-                s.nam_refs = new object[args.Length - 3];
-                for (int i = 0; i < s.nam_refs.Length; i++)
-                    s.nam_refs[i] = Handle.Unbox(args[i+3]);
-                s.code = RuntimeUnit.JitCompileSub;
-                if (s.protopad != null)
-                    s.protopad.code = s.code;
-                return null;
-            } else if (cmd == "sub_finish_dispatcher") {
-                SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-                string  k = (string)args[2];
-                if (k == "regex")
-                    s.code = Lexer.StandardProtoC;
-                else if (k == "multi")
-                    s.code = Kernel.StandardTypeProtoC;
-                else
-                    return new Exception("Unknown dispatcher type " + k);
-                if (s.protopad != null)
-                    s.protopad.code = s.code;
-                return null;
-            } else if (cmd == "save_unit") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                if (!ru.is_mainish && ru.bottom == null)
-                    ru.RunMainline();
-                if (ru.is_mainish)
-                    Compartment.Top.check.Run();
-                ru.Save();
-                return null;
-            } else if (cmd == "run_unit") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                bool evalmode = (bool)args[2];
-                Kernel.commandArgs = new string[args.Length - 3];
-                Array.Copy(args, 3, Kernel.commandArgs, 0, args.Length - 3);
-                Kernel.currentGlobals = ru.globals;
-                ru.PrepareEval();
-                Compartment.Top.check.Run();
-                Compartment.Top.init.Run();
-                if (!evalmode)
-                    Kernel.RunMain(ru);
-                return null;
-            } else if (cmd == "setnames") {
-                Builtins.execName = (string)args[1];
-                Builtins.programName = (string)args[2];
-                return null;
-            } else if (cmd == "unit_replrun") {
-                RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
-                Frame fret = null;
-                Compartment.Top.check.Run();
-                Compartment.Top.init.Run();
-                StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
-                b.Bind(Kernel.FalseV);
-                Frame ir = Kernel.GetInferiorRoot();
-                fret = ru.mainline.protosub.Invoke(ir, Variable.None, null);
-                fret.MarkShared();
-                Variable r = Kernel.RunInferior(fret);
-                if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
-                    Variable pl = Kernel.RunInferior(
-                        r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
-                            "gist", new Variable[] { r }, null));
-                    Console.WriteLine(pl.Fetch().mo.mro_raw_Str.Get(pl));
-                }
-                return new Handle(fret);
-            } else if (cmd == "safemode") {
-                Kernel.SaferMode = true;
-                return null;
-            } else if (cmd == "get_codepoint") {
-                return Niecza.UCD.DataSet.GetCodepoint((string)args[1]);
-            } else {
+            Func<object[],object> fn;
+            if (methods.TryGetValue(cmd, out fn))
+                return fn(args);
+            else {
                 ShowCall(args);
                 return new Exception("No handler for downcall " + cmd);
             }
+        }
+        public static object gettype(object[] args) {
+            object o = Handle.Unbox(args[1]);
+            return (o is SubInfo) ? "sub" : (o is RuntimeUnit) ? "unit" :
+                (o is STable) ? "type" : (o is Frame) ? "frame" :
+                (o is Parameter) ? "param" : "unknown";
+        }
+        public static object set_binding(object[] args) {
+            if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
+                Kernel.TraceFlags = Kernel.TRACE_CUR;
+                Kernel.TraceCount = Kernel.TraceFreq = 1;
+            }
+            Kernel.SetTrace();
+            Backend.obj_dir = (string)args[1];
+            Builtins.upcall_receiver = (System.Collections.IDictionary)args[2];
+            return null;
+        }
+        public static object push_compartment(object[] args) {
+            Compartment.Push();
+            return null;
+        }
+        public static object pop_compartment(object[] args) {
+            Compartment.Pop();
+            return null;
+        }
+        public static object new_unit(object[] args) {
+            RuntimeUnit ru = new RuntimeUnit((string)args[1],
+                    (string)args[2], (string)args[3],
+                    (bool)args[4], (bool)args[5]);
+
+            if (Kernel.containerRootUnit == null) {
+                // this is a module unit
+                Kernel.InitCompartment();
+                Kernel.containerRootUnit = ru;
+                ru.owner = ru;
+                ru.globals = Kernel.currentGlobals =
+                    new Dictionary<string,StashEnt>();
+            } else {
+                // needs to use the same globals as the other units in
+                // this serialization unit
+                ru.globals = Kernel.currentGlobals;
+                ru.owner = Kernel.containerRootUnit;
+                ru.owner.subordinates.Add(ru);
+            }
+            return new Handle(ru);
+        }
+        public static object unit_need_unit(object[] args) {
+            // LinkUnit state is owned by the root
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            string oname   = (string)args[2];
+
+            RuntimeUnit tg;
+            try {
+                tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
+            } catch (Exception ex) {
+                if (Config.SerFailInfo)
+                    Console.WriteLine("Thaw {0} failed: >>>{1}<<<", oname, ex);
+                // assume stale at first
+                object r1 = Builtins.UpCall(new object[] {
+                    "compile_unit", oname });
+                if (r1 != null)
+                    return r1;
+                tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
+            }
+            string err = ru.owner.LinkUnit(tg);
+            return err == null ? (object)new Handle(tg) : new Exception(err);
+        }
+        public static object unit_anon_stash(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            return ru.name + ":" + (ru.nextid++);
+        }
+        public static object unit_set_bottom(object[] args) {
+            ((RuntimeUnit)Handle.Unbox(args[1])).bottom =
+                (SubInfo)Handle.Unbox(args[2]);
+            return null;
+        }
+        public static object unit_bottom(object[] args) {
+            return Handle.Wrap(((RuntimeUnit)Handle.Unbox(args[1])).bottom);
+        }
+        public static object unit_mainline(object[] args) {
+            return Handle.Wrap(((RuntimeUnit)Handle.Unbox(args[1])).mainline);
+        }
+        public static object unit_set_mainline(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            ru.mainline = (SubInfo)Handle.Unbox(args[2]);
+            ru.mainline.special |= SubInfo.MAINLINE;
+            return null;
+        }
+        public static object sub_set_ltm(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).ltm =
+                BuildLad((object[])args[2]);
+            return null;
+        }
+        public static object sub_create_static_pad(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).CreateProtopad(null);
+            return null;
+        }
+        public static object sub_noninlinable(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).special |=
+                SubInfo.CANNOT_INLINE;
+            return null;
+        }
+        public static object sub_set_return_pass(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).special |=
+                SubInfo.RETURN_PASS;
+            return null;
+        }
+        public static object sub_set_transparent(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).special |=
+                SubInfo.TRANSPARENT;
+            return null;
+        }
+        public static object sub_set_run_once(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            if ((s.outer.special & SubInfo.RUN_ONCE) != 0) {
+                s.CreateProtopad(null);
+                s.special |= SubInfo.RUN_ONCE;
+            }
+            return null;
+        }
+        public static object sub_set_unsafe(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).special |=
+                SubInfo.UNSAFE;
+            return null;
+        }
+        public static object sub_is_inlinable(object[] args) {
+            return ((SubInfo)Handle.Unbox(args[1])).IsInlinable();
+        }
+        public static object sub_topicalizer(object[] args) {
+            return ((SubInfo)Handle.Unbox(args[1])).IsTopicalizer();
+        }
+        public static object sub_count(object[] args) {
+            return Builtins.get_count((SubInfo)Handle.Unbox(args[1]));
+        }
+        public static object sub_set_inlined(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).SetInlined();
+            return null;
+        }
+        public static object sub_run_BEGIN_CC(object[] args) {
+            SubInfo  si = (SubInfo)Handle.Unbox(args[1]);
+            Variable v  = si.RunBEGIN();
+            // no really this is a horrible hack... we need a way for
+            // the compiler to directly manipulate MOP values
+            return Niecza.UCD.DataSet.CompileCClass(v);
+        }
+        public static object sub_run_BEGIN(object[] args) {
+            SubInfo  si = (SubInfo)Handle.Unbox(args[1]);
+            Variable v  = si.RunBEGIN();
+            string   cn = (string)args[2];
+            while (si != null && !si.dylex.ContainsKey(cn)) si = si.outer;
+            LexInfo li = si == null ? null : si.dylex[cn];
+            if (li is LIConstant) {
+                ((LIConstant)li).value = v;
+            } else if (li is LICommon) {
+                StashEnt hkey = Kernel.currentGlobals[((LICommon)li).hkey];
+                hkey.constant = true;
+                hkey.v = v;
+            } else {
+                return new Exception("cannot bind constant value");
+            }
+            return null;
+        }
+        public static object sub_get_unit(object[] args) {
+            return new Handle(((SubInfo)Handle.Unbox(args[1])).unit);
+        }
+        public static object sub_run_once(object[] args) {
+            return (((SubInfo)Handle.Unbox(args[1])).special &
+                    SubInfo.RUN_ONCE) != 0;
+        }
+        public static object sub_transparent(object[] args) {
+            return (((SubInfo)Handle.Unbox(args[1])).special &
+                    SubInfo.TRANSPARENT) != 0;
+        }
+        public static object sub_outervar(object[] args) {
+            return ((SubInfo)Handle.Unbox(args[1])).outervar;
+        }
+        public static object sub_name(object[] args) {
+            return ((SubInfo)Handle.Unbox(args[1])).name;
+        }
+        public static object sub_methodof(object[] args) {
+            return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).methodof);
+        }
+        public static object sub_outer(object[] args) {
+            return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).outer);
+        }
+        public static object sub_class(object[] args) {
+            return ((SubInfo)Handle.Unbox(args[1])).mo.name;
+        }
+        public static object sub_body_of(object[] args) {
+            return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).body_of);
+        }
+        public static object sub_in_class(object[] args) {
+            return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).in_class);
+        }
+        public static object sub_cur_pkg(object[] args) {
+            return Handle.Wrap(((SubInfo)Handle.Unbox(args[1])).cur_pkg);
+        }
+        public static object sub_set_methodof(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).methodof =
+                (STable)Handle.Unbox(args[2]);
+            return null;
+        }
+        public static object sub_set_body_of(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).body_of =
+                (STable)Handle.Unbox(args[2]);
+            return null;
+        }
+        public static object sub_set_cur_pkg(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).cur_pkg =
+                (STable)Handle.Unbox(args[2]);
+            return null;
+        }
+        public static object sub_set_in_class(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).in_class =
+                (STable)Handle.Unbox(args[2]);
+            return null;
+        }
+        public static object sub_set_outervar(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).outervar = (string)args[2];
+            return null;
+        }
+        public static object sub_set_name(object[] args) {
+            ((SubInfo)Handle.Unbox(args[1])).name = (string)args[2];
+            return null;
+        }
+        public static object sub_set_class(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            STable  c = ResolveSubClass((string)args[2]);
+            s.mo = c;
+            if (s.protosub != null)
+                s.protosub.mo = c;
+            return null;
+        }
+        public static object sub_delete_lex(object[] args) {
+            // XXX This leaves a gap in the lexical/number mapping.
+            // Don't use it too much.
+            SubInfo from = (SubInfo)Handle.Unbox(args[1]);
+            string  lkey = (string)args[2];
+            from.dylex.Remove(lkey);
+            return null;
+        }
+        public static object sub_lookup_lex(object[] args) {
+            SubInfo from = (SubInfo)Handle.Unbox(args[1]);
+            string  lkey = (string)args[2];
+            string  file = (string)args[3];
+            int     line = (int)args[4];
+
+            SubInfo csr;
+            int levels = 0;
+            for (csr = from; csr != null; csr = csr.outer, levels++)
+                if (csr.dylex.ContainsKey(lkey))
+                    break;
+
+            if (csr == null)
+                return new object[0];
+            LexInfo li = csr.dylex[lkey];
+
+            if (file != null) {
+                for (SubInfo csr2 = from;
+                        csr2.used_in_scope != null && // modify only open units
+                        !csr2.used_in_scope.ContainsKey(lkey);
+                        csr2 = csr2.outer, levels--) {
+
+                    var uisi = new SubInfo.UsedInScopeInfo();
+                    uisi.orig_file = li.file;
+                    uisi.orig_line = li.line;
+                    uisi.file = file;
+                    uisi.line = line;
+                    uisi.levels = levels;
+                    csr2.used_in_scope[lkey] = uisi;
+                    if (csr == csr2)
+                        break; // stop *after* reaching defined scope
+                }
+            }
+
+
+            object[] r = null;
+            var lalias = li as LIAlias;
+            if (lalias != null)
+                r = new object[] { "alias",null,null,null, lalias.to };
+            var lsub   = li as LISub;
+            if (lsub != null)
+                r = new object[] { "sub",null,null,null, new Handle(lsub.def) };
+            var lpkg   = li as LIPackage;
+            if (lpkg != null)
+                r = new object[] { "package",null,null,null, new Handle(lpkg.pkg) };
+            var lsimp  = li as LISimple;
+            if (lsimp != null)
+                r = new object[] { "simple",null,null,null, lsimp.flags, Handle.Wrap(lsimp.type) };
+            var ldisp  = li as LIDispatch;
+            if (ldisp != null)
+                r = new object[] { "dispatch",null,null,null, Handle.Wrap(csr) };
+            var llab   = li as LILabel;
+            if (llab != null)
+                r = new object[] { "label",null,null,null };
+            var lhint  = li as LIConstant;
+            if (lhint != null)
+                r = new object[] { "hint",null,null,null };
+            var lcomm  = li as LICommon;
+            if (lcomm != null)
+                r = new object[] { "common",null,null,null, lcomm.Stash(), lcomm.VarName() };
+
+            r[1] = li.file;
+            r[2] = li.line;
+            r[3] = li.pos;
+
+            return r;
+        }
+        public static object lex_names(object[] args) {
+            List<object> ret = new List<object>();
+            foreach (string k in ((SubInfo)Handle.Unbox(args[1])).dylex.Keys)
+                ret.Add(k);
+            return ret.ToArray();
+        }
+        public static object unused_lexicals(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            List<object> ret = new List<object>();
+            foreach (KeyValuePair<string,LexInfo> kv in s.dylex) {
+                if (s.used_in_scope.ContainsKey(kv.Key))
+                    continue;
+                ret.Add(kv.Key);
+                ret.Add(kv.Value.pos);
+            }
+            return ret.ToArray();
+        }
+        public static object unit_stubbed_stashes(object[] args) {
+            RuntimeUnit u = (RuntimeUnit)Handle.Unbox(args[1]);
+            List<object> ret = new List<object>();
+            foreach (KeyValuePair<int,STable> kv in u.stubbed_stashes) {
+                ret.Add(kv.Key);
+                ret.Add(new Handle(kv.Value));
+            }
+            return ret.ToArray();
+        }
+        public static object unit_stub_stash(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            int    pos = (int)args[2];
+            STable type = (STable)Handle.Unbox(args[3]);
+            ru.stubbed_stashes.Add(new KeyValuePair<int,STable>(pos,type));
+            return null;
+        }
+        public static object unit_name(object[] args) {
+            return ((RuntimeUnit)Handle.Unbox(args[1])).name;
+        }
+        public static object sub_to_unit(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            while ((s.special & SubInfo.MAINLINE) == 0)
+                s = s.outer;
+            return new Handle(s);
+        }
+        public static object equal_handles(object[] args) {
+            return Handle.Unbox(args[1]) == Handle.Unbox(args[2]);
+        }
+        public static object sub_is_routine(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            return s.mo.HasType(Kernel.RoutineMO);
+        }
+        public static object sub_is_regex(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            return s.mo.HasType(Kernel.RegexMO);
+        }
+        public static object sub_has_lexical(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            return s.dylex.ContainsKey((string)args[2]);
+        }
+        public static object sub_lexical_used(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            return s.used_in_scope.ContainsKey((string)args[2]);
+        }
+        public static object sub_parameterize_topic(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            LISimple li = (LISimple)s.dylex["$_"];
+            li.flags = LISimple.NOINIT;
+            return null;
+        }
+        public static object unit_rel_pkg(object[] args) {
+            RuntimeUnit c = (RuntimeUnit)Handle.Unbox(args[1]);
+            bool auto     = (bool)args[2];
+            STable pkg    = args[3] == null ? null :
+                (STable)Handle.Unbox(args[3]);
+
+            for (int i = 4; i < args.Length; i++) {
+                string key = (string) args[i];
+                string who = "";
+                if (pkg != null) {
+                    if (!pkg.who.Isa(Kernel.StashMO))
+                        return new Exception(pkg.name + " fails to name a standard package");
+                    who = Kernel.UnboxAny<string>(pkg.who);
+                }
+                StashEnt v;
+                string hkey = (char)who.Length + who + key;
+                if (c.globals.TryGetValue(hkey, out v)) {
+                    if (v.v.rw || v.v.Fetch().IsDefined())
+                        return new Exception((who + "::" + key).Substring(2) + " names a non-package");
+                    pkg = v.v.Fetch().mo;
+                } else if (!auto) {
+                    return new Exception((who + "::" + key).Substring(2) + " does not name any package");
+                } else {
+                    c.globals[hkey] = v = new StashEnt();
+                    v.constant = true;
+                    v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, Kernel.StashMO));
+                    pkg = v.v.Fetch().mo;
+                }
+            }
+            return new Handle(pkg);
+        }
+        public static object unit_list_stash(object[] args) {
+            RuntimeUnit c = (RuntimeUnit) Handle.Unbox(args[1]);
+            string who = (string)args[2];
+            var r = new List<object>();
+            string filter = ((char)who.Length) + who;
+
+            foreach (KeyValuePair<string,StashEnt> kv in c.globals) {
+                if (!Utils.StartsWithInvariant(filter, kv.Key))
+                    continue;
+                r.Add(kv.Key.Substring(filter.Length));
+                StashEnt b = kv.Value;
+
+                if (!b.v.rw && !b.v.Fetch().IsDefined()) {
+                    r.Add(new Handle(b.v.Fetch().mo));
+                } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
+                    r.Add(new Handle(b.v.Fetch().GetSlot("info")));
+                } else {
+                    r.Add(null);
+                }
+            }
+            return r.ToArray();
+        }
+        public static object unit_get(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            string who  = (string)args[2];
+            string key  = (string)args[3];
+            string hkey = (char)who.Length + who + key;
+            StashEnt b;
+            if (ru.globals.TryGetValue(hkey, out b)) {
+                if (!b.v.rw && !b.v.Fetch().IsDefined()) {
+                    return new Handle(b.v.Fetch().mo);
+                } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
+                    return new Handle(b.v.Fetch().GetSlot("info"));
+                } else return null;
+            } else {
+                return null;
+            }
+        }
+        public static object unit_exists(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            string who  = (string)args[2];
+            string key  = (string)args[3];
+            string hkey = (char)who.Length + who + key;
+            return ru.globals.ContainsKey(hkey);
+        }
+        public static object unit_bind(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            string who  = (string)args[2];
+            string name = (string)args[3];
+            object item = Handle.Unbox(args[4]);
+            string file = (string)args[5];
+            int    line = (int)args[6];
+
+            Variable vitm = null;
+            if (item is STable)
+                vitm = ((STable)item).typeVar;
+            else if (item is SubInfo)
+                vitm = Kernel.NewROScalar(((SubInfo)item).protosub);
+            else if (item == null)
+                vitm = null;
+            else
+                return new Exception("weird thing to bind");
+
+            string err = ru.NsBind(who, name, vitm, file, line);
+            return err == null ? null : new Exception(err);
+        }
+        public static object type_CAN(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            //string meth = (string)args[2];
+            return (st.mo.type != P6how.PACKAGE && st.mo.type != P6how.MODULE);
+        }
+        public static object type_add_super(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            STable su = (STable)Handle.Unbox(args[2]);
+            st.mo.superclasses.Add(Kernel.ToInheritable(su));
+            return null;
+        }
+        public static object type_add_role(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            STable su = (STable)Handle.Unbox(args[2]);
+            st.mo.local_roles.Add(su);
+            return null;
+        }
+        public static object type_add_attribute(object[] args) {
+            STable  add_to = (STable)Handle.Unbox(args[1]);
+            string  name   = (string)args[2];
+            string  sigil  = (string)args[3];
+            bool    access = (bool)args[4];
+            STable  type   = (STable)Handle.Unbox(args[5]);
+            string  file   = (string)args[6];
+            int     line   = (int)args[7];
+
+            foreach (P6how.AttrInfo ai in add_to.mo.local_attr)
+                if (ai.name == name)
+                    return new Exception("Two definitions of attribute " + name + Backend.LocStr(ai.file, ai.line, file, line));
+
+            int flags = (sigil == "@") ? P6how.A_ARRAY :
+                (sigil == "%") ? P6how.A_HASH : 0;
+            if (access) flags |= P6how.A_PUBLIC;
+
+            add_to.mo.AddAttributePos(name, flags, null, type, file, line);
+            return null;
+        }
+        public static object type_add_initializer(object[] args) {
+            STable  add_to = (STable)Handle.Unbox(args[1]);
+            string  name   = (string)args[2];
+            SubInfo init   = (SubInfo)Handle.Unbox(args[3]);
+            for (int i = 0; i < add_to.mo.local_attr.Count; i++) {
+                var ai = add_to.mo.local_attr[i];
+                if (ai.name == name) {
+                    ai.init = init.protosub;
+                    add_to.mo.local_attr[i] = ai;
+                    break;
+                }
+            }
+            return null;
+        }
+        public static object type_add_method(object[] args) {
+            STable  add_to = (STable)Handle.Unbox(args[1]);
+            int     mode   = (int)args[2];
+            string  name   = (string)args[3];
+            SubInfo sub    = (SubInfo)Handle.Unbox(args[4]);
+            string  file   = (string)args[5];
+            int     line   = (int)args[6];
+            //int   pos    = (int)args[7];
+
+            if ((mode & P6how.M_MASK) == P6how.M_ONLY) {
+                foreach (P6how.MethodInfo mi in add_to.mo.lmethods) {
+                    if (mi.Name() == name &&
+                            ((mi.flags ^ mode) & P6how.V_MASK) == 0) {
+                        return new Exception("Two definitions of method " +
+                                name + Backend.LocStr(mi.file, mi.line, file, line));
+                    }
+                }
+            }
+
+            add_to.mo.AddMethodPos(mode, name, sub.protosub, file, line);
+            return null;
+        }
+        public static object type_set_instantiation_block(object[] args) {
+            STable  add_to = (STable)Handle.Unbox(args[1]);
+            SubInfo block  = (SubInfo)Handle.Unbox(args[2]);
+            add_to.mo.roleFactory = block.protosub;
+            return null;
+        }
+        public static object type_closed(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            return st.mo.isComposed;
+        }
+        public static object type_close(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            string err = st.mo.Compose();
+            if (err != null)
+                return new Exception(err);
+            return null;
+        }
+        public static object type_kind(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            return st.mo.rtype;
+        }
+        public static object type_name(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            return st.name;
+        }
+        public static object type_who(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            return Kernel.UnboxAny<string>(st.who);
+        }
+        public static object type_create(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            string name = (string)args[2];
+            string type = (string)args[3];
+            string who  = (string)args[4];
+
+            FieldInfo mof = ru.name == "CORE" ?
+                typeof(Kernel).GetField(name + "MO") : null;
+            FieldInfo pf = ru.name == "CORE" ?
+                typeof(Kernel).GetField(name + "P") : null;
+
+            STable nst = mof == null ? null : (STable)mof.GetValue(null);
+            if (nst == null) { // not all FooMO are initialized by kernel
+                nst = new STable(name);
+                if (mof != null) mof.SetValue(null, nst);
+            }
+            // Hack - we don't clear the MRO here, because we might need
+            // to call methods on the type in the process of defining the
+            // type itself.
+            nst.mo.superclasses.Clear();
+            if (nst.typeObject == null) // AnyMO.typeObject is set up early
+                nst.typeObject = new P6opaque(nst, 0);
+            ((P6opaque)nst.typeObject).slots = null;
+            nst.typeVar = Kernel.NewROScalar(nst.typeObject);
+
+            if (ru.name == "CORE" && name == "Nil") {
+                // this anomalous type object is iterable
+                nst.typeVar = Kernel.NewRWListVar(nst.typeObject);
+            }
+
+            if (pf != null)
+                pf.SetValue(null, nst.typeObject);
+
+            nst.initVar    = nst.typeVar;
+            nst.initObject = nst.typeObject;
+            nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
+            nst.how        = Kernel.BoxRaw<STable>(nst, Kernel.ClassHOWMO);
+            nst.mo.rtype   = type;
+            nst.mo.type =
+                type == "package" ? P6how.PACKAGE :
+                type == "module" ? P6how.MODULE :
+                type == "class" ? P6how.CLASS :
+                type == "grammar" ? P6how.GRAMMAR :
+                type == "role" ? P6how.ROLE :
+                type == "prole" ? P6how.PARAMETRIZED_ROLE :
+                type == "subset" ? P6how.SUBSET :
+                -1;
+            if (nst.mo.type < 0)
+                return new Exception(type);
+
+            return new Handle(nst);
+        }
+        public static object type_set_basetype(object[] args) {
+            STable subset = (STable)Handle.Unbox(args[1]);
+            STable basety = (STable)Handle.Unbox(args[2]);
+
+            subset.mo.FillSubset(basety);
+            subset.initObject = basety.initObject;
+            subset.initVar = basety.initVar;
+            return null;
+        }
+        public static object type_set_where(object[] args) {
+            STable  subset = (STable)Handle.Unbox(args[1]);
+            SubInfo where  = (SubInfo)Handle.Unbox(args[2]);
+            subset.mo.subsetWhereThunk = where.protosub;
+            return null;
+        }
+        public static object create_sub(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            string name = (string)args[2];
+            SubInfo outer = (SubInfo)Handle.Unbox(args[3]);
+            string cls = (string)args[4];
+            STable pkg = (STable)Handle.Unbox(args[5]);
+            STable icl = (STable)Handle.Unbox(args[6]);
+            bool once = (bool)args[7];
+            Frame outer_frame = (Frame)Handle.Unbox(args[8]);
+
+            if (outer_frame != null && outer_frame.info != outer) {
+                Console.WriteLine("MISMATCHED OUTER FRAME!!!");
+                outer_frame = null;
+            }
+
+            STable rcls = ResolveSubClass(cls);
+            if (rcls == null)
+                return new Exception("sub-class lookup fail for " + cls);
+
+            SubInfo n = new SubInfo(ru, name, outer, rcls, pkg, once,
+                    outer_frame);
+            n.in_class = icl;
+            if (n.outer != null && n.outer.unit == ru)
+                n.outer.children.Add(n);
+            ru.our_subs.Add(n);
+
+            if (outer == null) {
+                /* Hack - embed build information */
+                var li = new LIConstant();
+                var info = new VarHash();
+                info["name"] = Builtins.MakeStr("niecza");
+                string vers = "(unknown)\n";
+                try {
+                    vers = File.ReadAllText("VERSION");
+                } catch (Exception) {
+                    // ignore
+                }
+                info["version"] = Builtins.MakeStr(
+                        vers.Substring(0, vers.Length - 1));
+                info["build-time"] = Builtins.now();
+
+                li.value = Kernel.BoxAnyMO(info, Kernel.HashMO);
+
+                n.AddLexical("$?PERL", li);
+            }
+
+            return new Handle(n);
+        }
+        public static object add_my_name(object[] args) {
+            STable  type  = (STable)Handle.Unbox(args[6]);
+            int     flags = (int)   args[7];
+
+            return AddLexical(args, new LISimple(flags, type));
+        }
+        public static object add_hint(object[] args) {
+            return AddLexical(args, new LIConstant());
+        }
+        public static object add_label(object[] args) {
+            return AddLexical(args, new LILabel());
+        }
+        public static object add_dispatcher(object[] args) {
+            return AddLexical(args, new LIDispatch());
+        }
+        public static object add_common_name(object[] args) {
+            SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
+            STable  pkg   = (STable)Handle.Unbox(args[6]);
+            string  pname = (string)args[7];
+            if (!pkg.who.Isa(Kernel.StashMO))
+                return new Exception("NYI usage of a nonstandard package");
+            string  who   = Kernel.UnboxAny<string>(pkg.who);
+
+            string err = sub.unit.NsBind(who, pname, null,
+                    (string)args[3], (int)args[4]);
+            if (err != null) return new Exception(err);
+            return AddLexical(args, new LICommon((char)who.Length + who + pname));
+        }
+        public static object add_state_name(object[] args) {
+            SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
+            SubInfo outer = (sub.special & SubInfo.MAINLINE) != 0 ?
+                sub : sub.outer;
+            STable  type  = (STable)Handle.Unbox(args[6]);
+            int     flags = (int)   args[7];
+            string  back  = (string)args[8];
+            string  name  = (string)args[2];
+
+            args[1] = Handle.Wrap(outer);
+            args[2] = back;
+            AddLexical(args, new LISimple(flags, type));
+            if (name != null) {
+                args[1] = Handle.Wrap(sub);
+                args[2] = name;
+                return AddLexical(args, new LIAlias(back));
+            } else {
+                return new object[] { "" };
+            }
+        }
+        public static object add_my_stash(object[] args) {
+            STable  type  = (STable)Handle.Unbox(args[6]);
+
+            return AddLexical(args, new LIPackage(type));
+        }
+        public static object add_my_sub(object[] args) {
+            SubInfo body  = (SubInfo)Handle.Unbox(args[6]);
+
+            return AddLexical(args, new LISub(body));
+        }
+        public static object sub_no_signature(object[] args) {
+            SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
+            tgt.sig = null;
+            return null;
+        }
+        public static object param_new(object[] args) {
+            SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
+            int ix = 2;
+            List<string> names = new List<string>();
+            int    flags = (int)   args[ix++];
+            string name  = (string)args[ix++];
+            string slot  = (string)args[ix++];
+            while(true) {
+                string a_name = (string)args[ix++];
+                if (a_name == null) break;
+                names.Add(a_name);
+            }
+            SubInfo deflt = (SubInfo)Handle.Unbox(args[ix++]);
+            STable  type  = (STable)Handle.Unbox(args[ix++]);
+            if (deflt != null) flags |= Parameter.HASDEFAULT;
+            if (type != null) flags |= Parameter.HASTYPE;
+
+            return Handle.Wrap(new Parameter(flags,
+                (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
+                name, (names.Count == 0 ? null : names.ToArray()),
+                deflt, type ?? Kernel.AnyMO));
+        }
+        public static object param_constraints(object[] args) {
+            Parameter tgt = (Parameter)Handle.Unbox(args[1]);
+            tgt.post_constraints = new object[args.Length - 2];
+            for (int ix = 2; ix != args.Length; ix++)
+                tgt.post_constraints[ix-2] = Handle.Unbox(args[ix]);
+            return null;
+        }
+        public static object param_subsig(object[] args) {
+            Parameter tgt = (Parameter)Handle.Unbox(args[1]);
+            int ix = 2;
+            List<Parameter> sig = new List<Parameter>();
+            while (ix != args.Length)
+                sig.Add((Parameter)Handle.Unbox(args[ix++]));
+            object[] pc = tgt.post_constraints;
+            Array.Resize(ref pc, pc == null ? 1 : pc.Length + 1);
+            pc[pc.Length - 1] = new Signature(sig.ToArray());
+            tgt.post_constraints = pc;
+            return null;
+        }
+        public static object set_signature(object[] args) {
+            SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
+            int ix = 2;
+            List<Parameter> sig = new List<Parameter>();
+            while (ix != args.Length)
+                sig.Add((Parameter)Handle.Unbox(args[ix++]));
+            tgt.sig = new Signature(sig.ToArray());
+            return null;
+        }
+        public static object sub_contains_phaser(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            int     p = (int)args[2];
+            foreach (SubInfo z in s.children)
+                if (z.phaser == p)
+                    return true;
+            return false;
+        }
+        public static object sub_set_phaser(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            int     p = (int)args[2];
+            s.phaser = p;
+            if (p == Kernel.PHASER_CATCH)
+                s.outer.catch_ = s;
+            if (p == Kernel.PHASER_CONTROL)
+                s.outer.control = s;
+            if (p == Kernel.PHASER_INIT)
+                Compartment.Top.init.Add(s, true);
+            if (p == Kernel.PHASER_CHECK)
+                Compartment.Top.check.Add(s, true);
+            if (p == Kernel.PHASER_END)
+                Compartment.Top.end.Add(s, true);
+            return null;
+        }
+        public static object sub_set_extend(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            object[] val = new object[args.Length - 3];
+            Array.Copy(args, 3, val, 0, val.Length);
+            if (s.extend == null)
+                s.extend = new Dictionary<string,object[]>();
+            s.extend[(string)args[2]] = val;
+            return null;
+        }
+        public static object sub_get_extend(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            object[] ret = null;
+            if (s.extend != null)
+                s.extend.TryGetValue((string)args[2], out ret);
+            return ret ?? new object[0];
+        }
+        public static object sub_finish(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            s.nam_str = (string)args[2];
+            s.nam_refs = new object[args.Length - 3];
+            for (int i = 0; i < s.nam_refs.Length; i++)
+                s.nam_refs[i] = Handle.Unbox(args[i+3]);
+            s.code = RuntimeUnit.JitCompileSub;
+            if (s.protopad != null)
+                s.protopad.code = s.code;
+            return null;
+        }
+        public static object sub_finish_dispatcher(object[] args) {
+            SubInfo s = (SubInfo)Handle.Unbox(args[1]);
+            string  k = (string)args[2];
+            if (k == "regex")
+                s.code = Lexer.StandardProtoC;
+            else if (k == "multi")
+                s.code = Kernel.StandardTypeProtoC;
+            else
+                return new Exception("Unknown dispatcher type " + k);
+            if (s.protopad != null)
+                s.protopad.code = s.code;
+            return null;
+        }
+        public static object save_unit(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            if (!ru.is_mainish && ru.bottom == null)
+                ru.RunMainline();
+            if (ru.is_mainish)
+                Compartment.Top.check.Run();
+            ru.Save();
+            return null;
+        }
+        public static object run_unit(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            bool evalmode = (bool)args[2];
+            Kernel.commandArgs = new string[args.Length - 3];
+            Array.Copy(args, 3, Kernel.commandArgs, 0, args.Length - 3);
+            Kernel.currentGlobals = ru.globals;
+            ru.PrepareEval();
+            Compartment.Top.check.Run();
+            Compartment.Top.init.Run();
+            if (!evalmode)
+                Kernel.RunMain(ru);
+            return null;
+        }
+        public static object setnames(object[] args) {
+            Builtins.execName = (string)args[1];
+            Builtins.programName = (string)args[2];
+            return null;
+        }
+        public static object unit_replrun(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            Frame fret = null;
+            Compartment.Top.check.Run();
+            Compartment.Top.init.Run();
+            StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
+            b.Bind(Kernel.FalseV);
+            Frame ir = Kernel.GetInferiorRoot();
+            fret = ru.mainline.protosub.Invoke(ir, Variable.None, null);
+            fret.MarkShared();
+            Variable r = Kernel.RunInferior(fret);
+            if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
+                Variable pl = Kernel.RunInferior(
+                    r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
+                        "gist", new Variable[] { r }, null));
+                Console.WriteLine(pl.Fetch().mo.mro_raw_Str.Get(pl));
+            }
+            return new Handle(fret);
+        }
+        public static object safemode(object[] args) {
+            Kernel.SaferMode = true;
+            return null;
+        }
+        public static object get_codepoint(object[] args) {
+            return Niecza.UCD.DataSet.GetCodepoint((string)args[1]);
         }
     }
 }
