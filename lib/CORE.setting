@@ -646,7 +646,7 @@ my class Num does Real {
     method perl() {
         if defined(self) {
             my $num = self.Str;
-            $num ~= 'e0' unless $num ~~ /e/ || $num ~~ /Inf/ || $num ~~ /NaN/;
+            $num ~= 'e0' unless $num ~~ m:i/e/ || $num ~~ /Inf/ || $num ~~ /NaN/;
             $num;
         } else {
             self.typename;
