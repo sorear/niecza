@@ -288,6 +288,7 @@ S06-currying/named.t
 S06-multi/by-trait.t
 S06-multi/lexical-multis.t
 S06-multi/positional-vs-named.t
+S06-multi/type-based.t
 S06-operator-overloading/sub.t
 S06-other/anon-hashes-vs-blocks.t
 S06-other/main-eval.t
