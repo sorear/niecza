@@ -4294,6 +4294,23 @@ dynamic:
                     (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
                     name, (names.Count == 0 ? null : names.ToArray()),
                     deflt, type ?? Kernel.AnyMO));
+            } else if (cmd == "param_constraints") {
+                Parameter tgt = (Parameter)Handle.Unbox(args[1]);
+                tgt.post_constraints = new object[args.Length - 2];
+                for (int ix = 2; ix != args.Length; ix++)
+                    tgt.post_constraints[ix-2] = Handle.Unbox(args[ix]);
+                return null;
+            } else if (cmd == "param_subsig") {
+                Parameter tgt = (Parameter)Handle.Unbox(args[1]);
+                int ix = 2;
+                List<Parameter> sig = new List<Parameter>();
+                while (ix != args.Length)
+                    sig.Add((Parameter)Handle.Unbox(args[ix++]));
+                object[] pc = tgt.post_constraints;
+                Array.Resize(ref pc, pc == null ? 1 : pc.Length + 1);
+                pc[pc.Length - 1] = new Signature(sig.ToArray());
+                tgt.post_constraints = pc;
+                return null;
             } else if (cmd == "set_signature") {
                 SubInfo tgt = (SubInfo)Handle.Unbox(args[1]);
                 int ix = 2;

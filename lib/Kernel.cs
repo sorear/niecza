@@ -1384,7 +1384,7 @@ namespace Niecza {
         public SubInfo  def;
         public STable   type;
 
-        public object[]  post_constraints; // Signature | STable | SubInfo
+        public object[]  post_constraints; // Signature | SubInfo
 
         public override string ReprName() { return "P6parameter"; }
 
@@ -2432,6 +2432,34 @@ namespace Niecza {
             }
         }
 
+        static bool RunConstraint(Frame th, string signame, Parameter param,
+                bool quiet, Variable arg, object c) {
+            if (c is Signature) {
+                // Sub-signature
+                // dummy values; no junctional operation in subsigs
+                int jun_pivot = -1, jun_rank = int.MaxValue;
+                string jun_pivot_n = null;
+                P6any cap = Kernel.RunInferior(arg.Fetch().InvokeMethod(
+                    Kernel.GetInferiorRoot(), "Capture", new Variable[] { arg },
+                    null)).Fetch();
+                return BindSignature(th, (Signature)c,
+                        NO_JUNCTION + (quiet ? CHECK_ONLY : 0), param.name,
+                        (Variable[])cap.GetSlot("positionals"),
+                        (VarHash)cap.GetSlot("named"),
+                        ref jun_pivot, ref jun_pivot_n, ref jun_rank);
+            }
+            if (c is SubInfo) {
+                Frame thn = Kernel.GetInferiorRoot()
+                    .MakeChild(th, (SubInfo)c, Kernel.AnyP);
+                var sm = Kernel.RunInferior(thn);
+                bool res = Kernel.ACCEPTS(arg, sm);
+                if (!res && !quiet)
+                    throw new NieczaException("Constraint type check failed for parameter " + param.name + " in " + signame);
+                return res;
+            }
+            throw new NieczaException("funny object in post-constraint list");
+        }
+
         public static bool BindSignature(Frame th, Signature sig, int mode,
                 string signame, Variable[] pos, VarHash named,
                 ref int jun_pivot, ref string jun_pivot_n, ref int jun_rank) {
@@ -2555,6 +2583,11 @@ gotit:
                         throw new NieczaException("Parameter " + param.name + " in " + signame + " requires a defined argument");
                     default:
                         break;
+                }
+                if (param.post_constraints != null) {
+                    foreach (object c in param.post_constraints)
+                        if (!RunConstraint(th, signame, param, quiet, src, c))
+                            return false;
                 }
                 if ((flags & Parameter.RWTRANS) != 0) {
                 } else if ((flags & Parameter.IS_COPY) != 0) {
@@ -4701,8 +4734,9 @@ saveme:
                     p.constrained = false;
                     p.type = pa.type;
 
-                    if ((flags & Parameter.DEF_MASK) != Parameter.ANY_DEF &&
-                            (flags & Parameter.DEF_MASK) != 0) {
+                    if (((flags & Parameter.DEF_MASK) != Parameter.ANY_DEF &&
+                            (flags & Parameter.DEF_MASK) != 0) ||
+                            pa.post_constraints != null) {
                         p.constrained = true;
                         extra_constraints = true;
                     }
@@ -6332,6 +6366,13 @@ slow:
                 Console.WriteLine("usage: Kernel.dll -gen-app App.exe build/dir");
                 Console.WriteLine("usage: Kernel.dll -run Unit.Name");
             }
+        }
+
+        public static bool ACCEPTS(Variable obj, Variable filter) {
+            Variable ret = Kernel.RunInferior(filter.Fetch().
+                InvokeMethod(Kernel.GetInferiorRoot(), "ACCEPTS",
+                    new Variable[] { filter, obj }, null));
+            return ret.Fetch().mo.mro_raw_Bool.Get(ret);
         }
     }
 

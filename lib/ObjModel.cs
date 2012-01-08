@@ -503,13 +503,6 @@ next_method: ;
             FillClass(super.all_slot, new STable[] { super }, mro);
         }
 
-        static bool ACCEPTS(Variable obj, Variable filter) {
-            Variable ret = Kernel.RunInferior(filter.Fetch().
-                InvokeMethod(Kernel.GetInferiorRoot(), "ACCEPTS",
-                    new Variable[] { filter, obj }, null));
-            return ret.Fetch().mo.mro_raw_Bool.Get(ret);
-        }
-
         public bool AcceptsType(P6any obj) {
             if (type == SUBSET) {
                 if (!obj.Does(superclasses[0]))
@@ -517,7 +510,7 @@ next_method: ;
                 if (subsetFilter == null)
                     subsetFilter = Kernel.RunInferior(subsetWhereThunk.Invoke(
                         Kernel.GetInferiorRoot(), Variable.None, null));
-                return ACCEPTS(Kernel.NewROScalar(obj), subsetFilter);
+                return Kernel.ACCEPTS(Kernel.NewROScalar(obj), subsetFilter);
             }
             if (type == CURRIED_ROLE) {
                 foreach (STable cand in obj.mo.mo.type_list) {
@@ -530,7 +523,7 @@ next_method: ;
 
                     bool ok = true;
                     for (int i = 0; i < curriedArgs.Length; i++) {
-                        if (!ACCEPTS(cand.mo.curriedArgs[i], curriedArgs[i])) {
+                        if (!Kernel.ACCEPTS(cand.mo.curriedArgs[i], curriedArgs[i])) {
                             ok = false;
                             break;
                         }
