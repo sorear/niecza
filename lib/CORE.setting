@@ -642,7 +642,7 @@ my class Num does Real {
     our constant e  = 2.71828_18284_59045_235e0;
     our constant i  = Q:CgOp { (complex_new {0} {1}) };
     method Num() { self }
-    method FatRat() { self.Rat(0) }
+    method FatRat() { self.Rat(0).FatRat }
     method perl() {
         if defined(self) {
             my $num = self.Str;
