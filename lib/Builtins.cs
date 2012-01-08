@@ -2484,7 +2484,8 @@ again:
         return obj;
     }
 
-    public static Variable mixin(P6any obj, Variable role_list) {
+    public static Variable mixin(P6any obj, Variable role_list, Variable init,
+            Variable newtype) {
         VarDeque iter = start_iter(role_list);
         List<STable> roles = new List<STable>();
         while (Kernel.IterHasFlat(iter, true))
@@ -2500,11 +2501,23 @@ again:
         n.mo.superclasses.Add(obj.mo);
         n.mo.local_roles = roles;
         n.mo.Compose();
+        newtype.Store(n.typeObject);
+
+        string aname = null;
+        if (init != Kernel.AnyMO.typeVar) {
+            if (!obj.IsDefined())
+                throw new NieczaException("Cannot initialize a slot when mixing into a type object");
+            if (n.mo.local_attr.Count != 1 || (n.mo.local_attr[0].flags & P6how.A_PUBLIC) == 0)
+                throw new NieczaException("Role(s) being mixed in do not define precisely one, public attribute");
+            aname = n.mo.local_attr[0].name;
+        }
 
         if (obj.IsDefined()) {
             obj.ChangeType(n);
 
             BuildMostDerived(obj);
+            if (aname != null)
+                Kernel.Assign((Variable)obj.GetSlot(aname), init);
             return Kernel.NewROScalar(obj);
         } else {
             return n.typeVar;
@@ -2561,5 +2574,30 @@ again:
         return r.typeVar;
     }
 
+    public static Variable type_mixin_role(Variable type, Variable meth) {
+        STable stype = type.Fetch().mo;
+        string name = stype.name;
+        STable r = new STable("ANON");
+
+        r.mo.FillRole(new STable[0], null);
+        r.typeObject = r.initObject = new P6opaque(r);
+        r.typeVar = r.initVar = Kernel.NewROScalar(r.typeObject);
+        r.mo.AddMethod(0, name, meth.Fetch());
+        r.mo.AddMethod(P6how.V_PRIVATE, name, meth.Fetch());
+        r.mo.AddAttribute(name, P6how.A_PUBLIC, null, stype);
+        r.mo.Revalidate();
+        return r.typeVar;
+    }
+
     public static void raise(string sig) { PosixWrapper.raise(sig); }
+
+    public static Variable dyngetattr(Variable obj, Variable ty, Variable name) {
+        string sname = Kernel.UnboxAny<string>(name.Fetch());
+        return (Variable)obj.Fetch().GetSlot(sname);
+    }
+
+    public static Variable is_role(Variable o) {
+        int rty = o.Fetch().mo.mo.type;
+        return (rty == P6how.ROLE || rty == P6how.CURRIED_ROLE || rty == P6how.PARAMETRIZED_ROLE) ? Kernel.TrueV : Kernel.FalseV;
+    }
 }
