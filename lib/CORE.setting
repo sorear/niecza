@@ -643,7 +643,15 @@ my class Num does Real {
     our constant i  = Q:CgOp { (complex_new {0} {1}) };
     method Num() { self }
     method FatRat() { self.Rat(0) }
-    method perl() { defined(self) ?? ~self !! self.typename }
+    method perl() {
+        if defined(self) {
+            my $num = self.Str;
+            $num ~= 'e0' unless $num ~~ /e/ || $num ~~ /Inf/ || $num ~~ /NaN/;
+            $num;
+        } else {
+            self.typename;
+        }
+    }
 }
 our constant pi = 3.14159_26535_89793_238e0;
 our constant e  = 2.71828_18284_59045_235e0;
