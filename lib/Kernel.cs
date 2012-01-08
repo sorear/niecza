@@ -2584,11 +2584,6 @@ gotit:
                     default:
                         break;
                 }
-                if (param.post_constraints != null) {
-                    foreach (object c in param.post_constraints)
-                        if (!RunConstraint(th, signame, param, quiet, src, c))
-                            return false;
-                }
                 if ((flags & Parameter.RWTRANS) != 0) {
                 } else if ((flags & Parameter.IS_COPY) != 0) {
                     if ((flags & Parameter.IS_HASH) != 0)
@@ -2662,6 +2657,15 @@ bound: ;
                     case 9:  th.lex8 = src; break;
                     case 10: th.lex9 = src; break;
                     default: th.lexn[slot - 10] = src; break;
+                }
+                // Really, this should be earlier (next to the :D/:U checks);
+                // it's not right to be binding variables before doing
+                // constraint checks.  We're compromising a bit of purity here
+                // for the sake of making 'Int $odd where { $odd % 2 }' DWIM.
+                if (param.post_constraints != null) {
+                    foreach (object c in param.post_constraints)
+                        if (!RunConstraint(th, signame, param, quiet, src, c))
+                            return false;
                 }
             }
 
