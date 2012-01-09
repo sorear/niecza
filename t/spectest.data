@@ -29,6 +29,7 @@ integration/lexicals-and-attributes.t
 integration/man-or-boy.t
 #integration/packages.t
 integration/pair-in-array.t
+integration/real-strings.t
 S02-lexical-conventions/begin_end_pod.t
 S02-lexical-conventions/comments.t
 S02-lexical-conventions/minimal-whitespace.t
