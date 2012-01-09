@@ -2,6 +2,14 @@
 my module CORE;
 use MONKEY_TYPING;
 
+# The contract for 'is pure' is that, when provided a set of positional and
+# named arguments all of which are of immutable types, an immutable object
+# is returned which depends only on the arguments, not on any free variables.
+# In particular, any function which necessarily takes or returns a List
+# is excluded.
+# However, slurpy arguments are ok.  If an object is claimed to be immutable
+# but implements variable methods for Bool,Str,Int,etc, no rules apply.
+
 # Predeclarations of types {{{
 my class Mu       { ... }
 my grammar Cursor { ... }
@@ -18,16 +26,16 @@ my class Enum     { ... }
 my class Range    { ... }
 # }}}
 # Important inlinable definitions {{{
-sub infix:<+>($l,$r) is Niecza::builtin('plus',2,2) { $l + $r }
-sub infix:<->($l,$r) is Niecza::builtin('minus',2,2) { $l - $r }
-sub infix:<*> is Niecza::builtin('mul',2,2) is Niecza::absprec<u=> ($l,$r) { $l * $r }
-sub infix:</> is Niecza::builtin('divide',2,2) is equiv<*> ($l,$r) { $l / $r }
-sub infix:<%> is Niecza::builtin('mod',2,2) is equiv<*> ($l,$r) { $l % $r }
-sub infix:<**> is Niecza::builtin('pow',2,2)  is Niecza::absprec<w=> is assoc<right> ($l,$r) { $l ** $r }
+sub infix:<+>($l,$r) is pure is Niecza::builtin('plus',2,2) { $l + $r }
+sub infix:<->($l,$r) is pure is Niecza::builtin('minus',2,2) { $l - $r }
+sub infix:<*> is pure is Niecza::builtin('mul',2,2) is Niecza::absprec<u=> ($l,$r) { $l * $r }
+sub infix:</> is pure is Niecza::builtin('divide',2,2) is equiv<*> ($l,$r) { $l / $r }
+sub infix:<%> is pure is Niecza::builtin('mod',2,2) is equiv<*> ($l,$r) { $l % $r }
+sub infix:<**> is pure is Niecza::builtin('pow',2,2)  is Niecza::absprec<w=> is assoc<right> ($l,$r) { $l ** $r }
 
 # sub infix:<gcd>($l,$r) is Niecza::builtin('gcd',2,2) { $l gcd $r }
-sub infix:<gcd>($l,$r)  { Q:CgOp { (gcd {$l.Int} {$r.Int}) } }
-sub infix:<lcm>($l,$r) {
+sub infix:<gcd>($l,$r) is pure { Q:CgOp { (gcd {$l.Int} {$r.Int}) } }
+sub infix:<lcm>($l,$r) is pure {
     my $l-int = $l.Int.abs;
     my $r-int = $r.Int.abs;
     $l-int div ($l-int gcd $r-int) * $r-int;
@@ -49,70 +57,70 @@ sub term:<proceed>() {
 
 sub take(\|@pcl) { Q:CgOp { (take {@pcl.unwrap-single}) } }
 
-sub infix:<&> is Niecza::absprec<q=> is assoc<list>
+sub infix:<&> is pure is Niecza::absprec<q=> is assoc<list>
     (\|$p) { Junction.from-parcel(0, $p) }
-sub infix:<^> is Niecza::absprec<p=> is assoc<list>
+sub infix:<^> is pure is Niecza::absprec<p=> is assoc<list>
     (\|$p) { Junction.from-parcel(2, $p) }
-sub infix:<|> is Niecza::absprec<p=> is assoc<list>
+sub infix:<|> is pure is Niecza::absprec<p=> is assoc<list>
     (\|$p) { Junction.from-parcel(3, $p) }
-sub all  (*@p) { all @p }
-sub none (*@p) { none @p }
-sub one  (*@p) { one @p }
-sub any  (*@p) { any @p }
+sub all  (*@p) is pure { all @p }
+sub none (*@p) is pure { none @p }
+sub one  (*@p) is pure { one @p }
+sub any  (*@p) is pure { any @p }
 
-sub infix:<< == >>($l,$r) is Niecza::builtin('numeq',2,2)
+sub infix:<< == >>($l,$r) is pure is Niecza::builtin('numeq',2,2)
     is Niecza::absprec<m=> is assoc<chain> { $l == $r }
-sub infix:<< != >>($l,$r) is Niecza::builtin('numne',2,2)
+sub infix:<< != >>($l,$r) is pure is Niecza::builtin('numne',2,2)
     is equiv<==> { $l != $r }
-sub infix:<< < >>($l,$r)  is Niecza::builtin('numlt',2,2)
+sub infix:<< < >>($l,$r)  is pure is Niecza::builtin('numlt',2,2)
     is equiv<==> { $l <  $r }
-sub infix:<< > >>($l,$r)  is Niecza::builtin('numgt',2,2)
+sub infix:<< > >>($l,$r)  is pure is Niecza::builtin('numgt',2,2)
     is equiv<==> { $l >  $r }
-sub infix:<< <= >>($l,$r) is Niecza::builtin('numle',2,2)
+sub infix:<< <= >>($l,$r) is pure is Niecza::builtin('numle',2,2)
     is equiv<==> { $l <= $r }
-sub infix:<< >= >>($l,$r) is Niecza::builtin('numge',2,2)
+sub infix:<< >= >>($l,$r) is pure is Niecza::builtin('numge',2,2)
     is equiv<==> { $l >= $r }
 
 sub infix:<ge>($s1, $s2) is Niecza::builtin('strge',2,2)
-    is equiv<==> { $s1 ge $s2 }
+    is equiv<==> is pure { $s1 ge $s2 }
 sub infix:<gt>($s1, $s2) is Niecza::builtin('strgt',2,2)
-    is equiv<==> { $s1 gt $s2 }
+    is equiv<==> is pure { $s1 gt $s2 }
 sub infix:<le>($s1, $s2) is Niecza::builtin('strle',2,2)
-    is equiv<==> { $s1 le $s2 }
+    is equiv<==> is pure { $s1 le $s2 }
 sub infix:<lt>($s1, $s2) is Niecza::builtin('strlt',2,2)
-    is equiv<==> { $s1 lt $s2 }
+    is equiv<==> is pure { $s1 lt $s2 }
 sub infix:<eq>($s1, $s2) is Niecza::builtin('streq',2,2)
-    is equiv<==> { $s1 eq $s2 }
+    is equiv<==> is pure { $s1 eq $s2 }
 sub infix:<ne>($s1, $s2) is Niecza::builtin('strne',2,2)
-    is equiv<==> { $s1 ne $s2 }
+    is equiv<==> is pure { $s1 ne $s2 }
 
-sub infix:<,> is Niecza::builtin('comma',0) is Niecza::absprec<g=> is assoc<list> (\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
+sub infix:<,> is Niecza::builtin('comma',0) is pure is Niecza::absprec<g=> is assoc<list> (\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
 sub infix:<=>(\$a, \$b) is Niecza::absprec<i=> is assoc<right> is Niecza::builtin('assign',2,2) { $a = $b }
 
-sub chars($str) is Niecza::builtin('chars',1,1) { chars($str) }
-sub codes($str) is Niecza::builtin('codes',1,1) { codes($str) }
+sub chars($str) is pure is Niecza::builtin('chars',1,1) { chars($str) }
+sub codes($str) is pure is Niecza::builtin('codes',1,1) { codes($str) }
 
-sub defined(\$x) is Niecza::builtin('defined',1,1) { defined($x) }
+sub defined(\$x) is pure is Niecza::builtin('defined',1,1) { defined($x) }
 
-sub prefix:<~>(\$v) is Niecza::builtin('asstr', 1, 1) { ~$v }
-sub prefix:<?>(\$v) is Niecza::builtin('asbool', 1, 1) { ?$v }
-sub prefix:<->(\$v) is Niecza::builtin('negate', 1, 1) { -$v }
-sub prefix:<+>(\$v) is Niecza::builtin('num', 1, 1) { +$v }
-sub prefix:<!>(\$v) is Niecza::builtin('not', 1, 1) { !$v }
+sub prefix:<~>(\$v) is pure is Niecza::builtin('asstr', 1, 1) { ~$v }
+sub prefix:<?>(\$v) is pure is Niecza::builtin('asbool', 1, 1) { ?$v }
+sub prefix:<->(\$v) is pure is Niecza::builtin('negate', 1, 1) { -$v }
+sub prefix:<+>(\$v) is pure is Niecza::builtin('num', 1, 1) { +$v }
+sub prefix:<!>(\$v) is pure is Niecza::builtin('not', 1, 1) { !$v }
 
-sub not(\$v) is Niecza::builtin('not', 1, 1)    { not($v) }
-sub so(\$v)  is Niecza::builtin('asbool', 1, 1) { so $v }
+sub not(\$v) is pure is Niecza::builtin('not', 1, 1)    { not($v) }
+sub so(\$v)  is pure is Niecza::builtin('asbool', 1, 1) { so $v }
 
-sub infix:<+&> is Niecza::builtin('numand',2,2) is Niecza::absprec<u=> ($x, $y) { $x +& $y }
-sub infix:<+|>($x, $y) is Niecza::builtin('numor',2,2) { $x +| $y }
-sub infix:<+^>($x, $y) is Niecza::builtin('numxor',2,2) { $x +^ $y }
-sub infix:<< +< >>($x, $y) is Niecza::absprec<u=>
+sub infix:<+&> is pure is Niecza::builtin('numand',2,2) is Niecza::absprec<u=> ($x, $y) { $x +& $y }
+sub infix:<+|>($x, $y) is pure is Niecza::builtin('numor',2,2) { $x +| $y }
+sub infix:<+^>($x, $y) is pure is Niecza::builtin('numxor',2,2) { $x +^ $y }
+sub infix:<< +< >>($x, $y) is Niecza::absprec<u=> is pure
     is Niecza::builtin('numlshift',2,2) { $x +< $y }
-sub infix:<< +> >>($x, $y) is Niecza::absprec<u=>
+sub infix:<< +> >>($x, $y) is Niecza::absprec<u=> is pure
     is Niecza::builtin('numrshift',2,2) { $x +> $y }
-sub prefix:<< +^ >>($x) is Niecza::builtin('numcompl',1,1) { +^$x }
+sub prefix:<< +^ >>($x) is Niecza::builtin('numcompl',1,1) is pure { +^$x }
 
-sub infix:<< => >>($k, Mu $v) is equiv<=>
+sub infix:<< => >>($k, Mu $v) is equiv<=> is pure
     is Niecza::builtin('pair', 2, 2) { $k => $v }
 
 sub postcircumfix:<[ ]>(\$container, \$index, *%adverbs) {
@@ -141,7 +149,7 @@ sub prefix:<-->  is Niecza::absprec<x=> is Niecza::builtin('predec',1,1) ($v is 
 sub prefix:<++>  is Niecza::absprec<x=> is Niecza::builtin('preinc',1,1) ($v is rw) { $v = $v.succ; $v }
 sub postfix:<--> is Niecza::absprec<x=> is Niecza::builtin('postdec',1,1) ($v is rw) { my $old = $v; $v = $v.pred; $old }
 sub postfix:<++> is Niecza::absprec<x=> is Niecza::builtin('postinc',1,1) ($v is rw) { my $old = $v; $v = $v.succ; $old }
-sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) {
+sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) is pure {
     $start := $start(chars $str) if $start.^does(Code);
     $len := $len.^does(Code) ?? ($len(chars $str) - $start) !!
         $len // (chars($str) - $start);
@@ -151,7 +159,7 @@ sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) {
 }
 
 # not actually inlined but needed for constant i
-sub sqrt($x) { Q:CgOp { (sqrt {$x}) } }
+sub sqrt($x) is pure { Q:CgOp { (sqrt {$x}) } }
 sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
 sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
 
@@ -913,7 +921,7 @@ my constant True = Q:CgOp { (box Bool (bool 1)) };
 my constant False = Q:CgOp { (box Bool (bool 0)) };
 # }}}
 # Fundamental scalar operators {{{
-sub infix:<~> is Niecza::absprec<r=> is assoc<list> (\|$bits) { Q:CgOp {
+sub infix:<~> is Niecza::absprec<r=> is assoc<list> is pure (\|$bits) { Q:CgOp {
     (letn buf (strbuf_new)
           i   (int 0)
           ar  (unbox fvarlist (@ {$bits}))
@@ -925,8 +933,8 @@ sub infix:<~> is Niecza::absprec<r=> is assoc<list> (\|$bits) { Q:CgOp {
       [box Str (strbuf_seal (l buf))])
 } }
 
-sub infix:<max>(*@values) is Niecza::absprec<k=> is assoc<list> { @values.max }
-sub infix:<min>(*@values) is Niecza::absprec<k=> is assoc<list> { @values.min }
+sub infix:<max>(*@values) is pure is Niecza::absprec<k=> is assoc<list> { @values.max }
+sub infix:<min>(*@values) is pure is Niecza::absprec<k=> is assoc<list> { @values.min }
 sub infix:<minmax>(*@values) is Niecza::absprec<k=> is assoc<list> { @values.minmax }
 
 sub warn($str) { Q:CgOp { (control 11 (null frame) (int -1) (obj_getstr {$str}) (null obj)) } }
@@ -949,17 +957,17 @@ sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (obj_getnum {$status}))])
 } }
 
-sub index($haystack,$needle,$pos?) { $haystack.index($needle,$pos) }
-sub rindex($haystack,$needle,$pos?) { $haystack.rindex($needle,$pos) }
+sub index($haystack,$needle,$pos?) is pure { $haystack.index($needle,$pos) }
+sub rindex($haystack,$needle,$pos?) is pure { $haystack.rindex($needle,$pos) }
 sub comb($matcher,$str,$limit?,:$match) { (~$str).comb($matcher,$limit,:$match) }
 sub split($matcher,$str,$limit?,:$all) { (~$str).split($matcher,$limit,:$all) }
 
 sub item(Mu $x) { $x }
 sub list(*@x) { @x.list }
 
-sub prefix:<not> is Niecza::absprec<h=> (\$x) { not($x) }
+sub prefix:<not> is pure is Niecza::absprec<h=> (\$x) { not($x) }
 
-sub infix:<x> is Niecza::absprec<s=> ($str, $ct) {
+sub infix:<x> is pure is Niecza::absprec<s=> ($str, $ct) {
     my $i = +$ct;
     my $j = ''; # XXX use strbuf
     while $i >= 1 {
@@ -969,23 +977,23 @@ sub infix:<x> is Niecza::absprec<s=> ($str, $ct) {
     $j;
 }
 
-sub infix:<leg> is Niecza::absprec<n=> is assoc<non> ($s1, $s2) {
+sub infix:<leg> is pure is Niecza::absprec<n=> is assoc<non> ($s1, $s2) {
     (Q:CgOp { (box Num (cast num (strcmp (obj_getstr {$s1}) (obj_getstr {$s2})))) }).sign
 }
 
-sub lc($string)    { (~$string).lc }
-sub uc($string)    { (~$string).uc }
-sub chop($string)  { (~$string).chop }
-sub chomp($string) { (~$string).chomp }
-sub capitalize($string) { (~$string).capitalize }
+sub lc($string)    is pure { (~$string).lc }
+sub uc($string)    is pure { (~$string).uc }
+sub chop($string)  is pure { (~$string).chop }
+sub chomp($string) is pure { (~$string).chomp }
+sub capitalize($string) is pure { (~$string).capitalize }
 sub p5chop(*@strs) { my $r = ''; $r = .p5chop for @strs; $r }
 sub p5chomp(*@strs) { my $r = 0; $r += .p5chomp for @strs; $r }
-sub flip($string)  { (~$string).flip }
-sub lcfirst($o) { my $s = ~$o; lc(substr($s,0,1)) ~ substr($s,1) }
-sub ucfirst($o) { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
-sub trim-leading($string) { $string.trim-leading };
-sub trim-trailing($string) { $string.trim-trailing };
-sub trim($string) { $string.trim };
+sub flip($string) is pure { (~$string).flip }
+sub lcfirst($o) is pure { my $s = ~$o; lc(substr($s,0,1)) ~ substr($s,1) }
+sub ucfirst($o) is pure { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
+sub trim-leading($string) is pure { $string.trim-leading };
+sub trim-trailing($string) is pure { $string.trim-trailing };
+sub trim($string) is pure { $string.trim };
 
 # this one is horribly wrong and only handles the ref eq case.
 sub infix:<===>($l,$r) is equiv<==> { Q:CgOp {
@@ -1028,8 +1036,8 @@ sub infix:<but>($obj, \$roles, :$value) is rw {
 
 sub infix:<~~>($t,$m) is equiv<==> { $m.ACCEPTS($t) }
 
-sub ord($x) { Q:CgOp { (ord {$x}) } }
-sub chr($x) { Q:CgOp { (chr {$x}) } }
+sub ord($x) is pure { Q:CgOp { (ord {$x}) } }
+sub chr($x) is pure { Q:CgOp { (chr {$x}) } }
 sub ords($x) { $x.comb.map({ ord($_) }) }
 sub chrs(*@x) { @x.map({ chr($_ )}).join }
 
@@ -2105,10 +2113,10 @@ my class Range is Cool does Positional {
     }
 }
 
-sub infix:<..> is equiv<leg> ($a, $b)   { Range.new($a, $b) }
-sub infix:<..^> is equiv<leg> ($a, $b)  { Range.new($a, $b, :excludes_max) }
-sub infix:<^..> is equiv<leg> ($a, $b)  { Range.new($a, $b, :excludes_min) }
-sub infix:<^..^> is equiv<leg> ($a, $b) { Range.new($a, $b, :excludes_min, :excludes_max) }
+sub infix:<..> is equiv<leg> ($a, $b)   is pure { Range.new($a, $b) }
+sub infix:<..^> is equiv<leg> ($a, $b)  is pure { Range.new($a, $b, :excludes_max) }
+sub infix:<^..> is equiv<leg> ($a, $b)  is pure { Range.new($a, $b, :excludes_min) }
+sub infix:<^..^> is equiv<leg> ($a, $b) is pure { Range.new($a, $b, :excludes_min, :excludes_max) }
 
 sub _hyper_type($val) {
     #FIXME rewrite using roles
@@ -2326,24 +2334,24 @@ our sub Niecza::series-listop(Parcel $lists, $exclude-limit) {
     @l
 }
 
-sub infix:<%%> is Niecza::absprec<u=> ($x,$y) { $x % $y == 0 }
-sub infix:<?&> is Niecza::absprec<u=> ($a, $b) { ?($a && $b) }
-sub infix:<?|> ($a, $b) { ?($a || $b) }
-sub infix:<?^> ($a, $b) { ?( +$a +^ $b ) }
-sub prefix:<?^> ($a) { !$a }
-sub prefix:<|> (\$item) { $item.Capture }
-sub prefix:<^> ($limit) { 0 ..^ +$limit }
-sub prefix:<so> is Niecza::absprec<h=> (\$item) { ?$item }
+sub infix:<%%> is Niecza::absprec<u=> is pure ($x,$y) { $x % $y == 0 }
+sub infix:<?&> is Niecza::absprec<u=> is pure ($a, $b) { ?($a && $b) }
+sub infix:<?|> ($a, $b) is pure { ?($a || $b) }
+sub infix:<?^> ($a, $b) is pure { ?( +$a +^ $b ) }
+sub prefix:<?^> ($a) is pure { !$a }
+sub prefix:<|> (\$item) is pure { $item.Capture }
+sub prefix:<^> ($limit) is pure { 0 ..^ +$limit }
+sub prefix:<so> is Niecza::absprec<h=> is pure (\$item) { ?$item }
 sub infix:<xx> is Niecza::absprec<s=> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub _doreplicate($func, $ct) { map { $func() }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
-sub prefix:<abs> ($x) { Q:CgOp { (abs {$x}) } }
-sub abs($x) { Q:CgOp { (abs {$x}) } }
-sub floor($x) { Q:CgOp { (floor {$x}) } }
-sub ceiling($x) { -floor(-$x) }
-sub conjugate($x) { $x.conjugate }
-sub round($x, $scale=1) { floor($x / $scale + 0.5) * $scale }
-sub truncate($x) { $x.Int }
-sub sign($x) { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
+sub prefix:<abs> ($x) is pure { Q:CgOp { (abs {$x}) } }
+sub abs($x) is pure { Q:CgOp { (abs {$x}) } }
+sub floor($x) is pure { Q:CgOp { (floor {$x}) } }
+sub ceiling($x) is pure { -floor(-$x) }
+sub conjugate($x) is pure { $x.conjugate }
+sub round($x, $scale=1) is pure { floor($x / $scale + 0.5) * $scale }
+sub truncate($x) is pure { $x.Int }
+sub sign($x) is pure { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
 multi sub exp($x) { $x.exp }
 multi sub exp($x, $base) { $base ** $x }
 
@@ -2357,7 +2365,7 @@ my class Order is IntBasedEnum is Int {
     # method ACCEPTS(\$t) { defined(self) ?? self !! $t.^does(self) }
 }
 
-sub infix:« <=> » is equiv<leg> ($a, $b) { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
+sub infix:« <=> » is equiv<leg> ($a, $b) is pure { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality
 sub infix:<cmp> is equiv<leg> ($a, $b) {
     return ($a - $b).sign if $a ~~ Real && $b ~~ Real;
@@ -2382,8 +2390,8 @@ sub infix:<after> ($a, $b) is equiv<==> { ($a cmp $b) > 0 }
 sub seqop($op, \$x, \$y) { $op($x,$y) } # TODO: Special case with hyper
 sub reverseop($op, \$x, \$y) { $op($y, $x) }
 
-sub infix:<div> is Niecza::absprec<u=> ($x,$y) { Q:CgOp { (divop (i 4) {$x} {$y}) } }
-sub infix:<mod> is Niecza::absprec<u=> ($x,$y) { Q:CgOp { (divop (i 5) {$x} {$y}) } }
+sub infix:<div> is Niecza::absprec<u=> ($x,$y) is pure { Q:CgOp { (divop (i 4) {$x} {$y}) } }
+sub infix:<mod> is Niecza::absprec<u=> ($x,$y) is pure { Q:CgOp { (divop (i 5) {$x} {$y}) } }
 sub infix:<~&> ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:<~|> ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:<~^> ($x, $y) { die "Buffer bitops NYI"; } #OK
@@ -2391,7 +2399,7 @@ sub infix:«~<» ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub infix:«~>» ($x, $y) { die "Buffer bitops NYI"; } #OK
 sub prefix:<~^> ($x) { die "Buffer bitops NYI"; } #OK
 sub prefix:<||> (\|$args) { die "Slicels NYI" } #OK
-sub postfix:<i> is Niecza::absprec<y=> ($item) { $item ~~ Complex ?? $item * i !! Complex.new(0, $item) }
+sub postfix:<i> is Niecza::absprec<y=> ($item) is pure { $item ~~ Complex ?? $item * i !! Complex.new(0, $item) }
 sub prefix:<sleep> ($x) { Q:CgOp { (sleep (obj_getnum {$x})) } }
 sub infix:<...> is equiv<X> (\|$lists) { &Niecza::series-listop($lists, False) }
 sub infix:<...^> is equiv<X> (\|$lists) { &Niecza::series-listop($lists, True) }
@@ -2770,10 +2778,10 @@ sub getc($handle) { $handle.getc }
 
 multi sub log($x) { $x.log }
 multi sub log($x, $base) { $x.log($base) }
-sub log10($x) { $x.log(10) }
+sub log10($x) is pure { $x.log(10) }
 
-sub unpolar($mag, $angle) { Complex.new($mag * $angle.cos, $mag * $angle.sin); }
-sub cis($angle) { Complex.new($angle.cos, $angle.sin); }
+sub unpolar($mag, $angle) is pure { Complex.new($mag * $angle.cos, $mag * $angle.sin); }
+sub cis($angle) is pure { Complex.new($angle.cos, $angle.sin); }
 sub roots($x, $an) {
     my $n = $an.Int;
     return NaN if $n < 1;
@@ -2787,31 +2795,31 @@ sub roots($x, $an) {
     (^$n).map: { $mag.unpolar( ($angle + $_ * 2e0 * pi) / $n) };
 }
 
-sub sin($x) { $x.sin }
-sub asin($x) { $x.asin }
-sub cos($x) { $x.cos }
-sub acos($x) { $x.acos }
-sub tan($x) { $x.tan }
-sub atan($x) { $x.atan }
-sub sec($x) { $x.sec }
-sub asec($x) { $x.asec }
-sub cosec($x) { $x.cosec }
-sub acosec($x) { $x.acosec }
-sub cotan($x) { $x.cotan }
-sub acotan($x) { $x.acotan }
-sub sinh($x) { $x.sinh }
-sub asinh($x) { $x.asinh }
-sub cosh($x) { $x.cosh }
-sub acosh($x) { $x.acosh }
-sub tanh($x) { $x.tanh }
-sub atanh($x) { $x.atanh }
-sub sech($x) { $x.sech }
-sub asech($x) { $x.asech }
-sub cosech($x) { $x.cosech }
-sub acosech($x) { $x.acosech }
-sub cotanh($x) { $x.cotanh }
-sub acotanh($x) { $x.acotanh }
-sub atan2($y, $x = 1) { $y.atan2($x) }
+sub sin($x) is pure { $x.sin }
+sub asin($x) is pure { $x.asin }
+sub cos($x) is pure { $x.cos }
+sub acos($x) is pure { $x.acos }
+sub tan($x) is pure { $x.tan }
+sub atan($x) is pure { $x.atan }
+sub sec($x) is pure { $x.sec }
+sub asec($x) is pure { $x.asec }
+sub cosec($x) is pure { $x.cosec }
+sub acosec($x) is pure { $x.acosec }
+sub cotan($x) is pure { $x.cotan }
+sub acotan($x) is pure { $x.acotan }
+sub sinh($x) is pure { $x.sinh }
+sub asinh($x) is pure { $x.asinh }
+sub cosh($x) is pure { $x.cosh }
+sub acosh($x) is pure { $x.acosh }
+sub tanh($x) is pure { $x.tanh }
+sub atanh($x) is pure { $x.atanh }
+sub sech($x) is pure { $x.sech }
+sub asech($x) is pure { $x.asech }
+sub cosech($x) is pure { $x.cosech }
+sub acosech($x) is pure { $x.acosech }
+sub cotanh($x) is pure { $x.cotanh }
+sub acotanh($x) is pure { $x.acotanh }
+sub atan2($y, $x = 1) is pure { $y.atan2($x) }
 
 sub pick($num, *@values) { @values.pick($num) }
 sub roll($num, *@values) { @values.roll($num) }
