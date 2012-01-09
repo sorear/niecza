@@ -25,6 +25,32 @@ use STD;
 # }
 # }
 
+augment class Op {
+method const_value() { }
+}
+
+augment class Op::StatementList {
+    method const_value() { $!children[0].const_value if $!children == 1 }
+}
+
+augment class Op::Paren {
+    method const_value() { $!inside.const_value }
+}
+
+augment class Op::StringLiteral {
+    method const_value() { $*unit.string_constant(~$!text) }
+}
+
+augment class Op::Num {
+    method const_value() { $*unit.numeric_constant(@($!value)) }
+}
+
+class Op::GeneralConst is Op {
+    has $.value;
+    method const_value() { $!value }
+    method code($) { CgOp.const($!value) }
+}
+
 my constant %item_assignment = (:dba('item assignment') , :prec<i=>, :assoc<right>, :!pure);
 augment grammar STD::P6 {
     rule post_constraint {
@@ -42,6 +68,7 @@ augment grammar STD::P6 {
 class Operator::Mixin is Operator::Function {
     method with_args($/, *@args) {
         if @args[1] ~~ ::Op::CallSub {
+            nextsame if @args[1].invocant ~~ ::Op::Lexical && @args[1].invocant.name eq '&_param_role_inst';
             $/.CURSOR.sorry("Can only provide exactly one initial value to a mixin") unless @args[1].getargs.elems == 1;
             ::Op::CallSub.new(|node($/), invocant => $.function,
                 args => [@args[0], @args[1].invocant, ::Op::SimplePair.new(
@@ -53,6 +80,33 @@ class Operator::Mixin is Operator::Function {
 }
 
 augment class NieczaActions {
+method check_hash($/) {
+    my $do = $<pblock><blockoid>.ast;
+
+    return False unless $do.^isa(::Op::StatementList);
+    return True if $do.children == 0;
+    return False if $do.children > 1;
+
+    $do = $do.children[0];
+    my @bits = $do.^isa(::Op::SimpleParcel) ?? @( $do.items ) !! $do;
+
+    return True if @bits[0].^isa(::Op::SimplePair);
+
+    if @bits[0].^isa(::Op::Builtin) && @bits[0].name eq 'pair' {
+        return True;
+    }
+
+    if @bits[0].^isa(::Op::GeneralConst) && @bits[0].value.starts_with_pair {
+        return True;
+    }
+
+    if @bits[0].^isa(::Op::Lexical) && substr(@bits[0].name,0,1) eq '%' {
+        return True;
+    }
+
+    return False;
+}
+
 method process_block_traits($/, @tr) {
     my $sub = $*CURLEX<!sub>;
     my $pack = $sub.body_of;
@@ -96,6 +150,7 @@ method process_block_traits($/, @tr) {
         } elsif !$pack && $tr<nobinder> {
             $sub.set_signature(Any);
         } elsif !$pack && $tr<pure> {
+            $sub.outer.create_static_pad;
             $sub.set_extend('pure', True);
         } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
             my $rel = $tr.keys.[0];

@@ -532,7 +532,7 @@ namespace Niecza {
             return ValConstant(new string(c), Builtins.MakeFloat(n));
         }
 
-        public Variable ExactNum(int numbase, string digits) {
+        public static Variable ExactNum(int numbase, string digits) {
             BigInteger num = BigInteger.Zero;
             BigInteger den = BigInteger.Zero;
 

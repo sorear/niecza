@@ -2768,6 +2768,9 @@ dynamic:
             };
             handlers["const"] = delegate(NamProcessor th, object[] z) {
                 object[] ch = z[1] as object[];
+                if (ch == null) {
+                    return th.cpb.eu.RefConstant("", "", z[1], null);
+                }
                 string chh = JScalar.S(ch[0]);
                 if (chh == "exactnum") {
                     return th.cpb.eu.VarConstExact(JScalar.I(ch[1]),
@@ -3598,6 +3601,7 @@ dynamic:
             StringBuilder sb = new StringBuilder();
             foreach(object a in args) {
                 char ch = (a is int) ? 'i' : (a is Handle) ? 'h' :
+                    (a is double) ? 'd' :
                     (a is string) ? 's' : (a is bool) ? 'b' :
                     (a == null) ? 'n' : 'X';
                 sb.AppendFormat("{0}:{1}; ", ch, a);
@@ -3634,7 +3638,8 @@ dynamic:
             object o = Handle.Unbox(args[1]);
             return (o is SubInfo) ? "sub" : (o is RuntimeUnit) ? "unit" :
                 (o is STable) ? "type" : (o is Frame) ? "frame" :
-                (o is Parameter) ? "param" : "unknown";
+                (o is Variable) ? "value" : (o is Parameter) ? "param" :
+                "unknown";
         }
         public static object set_binding(object[] args) {
             if (Environment.GetEnvironmentVariable("NIECZA_DEFER_TRACE") != null) {
@@ -3766,6 +3771,48 @@ dynamic:
         public static object sub_set_inlined(object[] args) {
             ((SubInfo)Handle.Unbox(args[1])).SetInlined();
             return null;
+        }
+        public static object value_starts_with_pair(object[] args) {
+            var ob = ((Variable)Handle.Unbox(args[1])).Fetch();
+            if (ob.Isa(Kernel.PairMO))
+                return true;
+            if (ob.Isa(Kernel.ParcelMO) && Kernel.UnboxAny<Variable[]>(ob)[0].Fetch().Isa(Kernel.PairMO))
+                return true;
+            return false;
+        }
+        public static object unit_constant_fold(object[] args) {
+            var callee = (SubInfo)Handle.Unbox(args[2]);
+            var pos = new List<Variable>();
+            var nam = new VarHash();
+
+            for (int ix = 3; ix < args.Length; ix += 2) {
+                var v = (Variable)Handle.Unbox(args[ix+1]);
+                if (args[ix] == null) {
+                    pos.Add(v);
+                } else {
+                    nam[(string)args[ix]] = v;
+                }
+            }
+
+            object r = null;
+            try {
+                r = Handle.Wrap(Kernel.RunInferior(callee.protosub.Invoke(
+                    Kernel.GetInferiorRoot(), pos.ToArray(), nam)));
+            } catch (Exception) { }
+            return r;
+        }
+        public static object unit_string_constant(object[] args) {
+            return Handle.Wrap(Builtins.MakeStr((string)args[2]));
+        }
+        public static object unit_numeric_constant(object[] args) {
+            if (args.Length == 4) {
+                int bas       = (int)args[2];
+                string digits = (string)args[3];
+                return Handle.Wrap(EmitUnit.ExactNum(bas, digits));
+            } else {
+                double d = (args[2] is double) ? (double)args[2] : (int)args[2];
+                return Handle.Wrap(Builtins.MakeFloat(d));
+            }
         }
         public static object sub_run_BEGIN_CC(object[] args) {
             SubInfo  si = (SubInfo)Handle.Unbox(args[1]);

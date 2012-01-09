@@ -70,7 +70,8 @@ sub any  (*@p) is pure { any @p }
 
 sub infix:<< == >>($l,$r) is pure is Niecza::builtin('numeq',2,2)
     is Niecza::absprec<m=> is assoc<chain> { $l == $r }
-sub infix:<< != >>($l,$r) is pure is Niecza::builtin('numne',2,2)
+# Needs special handling of junctions
+sub infix:<< != >>(\$l,\$r) is pure is Niecza::builtin('numne',2,2)
     is equiv<==> { $l != $r }
 sub infix:<< < >>($l,$r)  is pure is Niecza::builtin('numlt',2,2)
     is equiv<==> { $l <  $r }
@@ -2339,7 +2340,7 @@ sub infix:<?&> is Niecza::absprec<u=> is pure ($a, $b) { ?($a && $b) }
 sub infix:<?|> ($a, $b) is pure { ?($a || $b) }
 sub infix:<?^> ($a, $b) is pure { ?( +$a +^ $b ) }
 sub prefix:<?^> ($a) is pure { !$a }
-sub prefix:<|> (\$item) is pure { $item.Capture }
+sub prefix:<|> (\$item) { $item.Capture } # marking this pure breaks syntax
 sub prefix:<^> ($limit) is pure { 0 ..^ +$limit }
 sub prefix:<so> is Niecza::absprec<h=> is pure (\$item) { ?$item }
 sub infix:<xx> is Niecza::absprec<s=> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }

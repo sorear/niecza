@@ -431,6 +431,7 @@ namespace Niecza.Serialization {
             null, typeof(Rat), typeof(FatRat), typeof(Complex),
             typeof(double), typeof(int), typeof(string), typeof(VarHash),
             typeof(Variable[]), typeof(VarDeque), typeof(STable),
+            typeof(BigInteger),
         };
         [Immutable]
         internal static Func<P6opaque>[] boxCreate = new Func<P6opaque>[] {
@@ -439,6 +440,7 @@ namespace Niecza.Serialization {
             BoxObject<int>.Create, BoxObject<string>.Create,
             BoxObject<VarHash>.Create, BoxObject<Variable[]>.Create,
             BoxObject<VarDeque>.Create, BoxObject<STable>.Create,
+            BoxObject<BigInteger>.Create,
         };
         [Immutable]
         static Type[] anyTypes = new Type[] {

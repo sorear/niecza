@@ -121,6 +121,22 @@ sub do_atpos($body, $nv, $invname, $op) { #OK not used
     return ::Op::Builtin.new(name => 'at_pos', args => $args);
 }
 
+# XXX should support folding of SimplePair, SimpleParcel too
+sub check_folding($sub, $op) {
+    my @evargs;
+    for $op.getargs -> $aop {
+        my $name;
+        if $aop.^isa(::Op::SimplePair) {
+            $name = $aop.key;
+            $aop := $aop.value;
+        }
+        push @evargs, $name, ($aop.const_value // return);
+    }
+
+    my $ret = $*unit.constant_fold($sub, @evargs) // return;
+    ::Op::GeneralConst.new(value => $ret);
+}
+
 sub run_optree($body, $op, $nv) {
     die "WTF in $body.name()" if !defined $op;
     my @kids := flat($op.ctxzyg($nv));
@@ -140,6 +156,10 @@ sub run_optree($body, $op, $nv) {
         if @inv_lex[0] eq 'dispatch' &&
             @inv_lex[4].has_lexical($invname ~ ':(!proto)');
     return $op unless @inv_lex[0] eq 'sub';
+
+    if @inv_lex[4].get_extend('pure') {
+        if check_folding(@inv_lex[4], $op) -> $nop { return $nop }
+    }
 
     if @inv_lex[4].get_extend('builtin') -> $B {
         return $op unless defined my $args = no_named_params($op);

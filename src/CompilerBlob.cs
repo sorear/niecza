@@ -48,7 +48,7 @@ namespace Niecza {
     public class Downcaller {
         internal static Variable upcall_cb;
         static IDictionary responder;
-        static P6any UnitP, StaticSubP, TypeP, ParamP;
+        static P6any UnitP, StaticSubP, TypeP, ParamP, ValueP;
         static string obj_dir;
 
         // let the CLR load assemblies from obj/ too
@@ -64,13 +64,14 @@ namespace Niecza {
         }
         // Better, but still fudgy.  Relies too much on path structure.
         public static void InitSlave(Variable cb, Variable unit,
-                Variable staticSub, Variable type, Variable param) {
+                Variable staticSub, Variable type, Variable param, Variable value) {
             if (responder != null) return;
 
             UnitP = unit.Fetch();
             StaticSubP = staticSub.Fetch();
             TypeP = type.Fetch();
             ParamP = param.Fetch();
+            ValueP = value.Fetch();
 
             obj_dir = Path.GetFullPath(Path.Combine(
                         AppDomain.CurrentDomain.BaseDirectory,
@@ -95,7 +96,10 @@ namespace Niecza {
                     return (string) o.mo.mro_raw_Str.Get(v);
                 else if (o.Isa(Kernel.BoolMO))
                     return (bool) o.mo.mro_raw_Bool.Get(v);
-                else if (o.Isa(Kernel.ListMO)) {
+                else if (o.Isa(Kernel.NumMO)) {
+                    double d = Kernel.UnboxAny<double>(o);
+                    return ((d % 1) == 0) ? (object)(int)d : (object)d;
+                } else if (o.Isa(Kernel.ListMO)) {
                     VarDeque it = o.mo.mro_raw_iterator.Get(v);
                     var lo = new List<object>();
                     while (Kernel.IterHasFlat(it, true))
@@ -133,6 +137,7 @@ namespace Niecza {
                 P6any pr = (t == "type") ? TypeP :
                     (t == "sub") ? StaticSubP :
                     (t == "param") ? ParamP :
+                    (t == "value") ? ValueP :
                     (t == "unit") ? UnitP : Kernel.AnyP;
                 return Kernel.BoxAnyMO(r, pr.mo);
             }

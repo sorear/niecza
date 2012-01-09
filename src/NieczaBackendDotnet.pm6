@@ -61,10 +61,11 @@ class Param { ... }
 class Unit { ... }
 class StaticSub { ... }
 class Type { ... }
+class Value { ... }
 
 method new(*%_) {
     my $self = callsame;
-    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled} {Unit} {StaticSub} {Type} {Param})) };
+    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled} {Unit} {StaticSub} {Type} {Param} {Value})) };
     downcall("safemode") if $self.safemode;
     $self;
 }
@@ -94,6 +95,11 @@ method accept($unit, :$filename, :$run, :$evalmode, :$repl) {
 class Param {
     method kind { "param" }
     method FALLBACK($name, *@args) { downcall("param_$name", self, @args) }
+}
+
+class Value {
+    method kind { "value" }
+    method FALLBACK($name, *@args) { downcall("value_$name", self, @args) }
 }
 
 class StaticSub {
