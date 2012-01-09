@@ -590,12 +590,16 @@ my class Cool {
     method ord() { ord(self) }
     method chr() { chr(self) }
     method ords() { ords(self) }
-    method trim-leading () { self.subst(/^ \s+/, "") };
-    method trim-trailing() { self.subst(/\s+ $/, "") };
-    method trim         () { self.trim-leading.trim-trailing };
+    method trim-leading () { self.subst(/^ \s+/, "") }
+    method trim-trailing() { self.subst(/\s+ $/, "") }
+    method trim         () { self.trim-leading.trim-trailing }
 
     method fmt(Str $format = '%s') {
-        sprintf($format, self)
+        sprintf($format, self);
+    }
+
+    method trans(*@changes) {
+        Niecza-trans(self, @changes);
     }
 }
 
@@ -1817,6 +1821,126 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
         }
     }
 }
+
+my class NieczaLSM {
+    has Cool $.source;
+    has      @!substitutions;
+
+    has Int  $!index = 0;
+    has Int  $!next_match;
+    has      $!next_substitution;
+    has      $!substitution_length;
+
+    has Str  $.unsubstituted_text;
+    has Str  $.substituted_text;
+
+    method add_substitution($key, $value) {
+        push @!substitutions, $key => $value;
+    }
+
+    method compare_substitution($substitution, Int $pos, Int $length) {
+        if $!next_match > $pos
+           || $!next_match == $pos && $!substitution_length < $length {
+
+            $!next_match = $pos;
+            $!substitution_length = $length;
+            $!next_substitution = $substitution;
+        }
+    }
+
+    multi method triage_substitution($substitution where { $^s.key ~~ Regex }) {
+        my $key = $substitution.key;
+        return unless $.source.substr($!index) ~~ $key;
+        self.compare_substitution($substitution, $!index + $/.from.Int, $/.to.Int - $/.from.Int);
+    }
+
+    multi method triage_substitution($substitution where { $^s.key ~~ Cool }) {
+        return unless defined index($.source, $substitution.key, $!index);
+        self.compare_substitution($substitution,
+                                  index($.source, $substitution.key, $!index),
+                                  $substitution.key.chars);
+    }
+
+    multi method triage_substitution($substitution) {
+        die "Don't know how to handle a {$substitution.WHAT} as a substitution key";
+    }
+
+    multi method increment_index(Regex $s) {
+        $.source.substr($!index) ~~ $s;
+        $!index = $!next_match + $/.chars.Int;
+    }
+
+    multi method increment_index(Cool $s) {
+        $!index = $!next_match + $s.chars;
+    }
+
+    method next_substitution() {
+        $!next_match = $.source.chars;
+
+        for @!substitutions {
+            self.triage_substitution($_);
+        }
+
+        $!unsubstituted_text
+            = $.source.substr($!index, $!next_match - $!index);
+        if defined $!next_substitution {
+            my $result = $!next_substitution.value;
+            $!substituted_text
+                = $result ~~ Callable ?? ~$result() !! $result;
+            self.increment_index($!next_substitution.key);
+        }
+
+        return $!next_match < $.source.chars;
+    }
+}
+
+sub Niecza-trans($str, *@changes) {
+    my sub expand($s) {
+        return $s.list if $s ~~ Positional;
+        gather for $s.comb(/ (\w) '..' (\w) | . /, :match) {
+            if .[0] {
+                take $_ for ~.[0] .. ~.[1];
+            } else {
+                take ~$_;
+            }
+        }
+    }
+
+    my $lsm = NieczaLSM.new(:source($str));
+    for (@changes) -> $p {
+        die "$p.perl() is not a Pair" unless $p ~~ Pair;
+        if $p.key ~~ Regex {
+            $lsm.add_substitution($p.key, $p.value);
+        }
+        elsif $p.value ~~ Callable {
+            my @from = expand $p.key;
+            for @from -> $f {
+                $lsm.add_substitution($f, $p.value);
+            }
+        }
+        else {
+            my @from = expand $p.key;
+            my @to   = expand $p.value;
+            if @to {
+                @to = @to xx ceiling(@from / @to);
+            } else {
+                @to = '' xx @from;
+            }
+            for @from Z @to -> $f, $t {
+                $lsm.add_substitution($f, $t);
+            }
+        }
+    }
+
+    my $r = "";
+    while $lsm.next_substitution {
+        $r ~= $lsm.unsubstituted_text ~ $lsm.substituted_text;
+    }
+    $r ~= $lsm.unsubstituted_text;
+
+    return $r;
+}
+
 # }}}
 # Regular expression support {{{
 my grammar Cursor is Any does Associative does Positional {
