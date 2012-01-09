@@ -98,7 +98,9 @@ namespace Niecza {
                     return (bool) o.mo.mro_raw_Bool.Get(v);
                 else if (o.Isa(Kernel.NumMO)) {
                     double d = Kernel.UnboxAny<double>(o);
-                    return ((d % 1) == 0) ? (object)(int)d : (object)d;
+                    if ((d % 1) == 0 && d <= int.MaxValue && d >= int.MinValue)
+                        return (object)(int)d;
+                    return (object)d;
                 } else if (o.Isa(Kernel.ListMO)) {
                     VarDeque it = o.mo.mro_raw_iterator.Get(v);
                     var lo = new List<object>();
