@@ -92,7 +92,8 @@ sub infix:<lt>($s1, $s2) is Niecza::builtin('strlt',2,2)
     is equiv<==> is pure { $s1 lt $s2 }
 sub infix:<eq>($s1, $s2) is Niecza::builtin('streq',2,2)
     is equiv<==> is pure { $s1 eq $s2 }
-sub infix:<ne>($s1, $s2) is Niecza::builtin('strne',2,2)
+# Needs special handling of junctions
+sub infix:<ne>(\$s1, \$s2) is Niecza::builtin('strne',2,2)
     is equiv<==> is pure { $s1 ne $s2 }
 
 sub infix:<,> is Niecza::builtin('comma',0) is pure is Niecza::absprec<g=> is assoc<list> (\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
