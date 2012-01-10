@@ -339,6 +339,20 @@ my class Any is Mu {
     method min($cmp = &infix:<cmp>) { @(self).min($cmp) }
     method max($cmp = &infix:<cmp>) { @(self).max($cmp) }
     method minmax($cmp = &infix:<cmp>) { @(self).minmax($cmp) }
+
+    method reduce($expression) {
+        my $result;
+        my $first = 1;
+        for @(self) -> $cur {
+            if $first {
+                $result = $cur;
+                $first = 0;
+                next;
+            }
+            $result = &$expression($result, $cur);
+        }
+        $result;
+    }
 }
 
 sub Niecza::autopun($pun, $name) {
@@ -2951,6 +2965,7 @@ sub atan2($y, $x = 1) is pure { $y.atan2($x) }
 sub pick($num, *@values) { @values.pick($num) }
 sub roll($num, *@values) { @values.roll($num) }
 sub rotate(@array, $n = 1) { @array.rotate($n) }
+sub reduce($expression, *@values) { @values.reduce($expression) }
 
 INIT {
     $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
