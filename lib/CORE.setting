@@ -671,6 +671,7 @@ my class Num does Real {
     our constant i  = Q:CgOp { (complex_new {0} {1}) };
     method Num() { self }
     method FatRat() { self.Rat(0).FatRat }
+    method gist() { self.Str }
     method perl() {
         if defined(self) {
             my $num = self.Str;
