@@ -2765,7 +2765,7 @@ grammar P6 is STD {
         :my $*IN_DECL = '';
         :dba('constraint')
         [
-        | '[' ~ ']' <signature>
+        | '[' ~ ']' <signature> $<bracket>={1}
         | '(' ~ ')' <signature>
         | where <EXPR(item %item_assignment)>
         ]

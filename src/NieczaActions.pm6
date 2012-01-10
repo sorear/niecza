@@ -220,8 +220,55 @@ method morename($/) {
     make ($<identifier> ?? ~$<identifier> !! $<EXPR> ?? $<EXPR>.ast !! Any);
 }
 
-method typename($ ) { }
-method type_constraint($ ) { }
+method get_Any() { $*CURLEX<!sub>.compile_get_pkg('CORE', 'Any') }
+method post_constraint($/) { }
+method type_constraint($/) {
+    if $<value> {
+        my $val = $<value>.ast.const_value;
+        $val // $/.CURSOR.sorry("Value constraint is not constant");
+        make { value => $val // ::Op::Num.new(value => 0).const_value };
+    } elsif $<typename> {
+        make $<typename>.ast;
+    } else {
+        make { where => $<EXPR>.ast };
+    }
+}
+
+method typename($/) {
+    constant %masks = ':_' => $Sig::ANY_DEF, ':T' => $Sig::UNDEF_ONLY,
+        ':U' => $Sig::UNDEF_ONLY, ':D' => $Sig::DEF_ONLY;
+
+    $/.CURSOR.sorry('WHENCE blocks not allowed on declarative type names')
+        if $<whence>;
+
+    if $<ident> {
+        $/.CURSOR.sorry('::?CLASS syntax NYI');
+        make { tmode => 0, type => self.get_Any };
+        return;
+    }
+
+    my $tmode = 0;
+    my $long = $<longname>;
+    my ($type) = self.process_name($long);
+
+    if !$type {
+        $/.CURSOR.sorry('A type must be provided');
+        $type = self.get_Any;
+    }
+
+    if $<typename> {
+        $/.CURSOR.sorry('Coercive declarations NYI');
+    }
+
+    for @( $long<colonpair> ) -> $cp {
+        if %masks{$cp} -> $mask {
+            $/.CURSOR.sorry("You may only specify one of :_ :D :U :T") if $tmode;
+            $tmode +|= $mask;
+        }
+    }
+
+    make { :$type, :$tmode };
+}
 
 # { dc: Bool, names: [Either String Op] }
 method name($/) {
@@ -1322,6 +1369,10 @@ method check_hash($/) {
         return True;
     }
 
+    if @bits[0].^isa(::Op::GeneralConst) && @bits[0].value.starts_with_pair {
+        return True;
+    }
+
     if @bits[0].^isa(::Op::Lexical) && substr(@bits[0].name,0,1) eq '%' {
         return True;
     }
@@ -1433,6 +1484,13 @@ method infix:sym<orelse>($/) { make ::Operator::ShortCircuit.new(kind => '//') }
 method infix:sym<andthen>($/) { make ::Operator::ShortCircuit.new(kind => 'andthen') }
 method infix:sym<?? !!>($/) { make ::Operator::Ternary.new(middle => $<EXPR>.ast) }
 method infix:sym<.=> ($/) { make ::Operator::DotEq.new }
+method infix:does ($/) {
+    make ::Operator::Mixin.new(function => mklex($/, '&infix:<does>'));
+}
+
+method infix:but ($/) {
+    make ::Operator::Mixin.new(function => mklex($/, '&infix:<but>'));
+}
 
 method prefix:temp ($/) { make ::Operator::Temp.new }
 method prefix:let ($/) { make ::Operator::Let.new }
@@ -2082,9 +2140,10 @@ method named_param($/) {
 # :: { flags : Int, slot : Maybe[Str] }
 method param_var($/) {
     if $<signature> {
-        $/.CURSOR.sorry('Sub-signatures NYI');
-        make { };
-        return Nil;
+        make { slot => Any, names => [], subsig => $<signature>.ast,
+            flags => $Sig::POSITIONAL +
+                (substr($/,0,1) eq '[' ?? $Sig::IS_LIST !! 0) };
+        return;
     }
     my $twigil = $<twigil> ?? ~$<twigil> !! '';
     my $sigil = ~$<sigil>;
@@ -2120,18 +2179,13 @@ method param_var($/) {
             $Sig::POSITIONAL };
 }
 
-# :: Sig::Parameter
 method parameter($/) {
-    my $type;
     my $sorry;
     my $p = $<param_var> // $<named_param>;
-    my $flags = $p.ast<flags>;
+    my $p_ast = $p ?? $p.ast !! { names => [], flags => $Sig::POSITIONAL };
+    my $flags = $p_ast<flags>;
 
     $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
-
-    if $<type_constraint> {
-        ($type) = self.process_name($<type_constraint>[0]<typename><longname>);
-    }
 
     for @( $<trait> ) -> $trait {
         if $trait.ast<rw> { $flags +|= $Sig::READWRITE }
@@ -2141,12 +2195,6 @@ method parameter($/) {
         else {
             $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
         }
-    }
-
-    if $<post_constraint> > 0 {
-        $/.sorry('Parameter post constraints NYI');
-        make ::Sig::Parameter.new;
-        return Nil;
     }
 
     my $default = $<default_value> ?? $<default_value>.ast !! Any;
@@ -2168,12 +2216,48 @@ method parameter($/) {
     else                 { $sorry = "Confusing parameters ($tag)" }
     if $sorry { $/.CURSOR.sorry($sorry); }
 
-    if defined $p.ast<slot> {
+    if defined $p_ast<slot> {
         # TODO: type constraint here
     }
 
     make ::Sig::Parameter.new(name => ~$/, mdefault => $default,
-        tclass => $type, |$p.ast, :$flags);
+        |$p_ast, :$flags);
+
+    for @<type_constraint> -> $tc {
+        if $tc.ast<where> {
+            push ($/.ast.where //= []), self.thunk_sub($tc.ast<where>.ast);
+        } elsif $tc.ast<value> {
+            $/.ast.tclass = $tc.ast<value>.get_type;
+            push ($/.ast.where //= []), self.thunk_sub(
+                ::Op::GeneralConst.new(value => $tc.ast<value>));
+        } else {
+            $/.CURSOR.sorry("Parameter coercion NYI") if $tc.ast<as>;
+            my $type = $tc.ast<type>;
+            if $type.kind eq 'subset' {
+                push ($/.ast.where //= []), self.thunk_sub(
+                    ::Op::GeneralConst.new(value => $type.get_type_var));
+                $type = $type.get_basetype while $type.kind eq 'subset';
+            }
+            $/.ast.tclass = $type;
+            $/.ast.flags +|= $tc.ast<tmode>;
+        }
+    }
+
+    for @<post_constraint> -> $pc {
+        # XXX this doesn't seem to be specced anywhere, but it's
+        # Rakudo-compatible and shouldn't hurt
+        if $pc<bracket> {
+            $/.ast.flags +&= +^$Sig::IS_HASH;
+            $/.ast.flags +|= $Sig::IS_LIST;
+        }
+
+        if $pc<signature> -> $ssig {
+            $ssig.CURSOR.sorry('Cannot have more than one sub-signature for a pparameter') if $/.ast.subsig;
+            $/.ast.subsig = $pc<signature>.ast;
+        } else {
+            push ($/.ast.where //= []), self.thunk_sub($pc<EXPR>.ast);
+        }
+    }
 }
 
 # signatures exist in several syntactic contexts so just make an object for now
@@ -2582,7 +2666,10 @@ method variable_declarator($/) {
 
     my $typeconstraint;
     if $*OFTYPE {
-        ($typeconstraint) = self.process_name($*OFTYPE<longname>);
+        my $of = $*OFTYPE.ast;
+        $*OFTYPE.CURSOR.sorry("Only simple types may be attached to variables")
+            if !$of<type> || $of<tmode> || $of<as>;
+        $typeconstraint = $of<type> // self.get_Any;
         $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
     }
 
@@ -2902,6 +2989,9 @@ method process_block_traits($/, @tr) {
                 if defined $sub.outervar;
         } elsif !$pack && $tr<nobinder> {
             $sub.set_signature(Any);
+        } elsif !$pack && $tr<pure> {
+            $sub.outer.create_static_pad;
+            $sub.set_extend('pure', True);
         } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
             my $rel = $tr.keys.[0];
             my $to  = $tr.values.[0];
@@ -3440,11 +3530,17 @@ method trait_mod:is ($/) {
 }
 
 method trait_mod:does ($/) {
-    make { does => self.process_name($<typename><longname>) };
+    my $does = $<typename>.ast;
+    $*OFTYPE.CURSOR.sorry("Only simple types may be used here")
+        if !$does<type> || $does<tmode> || $does<as>;
+    make { does => $does<type> // self.get_Any };
 }
 
 method trait_mod:of ($/) {
-    make { of => self.process_name($<typename><longname>) }
+    my $of = $<typename>.ast;
+    $*OFTYPE.CURSOR.sorry("Only simple types may be used here")
+        if !$of<type> || $of<tmode> || $of<as>;
+    make { of => $of<type> // self.get_Any };
 }
 
 method trait ($/) {

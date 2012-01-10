@@ -268,3 +268,18 @@ class Operator::Replicate is Operator {
             ::GLOBAL::NieczaActions.thunk_sub(@args[0])), @args[1]);
     }
 }
+
+# A bit hackish; handles the macro aspects of $foo does Role(23)
+class Operator::Mixin is Operator::Function {
+    method with_args($/, *@args) {
+        if @args[1] ~~ ::Op::CallSub {
+            nextsame if @args[1].invocant ~~ ::Op::Lexical && @args[1].invocant.name eq '&_param_role_inst';
+            $/.CURSOR.sorry("Can only provide exactly one initial value to a mixin") unless @args[1].getargs.elems == 1;
+            ::Op::CallSub.new(|node($/), invocant => $.function,
+                args => [@args[0], @args[1].invocant, ::Op::SimplePair.new(
+                    key => 'value', value => @args[1].getargs[0] // mklex($/,'Nil'))]);
+        } else {
+            nextsame;
+        }
+    }
+}
