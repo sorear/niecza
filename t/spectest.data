@@ -403,6 +403,7 @@ S32-array/shift.t
 S32-array/unshift.t
 S32-hash/delete.t
 S32-hash/delete_adverb.t
+S32-hash/exists.t
 S32-hash/invert.t
 S32-hash/keys_values.t
 S32-hash/kv.t
