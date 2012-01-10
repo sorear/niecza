@@ -4314,6 +4314,12 @@ dynamic:
             subset.initVar = basety.initVar;
             return null;
         }
+        public static object type_get_basetype(object[] args) {
+            return Handle.Wrap(((STable)Handle.Unbox(args[1])).mo.superclasses[0]);
+        }
+        public static object type_get_type_var(object[] args) {
+            return Handle.Wrap(((STable)Handle.Unbox(args[1])).typeVar);
+        }
         public static object type_set_where(object[] args) {
             STable  subset = (STable)Handle.Unbox(args[1]);
             SubInfo where  = (SubInfo)Handle.Unbox(args[2]);

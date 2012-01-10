@@ -286,7 +286,13 @@ method parameter($/) {
                 ::Op::GeneralConst.new(value => $tc.ast<value>));
         } else {
             $/.CURSOR.sorry("Parameter coercion NYI") if $tc.ast<as>;
-            $/.ast.tclass = $tc.ast<type>;
+            my $type = $tc.ast<type>;
+            if $type.kind eq 'subset' {
+                push ($/.ast.where //= []), self.thunk_sub(
+                    ::Op::GeneralConst.new(value => $type.get_type_var));
+                $type = $type.get_basetype while $type.kind eq 'subset';
+            }
+            $/.ast.tclass = $type;
             $/.ast.flags +|= $tc.ast<tmode>;
         }
     }
