@@ -308,6 +308,48 @@ method parameter($/) {
     }
 }
 
+# :: { flags : Int, slot : Maybe[Str] }
+method param_var($/) {
+    if $<signature> {
+        make { slot => Any, names => [], subsig => $<signature>.ast,
+            flags => $Sig::POSITIONAL +
+                (substr($/,0,1) eq '[' ?? $Sig::IS_LIST !! 0) };
+        return;
+    }
+    my $twigil = $<twigil> ?? ~$<twigil> !! '';
+    my $sigil = ~$<sigil>;
+    my $list = $sigil eq '@';
+    my $hash = $sigil eq '%';
+    my $name = $<name> ?? ~$<name> !! Any;
+
+    my $slot;
+    if $twigil eq '' {
+        $slot = defined($name) ?? ($sigil ~ $name) !! Any;
+    } elsif $twigil eq '*' {
+        $slot = "$sigil*" ~ "$name";
+    } else {
+        $/.CURSOR.sorry("Unhandled parameter twigil $twigil");
+        make { };
+        return Nil;
+    }
+
+    if ($sigil ne '$' && $sigil ne '@' && $sigil ne '%' && $sigil ne '&') {
+        $/.CURSOR.sorry('Non bare scalar targets NYI');
+        make { }
+        return Nil;
+    }
+
+    $/.CURSOR.trymop({
+        $/.CURSOR.check_categorical($slot);
+        $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, |mnode($/),
+            noinit => ?($*SIGNUM)) if defined($slot);
+    });
+
+    make { :$slot, names => defined($name) ?? [ $name ] !! [],
+        flags => ($list ?? $Sig::IS_LIST !! 0) + ($hash?? $Sig::IS_HASH !! 0) +
+            $Sig::POSITIONAL };
+}
+
 method variable_declarator($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
