@@ -1708,6 +1708,7 @@ sub keys($h) { $h.keys }
 sub values($h) { $h.values }
 
 sub kv($p) { $p.kv }
+sub pairs($p) { $p.pairs }
 
 sub sort(*@values) {
     if @values && @values[0] ~~ Callable {
