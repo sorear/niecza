@@ -105,6 +105,7 @@ S02-types/parsing-bool.t
 S02-types/range.t
 S02-types/sigils-and-types.t
 S02-types/subscripts_and_context.t
+S02-types/subset.t
 S02-types/type.t
 S02-types/whatever.t
 S03-junctions/associative.t
