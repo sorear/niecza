@@ -3772,6 +3772,9 @@ dynamic:
             ((SubInfo)Handle.Unbox(args[1])).SetInlined();
             return null;
         }
+        public static object value_get_type(object[] args) {
+            return Handle.Wrap(((Variable)Handle.Unbox(args[1])).Fetch().mo);
+        }
         public static object value_starts_with_pair(object[] args) {
             var ob = ((Variable)Handle.Unbox(args[1])).Fetch();
             if (ob.Isa(Kernel.PairMO))
