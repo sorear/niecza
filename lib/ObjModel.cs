@@ -501,6 +501,8 @@ next_method: ;
             Array.Copy(super.mo.mro, 0, mro, 1, mro.Length - 1);
             mro[0] = stable;
             FillClass(super.all_slot, new STable[] { super }, mro);
+            Revalidate();
+            stable.SetupVTables();
         }
 
         public bool AcceptsType(P6any obj) {
