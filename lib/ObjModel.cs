@@ -162,6 +162,7 @@ namespace Niecza {
         public List<MethodInfo> lmethods = new List<MethodInfo>();
         public List<AttrInfo> local_attr = new List<AttrInfo>();
 
+        public List<STable> trustees = new List<STable>();
         public List<STable> superclasses = new List<STable>();
         public List<STable> local_roles = new List<STable>();
         public List<STable> role_typecheck_list = new List<STable>();
@@ -180,8 +181,6 @@ namespace Niecza {
         public HashSet<STable> type_set = new HashSet<STable>();
         internal SubscriberSet subclasses = new SubscriberSet();
         Subscription[] mro_sub;
-        // role type objects have an empty MRO cache so no methods can be
-        // called against them; the fallback (NYI) is to pun.
         // }}}
 
         // types and constants {{{
@@ -757,6 +756,7 @@ next_method: ;
             fb.Refs<STable>(local_roles);
             fb.Refs<STable>(role_typecheck_list);
             fb.Refs<STable>(mro);
+            fb.Refs<STable>(trustees);
         }
 
         internal static P6how Thaw(ThawBuffer tb) {
@@ -808,6 +808,7 @@ next_method: ;
             n.local_roles = tb.RefsL<STable>();
             n.role_typecheck_list = tb.RefsL<STable>();
             n.mro = tb.RefsA<STable>();
+            n.trustees = tb.RefsL<STable>();
             tb.PushFixup(n);
             return n;
         }

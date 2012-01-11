@@ -4235,6 +4235,17 @@ dynamic:
             add_to.mo.roleFactory = block.protosub;
             return null;
         }
+        public static object type_add_trustee(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            STable nw = (STable)Handle.Unbox(args[2]);
+            st.mo.trustees.Add(nw);
+            return null;
+        }
+        public static object type_trusts(object[] args) {
+            STable st = (STable)Handle.Unbox(args[1]);
+            STable nw = (STable)Handle.Unbox(args[2]);
+            return st == nw || st.mo.trustees.Contains(nw);
+        }
         public static object type_closed(object[] args) {
             STable st = (STable)Handle.Unbox(args[1]);
             return st.mo.isComposed;
