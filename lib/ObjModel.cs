@@ -9,14 +9,6 @@ namespace Niecza {
 
         public abstract void Freeze(FreezeBuffer fb);
 
-        public virtual object GetSlot(string name) {
-            throw new NieczaException("Representation " + ReprName() + " does not support attributes");
-        }
-
-        public virtual void SetSlot(string name, object v) {
-            throw new NieczaException("Representation " + ReprName() + " does not support attributes");
-        }
-
         public virtual object GetSlot(STable type, string name) {
             throw new NieczaException("Representation " + ReprName() + " does not support attributes");
         }
@@ -946,11 +938,6 @@ next_method: ;
             mo.stable = this;
         }
 
-        public int FindSlot(string name) {
-            //Kernel.LogNameLookup(name);
-            return slotMap[name];
-        }
-
         public int FindSlot(STable type, string name) {
             //Kernel.LogNameLookup(name);
             int ix = slotMap[name];
@@ -1152,24 +1139,6 @@ next_method: ;
         public P6opaque(STable klass, int na) {
             this.mo = klass;
             this.slots = (na != 0) ? new object[na] : null;
-        }
-
-        public override void SetSlot(string name, object obj) {
-            if (slots == null) {
-                mo.FindSlot(name);
-                throw new NieczaException("Attempted to access slot " + name +
-                        " of type object for " + mo.name);
-            }
-            slots[mo.FindSlot(name)] = obj;
-        }
-
-        public override object GetSlot(string name) {
-            if (slots == null) {
-                mo.FindSlot(name);
-                throw new NieczaException("Attempted to access slot " + name +
-                        " of type object for " + mo.name);
-            }
-            return slots[mo.FindSlot(name)];
         }
 
         public override void SetSlot(STable type, string name, object obj) {

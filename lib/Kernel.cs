@@ -3133,10 +3133,10 @@ bound: ;
     }
     class CtxListIterator : ContextHandler<VarDeque> {
         public override VarDeque Get(Variable obj) {
-            P6opaque d = (P6opaque) obj.Fetch();
+            var d = obj.Fetch();
             if (!d.IsDefined()) return new VarDeque();
-            VarDeque r = new VarDeque( (VarDeque) d.slots[0] );
-            r.PushD((VarDeque) d.slots[1]);
+            VarDeque r = new VarDeque( (VarDeque) d.GetSlot(Kernel.ListMO, "items" ));
+            r.PushD((VarDeque) d.GetSlot(Kernel.ListMO, "rest"));
             return r;
         }
     }
