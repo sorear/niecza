@@ -2897,6 +2897,10 @@ sub mkdir($filename) is unsafe {
     True; # is there a way to actually detect problems with File.Delete?
 }
 
+sub shell($command) is unsafe {
+    Q:CgOp { (box Int (command_system (obj_getstr {$command}))) };
+}
+
 multi sub open($filename, :$w?, :$a?, :$r?, :$rw?) is unsafe {
     die "Not yet able to open both :r and :w" if ($r && $w) || $rw;
     if $a {

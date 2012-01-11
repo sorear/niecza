@@ -31,6 +31,7 @@ namespace Niecza {
         // references to methods that can be directly called
         public readonly static Func<uint> getuid, geteuid, getgid, getegid;
         public readonly static Func<uint,uint,int> setreuid, setregid;
+        public readonly static Func<string,int> system;
 
         // methods and fields that must be used through wrappers
         static readonly MethodInfo m_stat, m_access, m_raise;
@@ -91,6 +92,9 @@ namespace Niecza {
                 typeof(Func<uint,uint,int>), Syscall.GetMethod("setreuid"));
             setregid = (Func<uint,uint,int>)Delegate.CreateDelegate(
                 typeof(Func<uint,uint,int>), Syscall.GetMethod("setregid"));
+
+            system = (Func<string,int>)Delegate.CreateDelegate(
+                typeof(Func<string,int>), Stdlib.GetMethod("system"));
 
             m_stat = Syscall.GetMethod("stat");
             m_access = Syscall.GetMethod("access");
@@ -1661,6 +1665,10 @@ flat_enough:;
 
     public static void path_mkdir(string path) {
         Directory.CreateDirectory(path);
+    }
+
+    public static int command_system(string command) {
+        return PosixWrapper.system(command);
     }
 
     public static bool emulate_eaccess(string path, int mode) {
