@@ -5170,6 +5170,9 @@ again:
             if (inq.Count() == 0)
                 return outq;
             inq0v = inq[0];
+            if (inq0v == null) {
+                throw new NieczaException("Circular data dependency in list iteration, or last fetch threw exception");
+            }
             inq0 = inq0v.Fetch();
             if (inq0v.islist) {
                 inq.Shift();
