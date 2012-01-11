@@ -427,6 +427,7 @@ S32-hash/slice.t
 S32-io/dir.t
 S32-io/file-tests.t
 S32-list/classify.t
+S32-list/create.t
 S32-list/end.t
 S32-list/first.t
 S32-list/grep.t
