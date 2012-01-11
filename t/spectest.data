@@ -299,6 +299,7 @@ S06-multi/lexical-multis.t
 S06-multi/positional-vs-named.t
 S06-multi/syntax.t
 S06-multi/type-based.t
+S06-multi/unpackability.t
 S06-operator-overloading/sub.t
 S06-other/anon-hashes-vs-blocks.t
 S06-other/main-eval.t
@@ -323,6 +324,7 @@ S06-signature/scalar-type.t
 S06-signature/slurpy-and-interpolation.t
 S06-signature/slurpy-params.t
 S06-signature/slurpy-placeholders.t
+S06-signature/unpack-array.t
 S06-traits/is-copy.t
 S06-traits/is-rw.t
 S06-traits/precedence.t
@@ -333,6 +335,7 @@ S09-subscript/slice.t
 S10-packages/basic.t
 S12-attributes/augment-and-initialization.t
 S12-attributes/clone.t
+S12-attributes/inheritance.t
 S12-attributes/instance.t
 S12-class/anonymous.t
 S12-class/attributes.t
