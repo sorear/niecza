@@ -572,8 +572,8 @@ retry:
             if (sobj.Isa(Kernel.RegexMO)) {
                 toks.Add(sobj);
 
-                pad.outer_stack.Add((Frame)sobj.GetSlot("outer"));
-                pad.info_stack.Add((SubInfo)sobj.GetSlot("info"));
+                pad.outer_stack.Add(Kernel.GetOuter(sobj));
+                pad.info_stack.Add(Kernel.GetInfo(sobj));
                 lads.Add(pad.info_stack[0].ltm.Reify(pad));
                 pad.outer_stack.Clear();
                 pad.info_stack.Clear();
@@ -830,8 +830,8 @@ public class Cursor : P6any {
         CapInfo ci = null;
         while (Kernel.IterHasFlat(iter, true)) {
             P6any pair = iter.Shift().Fetch();
-            Variable k = (Variable)pair.GetSlot("key");
-            Variable v = (Variable)pair.GetSlot("value");
+            Variable k = (Variable)pair.GetSlot(Kernel.EnumMO, "key");
+            Variable v = (Variable)pair.GetSlot(Kernel.EnumMO, "value");
             ci = new CapInfo(ci, new string[] {
                     k.Fetch().mo.mro_raw_Str.Get(k) }, v);
         }
@@ -939,8 +939,8 @@ public class Cursor : P6any {
         for (int i = 0; i < pos.Length; i++)
             pos[i] = FixupList(posr[i]);
 
-        into.SetSlot("positionals", pos);
-        into.SetSlot("named", nam);
+        into.SetSlot(Kernel.CaptureMO, "positionals", pos);
+        into.SetSlot(Kernel.CaptureMO, "named", nam);
     }
 
     public Variable O(VarHash caps) {
@@ -1684,9 +1684,9 @@ public class LADDispatcher : LAD {
         LAD[] opts = new LAD[cands.Length];
 
         for (int i = 0; i < opts.Length; i++) {
-            pad.outer_stack.Add((Frame)cands[i].GetSlot("outer"));
-            pad.info_stack.Add((SubInfo)cands[i].GetSlot("info"));
-            opts[i] = ((SubInfo)cands[i].GetSlot("info")).ltm.Reify(pad);
+            pad.outer_stack.Add(Kernel.GetOuter(cands[i]));
+            pad.info_stack.Add(Kernel.GetInfo(cands[i]));
+            opts[i] = Kernel.GetInfo(cands[i]).ltm.Reify(pad);
             pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
             pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
         }
@@ -1901,8 +1901,8 @@ anew:
         LAD[] lads_p = new LAD[cands.Length];
 
         for (int i = 0; i < lads_p.Length; i++) {
-            pad.outer_stack.Add((Frame)cands[i].GetSlot("outer"));
-            pad.info_stack.Add((SubInfo)cands[i].GetSlot("info"));
+            pad.outer_stack.Add(Kernel.GetOuter(cands[i]));
+            pad.info_stack.Add(Kernel.GetInfo(cands[i]));
             lads_p[i] = pad.info_stack[0].ltm.Reify(pad);
             pad.outer_stack.RemoveAt(pad.outer_stack.Count - 1);
             pad.info_stack.RemoveAt(pad.info_stack.Count - 1);
@@ -2091,9 +2091,9 @@ anew:
 
     public static P6any MakeDispatcher(string name, P6any proto, P6any[] cands) {
         if (proto != null) {
-            SubInfo si = new SubInfo((SubInfo)proto.GetSlot("info"));
+            SubInfo si = new SubInfo(Kernel.GetInfo(proto));
             si.param = new object[] { cands, null };
-            return Kernel.MakeSub(si, (Frame)proto.GetSlot("outer"));
+            return Kernel.MakeSub(si, Kernel.GetOuter(proto));
         } else {
             SubInfo si = new SubInfo(name, StandardProtoC);
             si.param = new object[] { cands, null };

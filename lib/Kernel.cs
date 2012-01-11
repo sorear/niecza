@@ -153,7 +153,7 @@ namespace Niecza {
         int key;
         public ArrayViviHook(P6any ary, int key) { this.ary = ary; this.key = key; }
         public override void Do(Variable toviv) {
-            VarDeque vd = (VarDeque) ary.GetSlot("items");
+            VarDeque vd = (VarDeque) ary.GetSlot(Kernel.ListMO, "items");
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewTypedScalar(null));
             vd[key] = toviv;
@@ -843,8 +843,8 @@ namespace Niecza {
             if (!v.islist) return false;
             P6any p = v.Fetch();
             if (p.mo == Kernel.ArrayMO) {
-                return ((VarDeque)p.GetSlot("items")).Count() == 0 &&
-                    ((VarDeque)p.GetSlot("rest")).Count() == 0;
+                return ((VarDeque)p.GetSlot(Kernel.ListMO, "items")).Count() == 0 &&
+                    ((VarDeque)p.GetSlot(Kernel.ListMO, "rest")).Count() == 0;
             }
             else if (p.mo == Kernel.HashMO) {
                 return Kernel.UnboxAny<VarHash>(p).Count == 0;
@@ -2266,8 +2266,8 @@ namespace Niecza {
 
         public Variable GetArgs() {
             P6any nw = new P6opaque(Kernel.CaptureMO);
-            nw.SetSlot("positionals", pos ?? new Variable[0]);
-            nw.SetSlot("named", named);
+            nw.SetSlot(Kernel.CaptureMO, "positionals", pos ?? new Variable[0]);
+            nw.SetSlot(Kernel.CaptureMO, "named", named);
             return Kernel.NewROScalar(nw);
         }
 
@@ -2444,8 +2444,8 @@ namespace Niecza {
                     null)).Fetch();
                 return BindSignature(th, (Signature)c,
                         NO_JUNCTION + (quiet ? CHECK_ONLY : 0), param.name,
-                        (Variable[])cap.GetSlot("positionals"),
-                        (VarHash)cap.GetSlot("named"),
+                        (Variable[])cap.GetSlot(Kernel.CaptureMO, "positionals"),
+                        (VarHash)cap.GetSlot(Kernel.CaptureMO, "named"),
                         ref jun_pivot, ref jun_pivot_n, ref jun_rank);
             }
             if (c is SubInfo) {
@@ -2493,8 +2493,8 @@ namespace Niecza {
                 }
                 if ((flags & Parameter.SLURPY_CAP) != 0) {
                     P6any nw = new P6opaque(Kernel.CaptureMO);
-                    nw.SetSlot("positionals", pos);
-                    nw.SetSlot("named", named);
+                    nw.SetSlot(Kernel.CaptureMO, "positionals", pos);
+                    nw.SetSlot(Kernel.CaptureMO, "named", named);
                     src = Kernel.NewROScalar(nw);
                     named = null; namedc = null; posc = pos.Length;
                     goto gotit;
@@ -3126,8 +3126,8 @@ bound: ;
             VarDeque items = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
                 items.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
-            lhs_o.SetSlot("items", items);
-            lhs_o.SetSlot("rest", iter); /*now empty*/
+            lhs_o.SetSlot(Kernel.ListMO, "items", items);
+            lhs_o.SetSlot(Kernel.ListMO, "rest", iter); /*now empty*/
             return lhs;
         }
     }
@@ -3145,8 +3145,8 @@ bound: ;
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
             if (!o.IsDefined()) return Kernel.AnyMO.typeVar;
-            VarDeque items = (VarDeque)o.GetSlot("items");
-            VarDeque rest = (VarDeque)o.GetSlot("rest");
+            VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "items");
+            VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "rest");
             while (Kernel.IterHasFlat(rest, false))
                 items.Push(rest.Shift());
             return (items.Count() != 0) ? items.Pop() : Kernel.AnyMO.typeVar;
@@ -3156,8 +3156,8 @@ bound: ;
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
             if (!o.IsDefined()) return Kernel.AnyMO.typeVar;
-            VarDeque items = (VarDeque)o.GetSlot("items");
-            VarDeque rest = (VarDeque)o.GetSlot("rest");
+            VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "items");
+            VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "rest");
             if (items.Count() != 0)
                 return items.Shift();
             if (Kernel.IterHasFlat(rest, false))
@@ -3171,7 +3171,7 @@ bound: ;
             if (!o.IsDefined())
                 throw new NieczaException("Cannot push onto type object");
             VarDeque iter = new VarDeque(args);
-            VarDeque targ = (VarDeque)o.GetSlot("items");
+            VarDeque targ = (VarDeque)o.GetSlot(Kernel.ListMO, "items");
             VarDeque st = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
                 st.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
@@ -3185,8 +3185,8 @@ bound: ;
             if (!o.IsDefined())
                 throw new NieczaException("Cannot push onto type object");
             VarDeque iter = new VarDeque(args);
-            VarDeque targ = (VarDeque)o.GetSlot("rest");
-            if (targ.Count() == 0) targ = (VarDeque)o.GetSlot("items");
+            VarDeque targ = (VarDeque)o.GetSlot(Kernel.ListMO, "rest");
+            if (targ.Count() == 0) targ = (VarDeque)o.GetSlot(Kernel.ListMO, "items");
             while (Kernel.IterHasFlat(iter, true))
                 targ.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
             return v;
@@ -3209,8 +3209,8 @@ bound: ;
                         into[kv.Key] = kv.Value;
                     }
                 } else if (elt.mo.HasType(Kernel.PairMO)) {
-                    Variable k = (Variable) elt.GetSlot("key");
-                    Variable v = (Variable) elt.GetSlot("value");
+                    Variable k = (Variable) elt.GetSlot(Kernel.EnumMO, "key");
+                    Variable v = (Variable) elt.GetSlot(Kernel.EnumMO, "value");
                     into[k.Fetch().mo.mro_raw_Str.Get(k)] =
                         Kernel.NewMuScalar(v.Fetch());
                 } else {
@@ -4051,7 +4051,7 @@ tryagain:
             sc.type = CLR;
             sc.p1 = name;
             P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
-            who.SetSlot("name", Kernel.BoxAnyMO(name, Kernel.StrMO));
+            who.SetSlot(Kernel.PseudoStashMO, "name", Kernel.BoxAnyMO(name, Kernel.StrMO));
             return who;
         }
 
@@ -4206,7 +4206,7 @@ have_sc:
                 throw new NieczaException("cannot bind a pseudo package");
             {
                 P6any who = Kernel.BoxRaw(this, Kernel.PseudoStashMO);
-                who.SetSlot("name", Kernel.BoxAnyMO(key, Kernel.StrMO));
+                who.SetSlot(Kernel.PseudoStashMO, "name", Kernel.BoxAnyMO(key, Kernel.StrMO));
                 v = MakePackage(key, who);
             }
             return;
@@ -4260,7 +4260,7 @@ have_v:
                 if (sc.type == WHO)
                     return Kernel.NewROScalar((P6any) sc.p1);
                 P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
-                who.SetSlot("name", Kernel.BoxAnyMO(last, Kernel.StrMO));
+                who.SetSlot(Kernel.PseudoStashMO, "name", Kernel.BoxAnyMO(last, Kernel.StrMO));
                 return Kernel.NewROScalar(who);
             }
             if (bind_to != null) {
@@ -4499,8 +4499,8 @@ saveme:
 
         public static P6any SigSlurpCapture(Frame caller) {
             P6any nw = new P6opaque(CaptureMO);
-            nw.SetSlot("positionals", caller.pos);
-            nw.SetSlot("named", caller.named);
+            nw.SetSlot(CaptureMO, "positionals", caller.pos);
+            nw.SetSlot(CaptureMO, "named", caller.named);
             caller.named = null;
             return nw;
         }
@@ -4556,6 +4556,7 @@ saveme:
         }
 
         [CORESaved] public static STable PairMO;
+        [CORESaved] public static STable EnumMO;
         [CORESaved] public static STable EnumMapMO;
         [CORESaved] public static STable CallFrameMO;
         [CORESaved] public static STable CaptureMO;
@@ -4615,6 +4616,13 @@ saveme:
             if (outer != null) outer.MarkShared();
             n.slots[1] = info;
             return n;
+        }
+
+        public static SubInfo GetInfo(P6any sub) {
+            return (SubInfo)sub.GetSlot(CodeMO, "info");
+        }
+        public static Frame GetOuter(P6any sub) {
+            return (Frame)sub.GetSlot(CodeMO, "outer");
         }
 
         public class MMDParameter {
@@ -4679,7 +4687,7 @@ saveme:
             }
 
             public override bool Admissable(Frame th, Variable[] pos, VarHash named) {
-                Frame   o = (Frame)impl.GetSlot("outer");
+                Frame   o = (Frame)impl.GetSlot(Kernel.CodeMO, "outer");
                 // XXX sucks a bit to have an inf runloop here
                 var res = Kernel.RunInferior(info.SetupCall(
                     Kernel.GetInferiorRoot(), o, impl, pos, named, true, null));
@@ -4731,7 +4739,7 @@ saveme:
                 this.impl = impl;
                 this.group_n  = group_n;
                 this.filter_n = filter_n;
-                info = (SubInfo) impl.GetSlot("info");
+                info = (SubInfo) impl.GetSlot(Kernel.CodeMO, "info");
 
                 pos = new List<MMDParameter>();
                 nam = new Dictionary<string,MMDParameter>();
@@ -4850,7 +4858,7 @@ saveme:
 
             SubInfo si;
             if (cands.Length == 1 && cands[0] != null && proto != null) {
-                si = proto.GetSlot("info") as SubInfo;
+                si = GetInfo(proto);
                 // minor hack...
                 if (si != null && si.extend != null &&
                         si.extend.ContainsKey("builtin")) {
@@ -4858,13 +4866,11 @@ saveme:
                 }
             }
 
-            si = (proto != null) ?
-                new SubInfo((SubInfo)proto.GetSlot("info")) :
+            si = (proto != null) ? new SubInfo(GetInfo(proto)) :
                 new SubInfo(name, StandardTypeProtoC);
 
             si.param = new object[] { cands, null };
-            return Kernel.MakeSub(si, proto == null ? null :
-                    (Frame)proto.GetSlot("outer"));
+            return Kernel.MakeSub(si, proto == null ? null : GetOuter(proto));
 ltm:
             List<P6any> lp = new List<P6any>();
             foreach (P6any p in cands)
@@ -5084,7 +5090,7 @@ again:      if (i == prog.Length) {
                 P6any init = prog[i].init;
                 th.lexi0 = i;
 
-                SubInfo si = (SubInfo) init.GetSlot("info");
+                SubInfo si = GetInfo(init);
                 VarHash build_args = new VarHash();
                 foreach (Parameter pa in si.sig.parms) {
                     foreach (string name in pa.names ?? new string[0]) {
@@ -5151,8 +5157,8 @@ value:      vx = (Variable) th.resultSlot;
                     items.Push(iter.Shift());
                 }
             }
-            list.SetSlot("items", items);
-            list.SetSlot("rest", iter);
+            list.SetSlot(ListMO, "items", items);
+            list.SetSlot(ListMO, "rest", iter);
         }
 
         public static VarDeque IterFlatten(VarDeque inq) {
@@ -5225,9 +5231,9 @@ again:
             P6opaque dyl = lst.Fetch() as P6opaque;
             if (dyl == null) { goto slow; }
             if (dyl.mo != Kernel.ListMO) { goto slow; }
-            VarDeque itemsl = (VarDeque) dyl.GetSlot("items");
+            VarDeque itemsl = (VarDeque) dyl.GetSlot(ListMO, "items");
             if (itemsl.Count() == 0) {
-                VarDeque restl = (VarDeque) dyl.GetSlot("rest");
+                VarDeque restl = (VarDeque) dyl.GetSlot(ListMO, "rest");
                 if (restl.Count() == 0) {
                     return AnyMO.typeVar;
                 }
@@ -5242,8 +5248,8 @@ slow:
 
         public static Variable CreateArray() {
             P6any v = new P6opaque(ArrayMO, 2);
-            v.SetSlot("items", new VarDeque());
-            v.SetSlot("rest", new VarDeque());
+            v.SetSlot(ListMO, "items", new VarDeque());
+            v.SetSlot(ListMO, "rest", new VarDeque());
             return NewRWListVar(v);
         }
 
@@ -5482,7 +5488,7 @@ slow:
                 // Hack - reseat role to this closure-clone of methods
                 foreach (var mi in arg.mo.lmethods) {
                     var nmi = mi;
-                    SubInfo orig = (SubInfo) nmi.impl.GetSlot("info");
+                    SubInfo orig = GetInfo(nmi.impl);
                     nmi.impl = ((Variable)ifr.info.dylex[orig.outervar].
                             Get(ifr)).Fetch();
                     r.mo.lmethods.Add(nmi);
@@ -5490,7 +5496,7 @@ slow:
                 foreach (var ai in arg.mo.local_attr) {
                     var nai = ai;
                     if (nai.init != null) {
-                        SubInfo orig = (SubInfo) nai.init.GetSlot("info");
+                        SubInfo orig = GetInfo(nai.init);
                         nai.init = ((Variable)ifr.info.
                             dylex[orig.outervar].Get(ifr)).Fetch();
                     }
@@ -5559,7 +5565,7 @@ slow:
 
             // now methods, these are a lot harder
             var class_methods = new HashSet<Prod<int,string>>();
-            var role_methods  = new Dictionary<Prod<int,string>,Prod<string,object>>();
+            var role_methods  = new Dictionary<Prod<int,string>,Prod<string,SubInfo>>();
             var requirements  = new Dictionary<Prod<int,string>,string>();
 
             foreach (P6how.MethodInfo mi in cls.mo.lmethods) {
@@ -5570,7 +5576,7 @@ slow:
                 foreach (P6how.MethodInfo mi in r.mo.lmethods) {
                     var name = Prod.C(mi.flags & P6how.V_MASK, mi.short_name);
                     SubInfo info = mi.impl.Isa(CodeMO) ?
-                        ((SubInfo)mi.impl.GetSlot("info")) : null;
+                        GetInfo(mi.impl) : null;
                     if ((mi.flags & P6how.M_MASK) != P6how.M_ONLY) {
                         // multi methods from roles are not suppressed and
                         // never used as requirements
@@ -5581,10 +5587,10 @@ slow:
                             requirements[name] = r.name;
                             continue;
                         }
-                        if (role_methods.ContainsKey(name) && role_methods[name].v2 != mi.impl.GetSlot("info")) {
+                        if (role_methods.ContainsKey(name) && role_methods[name].v2 != GetInfo(mi.impl)) {
                             throw new NieczaException(MethodSlot(name) + " must be resolved by class '" + cls.name + "' because it exists in roles '" + role_methods[name].v1 + "' and '" + r.name + "'");
                         }
-                        role_methods[name] = Prod.C(r.name, mi.impl.GetSlot("info"));
+                        role_methods[name] = Prod.C(r.name, GetInfo(mi.impl));
                     }
                     cls.mo.lmethods.Add(mi);
                 }
@@ -5772,8 +5778,8 @@ slow:
 
         public static void AddCap(List<Variable> p,
                 VarHash n, P6any cap) {
-            Variable[] fp = cap.GetSlot("positionals") as Variable[];
-            VarHash fn = cap.GetSlot("named")
+            Variable[] fp = cap.GetSlot(CaptureMO,"positionals") as Variable[];
+            VarHash fn = cap.GetSlot(CaptureMO, "named")
                 as VarHash;
             p.AddRange(fp);
             if (fn != null) AddMany(n, fn);
@@ -5873,8 +5879,8 @@ slow:
                 new STable[] { BoolMO });
             TrueV  = NewROScalar(BoxRaw<int>(1, BoolMO));
             FalseV = NewROScalar(BoxRaw<int>(0, BoolMO));
-            FalseV.Fetch().SetSlot("index", BoxAnyMO(0, IntMO));
-            TrueV.Fetch().SetSlot("index", BoxAnyMO(1, IntMO));
+            FalseV.Fetch().SetSlot(BoolMO, "index", BoxAnyMO(0, IntMO));
+            TrueV.Fetch().SetSlot(BoolMO, "index", BoxAnyMO(1, IntMO));
 
             Handler_Vonly(StrMO, "Str", new CtxReturnSelf(),
                     new CtxJustUnbox<string>(""));

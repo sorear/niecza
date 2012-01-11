@@ -345,10 +345,7 @@ public class JsyncReader {
             }
             SkipWhite(true);
             SkipChar(']');
-            P6any i = new P6opaque(Kernel.ArrayMO);
-            i.SetSlot("items", q);
-            i.SetSlot("rest", new VarDeque());
-            return Kernel.NewROScalar(i);
+            return Kernel.NewROScalar(Builtins.MakeArray(q, new VarDeque()));
         } else if (look == '{') {
             VarHash q = new VarHash();
             int ct = 0;
@@ -503,9 +500,7 @@ public class JsyncReader {
     Variable GetFromArray() {
         SkipCharWS('[');
         VarDeque kids = new VarDeque();
-        P6opaque obj = new P6opaque(Kernel.ArrayMO);
-        obj.SetSlot("items", kids);
-        obj.SetSlot("rest",  new VarDeque());
+        P6any obj = Builtins.MakeArray(kids, new VarDeque());
         bool comma = false;
         string a_tag = null;
 

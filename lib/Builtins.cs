@@ -1729,14 +1729,25 @@ flat_enough:;
         return PosixWrapper.getuid() == (uint)stat[5];
     }
 
+    public static P6any MakeList(VarDeque items, VarDeque rest) {
+        P6any l = new P6opaque(Kernel.ListMO);
+        l.SetSlot(Kernel.ListMO, "rest", rest);
+        l.SetSlot(Kernel.ListMO, "items", items);
+        return l;
+    }
+
+    public static P6any MakeArray(VarDeque items, VarDeque rest) {
+        P6any l = new P6opaque(Kernel.ArrayMO);
+        l.SetSlot(Kernel.ListMO, "rest", rest);
+        l.SetSlot(Kernel.ListMO, "items", items);
+        return l;
+    }
+
     public static Variable BoxLoS(string[] los) {
         VarDeque items = new VarDeque();
         foreach (string i in los)
             items.Push(Kernel.BoxAnyMO(i, Kernel.StrMO));
-        P6any l = new P6opaque(Kernel.ListMO);
-        l.SetSlot("rest", new VarDeque());
-        l.SetSlot("items", items);
-        return Kernel.NewRWListVar(l);
+        return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
     }
 
     public static string[] UnboxLoS(Variable args) {
@@ -1802,11 +1813,15 @@ flat_enough:;
             Variable.None, null)).Fetch();
     }
 
-    public static Variable pair(Variable key, Variable value) {
+    public static P6any MakePair(Variable key, Variable value) {
         P6any l = new P6opaque(Kernel.PairMO);
-        l.SetSlot("key", key);
-        l.SetSlot("value", value);
-        return Kernel.NewROScalar(l);
+        l.SetSlot(Kernel.EnumMO, "key", key);
+        l.SetSlot(Kernel.EnumMO, "value", value);
+        return l;
+    }
+
+    public static Variable pair(Variable key, Variable value) {
+        return Kernel.NewROScalar(MakePair(key, value));
     }
 
     public static VarDeque start_iter(Variable thing) {
@@ -1821,10 +1836,7 @@ flat_enough:;
         VarDeque items = new VarDeque();
         while (Kernel.IterHasFlat(rest, true))
             items.Push(Kernel.NewMuScalar(rest.Shift().Fetch()));
-        P6any l = new P6opaque(Kernel.ArrayMO);
-        l.SetSlot("rest", rest);
-        l.SetSlot("items", items);
-        return Kernel.NewROScalar(l);
+        return Kernel.NewROScalar(MakeArray(items, rest));
     }
 
     public static string frame_subname(Frame fr) {
@@ -2547,7 +2559,7 @@ again:
                 Kernel.CreateHash() : Kernel.CreateArray();
             if (vx != null) Kernel.Assign(obj, vx);
         }
-        n.SetSlot(ai.name, obj);
+        n.SetSlot(ai.owner, ai.name, obj);
     }
 
 

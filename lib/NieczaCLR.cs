@@ -119,11 +119,11 @@ namespace Niecza {
 
             nth.named = named;
             nth.pos = pos;
-            nth.lex1 = junc_call.GetSlot("info");
+            nth.lex1 = Kernel.GetInfo(junc_call);
             nth.lex2 = jun_pivot_n;
             nth.lex3 = jo.slots[0];
             nth.lex4 = Kernel.UnboxAny<Variable[]>((P6any)jo.slots[1]);
-            nth.lex5 = junc_call.GetSlot("outer");
+            nth.lex5 = Kernel.GetOuter(junc_call);
             nth.lex6 = junc_call;
             nth.lex7 = null;
             nth.lex8 = new Variable[((Variable[])nth.lex4).Length];

@@ -64,7 +64,7 @@ namespace Niecza.Serialization {
         internal static HashAlgorithm NewHash() { return new SHA256Managed(); }
 
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 18;
+        static readonly int version = 19;
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,

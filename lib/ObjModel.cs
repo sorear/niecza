@@ -194,6 +194,7 @@ namespace Niecza {
 
         // types and constants {{{
         public struct AttrInfo {
+            public STable owner;
             public string name;
             public P6any init;
             public int flags;
@@ -405,6 +406,7 @@ next_method: ;
                 if (build != null) {
                     n.init  = build;
                     n.name  = null;
+                    n.owner = mro[i];
                     acc.Add(n);
                 }
             }
@@ -481,6 +483,7 @@ next_method: ;
         public void AddAttributePos(string name, int flags, P6any init,
                 STable type, string file, int line) {
             AttrInfo ai;
+            ai.owner = stable;
             ai.name = name;
             ai.flags = flags;
             ai.init = init;
@@ -801,6 +804,7 @@ next_method: ;
             int acount = tb.Int();
             while (acount-- > 0) {
                 AttrInfo ai = default(AttrInfo);
+                ai.owner = n.stable;
                 ai.name = tb.String();
                 ai.init = (P6any)tb.ObjRef();
                 ai.flags = tb.Byte();
