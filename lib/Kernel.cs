@@ -153,7 +153,7 @@ namespace Niecza {
         int key;
         public ArrayViviHook(P6any ary, int key) { this.ary = ary; this.key = key; }
         public override void Do(Variable toviv) {
-            VarDeque vd = (VarDeque) ary.GetSlot(Kernel.ListMO, "items");
+            VarDeque vd = (VarDeque) ary.GetSlot(Kernel.ListMO, "$!items");
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewTypedScalar(null));
             vd[key] = toviv;
@@ -843,8 +843,8 @@ namespace Niecza {
             if (!v.islist) return false;
             P6any p = v.Fetch();
             if (p.mo == Kernel.ArrayMO) {
-                return ((VarDeque)p.GetSlot(Kernel.ListMO, "items")).Count() == 0 &&
-                    ((VarDeque)p.GetSlot(Kernel.ListMO, "rest")).Count() == 0;
+                return ((VarDeque)p.GetSlot(Kernel.ListMO, "$!items")).Count() == 0 &&
+                    ((VarDeque)p.GetSlot(Kernel.ListMO, "$!rest")).Count() == 0;
             }
             else if (p.mo == Kernel.HashMO) {
                 return Kernel.UnboxAny<VarHash>(p).Count == 0;
@@ -2266,8 +2266,8 @@ namespace Niecza {
 
         public Variable GetArgs() {
             P6any nw = new P6opaque(Kernel.CaptureMO);
-            nw.SetSlot(Kernel.CaptureMO, "positionals", pos ?? new Variable[0]);
-            nw.SetSlot(Kernel.CaptureMO, "named", named);
+            nw.SetSlot(Kernel.CaptureMO, "$!positionals", pos ?? new Variable[0]);
+            nw.SetSlot(Kernel.CaptureMO, "$!named", named);
             return Kernel.NewROScalar(nw);
         }
 
@@ -2444,8 +2444,8 @@ namespace Niecza {
                     null)).Fetch();
                 return BindSignature(th, (Signature)c,
                         NO_JUNCTION + (quiet ? CHECK_ONLY : 0), param.name,
-                        (Variable[])cap.GetSlot(Kernel.CaptureMO, "positionals"),
-                        (VarHash)cap.GetSlot(Kernel.CaptureMO, "named"),
+                        (Variable[])cap.GetSlot(Kernel.CaptureMO, "$!positionals"),
+                        (VarHash)cap.GetSlot(Kernel.CaptureMO, "$!named"),
                         ref jun_pivot, ref jun_pivot_n, ref jun_rank);
             }
             if (c is SubInfo) {
@@ -2493,8 +2493,8 @@ namespace Niecza {
                 }
                 if ((flags & Parameter.SLURPY_CAP) != 0) {
                     P6any nw = new P6opaque(Kernel.CaptureMO);
-                    nw.SetSlot(Kernel.CaptureMO, "positionals", pos);
-                    nw.SetSlot(Kernel.CaptureMO, "named", named);
+                    nw.SetSlot(Kernel.CaptureMO, "$!positionals", pos);
+                    nw.SetSlot(Kernel.CaptureMO, "$!named", named);
                     src = Kernel.NewROScalar(nw);
                     named = null; namedc = null; posc = pos.Length;
                     goto gotit;
@@ -3126,8 +3126,8 @@ bound: ;
             VarDeque items = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
                 items.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
-            lhs_o.SetSlot(Kernel.ListMO, "items", items);
-            lhs_o.SetSlot(Kernel.ListMO, "rest", iter); /*now empty*/
+            lhs_o.SetSlot(Kernel.ListMO, "$!items", items);
+            lhs_o.SetSlot(Kernel.ListMO, "$!rest", iter); /*now empty*/
             return lhs;
         }
     }
@@ -3135,8 +3135,8 @@ bound: ;
         public override VarDeque Get(Variable obj) {
             var d = obj.Fetch();
             if (!d.IsDefined()) return new VarDeque();
-            VarDeque r = new VarDeque( (VarDeque) d.GetSlot(Kernel.ListMO, "items" ));
-            r.PushD((VarDeque) d.GetSlot(Kernel.ListMO, "rest"));
+            VarDeque r = new VarDeque( (VarDeque) d.GetSlot(Kernel.ListMO, "$!items" ));
+            r.PushD((VarDeque) d.GetSlot(Kernel.ListMO, "$!rest"));
             return r;
         }
     }
@@ -3145,8 +3145,8 @@ bound: ;
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
             if (!o.IsDefined()) return Kernel.AnyMO.typeVar;
-            VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "items");
-            VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "rest");
+            VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
+            VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "$!rest");
             while (Kernel.IterHasFlat(rest, false))
                 items.Push(rest.Shift());
             return (items.Count() != 0) ? items.Pop() : Kernel.AnyMO.typeVar;
@@ -3156,8 +3156,8 @@ bound: ;
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
             if (!o.IsDefined()) return Kernel.AnyMO.typeVar;
-            VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "items");
-            VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "rest");
+            VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
+            VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "$!rest");
             if (items.Count() != 0)
                 return items.Shift();
             if (Kernel.IterHasFlat(rest, false))
@@ -3171,7 +3171,7 @@ bound: ;
             if (!o.IsDefined())
                 throw new NieczaException("Cannot push onto type object");
             VarDeque iter = new VarDeque(args);
-            VarDeque targ = (VarDeque)o.GetSlot(Kernel.ListMO, "items");
+            VarDeque targ = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
             VarDeque st = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
                 st.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
@@ -3185,8 +3185,8 @@ bound: ;
             if (!o.IsDefined())
                 throw new NieczaException("Cannot push onto type object");
             VarDeque iter = new VarDeque(args);
-            VarDeque targ = (VarDeque)o.GetSlot(Kernel.ListMO, "rest");
-            if (targ.Count() == 0) targ = (VarDeque)o.GetSlot(Kernel.ListMO, "items");
+            VarDeque targ = (VarDeque)o.GetSlot(Kernel.ListMO, "$!rest");
+            if (targ.Count() == 0) targ = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
             while (Kernel.IterHasFlat(iter, true))
                 targ.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
             return v;
@@ -3209,8 +3209,8 @@ bound: ;
                         into[kv.Key] = kv.Value;
                     }
                 } else if (elt.mo.HasType(Kernel.PairMO)) {
-                    Variable k = (Variable) elt.GetSlot(Kernel.EnumMO, "key");
-                    Variable v = (Variable) elt.GetSlot(Kernel.EnumMO, "value");
+                    Variable k = (Variable) elt.GetSlot(Kernel.EnumMO, "$!key");
+                    Variable v = (Variable) elt.GetSlot(Kernel.EnumMO, "$!value");
                     into[k.Fetch().mo.mro_raw_Str.Get(k)] =
                         Kernel.NewMuScalar(v.Fetch());
                 } else {
@@ -4051,7 +4051,7 @@ tryagain:
             sc.type = CLR;
             sc.p1 = name;
             P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
-            who.SetSlot(Kernel.PseudoStashMO, "name", Kernel.BoxAnyMO(name, Kernel.StrMO));
+            who.SetSlot(Kernel.PseudoStashMO, "$!name", Kernel.BoxAnyMO(name, Kernel.StrMO));
             return who;
         }
 
@@ -4206,7 +4206,7 @@ have_sc:
                 throw new NieczaException("cannot bind a pseudo package");
             {
                 P6any who = Kernel.BoxRaw(this, Kernel.PseudoStashMO);
-                who.SetSlot(Kernel.PseudoStashMO, "name", Kernel.BoxAnyMO(key, Kernel.StrMO));
+                who.SetSlot(Kernel.PseudoStashMO, "$!name", Kernel.BoxAnyMO(key, Kernel.StrMO));
                 v = MakePackage(key, who);
             }
             return;
@@ -4260,7 +4260,7 @@ have_v:
                 if (sc.type == WHO)
                     return Kernel.NewROScalar((P6any) sc.p1);
                 P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
-                who.SetSlot(Kernel.PseudoStashMO, "name", Kernel.BoxAnyMO(last, Kernel.StrMO));
+                who.SetSlot(Kernel.PseudoStashMO, "$!name", Kernel.BoxAnyMO(last, Kernel.StrMO));
                 return Kernel.NewROScalar(who);
             }
             if (bind_to != null) {
@@ -4499,8 +4499,8 @@ saveme:
 
         public static P6any SigSlurpCapture(Frame caller) {
             P6any nw = new P6opaque(CaptureMO);
-            nw.SetSlot(CaptureMO, "positionals", caller.pos);
-            nw.SetSlot(CaptureMO, "named", caller.named);
+            nw.SetSlot(CaptureMO, "$!positionals", caller.pos);
+            nw.SetSlot(CaptureMO, "$!named", caller.named);
             caller.named = null;
             return nw;
         }
@@ -4619,10 +4619,10 @@ saveme:
         }
 
         public static SubInfo GetInfo(P6any sub) {
-            return (SubInfo)sub.GetSlot(CodeMO, "info");
+            return (SubInfo)sub.GetSlot(CodeMO, "$!info");
         }
         public static Frame GetOuter(P6any sub) {
-            return (Frame)sub.GetSlot(CodeMO, "outer");
+            return (Frame)sub.GetSlot(CodeMO, "$!outer");
         }
 
         public class MMDParameter {
@@ -4687,7 +4687,7 @@ saveme:
             }
 
             public override bool Admissable(Frame th, Variable[] pos, VarHash named) {
-                Frame   o = (Frame)impl.GetSlot(Kernel.CodeMO, "outer");
+                Frame   o = (Frame)impl.GetSlot(Kernel.CodeMO, "$!outer");
                 // XXX sucks a bit to have an inf runloop here
                 var res = Kernel.RunInferior(info.SetupCall(
                     Kernel.GetInferiorRoot(), o, impl, pos, named, true, null));
@@ -4739,7 +4739,7 @@ saveme:
                 this.impl = impl;
                 this.group_n  = group_n;
                 this.filter_n = filter_n;
-                info = (SubInfo) impl.GetSlot(Kernel.CodeMO, "info");
+                info = (SubInfo) impl.GetSlot(Kernel.CodeMO, "$!info");
 
                 pos = new List<MMDParameter>();
                 nam = new Dictionary<string,MMDParameter>();
@@ -5081,8 +5081,8 @@ again:      if (i == prog.Length) {
 
             Variable vx;
             if ((prog[i].flags & P6how.A_PUBLIC) != 0 &&
-                    args.TryGetValue(prog[i].name, out vx)) {
-                args.Remove(prog[i].name);
+                    args.TryGetValue(prog[i].name.Substring(2), out vx)) {
+                args.Remove(prog[i].name.Substring(2));
                 th.resultSlot = vx;
             } else if (prog[i].init == null) {
                 th.resultSlot = null;
@@ -5157,8 +5157,8 @@ value:      vx = (Variable) th.resultSlot;
                     items.Push(iter.Shift());
                 }
             }
-            list.SetSlot(ListMO, "items", items);
-            list.SetSlot(ListMO, "rest", iter);
+            list.SetSlot(ListMO, "$!items", items);
+            list.SetSlot(ListMO, "$!rest", iter);
         }
 
         public static VarDeque IterFlatten(VarDeque inq) {
@@ -5231,9 +5231,9 @@ again:
             P6opaque dyl = lst.Fetch() as P6opaque;
             if (dyl == null) { goto slow; }
             if (dyl.mo != Kernel.ListMO) { goto slow; }
-            VarDeque itemsl = (VarDeque) dyl.GetSlot(ListMO, "items");
+            VarDeque itemsl = (VarDeque) dyl.GetSlot(ListMO, "$!items");
             if (itemsl.Count() == 0) {
-                VarDeque restl = (VarDeque) dyl.GetSlot(ListMO, "rest");
+                VarDeque restl = (VarDeque) dyl.GetSlot(ListMO, "$!rest");
                 if (restl.Count() == 0) {
                     return AnyMO.typeVar;
                 }
@@ -5248,8 +5248,8 @@ slow:
 
         public static Variable CreateArray() {
             P6any v = new P6opaque(ArrayMO, 2);
-            v.SetSlot(ListMO, "items", new VarDeque());
-            v.SetSlot(ListMO, "rest", new VarDeque());
+            v.SetSlot(ListMO, "$!items", new VarDeque());
+            v.SetSlot(ListMO, "$!rest", new VarDeque());
             return NewRWListVar(v);
         }
 
@@ -5780,8 +5780,8 @@ slow:
 
         public static void AddCap(List<Variable> p,
                 VarHash n, P6any cap) {
-            Variable[] fp = cap.GetSlot(CaptureMO,"positionals") as Variable[];
-            VarHash fn = cap.GetSlot(CaptureMO, "named")
+            Variable[] fp = cap.GetSlot(CaptureMO, "$!positionals") as Variable[];
+            VarHash fn = cap.GetSlot(CaptureMO, "$!named")
                 as VarHash;
             p.AddRange(fp);
             if (fn != null) AddMany(n, fn);
@@ -5836,7 +5836,7 @@ slow:
             AnyMO.FillProtoClass(MuMO);
             AnyMO.Invalidate();
 
-            CodeMO.FillProtoClass(AnyMO, new string[] { "outer", "info" },
+            CodeMO.FillProtoClass(AnyMO, new string[] { "$!outer", "$!info" },
                 new STable[] { CodeMO, CodeMO });
             SubInvokeSubSI.param = new object[] { null, new InvokeSub() };
             CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(SubInvokeSubSI, null));
@@ -5859,7 +5859,7 @@ slow:
             RegexMO.FillProtoClass(MethodMO);
 
             LabelMO = new STable("Label");
-            LabelMO.FillProtoClass(AnyMO, new string[] { "target", "name" },
+            LabelMO.FillProtoClass(AnyMO, new string[] { "$!target", "$!name" },
                     new STable[] { LabelMO, LabelMO });
 
             // forward reference
@@ -5877,12 +5877,12 @@ slow:
 
             Handler_Vonly(BoolMO, "Bool", new CtxReturnSelf(),
                     new CtxBoolUnbox());
-            BoolMO.FillProtoClass(IntMO, new string[] { "index" },
+            BoolMO.FillProtoClass(IntMO, new string[] { "$!index" },
                 new STable[] { BoolMO });
             TrueV  = NewROScalar(BoxRaw<int>(1, BoolMO));
             FalseV = NewROScalar(BoxRaw<int>(0, BoolMO));
-            FalseV.Fetch().SetSlot(BoolMO, "index", BoxAnyMO(0, IntMO));
-            TrueV.Fetch().SetSlot(BoolMO, "index", BoxAnyMO(1, IntMO));
+            FalseV.Fetch().SetSlot(BoolMO, "$!index", BoxAnyMO(0, IntMO));
+            TrueV.Fetch().SetSlot(BoolMO, "$!index", BoxAnyMO(1, IntMO));
 
             Handler_Vonly(StrMO, "Str", new CtxReturnSelf(),
                     new CtxJustUnbox<string>(""));
@@ -5895,7 +5895,7 @@ slow:
             Handler_PandBox(JunctionMO, "Bool", new CtxJunctionBool(), BoolMO);
             JunctionMO.AddMethod(0, "FALLBACK", MakeSub(JunctionFallbackSI, null));
             JunctionMO.FillProtoClass(MuMO,
-                    new string[] { "kind_", "eigenstates_" },
+                    new string[] { "$!kind_", "$!eigenstates_" },
                     new STable[] { JunctionMO, JunctionMO });
 
             IteratorMO = new STable("Iterator");
@@ -5968,7 +5968,7 @@ slow:
             Handler_PandBox(ListMO, "Bool", new CtxListBool(), BoolMO);
             Handler_PandBoxInty(ListMO, "Numeric", new CtxListNum());
             Handler_Vonly(ListMO, "list", new CtxReturnSelfList(), null);
-            ListMO.FillProtoClass(AnyMO, new string[] { "items", "rest" },
+            ListMO.FillProtoClass(AnyMO, new string[] { "$!items", "$!rest" },
                 new STable[] { ListMO, ListMO });
 
             ArrayMO = new STable("Array");

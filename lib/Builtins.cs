@@ -1731,15 +1731,15 @@ flat_enough:;
 
     public static P6any MakeList(VarDeque items, VarDeque rest) {
         P6any l = new P6opaque(Kernel.ListMO);
-        l.SetSlot(Kernel.ListMO, "rest", rest);
-        l.SetSlot(Kernel.ListMO, "items", items);
+        l.SetSlot(Kernel.ListMO, "$!rest", rest);
+        l.SetSlot(Kernel.ListMO, "$!items", items);
         return l;
     }
 
     public static P6any MakeArray(VarDeque items, VarDeque rest) {
         P6any l = new P6opaque(Kernel.ArrayMO);
-        l.SetSlot(Kernel.ListMO, "rest", rest);
-        l.SetSlot(Kernel.ListMO, "items", items);
+        l.SetSlot(Kernel.ListMO, "$!rest", rest);
+        l.SetSlot(Kernel.ListMO, "$!items", items);
         return l;
     }
 
@@ -1815,8 +1815,8 @@ flat_enough:;
 
     public static P6any MakePair(Variable key, Variable value) {
         P6any l = new P6opaque(Kernel.PairMO);
-        l.SetSlot(Kernel.EnumMO, "key", key);
-        l.SetSlot(Kernel.EnumMO, "value", value);
+        l.SetSlot(Kernel.EnumMO, "$!key", key);
+        l.SetSlot(Kernel.EnumMO, "$!value", value);
         return l;
     }
 
@@ -1851,7 +1851,7 @@ flat_enough:;
     public static int get_count(P6any fcni) {
         if (!fcni.Isa(Kernel.CodeMO))
             return 1; // can't introspect fake subs (?)
-        return get_count((SubInfo) fcni.GetSlot(Kernel.CodeMO, "info"));
+        return get_count(Kernel.GetInfo(fcni));
     }
     public static int get_count(SubInfo si) {
         if (si.sig == null)
@@ -1871,7 +1871,7 @@ flat_enough:;
     public static Variable arity(P6any fcni) {
         if (!fcni.Isa(Kernel.CodeMO))
             return MakeInt(1); // can't introspect fake subs (?)
-        SubInfo si = (SubInfo) fcni.GetSlot(Kernel.CodeMO, "info");
+        SubInfo si = (SubInfo) Kernel.GetInfo(fcni);
         if (si.sig == null)
             return MakeInt(1);
         int arity = 0;
@@ -2495,7 +2495,7 @@ again:
         foreach (STable m in obj.mo.mo.mro) {
             foreach (P6how.AttrInfo ai in m.mo.local_attr) {
                 if ((ai.flags & P6how.A_PUBLIC) == 0) continue;
-                if (!mods.TryGetValue(ai.name, out arg)) continue;
+                if (!mods.TryGetValue(ai.name.Substring(2), out arg)) continue;
 
                 EstablishSlot(obj, ai, arg);
             }

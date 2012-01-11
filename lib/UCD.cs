@@ -645,8 +645,8 @@ namespace Niecza.UCD {
 
         public static object CompileCClass(Variable pair) {
             P6any pairo = pair.Fetch();
-            Variable tbl = (Variable)pairo.GetSlot(Kernel.EnumMO, "key");
-            Variable sm =  (Variable)pairo.GetSlot(Kernel.EnumMO, "value");
+            Variable tbl = (Variable)pairo.GetSlot(Kernel.EnumMO, "$!key");
+            Variable sm =  (Variable)pairo.GetSlot(Kernel.EnumMO, "$!value");
             Property p = (Property)DataSet.GetTable(
                     tbl.Fetch().mo.mro_raw_Str.Get(tbl));
             int[] rranges = p.GetRanges(sm);

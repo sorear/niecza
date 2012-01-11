@@ -626,7 +626,7 @@ my class Capture does Positional does Associative {
     has $!named;
 
     method Parcel() {
-        Q:CgOp { (box Parcel (getslot Capture positionals fvarlist (@ {self}))) }
+        Q:CgOp { (box Parcel (getslot Capture $!positionals fvarlist (@ {self}))) }
     }
     method perl() {
         self // return self.typename;
@@ -650,7 +650,7 @@ my class Capture does Positional does Associative {
     }
     method list () { @(self.Parcel) }
     method hash () { unitem( Q:CgOp {
-        (letn h (getslot Capture named varhash (@ {self}))
+        (letn h (getslot Capture $!named varhash (@ {self}))
           (ternary (== (l h) (null varhash)) {{}} (box Hash (l h))))
     }) }
 }
@@ -838,7 +838,7 @@ my class Code does Callable {
     has $!outer;
     has $!info;
 
-    method outer() { Q:CgOp { (ns (getslot Code outer frame (@ {self}))) } }
+    method outer() { Q:CgOp { (ns (getslot Code $!outer frame (@ {self}))) } }
     method perl() { defined(self) ?? '{ ... }' !! self.typename }
 }
 
@@ -916,7 +916,7 @@ my class IntBasedEnum is CommonEnum {
     method Stringy() { defined(self) ?? self.key !! nextsame }
     method _create($ix,$val) { Q:CgOp {
         (letn obj (box (@ {self}) (unbox int (@ {$val.Int})))
-          (setslot CommonEnum index (@ (l obj)) {$ix.Int})
+          (setslot CommonEnum $!index (@ (l obj)) {$ix.Int})
           (l obj))
     } }
 }
@@ -924,7 +924,7 @@ my class IntBasedEnum is CommonEnum {
 my class StrBasedEnum is CommonEnum {
     method _create($ix,$val) { Q:CgOp {
         (letn obj (box (@ {self}) (unbox str (@ {$val.Str})))
-          (setslot CommonEnum index (@ (l obj)) {$ix.Int})
+          (setslot CommonEnum $!index (@ (l obj)) {$ix.Int})
           (l obj))
     } }
 }
@@ -1111,8 +1111,8 @@ sub _lexotic ($id, $x, \$val) {
               nm (null str)
               id (@ {$x})
           (ternary (obj_isa (l id) (class_ref mo Label))
-            (prog (l fr (getslot Label target frame (l id)))
-                  (l nm (getslot Label name str (l id))))
+            (prog (l fr (getslot Label $!target frame (l id)))
+                  (l nm (getslot Label $!name str (l id))))
             (ternary (obj_isa (l id) (class_ref mo Str))
               (l nm (obj_getstr {$x}))
               (prog)))
@@ -1221,7 +1221,7 @@ my class Parcel is Cool does Positional {
     method Capture () {
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {Capture})))
-              (setslot Capture positionals (l n) (unbox fvarlist (@ {self})))
+              (setslot Capture $!positionals (l n) (unbox fvarlist (@ {self})))
               (ns (l n)))
         }
     }
@@ -1258,15 +1258,15 @@ my class Parcel is Cool does Positional {
 }
 
 my class List is Cool does Positional {
-    has @!items;
-    has @!rest;
+    has $!items;
+    has $!rest;
     has $!flat;
 
     method new() {
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {self})))
-              (setslot List items (l n) (vvarlist_new_empty))
-              (setslot List rest  (l n) (vvarlist_new_empty))
+              (setslot List $!items (l n) (vvarlist_new_empty))
+              (setslot List $!rest  (l n) (vvarlist_new_empty))
               (newrwlistvar (l n)))
         };
     }
@@ -1282,18 +1282,18 @@ my class List is Cool does Positional {
     method clone() { Q:CgOp {
         (letn selfo (@ {self})
               new (obj_newblank (obj_llhow (l selfo)))
-          (setslot List items (l new) (vvarlist_clone
-              (getslot List items vvarlist (l selfo))))
-          (setslot List rest (l new) (vvarlist_clone
-              (getslot List rest vvarlist (l selfo))))
+          (setslot List $!items (l new) (vvarlist_clone
+              (getslot List $!items vvarlist (l selfo))))
+          (setslot List $!rest (l new) (vvarlist_clone
+              (getslot List $!rest vvarlist (l selfo))))
           (newrwlistvar (l new)))
     } }
 
     method Capture () {
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {Capture})))
-              (setslot Capture positionals (l n) (vvarlist_to_fvarlist
-                  (getslot List items vvarlist (@ {self.eager}))))
+              (setslot Capture $!positionals (l n) (vvarlist_to_fvarlist
+                  (getslot List $!items vvarlist (@ {self.eager}))))
               (ns (l n)))
         }
     }
@@ -1312,7 +1312,7 @@ my class List is Cool does Positional {
     method eager() { +self; self }
 
     method head() { self ??
-        Q:CgOp { (vvarlist_item (i 0) (getslot List items vvarlist (@ {self}))) } !!
+        Q:CgOp { (vvarlist_item (i 0) (getslot List $!items vvarlist (@ {self}))) } !!
         Any
     }
 
@@ -1348,9 +1348,9 @@ my class List is Cool does Positional {
         my $l = @(self).eager;
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {List})))
-              (setslot List items (l n) (vvarlist_sort (@ {$cmp})
-                  (getslot List items vvarlist (@ {$l}))))
-              (setslot List rest (l n) (vvarlist_new_empty))
+              (setslot List $!items (l n) (vvarlist_sort (@ {$cmp})
+                  (getslot List $!items vvarlist (@ {$l}))))
+              (setslot List $!rest (l n) (vvarlist_new_empty))
               (newrwlistvar (l n)))
         }
     }
@@ -1409,7 +1409,7 @@ my class List is Cool does Positional {
     method plan(*@items) {
         Q:CgOp {
             (rnull
-              (vvarlist_append (getslot List rest vvarlist (@ {self}))
+              (vvarlist_append (getslot List $!rest vvarlist (@ {self}))
                 (unbox vvarlist (@ {@items.iterator}))))
         }
     }
@@ -1484,8 +1484,8 @@ my class Hash does Associative {
     method Capture () {
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {Capture})))
-              (setslot Capture positionals (l n) (fvarlist_new))
-              (setslot Capture named (l n) (varhash_dup
+              (setslot Capture $!positionals (l n) (fvarlist_new))
+              (setslot Capture $!named (l n) (varhash_dup
                   (unbox varhash (@ {self}))))
               (ns (l n)))
         }
@@ -1560,8 +1560,8 @@ my class Enum is Cool {
         Q:CgOp {
             (letn n (obj_newblank (obj_llhow (@ {Capture})))
                   d (varhash_new)
-              (setslot Capture positionals (l n) (fvarlist_new))
-              (setslot Capture named (l n) (l d))
+              (setslot Capture $!positionals (l n) (fvarlist_new))
+              (setslot Capture $!named (l n) (l d))
               (varhash_setindex (obj_getstr {$!key})
                 (l d) {$!value})
               (ns (l n)))
@@ -1652,12 +1652,12 @@ my class Junction is Mu {
 
     method !create($kind, $eigenstates) { Q:CgOp {
         (letn ob (obj_newblank (obj_llhow (@ {self})))
-          (setslot Junction kind_ (l ob) (@ {$kind}))
-          (setslot Junction eigenstates_ (l ob) (@ {$eigenstates}))
+          (setslot Junction $!kind_ (l ob) (@ {$kind}))
+          (setslot Junction $!eigenstates_ (l ob) (@ {$eigenstates}))
           (ns (l ob)))
     } }
-    method !kind() { Q:CgOp { (ns (getslot Junction kind_ obj (@ {self}))) } }
-    method !eigenstates() { Q:CgOp { (ns (getslot Junction eigenstates_ obj (@ {self}))) } }
+    method !kind() { Q:CgOp { (ns (getslot Junction $!kind_ obj (@ {self}))) } }
+    method !eigenstates() { Q:CgOp { (ns (getslot Junction $!eigenstates_ obj (@ {self}))) } }
 
     my @kinds = <all none one any>;
     method perl() {

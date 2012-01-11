@@ -4105,7 +4105,7 @@ dynamic:
                 if (!b.v.rw && !b.v.Fetch().IsDefined()) {
                     r.Add(new Handle(b.v.Fetch().mo));
                 } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
-                    r.Add(new Handle(b.v.Fetch().GetSlot(Kernel.CodeMO, "info")));
+                    r.Add(new Handle(b.v.Fetch().GetSlot(Kernel.CodeMO, "$!info")));
                 } else {
                     r.Add(null);
                 }
@@ -4122,7 +4122,7 @@ dynamic:
                 if (!b.v.rw && !b.v.Fetch().IsDefined()) {
                     return new Handle(b.v.Fetch().mo);
                 } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
-                    return new Handle(b.v.Fetch().GetSlot(Kernel.CodeMO, "info"));
+                    return new Handle(b.v.Fetch().GetSlot(Kernel.CodeMO, "$!info"));
                 } else return null;
             } else {
                 return null;

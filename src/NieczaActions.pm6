@@ -2597,8 +2597,9 @@ method multi_declarator:multi ($/) { make ($<declarator> // $<routine_def>).ast}
 method multi_declarator:proto ($/) { make ($<declarator> // $<routine_def>).ast}
 method multi_declarator:only  ($/) { make ($<declarator> // $<routine_def>).ast}
 
-method add_attribute($/, $name, $sigil, $accessor, $type) {
+method add_attribute($/, $barename, $sigil, $accessor, $type) {
     my $ns = $*CURLEX<!sub>.body_of;
+    my $name = $sigil ~ '!' ~ $barename;
     $/.CURSOR.sorry("Attribute $name declared outside of any class"),
         return ::Op::StatementList.new unless $ns;
     $/.CURSOR.sorry("Attribute $name declared in an augment"),
@@ -2611,7 +2612,7 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
 
     my $nb = $*unit.create_sub(
         outer      => $*CURLEX<!sub>,
-        name       => $name,
+        name       => $barename,
         cur_pkg    => $*CURLEX<!sub>.cur_pkg,
         class      => 'Method');
     $nb.set_transparent;
@@ -2627,10 +2628,10 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
         $nb.set_outervar($ac);
         $*CURLEX<!sub>.add_my_sub($ac, $nb, |mnode($/));
         $ns.add_attribute($name, $sigil, +$accessor, $type, |mnode($/));
-        $ns.add_method($*backend.sub_visibility("private"), $name, $nb,
+        $ns.add_method($*backend.sub_visibility("private"), $barename, $nb,
             |mnode($/));
         if $accessor {
-            $ns.add_method(0, $name, $nb, |mnode($/));
+            $ns.add_method(0, $barename, $nb, |mnode($/));
         }
         $at = True;
     });

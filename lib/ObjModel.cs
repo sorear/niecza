@@ -956,7 +956,7 @@ next_method: ;
             //Kernel.LogNameLookup(name);
             int ix;
             if (!slotMap.TryGetValue(name, out ix))
-                throw new NieczaException("Attribute {0} not defined in {1} or any superclass");
+                throw new NieczaException("Attribute {0} not defined in {1} or any superclass", name, this.name);
             if (type_slot[ix] == type)
                 return ix;
 

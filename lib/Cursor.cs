@@ -830,8 +830,8 @@ public class Cursor : P6any {
         CapInfo ci = null;
         while (Kernel.IterHasFlat(iter, true)) {
             P6any pair = iter.Shift().Fetch();
-            Variable k = (Variable)pair.GetSlot(Kernel.EnumMO, "key");
-            Variable v = (Variable)pair.GetSlot(Kernel.EnumMO, "value");
+            Variable k = (Variable)pair.GetSlot(Kernel.EnumMO, "$!key");
+            Variable v = (Variable)pair.GetSlot(Kernel.EnumMO, "$!value");
             ci = new CapInfo(ci, new string[] {
                     k.Fetch().mo.mro_raw_Str.Get(k) }, v);
         }
@@ -939,8 +939,8 @@ public class Cursor : P6any {
         for (int i = 0; i < pos.Length; i++)
             pos[i] = FixupList(posr[i]);
 
-        into.SetSlot(Kernel.CaptureMO, "positionals", pos);
-        into.SetSlot(Kernel.CaptureMO, "named", nam);
+        into.SetSlot(Kernel.CaptureMO, "$!positionals", pos);
+        into.SetSlot(Kernel.CaptureMO, "$!named", nam);
     }
 
     public Variable O(VarHash caps) {
