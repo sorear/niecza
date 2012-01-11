@@ -342,9 +342,9 @@ namespace Niecza.CLRBackend {
         public static readonly MethodInfo P6any_Invoke =
             P6any.GetMethod("Invoke");
         public static readonly MethodInfo P6any_SetSlot =
-            P6any.GetMethod("SetSlot");
+            P6any.GetMethod("SetSlot", new Type[] { String, typeof(object) });
         public static readonly MethodInfo P6any_GetSlot =
-            P6any.GetMethod("GetSlot");
+            P6any.GetMethod("GetSlot", new Type[] { String });
         public static readonly MethodInfo SubInfo_AddHint =
             SubInfo.GetMethod("AddHint");
         public static readonly MethodInfo Variable_Fetch =
@@ -433,8 +433,6 @@ namespace Niecza.CLRBackend {
             typeof(STable).GetMethod("FillParametricRole");
         public static readonly MethodInfo DMO_FillRole =
             typeof(STable).GetMethod("FillRole");
-        public static readonly MethodInfo DMO_FillClass =
-            typeof(STable).GetMethod("FillClass");
         public static readonly MethodInfo RxFrame_PushBacktrack =
             typeof(RxFrame).GetMethod("PushBacktrack");
         public static readonly MethodInfo RxFrame_PushCapture =

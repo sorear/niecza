@@ -664,7 +664,7 @@ for $args (0..9) {
             STable[] mro = new STable[pm.mo.mro.Length + 1];
             Array.Copy(pm.mo.mro, 0, mro, 1, pm.mo.mro.Length);
             mro[0] = m;
-            m.FillClass(new string[] { }, new STable[] { pm }, mro);
+            m.FillClass(new string[] { }, new STable[] { }, new STable[] { pm }, mro);
 
             HashSet<string> needNewWrapper = new HashSet<string>();
             needNewWrapper.Add("new"); // don't inherit constructors

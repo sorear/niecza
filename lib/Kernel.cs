@@ -2816,6 +2816,7 @@ bound: ;
         // hide clr stack trace for these
         public override string ToString() { return Message; }
         public NieczaException(string detail) : base(detail) {}
+        public NieczaException(string fmt, params object[] args) : base(string.Format(fmt, args)) {}
         public NieczaException() : base() {}
     }
 
@@ -5812,7 +5813,7 @@ slow:
                     new CtxRawNativeDefined());
             Handler_Vonly(MuMO, "item", new CtxReturnSelfItem(), null);
 
-            MuMO.FillProtoClass(null, new string[] { });
+            MuMO.FillProtoClass(null, new string[0], new STable[0]);
             MuMO.Invalidate();
 
             // AnyMO.typeObject is needed very early, while setting up the
@@ -5824,10 +5825,11 @@ slow:
             WrapIndexy(AnyMO, "postcircumfix:<{ }>", new IxAnyAtKey(),
                     new IxAnyExistsKey(), new IxAnyDeleteKey(),
                     new IxAnyBindKey());
-            AnyMO.FillProtoClass(MuMO, new string[] { });
+            AnyMO.FillProtoClass(MuMO);
             AnyMO.Invalidate();
 
-            CodeMO.FillProtoClass(AnyMO, "outer", "info");
+            CodeMO.FillProtoClass(AnyMO, new string[] { "outer", "info" },
+                new STable[] { CodeMO, CodeMO });
             SubInvokeSubSI.param = new object[] { null, new InvokeSub() };
             CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(SubInvokeSubSI, null));
             CodeMO.Invalidate();
@@ -5840,16 +5842,17 @@ slow:
             MethodMO = new STable("Method");
             RegexMO = new STable("Regex");
 
-            BlockMO.FillProtoClass(CodeMO, "outer", "info");
-            RoutineMO.FillProtoClass(BlockMO, "outer", "info");
-            WhateverCodeMO.FillProtoClass(BlockMO, "outer", "info");
-            SubMO.FillProtoClass(RoutineMO, "outer", "info");
-            MethodMO.FillProtoClass(RoutineMO, "outer", "info");
-            SubmethodMO.FillProtoClass(RoutineMO, "outer", "info");
-            RegexMO.FillProtoClass(MethodMO, "outer", "info");
+            BlockMO.FillProtoClass(CodeMO);
+            RoutineMO.FillProtoClass(BlockMO);
+            WhateverCodeMO.FillProtoClass(BlockMO);
+            SubMO.FillProtoClass(RoutineMO);
+            MethodMO.FillProtoClass(RoutineMO);
+            SubmethodMO.FillProtoClass(RoutineMO);
+            RegexMO.FillProtoClass(MethodMO);
 
             LabelMO = new STable("Label");
-            LabelMO.FillProtoClass(AnyMO, "target", "name");
+            LabelMO.FillProtoClass(AnyMO, new string[] { "target", "name" },
+                    new STable[] { LabelMO, LabelMO });
 
             // forward reference
             StrMO = new STable("Str");
@@ -5866,7 +5869,8 @@ slow:
 
             Handler_Vonly(BoolMO, "Bool", new CtxReturnSelf(),
                     new CtxBoolUnbox());
-            BoolMO.FillProtoClass(IntMO, "index");
+            BoolMO.FillProtoClass(IntMO, new string[] { "index" },
+                new STable[] { BoolMO });
             TrueV  = NewROScalar(BoxRaw<int>(1, BoolMO));
             FalseV = NewROScalar(BoxRaw<int>(0, BoolMO));
             FalseV.Fetch().SetSlot("index", BoxAnyMO(0, IntMO));
@@ -5882,7 +5886,9 @@ slow:
             JunctionMO = new STable("Junction");
             Handler_PandBox(JunctionMO, "Bool", new CtxJunctionBool(), BoolMO);
             JunctionMO.AddMethod(0, "FALLBACK", MakeSub(JunctionFallbackSI, null));
-            JunctionMO.FillProtoClass(MuMO, "kind_", "eigenstates_");
+            JunctionMO.FillProtoClass(MuMO,
+                    new string[] { "kind_", "eigenstates_" },
+                    new STable[] { JunctionMO, JunctionMO });
 
             IteratorMO = new STable("Iterator");
             IteratorMO.FillProtoClass(AnyMO);
@@ -5954,13 +5960,14 @@ slow:
             Handler_PandBox(ListMO, "Bool", new CtxListBool(), BoolMO);
             Handler_PandBoxInty(ListMO, "Numeric", new CtxListNum());
             Handler_Vonly(ListMO, "list", new CtxReturnSelfList(), null);
-            ListMO.FillProtoClass(AnyMO, "items", "rest");
+            ListMO.FillProtoClass(AnyMO, new string[] { "items", "rest" },
+                new STable[] { ListMO, ListMO });
 
             ArrayMO = new STable("Array");
             WrapHandler1(ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
             WrapIndexy(ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
                     null, null, new IxListBindPos());
-            ArrayMO.FillProtoClass(ListMO, "items", "rest");
+            ArrayMO.FillProtoClass(ListMO);
 
             HashMO = new STable("Hash");
             WrapHandler1(HashMO, "LISTSTORE", new IxHashLISTSTORE());

@@ -17,6 +17,14 @@ namespace Niecza {
             throw new NieczaException("Representation " + ReprName() + " does not support attributes");
         }
 
+        public virtual object GetSlot(STable type, string name) {
+            throw new NieczaException("Representation " + ReprName() + " does not support attributes");
+        }
+
+        public virtual void SetSlot(STable type, string name, object v) {
+            throw new NieczaException("Representation " + ReprName() + " does not support attributes");
+        }
+
         protected Frame Fail(Frame caller, string msg) {
             return Kernel.Die(caller, msg + " in class " + mo.name);
         }
@@ -482,14 +490,14 @@ next_method: ;
             local_attr.Add(ai);
         }
 
-        public void FillProtoClass(STable parent, string[] slots) {
+        public void FillProtoClass(STable parent, string[] slots, STable[] slot_types) {
             if (parent == null) {
-                FillClass(slots, new STable[] {}, new STable[] { stable });
+                FillClass(slots, slot_types, new STable[] {}, new STable[] { stable });
             } else {
                 STable[] mro = new STable[parent.mo.mro.Length + 1];
                 Array.Copy(parent.mo.mro, 0, mro, 1, mro.Length-1);
                 mro[0] = stable;
-                FillClass(slots, new STable[] { parent }, mro);
+                FillClass(slots, slot_types, new STable[] { parent }, mro);
             }
             Invalidate();
         }
@@ -500,7 +508,7 @@ next_method: ;
             STable[] mro = new STable[super.mo.mro.Length + 1];
             Array.Copy(super.mo.mro, 0, mro, 1, mro.Length - 1);
             mro[0] = stable;
-            FillClass(super.all_slot, new STable[] { super }, mro);
+            FillClass(super.all_slot, super.type_slot, new STable[] { super }, mro);
             Revalidate();
             stable.SetupVTables();
         }
@@ -538,11 +546,12 @@ next_method: ;
             throw new NieczaException("accepts_type unimplemented for " + rtype);
         }
 
-        public void FillClass(string[] all_slot, STable[] superclasses,
-                STable[] mro) {
+        public void FillClass(string[] all_slot, STable[] type_slot,
+                STable[] superclasses, STable[] mro) {
             this.superclasses = new List<STable>(superclasses);
             SetMRO(mro);
             stable.all_slot = all_slot;
+            stable.type_slot = type_slot;
 
             stable.nslots = 0;
             foreach (string an in all_slot) {
@@ -684,10 +693,14 @@ next_method: ;
             if ((err = ComputeMRO()) != null) return err;
 
             List<string> all_slot_l = new List<string>();
+            List<STable> type_slot_l = new List<STable>();
             foreach (STable m in mro)
-                foreach (AttrInfo ai in m.mo.local_attr)
+                foreach (AttrInfo ai in m.mo.local_attr) {
                     all_slot_l.Add(ai.name);
+                    type_slot_l.Add(m);
+                }
             stable.all_slot = all_slot_l.ToArray();
+            stable.type_slot = type_slot_l.ToArray();
 
             stable.nslots = 0;
             foreach (string an in stable.all_slot) {
@@ -891,6 +904,7 @@ next_method: ;
         public Dictionary<string, int> slotMap = new Dictionary<string, int>();
         public int nslots = 0;
         public string[] all_slot;
+        public STable[] type_slot;
         /// }}}
 
         /// caches set up by Revalidate {{{
@@ -931,6 +945,14 @@ next_method: ;
         public int FindSlot(string name) {
             //Kernel.LogNameLookup(name);
             return slotMap[name];
+        }
+
+        public int FindSlot(STable type, string name) {
+            //Kernel.LogNameLookup(name);
+            int ix = slotMap[name];
+            if (type_slot[ix] != type)
+                throw new NieczaException("Attribute {0} in {1} is defined in {2}, not {3}", name, this.name, type_slot[ix].name, type.name);
+            return ix;
         }
 
         public LexerCache GetLexerCache() {
@@ -1043,13 +1065,16 @@ next_method: ;
             mo.AddAttribute(name, flags, init, type);
         }
 
-        public void FillProtoClass(STable parent, params string[] slots) {
-            mo.FillProtoClass(parent, slots);
+        public void FillProtoClass(STable parent) {
+            mo.FillProtoClass(parent, parent.all_slot, parent.type_slot);
+        }
+        public void FillProtoClass(STable parent, string[] slots, STable[] stypes) {
+            mo.FillProtoClass(parent, slots, stypes);
         }
 
-        public void FillClass(string[] all_slot, STable[] superclasses,
-                STable[] mro) {
-            mo.FillClass(all_slot, superclasses, mro);
+        public void FillClass(string[] all_slot, STable[] type_slot,
+                STable[] superclasses, STable[] mro) {
+            mo.FillClass(all_slot, type_slot, superclasses, mro);
         }
 
         public void FillRole(STable[] superclasses, STable[] cronies) {
@@ -1073,6 +1098,7 @@ next_method: ;
             fb.Byte((byte)(useAcceptsType ? 1 : 0));
             fb.String(box_type == null ? null : box_type.AssemblyQualifiedName);
             fb.Strings(all_slot);
+            fb.Refs(type_slot);
         }
 
         internal static STable Thaw(ThawBuffer tb) {
@@ -1090,6 +1116,7 @@ next_method: ;
             string box_type = tb.String();
             n.box_type = box_type == null ? null : Type.GetType(box_type,true);
             n.all_slot = tb.Strings();
+            n.type_slot = tb.RefsA<STable>();
 
             if (n.all_slot != null)
                 foreach (string s in n.all_slot)
@@ -1124,17 +1151,39 @@ next_method: ;
         }
 
         public override void SetSlot(string name, object obj) {
-            if (slots == null)
+            if (slots == null) {
+                mo.FindSlot(name);
                 throw new NieczaException("Attempted to access slot " + name +
                         " of type object for " + mo.name);
+            }
             slots[mo.FindSlot(name)] = obj;
         }
 
         public override object GetSlot(string name) {
-            if (slots == null)
+            if (slots == null) {
+                mo.FindSlot(name);
                 throw new NieczaException("Attempted to access slot " + name +
                         " of type object for " + mo.name);
+            }
             return slots[mo.FindSlot(name)];
+        }
+
+        public override void SetSlot(STable type, string name, object obj) {
+            if (slots == null) {
+                mo.FindSlot(type, name);
+                throw new NieczaException("Attempted to access slot " + name +
+                        " of type object for " + mo.name);
+            }
+            slots[mo.FindSlot(type, name)] = obj;
+        }
+
+        public override object GetSlot(STable type, string name) {
+            if (slots == null) {
+                mo.FindSlot(type, name);
+                throw new NieczaException("Attempted to access slot " + name +
+                        " of type object for " + mo.name);
+            }
+            return slots[mo.FindSlot(type, name)];
         }
 
         protected void CopyTo(P6opaque to) {

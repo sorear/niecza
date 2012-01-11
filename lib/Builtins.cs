@@ -1839,7 +1839,7 @@ flat_enough:;
     public static int get_count(P6any fcni) {
         if (!fcni.Isa(Kernel.CodeMO))
             return 1; // can't introspect fake subs (?)
-        return get_count((SubInfo) fcni.GetSlot("info"));
+        return get_count((SubInfo) fcni.GetSlot(Kernel.CodeMO, "info"));
     }
     public static int get_count(SubInfo si) {
         if (si.sig == null)
@@ -1859,7 +1859,7 @@ flat_enough:;
     public static Variable arity(P6any fcni) {
         if (!fcni.Isa(Kernel.CodeMO))
             return MakeInt(1); // can't introspect fake subs (?)
-        SubInfo si = (SubInfo) fcni.GetSlot("info");
+        SubInfo si = (SubInfo) fcni.GetSlot(Kernel.CodeMO, "info");
         if (si.sig == null)
             return MakeInt(1);
         int arity = 0;
@@ -2525,7 +2525,7 @@ again:
 
             BuildMostDerived(obj);
             if (aname != null)
-                Kernel.Assign((Variable)obj.GetSlot(aname), init);
+                Kernel.Assign((Variable)obj.GetSlot(n, aname), init);
             return Kernel.NewROScalar(obj);
         } else {
             return n.typeVar;
@@ -2601,7 +2601,7 @@ again:
 
     public static Variable dyngetattr(Variable obj, Variable ty, Variable name) {
         string sname = Kernel.UnboxAny<string>(name.Fetch());
-        return (Variable)obj.Fetch().GetSlot(sname);
+        return (Variable)obj.Fetch().GetSlot(ty.Fetch().mo, sname);
     }
 
     public static Variable is_role(Variable o) {
