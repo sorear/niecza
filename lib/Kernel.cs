@@ -4685,6 +4685,10 @@ saveme:
                 return (res == Kernel.TrueV);
             }
 
+            public override Frame Invoke(Frame th, Variable[] pos, VarHash named) {
+                return impl.Invoke(th, pos, named);
+            }
+
             public bool IsNarrowerThan(MMDCandidate other) {
                 int narrower = 0;
 
@@ -4827,10 +4831,8 @@ saveme:
                 cs = new CandidateSet(dth.info.name, mc.ToArray());
                 Interlocked.CompareExchange(ref dth.info.param[1], cs, null);
             }
-            var cand = (MMDCandidate)cs.DoDispatch(th, dth.pos, dth.named);
-
             if (tailcall) th = th.Return();
-            return cand.impl.Invoke(th, dth.pos, dth.named);
+            return cs.DoDispatch(th, dth.pos, dth.named, dth.sub);
         }
 
         internal static Frame StandardTypeProtoC(Frame th) {

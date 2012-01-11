@@ -42,6 +42,7 @@ namespace Niecza {
         public abstract int  Compare(int arity, MultiCandidate other);
         public abstract bool AdmissableArity(int arity);
         public abstract int  MinDispatchArity();
+        public abstract Frame Invoke(Frame th, Variable[] pos, VarHash named);
 
         internal int[] conflictors;
     }
@@ -81,8 +82,61 @@ namespace Niecza {
             }
         }
 
+        static void CheckJunctionArg(Variable v, ref int jun_pivot,
+                ref string jun_pivot_n, ref int jun_rank, int num, string nam) {
+            P6any obj = v.Fetch();
+            if (!obj.mo.HasType(Kernel.JunctionMO))
+                return;
+            int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)obj).slots[0]) / 2;
+            if (jrank < jun_rank) {
+                jun_rank = jrank;
+                jun_pivot = num;
+                jun_pivot_n = nam;
+            }
+        }
+
+        static Frame CheckJunctions(Frame th, Variable[] pos, VarHash named, P6any junc_call) {
+            int jun_pivot = -1;
+            int jun_rank  = int.MaxValue;
+            string jun_pivot_n = null;
+            for (int i = 0; i < pos.Length; i++)
+                CheckJunctionArg(pos[i], ref jun_pivot, ref jun_pivot_n,
+                        ref jun_rank, i, null);
+            if (named != null) {
+                foreach (KeyValuePair<string,Variable> kv in named)
+                    CheckJunctionArg(kv.Value, ref jun_pivot, ref jun_pivot_n,
+                            ref jun_rank, -2, kv.Key);
+            }
+
+            if (jun_pivot == -1)
+                return null;
+
+            Variable jct = (jun_pivot == -2 ? named[jun_pivot_n] :
+                    pos[jun_pivot]);
+            Frame nth = th.MakeChild(null, Kernel.AutoThreadSubSI, Kernel.AnyP);
+
+            P6opaque jo  = (P6opaque) jct.Fetch();
+
+            nth.named = named;
+            nth.pos = pos;
+            nth.lex1 = junc_call.GetSlot("info");
+            nth.lex2 = jun_pivot_n;
+            nth.lex3 = jo.slots[0];
+            nth.lex4 = Kernel.UnboxAny<Variable[]>((P6any)jo.slots[1]);
+            nth.lex5 = junc_call.GetSlot("outer");
+            nth.lex6 = junc_call;
+            nth.lex7 = null;
+            nth.lex8 = new Variable[((Variable[])nth.lex4).Length];
+            nth.lex9 = jct;
+
+            nth.lexi0 = jun_pivot;
+            nth.lexi1 = 0;
+
+            return nth;
+        }
+
         // throws on dispatch failure
-        public MultiCandidate DoDispatch(Frame th, Variable[] pos, VarHash named) {
+        public Frame DoDispatch(Frame th, Variable[] pos, VarHash named, P6any junc_call) {
             MultiCandidate[] avail = GetCandidateList(pos.Length);
 
             int last_ix;
@@ -91,7 +145,11 @@ namespace Niecza {
                     break;
 
             if (last_ix < 0) {
-                throw new NieczaException("No candidates for dispatch to " + name +
+                Frame nth = CheckJunctions(th, pos, named, junc_call);
+                if (nth != null)
+                    return nth;
+
+                return Kernel.Die(th, "No candidates for dispatch to " + name +
                     "; candidates are:" + Console.Out.NewLine + "    " +
                     Kernel.JoinS(Console.Out.NewLine + "    ", avail));
             }
@@ -104,7 +162,7 @@ namespace Niecza {
                         if (mc.Admissable(th, pos, named))
                             matched.Add(mc);
 
-                    throw new NieczaException("Ambiguous dispatch for " + name +
+                    return Kernel.Die(th, "Ambiguous dispatch for " + name +
                         "; matched candidates are:" + Console.Out.NewLine + "    " +
                         Kernel.JoinS(Console.Out.NewLine + "    ", matched));
                 }
@@ -113,7 +171,7 @@ namespace Niecza {
             if (CLROpts.MMDDebug)
                 Console.WriteLine("Using {0}", avail[last_ix]);
 
-            return avail[last_ix];
+            return avail[last_ix].Invoke(th, pos, named);
         }
 
         MultiCandidate[] SortCandidates(int arity) {
@@ -303,42 +361,45 @@ namespace Niecza {
         void WritebackRefs(Variable[] pos, object[] argv) {
             for (int i = 0; i < args.Length; i++)
                 if (refs[i])
-                    pos[i].Store(CLRWrapperProvider.BoxResult(args[i],
+                    pos[i+1].Store(CLRWrapperProvider.BoxResult(args[i],
                                 argv[i]).Fetch());
         }
 
-        public Variable Invoke(object obj, Variable[] pos, VarHash named) {
+        // pos[0] = self is not used for dispatch
+        public override Frame Invoke(Frame th, Variable[] pos, VarHash named) {
             object[] argv = new object[args.Length +
                 (param_array != null ? 1 : 0)];
             for (int i = 0; i < args.Length; i++)
-                CLRWrapperProvider.CoerceArgument(out argv[i], args[i], pos[i]);
+                CLRWrapperProvider.CoerceArgument(out argv[i], args[i], pos[i+1]);
             if (param_array != null) {
-                int npa = pos.Length - args.Length;
+                int npa = pos.Length - 1 - args.Length;
                 Array pa = Array.CreateInstance(param_array, npa);
                 for (int j = 0; j < npa; j++) {
                     object arg;
-                    CLRWrapperProvider.CoerceArgument(out arg, param_array, pos[j + args.Length]);
+                    CLRWrapperProvider.CoerceArgument(out arg, param_array, pos[j + args.Length + 1]);
                     pa.SetValue(arg, j);
                 }
                 argv[args.Length] = pa;
             }
+            object obj = Kernel.UnboxAny<object>(pos[0].Fetch());
             if (what_call is MethodInfo) {
                 MethodInfo mi = (MethodInfo) what_call;
                 object ret = mi.Invoke((mi.IsStatic ? null : obj), argv);
                 WritebackRefs(pos, argv);
-                return CLRWrapperProvider.BoxResult(mi.ReturnType, ret);
+                th.resultSlot = CLRWrapperProvider.BoxResult(mi.ReturnType, ret);
             } else if (what_call is ConstructorInfo) {
                 ConstructorInfo ci = (ConstructorInfo) what_call;
                 object ret = ci.Invoke(argv);
                 WritebackRefs(pos, argv);
-                return CLRWrapperProvider.BoxResult(ci.DeclaringType, ret);
+                th.resultSlot = CLRWrapperProvider.BoxResult(ci.DeclaringType, ret);
             } else if (what_call is FieldInfo) {
-                return new FieldProxy((FieldInfo) what_call, obj);
+                th.resultSlot = new FieldProxy((FieldInfo) what_call, obj);
             } else if (what_call is PropertyInfo) {
-                return new PropertyProxy((PropertyInfo) what_call, obj, argv);
+                th.resultSlot = new PropertyProxy((PropertyInfo) what_call, obj, argv);
             } else {
                 throw new NieczaException("Unhandled member type " + what_call.GetType());
             }
+            return th;
         }
 
         public override bool Admissable(Frame th, Variable[] pos, VarHash named) {
@@ -349,12 +410,12 @@ namespace Niecza {
 
             object dummy;
             for (int i = 0; i < args.Length; i++)
-                if (!CLRWrapperProvider.CoerceArgument(out dummy, args[i], pos[i])
-                        || (refs[i] && !pos[i].rw))
+                if (!CLRWrapperProvider.CoerceArgument(out dummy, args[i], pos[i+1])
+                        || (refs[i] && !pos[i+1].rw))
                     return false;
             // XXX: maybe param arrays should be treated as slurpies?
-            for (int i = args.Length; i < pos.Length; i++)
-                if (!CLRWrapperProvider.CoerceArgument(out dummy, param_array, pos[i]))
+            for (int i = args.Length; i < pos.Length - 1; i++)
+                if (!CLRWrapperProvider.CoerceArgument(out dummy, param_array, pos[i+1]))
                     return false;
 
             return true;
@@ -428,12 +489,12 @@ namespace Niecza {
         }
 
         public override bool AdmissableArity(int arity) {
-            return param_array == null ? arity == args.Length :
-                arity >= args.Length;
+            return param_array == null ? arity == args.Length + 1 :
+                arity >= args.Length + 1;
         }
 
         public override int  MinDispatchArity() {
-            return args.Length + 1;
+            return args.Length + 2;
         }
     }
 
@@ -487,13 +548,7 @@ namespace Niecza {
         }
 
         static Frame Binder(Frame th) {
-            Variable[] rpos = new Variable[th.pos.Length - 1];
-            Array.Copy(th.pos, 1, rpos, 0, rpos.Length);
-            OverloadCandidate oc = (OverloadCandidate)
-                (th.info.param[0] as CandidateSet).DoDispatch(null, rpos, th.named);
-            th.caller.resultSlot = oc.Invoke(Kernel.UnboxAny<object>(
-                th.pos[0].Fetch()), rpos, th.named);
-            return th.caller;
+            return (th.info.param[0] as CandidateSet).DoDispatch(th.caller, th.pos, th.named, th.sub);
         }
 
         /*
