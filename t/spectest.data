@@ -9,6 +9,7 @@ integration/99problems-11-to-20.t
 integration/99problems-31-to-40.t
 integration/99problems-51-to-60.t
 integration/advent2009-day01.t
+integration/advent2009-day02.t
 integration/advent2009-day03.t
 integration/advent2009-day04.t
 integration/advent2009-day05.t
