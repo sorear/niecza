@@ -5558,8 +5558,10 @@ slow:
                             throw new NieczaException("Attribute '" + ai.name + "' is provided by both '" + attrs[ai.name] + "' and '" + r.name + "'");
                         }
                     }
-                    cls.mo.local_attr.Add(ai);
-                    attrs[ai.name] = r.name;
+                    var nai = ai;
+                    nai.owner = cls;
+                    cls.mo.local_attr.Add(nai);
+                    attrs[nai.name] = r.name;
                 }
             }
 
