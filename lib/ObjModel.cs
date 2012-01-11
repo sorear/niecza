@@ -938,12 +938,34 @@ next_method: ;
             mo.stable = this;
         }
 
+        public int TryFindSlot(STable type, string name) {
+            //Kernel.LogNameLookup(name);
+            int ix;
+            if (!slotMap.TryGetValue(name, out ix))
+                return -1;
+            if (type_slot[ix] == type)
+                return ix;
+            for (ix = 0; ix < all_slot.Length; ix++) {
+                if (all_slot[ix] == name && type_slot[ix] == type)
+                    return ix;
+            }
+            return -1;
+        }
+
         public int FindSlot(STable type, string name) {
             //Kernel.LogNameLookup(name);
-            int ix = slotMap[name];
-            if (type_slot[ix] != type)
-                throw new NieczaException("Attribute {0} in {1} is defined in {2}, not {3}", name, this.name, type_slot[ix].name, type.name);
-            return ix;
+            int ix;
+            if (!slotMap.TryGetValue(name, out ix))
+                throw new NieczaException("Attribute {0} not defined in {1} or any superclass");
+            if (type_slot[ix] == type)
+                return ix;
+
+            for (ix = 0; ix < all_slot.Length; ix++) {
+                if (all_slot[ix] == name && type_slot[ix] == type)
+                    return ix;
+            }
+
+            throw new NieczaException("Attribute {0} in {1} is defined in {2} but not {3}", name, this.name, type_slot[slotMap[name]].name, type.name);
         }
 
         public LexerCache GetLexerCache() {
@@ -1175,7 +1197,7 @@ next_method: ;
 
             for (int i = 0; i < to.nslots; i++) {
                 int old;
-                if (mo.slotMap.TryGetValue(to.all_slot[i], out old))
+                if ((old = mo.TryFindSlot(to.type_slot[i], to.all_slot[i])) >= 0)
                     slots[i] = old_slots[old];
             }
 
