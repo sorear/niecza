@@ -6,8 +6,6 @@ sub mnode($M) is export {
         { file => $*FILE<name>, line => $M.lineof($M.pos), pos => $M.pos }
 }
 
-sub node($M) is export { { line => $M.CURSOR.lineof($M.pos) } }
-
 sub mklet($value, $body) is export {
     my $var = ::GLOBAL::NieczaActions.gensym;
     ::Op::Let.new(var => $var, to => $value,
@@ -17,21 +15,21 @@ sub mklet($value, $body) is export {
 sub mkcall($/, $name, *@positionals) is export {
     $/.CURSOR.mark_used($name);
     $*CURLEX<!sub>.noninlinable if $name eq '&eval'; # HACK
-    ::Op::CallSub.new(|node($/),
-        invocant => ::Op::Lexical.new(|node($/), :$name), :@positionals);
+    ::Op::CallSub.new(pos=>$/,
+        invocant => ::Op::Lexical.new(pos=>$/, :$name), :@positionals);
 }
 
 sub mklex($/, $name, *%_) is export {
     $/.CURSOR.mark_used($name);
     $*CURLEX<!sub>.noninlinable if $name eq '&eval'; # HACK
-    ::Op::Lexical.new(|node($/), :$name, |%_);
+    ::Op::Lexical.new(pos=>$/, :$name, |%_);
 }
 
 sub mkbool($i) is export { ::Op::Lexical.new(name => $i ?? 'True' !! 'False') }
 
 sub mktemptopic($/, $item, $expr) is export {
     mklet(mklex($/, '$_'), -> $old_ {
-        ::Op::StatementList.new(|node($/), children => [
+        ::Op::StatementList.new(pos=>$/, children => [
             ::Op::LexicalBind.new(:name<$_>, rhs => $item),
             mklet($expr, -> $result {
                 ::Op::StatementList.new(children => [
@@ -42,20 +40,20 @@ sub mktemptopic($/, $item, $expr) is export {
 sub mkstringycat($/, *@strings) is export {
     my @a;
     for @strings -> $s {
-        my $i = ($s !~~ ::GLOBAL::Op) ?? ::Op::StringLiteral.new(|node($/),
+        my $i = ($s !~~ ::GLOBAL::Op) ?? ::Op::StringLiteral.new(pos=>$/,
             text => $s) !! $s;
 
         # this *might* belong in an optimization pass
         if @a && @a[*-1] ~~ ::Op::StringLiteral &&
                 $i ~~ ::Op::StringLiteral {
-            @a[*-1] = ::Op::StringLiteral.new(|node($/),
+            @a[*-1] = ::Op::StringLiteral.new(pos=>$/,
                 text => (@a[*-1].text ~ $i.text));
         } else {
             push @a, $i;
         }
     }
     if @a == 0 {
-        return ::Op::StringLiteral.new(|node($/), text => "");
+        return ::Op::StringLiteral.new(pos=>$/, text => "");
     } elsif  @a == 1 {
         return (@a[0] ~~ ::Op::StringLiteral) ?? @a[0] !!
             mkcall($/, '&prefix:<~>', @a[0]);

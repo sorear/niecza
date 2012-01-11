@@ -66,7 +66,7 @@ method do_variable_reference($M, $v) {
         if $pclass && !$pclass.trusts($*CURLEX<!sub>.cur_pkg) {
             $M.CURSOR.sorry("Cannot call private method '$v<name>' on $pclass.name() because it does not trust $*CURLEX<!sub>.cur_pkg.name()");
         }
-        ::Op::GetSlot.new(|node($M), object => mklex($M, 'self'),
+        ::Op::GetSlot.new(pos=>$M, object => mklex($M, 'self'),
             type => $pclass, name => $v<sigil> ~ '!' ~ $v<name>);
     }
     elsif $tw eq '.' {
@@ -75,7 +75,7 @@ method do_variable_reference($M, $v) {
             return ::Op::StatementList.new;
         }
 
-        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(pos=>$M,
             name => $v<name>, receiver => mklex($M, 'self')));
     }
     # no twigil in lex name for these
@@ -83,27 +83,27 @@ method do_variable_reference($M, $v) {
         mklex($M, $v<sigil> ~ $v<name>, :$hash, :$list);
     }
     elsif $tw eq '*' {
-        ::Op::ContextVar.new(|node($M), name => $sl);
+        ::Op::ContextVar.new(pos=>$M, name => $sl);
     }
     elsif $tw eq '' || $tw eq '?' {
         if defined($v<pkg>) {
             self.package_var($M, self.gensym, $sl, $v<pkg>);
         } elsif $tw eq '?' && $sl eq '$?POSITION' {
             mkcall($M, '&infix:<..^>',
-                ::Op::Num.new(|node($M), value => [10, ~$M.from]),
-                ::Op::Num.new(|node($M), value => [10, ~$M.to]));
+                ::Op::Num.new(pos=>$M, value => [10, ~$M.from]),
+                ::Op::Num.new(pos=>$M, value => [10, ~$M.to]));
         } elsif $tw eq '?' && $sl eq '$?LINE' {
-            ::Op::Num.new(|node($M), value => [10, ~$M.cursor.lineof($M.from)]);
+            ::Op::Num.new(pos=>$M, value => [10, ~$M.cursor.lineof($M.from)]);
         } elsif $tw eq '?' && $sl eq '$?FILE' {
-            ::Op::StringLiteral.new(|node($M), text => $*FILE<name>);
+            ::Op::StringLiteral.new(pos=>$M, text => $*FILE<name>);
         } elsif $tw eq '?' && $sl eq '$?ORIG' {
-            ::Op::StringLiteral.new(|node($M), text => $M.orig);
+            ::Op::StringLiteral.new(pos=>$M, text => $M.orig);
         } elsif $tw eq '?' && $sl eq '&?BLOCK' {
             $*CURLEX<!sub>.noninlinable;
-            ::Op::GetBlock.new(|node($M))
+            ::Op::GetBlock.new(pos=>$M)
         } elsif $tw eq '?' && $sl eq '&?ROUTINE' {
             $*CURLEX<!sub>.noninlinable;
-            ::Op::GetBlock.new(|node($M), :routine)
+            ::Op::GetBlock.new(pos=>$M, :routine)
         } else {
             mklex($M, $sl, :$hash, :$list);
         }
@@ -121,7 +121,7 @@ augment class Operator::Method {
                 $/.CURSOR.sorry("Interrogative operator $.name does not take arguments");
                 return ::Op::StatementList.new;
             }
-            ::Op::Interrogative.new(|node($/), receiver => @args[0],
+            ::Op::Interrogative.new(pos=>$/, receiver => @args[0],
                 name => $.name);
         } else {
             $*CURLEX<!sub>.noninlinable if $!name eq 'eval';
@@ -140,7 +140,7 @@ augment class Operator::Method {
             } else {
                 $pclass = $.package;
             }
-            ::Op::CallMethod.new(|node($/),
+            ::Op::CallMethod.new(pos=>$/,
                 receiver => @args[0],
                 ismeta   => $.meta,
                 name     => $.name,

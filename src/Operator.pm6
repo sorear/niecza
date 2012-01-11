@@ -53,7 +53,7 @@ class Function is Operator {
     }
 
     method with_args($/, *@args) {
-        ::Op::CallSub.new(|node($/), invocant => $.function,
+        ::Op::CallSub.new(pos=>$/, invocant => $.function,
             positionals => [ @$.preargs, @args, @$.args ])
     }
 
@@ -74,7 +74,7 @@ class PostCall is Operator {
     has $.args = [];
 
     method with_args($/, *@args) {
-        ::Op::CallSub.new(|node($/),
+        ::Op::CallSub.new(pos=>$/,
             invocant => @args[0],
             args => [ @$.args ]);
     }
@@ -104,7 +104,7 @@ class Method is Operator {
                 $/.CURSOR.sorry("Interrogative operator $.name does not take arguments");
                 return ::Op::StatementList.new;
             }
-            ::Op::Interrogative.new(|node($/), receiver => @args[0],
+            ::Op::Interrogative.new(pos=>$/, receiver => @args[0],
                 name => $.name);
         } else {
             $*CURLEX<!sub>.noninlinable if $!name eq 'eval';
@@ -120,7 +120,7 @@ class Method is Operator {
             } else {
                 $pclass = $.package;
             }
-            ::Op::CallMethod.new(|node($/),
+            ::Op::CallMethod.new(pos=>$/,
                 receiver => @args[0],
                 ismeta   => $.meta,
                 name     => $.name,
@@ -141,7 +141,7 @@ class Operator::FlipFlop is Operator {
         my $state_var = ::GLOBAL::NieczaActions.gensym;
         $*CURLEX<!sub>.add_state_name(Str, $state_var);
         @args[1] := mklex($/, 'False') if @args[1].^isa(::Op::Whatever);
-        ::Op::FlipFlop.new(|node($/), :$state_var, :$!excl_lhs, :$!excl_rhs,
+        ::Op::FlipFlop.new(pos=>$/, :$state_var, :$!excl_lhs, :$!excl_rhs,
             :$!sedlike, :lhs(@args[0]), :rhs(@args[1]))
     }
 
@@ -152,7 +152,7 @@ class ShortCircuit is Operator {
     has $.kind; # Str
 
     method with_args($/, *@args) {
-        ::Op::ShortCircuit.new(|node($/), kind => $.kind, args => [ @args ])
+        ::Op::ShortCircuit.new(pos=>$/, kind => $.kind, args => [ @args ])
     }
 
     method whatever_curry() { True }
@@ -164,7 +164,7 @@ class CompoundAssign is Operator {
     method with_args($/, *@rest) {
         my $left = shift @rest;
         if $left.^isa(::Op::Lexical) {
-            my $nlft = ::Op::Lexical.new(|node($/), name => $left.name);
+            my $nlft = ::Op::Lexical.new(pos=>$/, name => $left.name);
             mkcall($/, '&infix:<=>', $left, $.base.with_args($/, $nlft, @rest));
         } else {
             mklet($left, -> $ll {
@@ -208,7 +208,7 @@ class Comma is Operator {
         for @args -> $a {
             push @bits, $a.^isa(::Op::SimpleParcel) ?? @( $a.items ) !! $a;
         }
-        ::Op::SimpleParcel.new(|node($/), items => @bits);
+        ::Op::SimpleParcel.new(pos=>$/, items => @bits);
     }
     method as_function($/) { mklex($/, '&infix:<,>') }
 }
@@ -216,7 +216,7 @@ class Comma is Operator {
 class Ternary is Operator {
     has $.middle; # Op
     method with_args($/, *@args) {
-        ::Op::Conditional.new(|node($/), check => @args[0], true => $.middle,
+        ::Op::Conditional.new(pos=>$/, check => @args[0], true => $.middle,
             false => @args[1]);
     }
 }
@@ -226,7 +226,7 @@ class Temp is Operator {
         my $rarg = @args[0];
         if !$rarg.^isa(::Op::ContextVar) || $rarg.uplevel {
             $*CURLEX<!sub>.noninlinable;
-            return ::Op::Temporize.new(|node($/), mode => 0, var => $rarg);
+            return ::Op::Temporize.new(pos=>$/, mode => 0, var => $rarg);
         }
         my $hash = substr($rarg.name,0,1) eq '%';
         my $list = substr($rarg.name,0,1) eq '@';
@@ -240,7 +240,7 @@ class Temp is Operator {
 class Operator::Let is Operator {
     method with_args($/, *@args) {
         $*CURLEX<!sub>.noninlinable;
-        return ::Op::Temporize.new(|node($/), mode => 1, var => @args[0]);
+        return ::Op::Temporize.new(pos=>$/, mode => 1, var => @args[0]);
     }
 }
 
@@ -275,7 +275,7 @@ class Operator::Mixin is Operator::Function {
         if @args[1] ~~ ::Op::CallSub {
             nextsame if @args[1].invocant ~~ ::Op::Lexical && @args[1].invocant.name eq '&_param_role_inst';
             $/.CURSOR.sorry("Can only provide exactly one initial value to a mixin") unless @args[1].getargs.elems == 1;
-            ::Op::CallSub.new(|node($/), invocant => $.function,
+            ::Op::CallSub.new(pos=>$/, invocant => $.function,
                 args => [@args[0], @args[1].invocant, ::Op::SimplePair.new(
                     key => 'value', value => @args[1].getargs[0] // mklex($/,'Nil'))]);
         } else {

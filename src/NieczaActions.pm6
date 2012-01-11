@@ -203,7 +203,7 @@ method charspec($/) {
 
 # Value :: Op
 method value($ ) { }
-method value:number ($/){ make ::Op::Num.new(|node($/), value => $<number>.ast)}
+method value:number ($/){ make ::Op::Num.new(pos=>$/, value => $<number>.ast)}
 method value:quote ($/) { make $<quote>.ast }
 
 method ident($ ) { }
@@ -440,7 +440,7 @@ method op_for_regex($/, $rxop) {
     my @lift = $rxop.oplift;
     my $ltm = ::GLOBAL::OptRxSimple.run_lad($rxop.lad);
     my ($orxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
-    my $sub = self.thunk_sub(::Op::RegexBody.new(|node($/),
+    my $sub = self.thunk_sub(::Op::RegexBody.new(pos=>$/,
             canback => $mb, pre => @lift, rxop => $orxop),
         class => 'Regex', params => ['self'], :$ltm);
     $sub.add_my_name('$/');
@@ -453,7 +453,7 @@ method quote:rx ($/) {
     make self.op_for_regex($/, $<quibble>.ast);
 }
 method quote:m  ($/) {
-    make ::Op::CallMethod.new(|node($/), name => 'match',
+    make ::Op::CallMethod.new(pos=>$/, name => 'match',
             receiver => mklex($/, '$_'),
             args => [
                 self.op_for_regex($/, $<quibble>.ast),
@@ -467,8 +467,8 @@ method encapsulate_regex($/, $rxop, :$passcut = False) {
     my $subop = self.thunk_sub(
         ::Op::RegexBody.new(canback => $mb, pre => @lift, :$passcut,
             rxop => $nrxop), ltm => $lad, class => 'Regex', params => ['self']);
-    $subop = ::Op::CallSub.new(|node($/), invocant => self.block_expr($/, $subop),
-        positionals => [ ::Op::MakeCursor.new(|node($/)) ]);
+    $subop = ::Op::CallSub.new(pos=>$/, invocant => self.block_expr($/, $subop),
+        positionals => [ ::Op::MakeCursor.new(pos=>$/) ]);
     ::RxOp::Subrule.new(regex => $subop, ltm => $lad);
 }
 
@@ -530,10 +530,10 @@ method regex_def($/) {
     if $<regex_block><onlystar> {
         $*CURLEX<!sub>.finish_dispatcher('regex');
     } else {
-        $*CURLEX<!sub>.finish(::Op::RegexBody.new(|node($/), pre => @lift,
+        $*CURLEX<!sub>.finish(::Op::RegexBody.new(pos=>$/, pre => @lift,
             name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb));
     }
-    make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
+    make ::Op::Lexical.new(pos=>$/, name => $*CURLEX<!sub>.outervar);
 }
 
 method regex_declarator:regex ($/) { make $<regex_def>.ast }
@@ -676,7 +676,7 @@ method metachar:sym<{ }> ($/) {
     });
 
     make ::RxOp::VoidBlock.new(block => self.inliney_call($/,
-        $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
+        $<embeddedblock>.ast, ::Op::MakeCursor.new(pos=>$/)));
 }
 
 method metachar:mod ($/) {
@@ -698,10 +698,10 @@ method metachar:sym<( )> ($/) {
 }
 
 method metachar:sym« <( » ($/) {
-    make ::RxOp::Endpoint.new(|node($/), :type<from>)
+    make ::RxOp::Endpoint.new(pos=>$/, :type<from>)
 }
 method metachar:sym« )> » ($/) {
-    make ::RxOp::Endpoint.new(|node($/), :type<to>)
+    make ::RxOp::Endpoint.new(pos=>$/, :type<to>)
 }
 method metachar:sym« << » ($/) { make ::RxOp::ZeroWidth.new(type => '<<') }
 method metachar:sym« >> » ($/) { make ::RxOp::ZeroWidth.new(type => '>>') }
@@ -1008,15 +1008,15 @@ method assertion:variable ($/) {
     given substr($/,0,1) {
         when '&' {
             if $<variable>.ast ~~ ::Op::CallSub {
-                make ::RxOp::Subrule.new(|node($/), regex =>
-                    ::Op::CallSub.new(|node($/),
+                make ::RxOp::Subrule.new(pos=>$/, regex =>
+                    ::Op::CallSub.new(pos=>$/,
                         invocant => $<variable>.ast.invocant,
-                        args => [ ::Op::MakeCursor.new(|node($/)),
+                        args => [ ::Op::MakeCursor.new(pos=>$/),
                             @( $<variable>.ast.args ) ]));
             } else {
-                make ::RxOp::Subrule.new(|node($/), regex =>
-                    ::Op::CallSub.new(|node($/), invocant => $<variable>.ast,
-                        positionals => [ ::Op::MakeCursor.new(|node($/)) ]));
+                make ::RxOp::Subrule.new(pos=>$/, regex =>
+                    ::Op::CallSub.new(pos=>$/, invocant => $<variable>.ast,
+                        positionals => [ ::Op::MakeCursor.new(pos=>$/) ]));
             }
         }
         when '$' {
@@ -1036,9 +1036,9 @@ method assertion:variable ($/) {
 
 method assertion:method ($/) {
     if $<dottyop> {
-        make ::RxOp::Subrule.new(|node($/), regex =>
+        make ::RxOp::Subrule.new(pos=>$/, regex =>
             self.rxembed($/, $<dottyop>.ast.with_args($/,
-                    ::Op::MakeCursor.new(|node($/))), True));
+                    ::Op::MakeCursor.new(pos=>$/)), True));
     } else {
         make self.decapturize($/);
     }
@@ -1071,7 +1071,7 @@ method assertion:sym<{ }> ($/) {
     });
 
     make ::RxOp::ListPrim.new(type => 'scalar_asn', ops => self.inliney_call($/,
-        $<embeddedblock>.ast, ::Op::MakeCursor.new(|node($/))));
+        $<embeddedblock>.ast, ::Op::MakeCursor.new(pos=>$/)));
 }
 
 method assertion:sym<:> ($/) { make self.cc_to_rxop($<cclass_expr>.ast) }
@@ -1230,19 +1230,19 @@ method process_nibble($/, @bits, $prefix?) {
     elsif $post eq 'words' || $post eq 'quotewords' {
         my $sl = $/.ast;
         if !$sl.^isa(::Op::StringLiteral) {
-            make ::Op::CallMethod.new(|node($/), :name<words>, receiver => $sl);
+            make ::Op::CallMethod.new(pos=>$/, :name<words>, receiver => $sl);
         }
         else {
             my @tok = $sl.text.words;
-            @tok = map { ::Op::StringLiteral.new(|node($/), text => $_) }, @tok;
+            @tok = map { ::Op::StringLiteral.new(pos=>$/, text => $_) }, @tok;
 
-            make ((@tok == 1) ?? @tok[0] !! ::Op::Paren.new(|node($/),
-                inside => ::Op::SimpleParcel.new(|node($/), items => @tok)));
+            make ((@tok == 1) ?? @tok[0] !! ::Op::Paren.new(pos=>$/,
+                inside => ::Op::SimpleParcel.new(pos=>$/, items => @tok)));
         }
     }
     elsif $post eq 'path' {
         # TODO could stand to be a lot fancier.
-        make ::Op::CallMethod.new(|node($/), receiver => $/.ast, :name<IO>);
+        make ::Op::CallMethod.new(pos=>$/, receiver => $/.ast, :name<IO>);
     }
     elsif $post eq 'run' {
         make mkcall($/, '&rungather', $/.ast);
@@ -1304,7 +1304,7 @@ method nibbler($/, $prefix?) {
             make ::Op::StatementList.new;
             return Nil;
         }
-        make ::Op::CgOp.new(|node($/), optree => $<cgexp>.ast);
+        make ::Op::CgOp.new(pos=>$/, optree => $<cgexp>.ast);
     } elsif iscclass($/.CURSOR) {
         make self.process_tribble($<nibbles>);
     } else {
@@ -1316,15 +1316,15 @@ method split_circumfix ($/) {
     my $sl = $<nibble>.ast;
 
     if !$sl.^isa(::Op::StringLiteral) {
-        make ::Op::CallMethod.new(|node($/), name => "words", receiver => $sl);
+        make ::Op::CallMethod.new(pos=>$/, name => "words", receiver => $sl);
         return Nil;
     }
 
     my @tok = $sl.text.words;
-    @tok = map { ::Op::StringLiteral.new(|node($/), text => $_) }, @tok;
+    @tok = map { ::Op::StringLiteral.new(pos=>$/, text => $_) }, @tok;
 
     make ((@tok == 1) ?? @tok[0] !!
-        ::Op::SimpleParcel.new(|node($/), items => @tok));
+        ::Op::SimpleParcel.new(pos=>$/, items => @tok));
 }
 method circumfix:sym«< >» ($/)   { make $<nibble>.ast }
 method circumfix:sym«<< >>» ($/) { make $<nibble>.ast }
@@ -1338,17 +1338,17 @@ method circumfix:sym<( )> ($/) {
         make @kids[0];
     } elsif !@kids {
         # an empty StatementList returns Nil, but () needs to be defined...
-        make ::Op::Paren.new(|node($/), inside =>
+        make ::Op::Paren.new(pos=>$/, inside =>
             ::Op::SimpleParcel.new(items => []));
     } else {
-        make ::Op::StatementList.new(|node($/), children => @kids);
+        make ::Op::StatementList.new(pos=>$/, children => @kids);
     }
 }
 
 method circumfix:sym<[ ]> ($/) {
     my @kids = @( $<semilist>.ast );
     make mkcall($/, '&_array_constructor',
-        ::Op::StatementList.new(|node($/), children => @kids));
+        ::Op::StatementList.new(pos=>$/, children => @kids));
 }
 
 # XXX This fails to catch {; ... } because it runs after empty statement
@@ -1383,7 +1383,7 @@ method check_hash($/) {
 method circumfix:sym<{ }> ($/) {
     my $var = self.gensym;
     $*CURLEX<!sub>.add_my_sub($var, $<pblock>.ast);
-    make ::Op::BareBlock.new(|node($/), :$var);
+    make ::Op::BareBlock.new(pos=>$/, :$var);
 
     if self.check_hash($/) {
         make mkcall($/, '&_hash_constructor',
@@ -1395,7 +1395,7 @@ method circumfix:sigil ($/) {
     # XXX duplicates logic in variable
     if $<semilist>.ast.elems == 0 {
         if $<sigil> eq '$' {
-            make ::Op::ShortCircuit.new(|node($/), kind => '//',
+            make ::Op::ShortCircuit.new(pos=>$/, kind => '//',
                 args => [ ::Op::CallMethod.new(name => 'ast',
                             receiver => mklex($/, '$/')),
                           ::Op::CallMethod.new(name => 'Str',
@@ -1497,7 +1497,7 @@ method prefix:let ($/) { make ::Operator::Let.new }
 
 method statement_control:TEMP ($/) {
     $*CURLEX<!sub>.noninlinable;
-    make ::Op::Temporize.new(|node($/), mode => 2,
+    make ::Op::Temporize.new(pos=>$/, mode => 2,
         var => self.inliney_call($/, $<block>.ast));
 }
 
@@ -1514,7 +1514,7 @@ method INFIX($/) {
             my $cv = self.gensym;
             $*CURLEX<!sub>.add_state_name(Str, $cv);
             make mklet($lhs, -> $ll {
-                Op::StatementList.new(|node($/), children => [
+                Op::StatementList.new(pos=>$/, children => [
                     Op::Start.new(condvar => $cv, body =>
                         $fn.with_args($/, $ll, $rhs)),
                     $ll]) });
@@ -1558,7 +1558,7 @@ method CHAIN($/) {
         if @ops {
             mklet($fa, -> $lhs { mklet(@vargs[0], -> $rhs {
                 @vargs[0] = $rhs;
-                ::Op::ShortCircuit.new(|node($/), kind => '&&', args =>
+                ::Op::ShortCircuit.new(pos=>$/, kind => '&&', args =>
                     [ $fo.with_args($/, $lhs, $rhs), reduce($/) ]) }) })
         } else {
             $fo.with_args($/, $fa, @vargs[0])
@@ -1808,7 +1808,7 @@ method whatever_postcheck($/, $st, $term) {
 
         $*CURLEX<!sub>.add_my_sub($slot, $body);
 
-        ::Op::WhateverCode.new(ops => Any, vars => $st, :$slot, |node($/));
+        ::Op::WhateverCode.new(ops => Any, vars => $st, :$slot, pos=>$/);
     } else {
         $term;
     }
@@ -1825,7 +1825,7 @@ method package_var($/, $slot, $name, $path) {
         $*CURLEX<!sub>.add_common_name($slot, $ref, $name, |mnode($/));
         $/.CURSOR.mark_used($slot);
     });
-    ::Op::Lexical.new(|node($/), name => $slot);
+    ::Op::Lexical.new(pos=>$/, name => $slot);
 }
 
 method term:name ($/) {
@@ -1837,13 +1837,13 @@ method term:name ($/) {
     }
 
     if $name<iname> {
-        make ::Op::IndirectVar.new(|node($/), name => $name<iname>);
+        make ::Op::IndirectVar.new(pos=>$/, name => $name<iname>);
     }
     elsif $name<pkg> {
         make self.package_var($/, self.gensym, $name<name>, $name<pkg>);
     }
     elsif self.is_pseudo_pkg($name<name>) {
-        make ::Op::IndirectVar.new(|node($/),
+        make ::Op::IndirectVar.new(pos=>$/,
             name => ::Op::StringLiteral.new(text => $name<name>));
     }
     else {
@@ -1863,7 +1863,7 @@ method term:name ($/) {
             return;
         }
 
-        make ::Op::CallSub.new(|node($/), invocant => $/.ast,
+        make ::Op::CallSub.new(pos=>$/, invocant => $/.ast,
             args => $sal[0] // []);
     }
 
@@ -1889,7 +1889,7 @@ method term:identifier ($/) {
     }
 
     if self.is_pseudo_pkg($id) {
-        make Op::IndirectVar.new(|node($/),
+        make Op::IndirectVar.new(pos=>$/,
             name => Op::StringLiteral.new(text => $id));
         self.check_type_args($/);
         return;
@@ -1906,7 +1906,7 @@ method term:identifier ($/) {
 
     make mklex($/, $is_name ?? $id !! '&' ~ $id);
     self.check_type_args($/);
-    make ::Op::CallSub.new(|node($/), invocant => $/.ast, :$args);
+    make ::Op::CallSub.new(pos=>$/, invocant => $/.ast, :$args);
 }
 
 method term:sym<self> ($/) { make mklex($/, 'self') }
@@ -1925,11 +1925,11 @@ method term:statement_prefix ($/) { make $<statement_prefix>.ast }
 method term:variable ($/) {
     make self.do_variable_reference($/, $<variable>.ast);
 }
-method term:sym<...> ($/) { make ::Op::Yada.new(|node($/), kind => '...') }
-method term:sym<???> ($/) { make ::Op::Yada.new(|node($/), kind => '???') }
-method term:sym<!!!> ($/) { make ::Op::Yada.new(|node($/), kind => '!!!') }
+method term:sym<...> ($/) { make ::Op::Yada.new(pos=>$/, kind => '...') }
+method term:sym<???> ($/) { make ::Op::Yada.new(pos=>$/, kind => '???') }
+method term:sym<!!!> ($/) { make ::Op::Yada.new(pos=>$/, kind => '!!!') }
 method term:sym<*> ($/) {
-    make ::Op::Whatever.new(|node($/), slot => self.gensym)
+    make ::Op::Whatever.new(pos=>$/, slot => self.gensym)
 }
 method term:lambda ($/) {
     make self.block_expr($/, $<pblock>.ast);
@@ -1948,7 +1948,7 @@ method term:fatarrow ($/) { make $<fatarrow>.ast }
 
 method term:reduce ($/) {
     my $assoc = $<op><O><assoc>;
-    make Op::CallSub.new(|node($/),
+    make Op::CallSub.new(pos=>$/,
         invocant => mklex($/, '&reduceop'),
         args => [
             mkbool($<triangle> ne ''), mkbool($assoc eq 'list'),
@@ -1981,7 +1981,7 @@ method do_variable_reference($M, $v) {
         } else {
             $M.CURSOR.sorry("Cannot resolve class for private method");
         }
-        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(pos=>$M,
             name => $v<name>, private => True, receiver => mklex($M, 'self'),
             :$pclass));
     }
@@ -1991,7 +1991,7 @@ method do_variable_reference($M, $v) {
             return ::Op::StatementList.new;
         }
 
-        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
+        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(pos=>$M,
             name => $v<name>, receiver => mklex($M, 'self')));
     }
     # no twigil in lex name for these
@@ -1999,27 +1999,27 @@ method do_variable_reference($M, $v) {
         mklex($M, $v<sigil> ~ $v<name>, :$hash, :$list);
     }
     elsif $tw eq '*' {
-        ::Op::ContextVar.new(|node($M), name => $sl);
+        ::Op::ContextVar.new(pos=>$M, name => $sl);
     }
     elsif $tw eq '' || $tw eq '?' {
         if defined($v<pkg>) {
             self.package_var($M, self.gensym, $sl, $v<pkg>);
         } elsif $tw eq '?' && $sl eq '$?POSITION' {
             mkcall($M, '&infix:<..^>',
-                ::Op::Num.new(|node($M), value => [10, ~$M.from]),
-                ::Op::Num.new(|node($M), value => [10, ~$M.to]));
+                ::Op::Num.new(pos=>$M, value => [10, ~$M.from]),
+                ::Op::Num.new(pos=>$M, value => [10, ~$M.to]));
         } elsif $tw eq '?' && $sl eq '$?LINE' {
-            ::Op::Num.new(|node($M), value => [10, ~$M.cursor.lineof($M.from)]);
+            ::Op::Num.new(pos=>$M, value => [10, ~$M.cursor.lineof($M.from)]);
         } elsif $tw eq '?' && $sl eq '$?FILE' {
-            ::Op::StringLiteral.new(|node($M), text => $*FILE<name>);
+            ::Op::StringLiteral.new(pos=>$M, text => $*FILE<name>);
         } elsif $tw eq '?' && $sl eq '$?ORIG' {
-            ::Op::StringLiteral.new(|node($M), text => $M.orig);
+            ::Op::StringLiteral.new(pos=>$M, text => $M.orig);
         } elsif $tw eq '?' && $sl eq '&?BLOCK' {
             $*CURLEX<!sub>.noninlinable;
-            ::Op::GetBlock.new(|node($M))
+            ::Op::GetBlock.new(pos=>$M)
         } elsif $tw eq '?' && $sl eq '&?ROUTINE' {
             $*CURLEX<!sub>.noninlinable;
-            ::Op::GetBlock.new(|node($M), :routine)
+            ::Op::GetBlock.new(pos=>$M, :routine)
         } else {
             mklex($M, $sl, :$hash, :$list);
         }
@@ -2037,7 +2037,7 @@ method docontext($M, $sigil, $term) {
                  ($sigil eq '@') ?? 'list' !!
                                    'hash';
 
-    ::Op::Builtin.new(|node($M), name => $method, args => [$term]);
+    ::Op::Builtin.new(pos=>$M, name => $method, args => [$term]);
 }
 
 method docontextif($/, $sigil, $op) {
@@ -2056,7 +2056,7 @@ method variable($/) {
         make { term => self.docontext($/, $sigil, $dsosl<ind>) };
         return;
     } elsif defined($dsosl<iname>) {
-        make { term => ::Op::IndirectVar.new(|node($/),
+        make { term => ::Op::IndirectVar.new(pos=>$/,
             name => mkstringycat($/, $sigil ~ $twigil, $dsosl<iname>)) };
         return;
     } elsif defined $dsosl {
@@ -2087,7 +2087,7 @@ method variable($/) {
             if $<postcircumfix>[0].ast.args[0] -> $arg {
                 make { term => self.docontext($/, $sigil, $arg) };
             } elsif $sigil eq '$' {
-                make { term => ::Op::ShortCircuit.new(|node($/), kind => '//',
+                make { term => ::Op::ShortCircuit.new(pos=>$/, kind => '//',
                     args => [ ::Op::CallMethod.new(name => 'ast',
                                 receiver => mklex($/, '$/')),
                               ::Op::CallMethod.new(name => 'Str',
@@ -2397,7 +2397,7 @@ method sibble($/) {
         $repl = $<right>.ast;
     }
     $repl = self.block_expr($/, self.thunk_sub($repl));
-    make ::Op::CallMethod.new(|node($/), receiver => mklex($/, '$_'),
+    make ::Op::CallMethod.new(pos=>$/, receiver => mklex($/, '$_'),
         name => 'subst',
         args => [ $regex, $repl, self.extract_rx_adverbs(True, True, $/),
             ::Op::SimplePair.new(key => 'inplace', value => mklex($/,'True'))]);
@@ -2415,7 +2415,7 @@ method quotepair_term($/) {
     } else {
         $v = mklex($/, $<v> ?? "True" !! "False");
     }
-    ::Op::SimplePair.new(|node($/), key => $<k>, value => $v);
+    ::Op::SimplePair.new(pos=>$/, key => $<k>, value => $v);
 }
 
 method extract_rx_adverbs($ismatch, $issubst, $match) {
@@ -2465,9 +2465,9 @@ method capterm($/) {
             @args = $x;
         }
     } elsif $<termish> {
-        @args = ::Op::Paren.new(|node($/), inside => $<termish>.ast);
+        @args = ::Op::Paren.new(pos=>$/, inside => $<termish>.ast);
     }
-    make ::Op::CallSub.new(|node($/), invocant => mklex($/, '&_make_capture'),
+    make ::Op::CallSub.new(pos=>$/, invocant => mklex($/, '&_make_capture'),
         args => @args);
 }
 
@@ -2490,7 +2490,7 @@ method blockoid($/) {
                 for $l.lex_names;
         }
 
-        make ::Op::YouAreHere.new(|node($/), unitname => $*UNITNAME);
+        make ::Op::YouAreHere.new(pos=>$/, unitname => $*UNITNAME);
     } else {
         make $<statementlist>.ast;
     }
@@ -2564,17 +2564,17 @@ method declarator($/) {
             if $*SCOPE eq 'state' {
                 $sub.add_state_name($slot, self.gensym, :$list, :$hash,
                     typeconstraint => $type, |mnode($/));
-                $param = Op::Lexical.new(name => $slot, |node($/));
+                $param = Op::Lexical.new(name => $slot, pos=>$/);
             } elsif $*SCOPE eq 'our' {
                 $param = self.package_var($/, $slot, $slot, ['OUR']);
             } else {
                 $sub.add_my_name($slot, :$list, :$hash,
                     typeconstraint => $type, |mnode($/));
-                $param = Op::Lexical.new(name => $slot, |node($/));
+                $param = Op::Lexical.new(name => $slot, pos=>$/);
             }
         }
-        make Op::SimpleParcel.new(|node($/), items => @p);
-        make Op::StateDecl.new(|node($/), inside => $/.ast)
+        make Op::SimpleParcel.new(pos=>$/, items => @p);
+        make Op::StateDecl.new(pos=>$/, inside => $/.ast)
             if $*SCOPE eq 'state';
         return;
     }
@@ -2713,8 +2713,8 @@ method variable_declarator($/) {
             $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
                 :$hash, :$typeconstraint, |mnode($/));
         });
-        make Op::StateDecl.new(|node($/), inside =>
-            Op::Lexical.new(|node($/), name => $slot, :$list, :$hash));
+        make Op::StateDecl.new(pos=>$/, inside =>
+            Op::Lexical.new(pos=>$/, name => $slot, :$list, :$hash));
     } elsif $scope eq 'our' {
         make self.package_var($/, $slot, $slot, ['OUR']);
     } else {
@@ -2723,14 +2723,14 @@ method variable_declarator($/) {
             $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
                 :$typeconstraint, |mnode($/));
         });
-        make ::Op::Lexical.new(|node($/), name => $slot, :$list, :$hash);
+        make ::Op::Lexical.new(pos=>$/, name => $slot, :$list, :$hash);
     }
 
     if $start {
         my $cv = self.gensym;
         $*CURLEX<!sub>.add_state_name(Str, $cv);
         make mklet($/.ast, -> $ll {
-            Op::StatementList.new(|node($/), children => [
+            Op::StatementList.new(pos=>$/, children => [
                 Op::Start.new(condvar => $cv, body =>
                     self.inliney_call($/, $start, $ll)), $ll ]) });
     }
@@ -2807,7 +2807,7 @@ method make_constant($/, $scope, $name) {
         }
     });
 
-    ::Op::ConstantDecl.new(|node($/), name => $slot, init => False);
+    ::Op::ConstantDecl.new(pos=>$/, name => $slot, init => False);
 }
 
 method make_constant_into($/, $pkg, $name, $rhs) {
@@ -2815,7 +2815,7 @@ method make_constant_into($/, $pkg, $name, $rhs) {
     $/.CURSOR.trymop({
         $*CURLEX<!sub>.add_common_name($slot, $pkg, $name, |mnode($/));
     });
-    self.init_constant(::Op::ConstantDecl.new(|node($/), name => $slot,
+    self.init_constant(::Op::ConstantDecl.new(pos=>$/, name => $slot,
         init => False), $rhs);
 }
 
@@ -2920,7 +2920,7 @@ method type_declarator:enum ($/) {
     } else {
         make self.init_constant(
             self.make_constant($/, $<name> ?? $scope !! 'anon', ~$<name>),
-            ::Op::CallMethod.new(|node($/), name => 'new',
+            ::Op::CallMethod.new(pos=>$/, name => 'new',
                 receiver => mklex($/, 'EnumMap'),
                 args => [$<term>.ast])),
     }
@@ -2945,7 +2945,7 @@ method package_declarator:require ($/) {
         make ::Op::StatementList.new;
         return Nil;
     }
-    make ::Op::Require.new(|node($/), unit => ~$<module_name>);
+    make ::Op::Require.new(pos=>$/, unit => ~$<module_name>);
 }
 
 method process_block_traits($/, @tr) {
@@ -3113,7 +3113,7 @@ method args($/) {
 
 method statement($/) {
     if $<label> {
-        make ::Op::Labelled.new(|node($/), name => $<label>.ast,
+        make ::Op::Labelled.new(pos=>$/, name => $<label>.ast,
             stmt => $<statement>.ast);
         return;
     }
@@ -3125,13 +3125,13 @@ method statement($/) {
         my ($sym, $exp) = @( $<statement_mod_cond>.ast );
 
         if $sym eq 'if' {
-            make ::Op::Conditional.new(|node($/), check => $exp,
+            make ::Op::Conditional.new(pos=>$/, check => $exp,
                 true => $/.ast, false => Any);
         } elsif $sym eq 'unless' {
-            make ::Op::Conditional.new(|node($/), check => $exp,
+            make ::Op::Conditional.new(pos=>$/, check => $exp,
                 false => $/.ast, true => Any);
         } elsif $sym eq 'when' {
-            make ::Op::Conditional.new(|node($/),
+            make ::Op::Conditional.new(pos=>$/,
                 check => ::Op::CallMethod.new(name => 'ACCEPTS',
                     receiver => $exp, positionals => [ mklex($/, '$_') ]),
                 true => $/.ast, false => Any);
@@ -3146,17 +3146,17 @@ method statement($/) {
         my ($sym, $exp) = @( $<statement_mod_loop>.ast );
 
         if $sym eq 'while' {
-            make ::Op::WhileLoop.new(|node($/), check => $exp,
+            make ::Op::WhileLoop.new(pos=>$/, check => $exp,
                 body => $/.ast, until => False, once => False);
         } elsif $sym eq 'until' {
-            make ::Op::WhileLoop.new(|node($/), check => $exp,
+            make ::Op::WhileLoop.new(pos=>$/, check => $exp,
                 body => $/.ast, until => True, once => False);
         } elsif $sym eq 'given' {
             make mktemptopic($/, $exp, $/.ast);
         } elsif $sym eq 'for' {
             # XXX laziness, comprehensions
             my $var = self.gensym;
-            make ::Op::ImmedForLoop.new(|node($/), :$var, source => $exp,
+            make ::Op::ImmedForLoop.new(pos=>$/, :$var, source => $exp,
                 sink => mktemptopic($/, ::Op::LetVar.new(name => $var), $/.ast));
         } else {
             $/.CURSOR.sorry("Unhandled statement modifier $sym");
@@ -3178,7 +3178,7 @@ method statement_mod_loop:for ($/)    { self.statement_mod_loop($/) }
 method statement_mod_loop:given ($/)  { self.statement_mod_loop($/) }
 
 method statementlist($/) {
-    make ::Op::StatementList.new(|node($/), children =>
+    make ::Op::StatementList.new(pos=>$/, children =>
         [ map *.statement_level, map *.ast, @( $<statement> ) ]);
 }
 
@@ -3207,7 +3207,7 @@ method if_block($/, $cond, $pb) {
 method if_branches($/, *@branches) {
     my $branch = shift @branches;
     mklet($branch.ast[0], -> $cond {
-        ::Op::Conditional.new(|node($/), check => $cond,
+        ::Op::Conditional.new(pos=>$/, check => $cond,
             true  => self.if_block($/, $cond, $branch<pblock>),
             false => @branches ?? self.if_branches($/, @branches) !!
                 $<else> ?? self.if_block($/, $cond, $<else>) !!
@@ -3221,20 +3221,20 @@ method statement_control:if ($/) {
 
 method statement_control:unless ($/) {
     make mklet($<xblock>.ast[0], -> $cond {
-        ::Op::Conditional.new(|node($/), check => $cond,
+        ::Op::Conditional.new(pos=>$/, check => $cond,
             false => self.if_block($/, $cond, $<xblock><pblock>)) });
 }
 
 # Hack - Op::WhileLoop binds the condition to "!cond"
 method statement_control:while ($/) {
-    make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
+    make ::Op::WhileLoop.new(pos=>$/, check => $<xblock>.ast[0],
         body => self.if_block($/, ::Op::LetVar.new(name => '!cond'),
             $<xblock><pblock>), :!until, :!once,
             :need_cond(defined $<xblock><pblock><lambda>));
 }
 
 method statement_control:until ($/) {
-    make ::Op::WhileLoop.new(|node($/), check => $<xblock>.ast[0],
+    make ::Op::WhileLoop.new(pos=>$/, check => $<xblock>.ast[0],
         body => self.if_block($/, ::Op::LetVar.new(name => '!cond'),
             $<xblock><pblock>), :until, :!once,
             :need_cond(defined $<xblock><pblock><lambda>));
@@ -3245,7 +3245,7 @@ method statement_control:repeat ($/) {
     my $check = $<xblock> ?? $<xblock>.ast[0] !! $<EXPR>.ast;
     my $pb = $<xblock> ?? $<xblock><pblock> !! $<pblock>;
     my $body  = self.if_block($/, ::Op::LetVar.new(name => '!cond'), $pb);
-    make ::Op::WhileLoop.new(|node($/), :$check, :$until, :$body, :once,
+    make ::Op::WhileLoop.new(pos=>$/, :$check, :$until, :$body, :once,
             :need_cond(defined $pb<lambda>));
 }
 
@@ -3256,11 +3256,11 @@ method statement_control:loop ($/) {
     my $cond = $0 && $0<e2> ?? $0<e2>.ast !! Any;
     my $step = $0 && $0<e3> ?? $0<e3>.ast !! Any;
 
-    make ::Op::GeneralLoop.new(|node($/), :$body, :$init, :$cond, :$step);
+    make ::Op::GeneralLoop.new(pos=>$/, :$body, :$init, :$cond, :$step);
 }
 
 method statement_control:for ($/) {
-    make ::Op::ForLoop.new(|node($/), source => $<xblock>.ast[0],
+    make ::Op::ForLoop.new(pos=>$/, source => $<xblock>.ast[0],
         sink => self.block_expr($/, $<xblock>.ast[1]).name);
 }
 
@@ -3269,12 +3269,12 @@ method statement_control:given ($/) {
 }
 
 method statement_control:default ($/) {
-    make ::Op::When.new(|node($/), match => mklex($/, 'True'),
+    make ::Op::When.new(pos=>$/, match => mklex($/, 'True'),
         body => self.inliney_call($/, $<block>.ast));
 }
 
 method statement_control:when ($/) {
-    make ::Op::When.new(|node($/), match => $<xblock>.ast[0],
+    make ::Op::When.new(pos=>$/, match => $<xblock>.ast[0],
         body => self.inliney_call($/, $<xblock>.ast[1]));
 }
 
@@ -3459,7 +3459,7 @@ method package_def ($/) {
         $sub.create_static_pad;
         $ph.set_phaser($*backend.phaser('INIT'));
 
-        make ::Op::CallSub.new(|node($/), invocant => mklex($/, $bodyvar));
+        make ::Op::CallSub.new(pos=>$/, invocant => mklex($/, $bodyvar));
     }
     else {
         if $<stub> {
@@ -3473,14 +3473,14 @@ method package_def ($/) {
             if $obj.kind eq 'prole' {
                 # return the frame object so that role instantiation can
                 # find the cloned methods
-                $ast = ::Op::StatementList.new(|node($/), children => [
+                $ast = ::Op::StatementList.new(pos=>$/, children => [
                     $ast, mkcall($/, '&callframe') ]);
                 $sub.create_static_pad;
                 $obj.set_instantiation_block($sub);
 
                 make mklex($/, $*CURLEX<!sub>.outervar);
             } else {
-                make ::Op::StatementList.new(|node($/), children => [
+                make ::Op::StatementList.new(pos=>$/, children => [
                     ::Op::CallSub.new(invocant => mklex($/, $bodyvar)),
                     ::Op::Lexical.new(name => $*CURLEX<!sub>.outervar) ]);
             }
@@ -3786,7 +3786,7 @@ method finish_method_routine ($/) {
     } else {
         $*CURLEX<!sub>.finish($<blockoid>.ast);
     }
-    make ::Op::Lexical.new(|node($/), name => $*CURLEX<!sub>.outervar);
+    make ::Op::Lexical.new(pos=>$/, name => $*CURLEX<!sub>.outervar);
 }
 method routine_def ($/) { self.finish_method_routine($/) }
 method method_def ($/)  { self.finish_method_routine($/) }
@@ -3815,21 +3815,21 @@ method blast($/) {
 }
 
 method statement_prefix:do ($/) {
-    make Op::DoOnceLoop.new(|node($/),
+    make Op::DoOnceLoop.new(pos=>$/,
         body => self.inliney_call($/, $<blast>.ast));
 }
 method statement_prefix:gather ($/) {
-    make ::Op::Gather.new(|node($/),
+    make ::Op::Gather.new(pos=>$/,
         var => self.block_expr($/, $<blast>.ast).name);
 }
 method statement_prefix:try ($/) {
-    make ::Op::Try.new(|node($/), body => self.inliney_call($/, $<blast>.ast));
+    make ::Op::Try.new(pos=>$/, body => self.inliney_call($/, $<blast>.ast));
 }
 
 method statement_prefix:START ($/) {
     my $cv = self.gensym;
     $*CURLEX<!sub>.add_state_name(Str, $cv);
-    make ::Op::Start.new(|node($/), condvar => $cv, body =>
+    make ::Op::Start.new(pos=>$/, condvar => $cv, body =>
         self.inliney_call($/, $<blast>.ast));
 }
 

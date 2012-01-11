@@ -2,8 +2,7 @@ class Op;
 
 use CgOp;
 
-# XXX Use raw-er StrPos stuff, and track more details
-has $.line; # Int
+has Match $.pos;
 
 method zyg() { }
 # This should be a conservative approximation of nonvoid context for
@@ -12,8 +11,8 @@ method zyg() { }
 method ctxzyg($) { map { $_, 1 }, self.zyg }
 
 method cgop($body) {
-    if (defined $.line) {
-        CgOp.ann("", $.line, self.code($body));
+    if $!pos -> $p {
+        CgOp.ann($p.CURSOR.lineof($p.pos), self.code($body));
     } else {
         self.code($body);
     }
@@ -26,8 +25,8 @@ method to_bind($/, $ro, $rhs) { #OK not used
 
 # ick
 method cgop_labelled($body, $label) {
-    if (defined $.line) {
-        CgOp.ann("", $.line, self.code_labelled($body, $label));
+    if $!pos -> $p {
+        CgOp.ann($p.CURSOR.lineof($p.pos), self.code_labelled($body, $label));
     } else {
         self.code_labelled($body, $label);
     }

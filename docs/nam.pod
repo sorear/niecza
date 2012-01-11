@@ -169,7 +169,7 @@ some internal code fragments, usually in response to _hack settings.
 
 =head2 Annotations
 
-=head3 ann($unused,$line_number,$operation)
+=head3 ann($line_number,$operation)
 
 Sets the C<$line_number> for the C<$operation>.  In the C# backend, line
 number is only recorded at high-level call sites within the span.

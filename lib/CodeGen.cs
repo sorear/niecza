@@ -2434,7 +2434,7 @@ namespace Niecza.CLRBackend {
             handlers["bool"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.BoolLiteral(FixBool(zyg[1])); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
-                return CpsOp.Annotate(FixInt(zyg[2]), th.Scan(zyg[3])); };
+                return CpsOp.Annotate(FixInt(zyg[1]), th.Scan(zyg[2])); };
             handlers["label"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.Label(FixStr(z[1]), true);
             };
