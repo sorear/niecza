@@ -298,6 +298,7 @@ S06-advanced/lexical-subs.t
 S06-advanced/recurse.t
 S06-advanced/return.t
 S06-currying/assuming-and-mmd.t
+S06-currying/mixed.t
 S06-currying/named.t
 S06-multi/by-trait.t
 S06-multi/lexical-multis.t
