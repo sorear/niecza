@@ -204,11 +204,16 @@ class CallMethod is CallLike {
 
 class GetSlot is Op {
     has $.object = die "GetSlot.object required"; # Op
-    has $.name = die "GetSlot.name required"; # Str
+    has Str $.name = die "GetSlot.name required";
+    has $.type = die "GetSlot.type required";
     method zyg() { $.object }
 
     method code($body) {
-        CgOp.varattr($.name, CgOp.fetch($.object.cgop($body)));
+        my $kl = CgOp.class_ref('mo', $!type);
+        if $!type.kind eq 'prole' {
+            $kl = CgOp.obj_llhow(CgOp.fetch(CgOp.scopedlex('$?CLASS')));
+        }
+        CgOp.getslot($kl, $.name, 'var', CgOp.fetch($.object.cgop($body)));
     }
 }
 

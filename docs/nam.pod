@@ -858,7 +858,7 @@ Returns the raw C<stab> for a class, by CORE:: name or xref node fields.
 
 Implements Mu.new.
 
-=head3 getslot($name,$type,$object)
+=head3 getslot($scope,$name,$type,$object)
 
 Fetches a named slot from an object.  C<$type> must be used consistantly.
 
@@ -898,7 +898,7 @@ Implements the but operator for type objects.
 
 Mutates a boxed value in place.  Use carefully!
 
-=head3 setslot($name, obj $obj, ::T $value)
+=head3 setslot($scope, $name, obj $obj, ::T $value)
 
 Binds a slot, possibly to a native value.
 

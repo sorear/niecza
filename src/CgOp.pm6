@@ -81,8 +81,6 @@ method newblankhash() { CgOp.newhash }
 method string_var($x) { CgOp.box('Str', CgOp.str($x)) }
 method noop() { CgOp.prog() }
 method rnull($p) { CgOp.prog($p, CgOp.corelex('Nil')) }
-method getattr($a,$v) { CgOp.fetch(CgOp.varattr($a,$v)) }
-method varattr($a,$v) { CgOp.getslot($a, 'var', $v) }
 
 my $nextlet = 0;
 method let($head,$body) {

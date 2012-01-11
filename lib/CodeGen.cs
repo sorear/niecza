@@ -342,9 +342,9 @@ namespace Niecza.CLRBackend {
         public static readonly MethodInfo P6any_Invoke =
             P6any.GetMethod("Invoke");
         public static readonly MethodInfo P6any_SetSlot =
-            P6any.GetMethod("SetSlot", new Type[] { String, typeof(object) });
+            P6any.GetMethod("SetSlot", new Type[] { STable, String, typeof(object) });
         public static readonly MethodInfo P6any_GetSlot =
-            P6any.GetMethod("GetSlot", new Type[] { String });
+            P6any.GetMethod("GetSlot", new Type[] { STable, String });
         public static readonly MethodInfo SubInfo_AddHint =
             SubInfo.GetMethod("AddHint");
         public static readonly MethodInfo Variable_Fetch =
@@ -2241,6 +2241,12 @@ namespace Niecza.CLRBackend {
             }
         }
 
+        STable ResolvePkg(string name) {
+            int dummy;
+            LexInfo li = ResolveLex(name, false, out dummy, true);
+            return ((LIPackage)li).pkg;
+        }
+
         // synchronize with LIDispatch.MakeDispatch
         internal CpsOp MakeDispatch(string prefix) {
             HashSet<string> names = new HashSet<string>();
@@ -2544,12 +2550,16 @@ namespace Niecza.CLRBackend {
                     return CpsOp.PolyOp(FixStr(zyg[1]),
                             th.Scan(zyg[2]), th.Scan(zyg[3])); };
             handlers["setslot"] = delegate(NamProcessor th, object[] zyg) {
+                CpsOp scope = (zyg[1] is object[]) ? th.Scan(zyg[1]) :
+                    th.cpb.eu.TypeConstant(th.ResolvePkg(JScalar.S(zyg[1])));
                 return CpsOp.MethodCall(Tokens.P6any_SetSlot,
-                    th.Scan(zyg[2]), th.AnyStr(zyg[1]), th.Scan(zyg[3])); };
+                    th.Scan(zyg[3]), scope, th.AnyStr(zyg[2]), th.Scan(zyg[4])); };
             handlers["getslot"] = delegate(NamProcessor th, object[] zyg) {
-                Type ty = namtype(zyg[2]);
+                Type ty = namtype(zyg[3]);
+                CpsOp scope = (zyg[1] is object[]) ? th.Scan(zyg[1]) :
+                    th.cpb.eu.TypeConstant(th.ResolvePkg(JScalar.S(zyg[1])));
                 return CpsOp.UnboxAny(ty, CpsOp.MethodCall(Tokens.P6any_GetSlot,
-                    th.Scan(zyg[3]), th.AnyStr(zyg[1]))); };
+                    th.Scan(zyg[4]), scope, th.AnyStr(zyg[2]))); };
             handlers["cast"] = delegate(NamProcessor th, object[] zyg) {
                 Type tty = namtype(zyg[1]);
                 CpsOp z = th.Scan(zyg[2]);
@@ -2678,10 +2688,7 @@ dynamic:
                 if (z[2] is STable) {
                     m = (STable)z[2];
                 } else {
-                    int dummy;
-                    LexInfo li = th.ResolveLex(JScalar.S(z[2]),
-                            false, out dummy, true);
-                    m = ((LIPackage)li).pkg;
+                    m = th.ResolvePkg(JScalar.S(z[2]));
                 }
                 if (kind == "mo")
                     return th.cpb.eu.TypeConstant(m);

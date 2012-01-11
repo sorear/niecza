@@ -2617,7 +2617,7 @@ method add_attribute($/, $name, $sigil, $accessor, $type) {
     $nb.set_transparent;
     $nb.add_my_name('self', noinit => True);
     $nb.set_signature(Sig.simple('self'));
-    $nb.finish(::Op::GetSlot.new(name => $name,
+    $nb.finish(::Op::GetSlot.new(name => $name, type => $ns,
         object => ::Op::Lexical.new(name => 'self')));
     $*CURLEX<!sub>.create_static_pad; # for protosub instance
     my $at;
