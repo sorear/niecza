@@ -3256,6 +3256,7 @@ grammar P6 is STD {
         {} <infixish('hyper')> [ '«' | '»' || <.panic: "Missing « or »"> ]
         <.can_meta($<infixish>, "hyper with")>
         $<O> = {$<infixish><O>}
+        $<sym> = {$<infixish><sym>}
     }
 
     token infix_circumfix_meta_operator:sym«<< >>» {
@@ -4454,7 +4455,7 @@ method EXPR ($preclvl?) {
                 self.deb("reducing") if $*DEBUG +& DEBUG::EXPR;
                 self.deb("Termstack size: ", +@termstack) if $*DEBUG +& DEBUG::EXPR;
 
-                self.deb($op.dump) if $*DEBUG +& DEBUG::EXPR;
+                self.deb($op.perl) if $*DEBUG +& DEBUG::EXPR;
                 my $arg = pop @termstack;
                 if $arg.from < $op.from { # postfix
                     push @termstack, Match.synthetic(
@@ -4542,14 +4543,14 @@ method EXPR ($preclvl?) {
             last TERM unless $infix;
             
             if not $infix<sym> {
-                die $infix.dump if $*DEBUG +& DEBUG::EXPR;
+                die $infix.perl if $*DEBUG +& DEBUG::EXPR;
             }
 
             my $inO = $infix<O>;
             my $inprec = $inO<prec>;
             if not defined $inprec {
                 self.deb("No prec given in infix!") if $*DEBUG +& DEBUG::EXPR;
-                die $infix.dump if $*DEBUG +& DEBUG::EXPR;
+                die $infix.perl if $*DEBUG +& DEBUG::EXPR;
                 $inprec = %terminator<prec>;   # XXX lexical scope is wrong
             }
 

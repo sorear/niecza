@@ -235,9 +235,6 @@ method parse(:$unitname, :$filename, :$source, :$outer, :$run, :$main, :$evalmod
     my $*IN_SUPPOSE = 0;
     my $*FATALS = 0;
 
-    $DEBUG::EXPR = $STD::DEBUG::EXPR = $STD::DEBUG::symtab =
-        $*verbose > 1;
-
     my $*LAST_NIBBLE = 0;
     my $*LAST_NIBBLE_START = 0;
     my $*LAST_NIBBLE_MULTILINE = 0;

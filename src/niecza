@@ -17,6 +17,8 @@ use RxOp;
 use Sig;
 use STD;
 
+$GLOBAL::DEBUG_STD = (%*ENV<NIECZA_STD_DEBUG> ?? -1 !! 0);
+
 # augment class RxOp {
 # method oplift() {
 #     say "oplift: {self.typename}";
