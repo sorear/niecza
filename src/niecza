@@ -64,9 +64,8 @@ method do_variable_reference($M, $v) {
         if $pclass && !$pclass.trusts($*CURLEX<!sub>.cur_pkg) {
             $M.CURSOR.sorry("Cannot call private method '$v<name>' on $pclass.name() because it does not trust $*CURLEX<!sub>.cur_pkg.name()");
         }
-        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(|node($M),
-            name => $v<name>, private => True, receiver => mklex($M, 'self'),
-            :$pclass));
+        ::Op::GetSlot.new(|node($M), object => mklex($M, 'self'),
+            type => $pclass, name => $v<sigil> ~ '!' ~ $v<name>);
     }
     elsif $tw eq '.' {
         if defined $v<pkg> {

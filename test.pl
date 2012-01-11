@@ -464,6 +464,7 @@ EOC
     my $d = 0;
     my $e = 0;
 
+    augment class Any { trusts GLOBAL }
     (Any!Any::butWHENCE({ $a = 1 }));
     my $x := (Any!Any::butWHENCE({ $b = 1 }));  #OK not used
     my $y ::= (Any!Any::butWHENCE({ $c = 1 })); #OK not used
