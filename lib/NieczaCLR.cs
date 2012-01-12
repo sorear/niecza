@@ -237,7 +237,7 @@ namespace Niecza {
 
         void IFreeze.Freeze(FreezeBuffer fb) {
             // anyone who holds a ref to one of these needs to recreate it.
-            fb.Byte((byte) SerializationCode.Null);
+            fb.Ephemeralize();
         }
     }
 

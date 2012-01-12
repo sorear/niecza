@@ -88,6 +88,12 @@ namespace Niecza.Serialization {
             return false;
         }
 
+        // Undo previous method...
+        public void DeleteLastObject(SerUnit into) {
+            byref.Remove(into.bynum[--into.nobj]);
+            into.bynum[into.nobj] = null;
+        }
+
         public void RegisterThawed(SerUnit into, object o) {
             ObjRef or;
             if (into.nobj == into.bynum.Length)
@@ -383,6 +389,11 @@ namespace Niecza.Serialization {
                 foreach (T y in x)
                     ObjRef(y);
             }
+        }
+
+        public void Ephemeralize() {
+            Byte((byte)SerializationCode.Null);
+            reg.DeleteLastObject(unit);
         }
 
         // This is the main routine you should call from your Freeze
