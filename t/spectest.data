@@ -364,6 +364,7 @@ S12-class/self-inheritance.t
 S12-class/stubs.t
 S12-class/type-object.t
 S12-construction/autopairs.t
+S12-construction/construction.t
 S12-construction/named-params-in-BUILD.t
 S12-enums/anonymous.t
 S12-enums/basic.t
