@@ -4438,6 +4438,9 @@ dynamic:
                 return new object[] { "" };
             }
         }
+        public static object add_alias(object[] args) {
+            return AddLexical(args, new LIAlias((string)args[6]));
+        }
         public static object add_my_stash(object[] args) {
             STable  type  = (STable)Handle.Unbox(args[6]);
 

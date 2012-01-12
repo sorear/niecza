@@ -206,6 +206,10 @@ class StaticSub {
             ($list ?? 8 !! 0) + ($hash ?? 16 !! 0),
             $backing));
     }
+    method add_alias($name, $to, :$file, :$line, :$pos) {
+        self._addlex_result(downcall("add_alias", self, ~$name,
+            ~($file//''), +($line//0), +($pos// -1), $to));
+    }
     method add_my_stash($name, $pkg, :$file, :$line, :$pos) {
         self._addlex_result(downcall("add_my_stash", self, ~$name,
             ~($file//''), +($line//0), +($pos// -1), $pkg));
