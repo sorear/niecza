@@ -139,6 +139,10 @@ sub push(@array, *@stuff) is Niecza::builtin('push', 1) { @array.push(@stuff) }
 sub unshift(@array, *@stuff) is Niecza::builtin('unshift', 1) { @array.unshift(@stuff) }
 sub pop(@array) is Niecza::builtin('pop', 1, 1) { @array.pop }
 sub shift(@array) is Niecza::builtin('shift', 1, 1) { @array.shift }
+multi sub splice(@array is rw) { @array.splice() }
+multi sub splice(@array is rw, *@values) { @array.splice(@values) }
+multi sub splice(@array is rw, $offset, *@values) { @array.splice($offset,Inf,@values); }
+multi sub splice(@array is rw, $offset, $size, *@values) { @array.splice($offset, $size, @values); }
 
 sub grep(Mu $filter, *@items) is Niecza::builtin('grep',1) { grep($filter, @items) }
 sub map($callback, *@items) is Niecza::builtin('map',1) { map($callback, @items) }
@@ -1456,6 +1460,40 @@ my class List is Cool does Positional {
     method rotate($n = 1) {
         my $k = $n % self.elems;
         self[$k .. self.elems-1, 0 .. $k-1];
+    }
+
+    method splice( @array is rw: $offset = 0, $size = Inf, *@values ) {
+        my $begin = $offset.^does(Code) ?? $offset.(@array.elems) !! $offset;
+        my $max;
+
+        if $size.^does(Code) {
+            $max = $size.(@array.elems);
+        } elsif $size < 0 {
+           die '$size must be non-negative.';
+        } else {
+            $max = $begin + $size;
+        }
+
+        if $max > @array.elems {
+            $max = @array.elems;
+        }
+
+        if ($begin < 0) {
+           die '$offset must be non-negative.';
+        }
+
+        if ($max < 0) {
+           die '$size must be non-negative.';
+        }
+
+        my @retval = @array.delete($begin..^$max);
+
+        my @temp = @array[0..^$begin]; 
+        @temp.push(@values);
+        @temp.push(@array[$max..^@array.elems]);
+        @array = @temp;
+
+        return @retval;
     }
 }
 
