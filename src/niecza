@@ -84,6 +84,8 @@ method do_variable_reference($M, $v) {
         my $pclass;
         if $v<pkg> {
             $pclass = $v<pkg>;
+        } elsif $*CURLEX<!sub>.lookup_lex($sl) {
+            return mklex($M, $sl);
         } elsif $*CURLEX<!sub>.in_class -> $c {
             $pclass = $c;
         } else {
@@ -93,7 +95,7 @@ method do_variable_reference($M, $v) {
             $M.CURSOR.sorry("Cannot call private method '$v<name>' on $pclass.name() because it does not trust $*CURLEX<!sub>.cur_pkg.name()");
         }
         ::Op::GetSlot.new(pos=>$M, object => mklex($M, 'self'),
-            type => $pclass, name => $v<sigil> ~ '!' ~ $v<name>);
+            type => $pclass, name => $sl);
     }
     elsif $tw eq '.' {
         if defined $v<pkg> {
@@ -137,6 +139,157 @@ method do_variable_reference($M, $v) {
     else {
         $M.CURSOR.sorry("Unhandled reference twigil $tw");
     }
+}
+
+method variable_declarator($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+
+    my $scope = $*SCOPE // 'my';
+
+    my $start;
+    for @$<trait> -> $t {
+        if $t.ast<rw> {
+        } elsif $t.ast<dynamic> {
+        } elsif $t.ast<start> && $*SCOPE eq 'state' {
+            $start = $t.ast<start>;
+        } else {
+            $/.CURSOR.sorry("Trait $t.ast.keys.[0] not available on variables");
+        }
+    }
+    if $<post_constraint> || $<postcircumfix> || $<semilist> {
+        $/.CURSOR.sorry("Postconstraints, and shapes on variable declarators NYI");
+    }
+
+    if $scope eq 'augment' || $scope eq 'supersede' {
+        $/.CURSOR.sorry("Illogical scope $scope for simple variable");
+    }
+
+    my $typeconstraint;
+    if $*OFTYPE {
+        my $of = $*OFTYPE.ast;
+        $*OFTYPE.CURSOR.sorry("Only simple types may be attached to variables")
+            if !$of<type> || $of<tmode> || $of<as>;
+        $typeconstraint = $of<type> // self.get_Any;
+        $/.CURSOR.sorry("Common variables are not unique definitions and may not have types") if $scope eq 'our';
+    }
+
+    my $v = $<variable>.ast;
+    my $t = $v<twigil>;
+    my $list = $v<sigil> && $v<sigil> eq '@';
+    my $hash = $v<sigil> && $v<sigil> eq '%';
+    if ($t && defined "?=~^:".index($t)) {
+        $/.CURSOR.sorry("Variables with the $t twigil cannot be declared " ~
+            "using $scope; they are created " ~
+            ($t eq '?' ?? "using 'constant'." !!
+             $t eq '=' ?? "by parsing POD blocks." !!
+             $t eq '~' ?? "by 'slang' definitions." !!
+             "automatically as parameters to the current block."));
+    }
+
+    if ($scope ne any <has our my>) && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid with scopes has, our, or my.");
+        $scope = 'has';
+    }
+
+    if !defined($v<name>) && ($scope ne any < my anon state >) {
+        $/.CURSOR.sorry("Scope $scope requires a name");
+        $v<name> = "anon";
+    }
+
+    if defined($v<pkg>) || defined($v<iname>) {
+        $/.CURSOR.sorry(":: syntax is only valid when referencing variables, not when defining them.");
+    }
+
+    my $name = defined($v<name>) ?? $v<sigil> ~ $v<twigil> ~ $v<name> !! "";
+    # otherwise identical to my
+    my $slot = ($scope eq 'anon' || !defined($v<name>))
+        ?? self.gensym !! $name;
+
+    if ($scope eq any <our my>) && $t eq any < . ! > {
+        $slot = $name = $v<sigil> ~ '!' ~ $v<name>;
+        self.add_accessor($/, $v<name>, $slot, True, $t eq '.');
+    }
+
+    if $scope eq 'has' {
+        make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.',
+            $typeconstraint);
+    } elsif $scope eq 'state' {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_state_name($slot, self.gensym, :$list,
+                :$hash, :$typeconstraint, |mnode($/));
+        });
+        make Op::StateDecl.new(pos=>$/, inside =>
+            Op::Lexical.new(pos=>$/, name => $slot, :$list, :$hash));
+    } elsif $scope eq 'our' {
+        make self.package_var($/, $slot, $slot, ['OUR']);
+    } else {
+        $/.CURSOR.trymop({
+            $/.CURSOR.check_categorical($slot);
+            $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash,
+                :$typeconstraint, |mnode($/));
+        });
+        make ::Op::Lexical.new(pos=>$/, name => $slot, :$list, :$hash);
+    }
+
+    if $start {
+        my $cv = self.gensym;
+        $*CURLEX<!sub>.add_state_name(Str, $cv);
+        make mklet($/.ast, -> $ll {
+            Op::StatementList.new(pos=>$/, children => [
+                Op::Start.new(condvar => $cv, body =>
+                    self.inliney_call($/, $start, $ll)), $ll ]) });
+    }
+}
+
+method add_accessor($/, $name, $store_name, $lexical, $public) {
+    my $ns = $*CURLEX<!sub>.body_of;
+    my $nb = $*unit.create_sub(
+        outer      => $*CURLEX<!sub>,
+        name       => $name,
+        cur_pkg    => $*CURLEX<!sub>.cur_pkg,
+        class      => 'Method');
+    $nb.set_transparent;
+    $nb.add_my_name('self', noinit => True);
+    $nb.set_signature(Sig.simple('self'));
+    $nb.finish($lexical ?? ::Op::Lexical.new(name => $store_name) !!
+        ::Op::GetSlot.new(name => $store_name, type => $ns,
+            object => ::Op::Lexical.new(name => 'self')));
+    $*CURLEX<!sub>.create_static_pad; # for protosub instance
+
+    $/.CURSOR.trymop({
+        my $ac = self.gensym;
+        $nb.set_outervar($ac);
+        $*CURLEX<!sub>.add_my_sub($ac, $nb, |mnode($/));
+        $ns.add_method($*backend.sub_visibility("private"), $name, $nb,
+            |mnode($/));
+        if $public {
+            $ns.add_method(0, $name, $nb, |mnode($/));
+        }
+    });
+}
+
+method add_attribute($/, $barename, $sigil, $accessor, $type) {
+    my $ns = $*CURLEX<!sub>.body_of;
+    my $name = $sigil ~ '!' ~ $barename;
+    $/.CURSOR.sorry("Attribute $name declared outside of any class"),
+        return ::Op::StatementList.new unless $ns;
+    $/.CURSOR.sorry("Attribute $name declared in an augment"),
+        return ::Op::StatementList.new if defined $*AUGMENT_BUFFER;
+
+    if !$ns.CAN('add_attribute') {
+        $/.CURSOR.sorry("A $ns.WHAT() cannot have attributes");
+        return ::Op::StatementList.new
+    }
+
+    self.add_accessor($/, $barename, $name, False, $accessor);
+    $/.CURSOR.trymop({
+        $ns.add_attribute($name, $sigil, +$accessor, $type, |mnode($/));
+    });
+
+    ::Op::Attribute.new(name => $name, initializer => $ns);
 }
 }
 
