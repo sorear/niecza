@@ -58,6 +58,28 @@ class Op::SetSlot is Op {
 }
 
 augment class NieczaActions {
+method whatever_postcheck($/, $st, $term) {
+    if @$st {
+        my $slot = self.gensym;
+
+        my $body = $*unit.create_sub(
+            outer => $*CURLEX<!sub>,
+            class => 'WhateverCode',
+            in_class => $*CURLEX<!sub>.in_class,
+            cur_pkg => $*CURLEX<!sub>.cur_pkg);
+
+        $body.add_my_name($_, :noinit) for @$st;
+        $body.set_signature(::GLOBAL::Sig.simple(@$st));
+        $body.set_transparent;
+        $body.finish($term);
+
+        $*CURLEX<!sub>.add_my_sub($slot, $body);
+
+        ::Op::WhateverCode.new(ops => Any, vars => $st, :$slot, pos=>$/);
+    } else {
+        $term;
+    }
+}
 method check_hash($/) {
     my $do = $<pblock><blockoid>.ast;
 
