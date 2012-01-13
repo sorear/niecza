@@ -77,10 +77,13 @@ sub downcall(*@args) {
 sub gethash($str) {
     Q:CgOp { (box Str (rawscall Niecza.Downcaller,CompilerBlob.DoHash (obj_getstr {$str}))) }
 }
+sub execname() {
+    Q:CgOp { (box Str (rawscall Niecza.Downcaller,CompilerBlob.ExecName)) }
+}
 
 method accept($unit, :$filename, :$run, :$evalmode, :$repl) {
     if $run {
-        downcall("setnames", $*PROGRAM_NAME // '???', $filename) unless $repl;
+        downcall("setnames", execname(), $filename) unless $repl;
         downcall("run_unit", $unit, ?$evalmode, @$!run_args);
         if $repl {
             $*repl_outer_frame = $unit.replrun;

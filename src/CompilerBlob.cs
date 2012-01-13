@@ -209,5 +209,9 @@ namespace Niecza {
             }
             return new string(buf);
         }
+
+        public static string ExecName() {
+            return Assembly.GetEntryAssembly().Location;
+        }
     }
 }
