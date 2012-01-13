@@ -64,7 +64,7 @@ namespace Niecza.Serialization {
         internal static HashAlgorithm NewHash() { return new SHA256Managed(); }
 
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 20;
+        static readonly int version = 21;
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,
@@ -248,6 +248,7 @@ namespace Niecza.Serialization {
         SimpleVariable_3,
         SubstrLValue,
         TiedVariable,
+        Blackhole,
 
         // vivification hooks
         SubViviHook,
@@ -747,6 +748,8 @@ namespace Niecza.Serialization {
                     return SubstrLValue.Thaw(this);
                 case SerializationCode.TiedVariable:
                     return TiedVariable.Thaw(this);
+                case SerializationCode.Blackhole:
+                    return Builtins.Blackhole.Thaw(this);
 
                 case SerializationCode.SubViviHook:
                     return SubViviHook.Thaw(this);

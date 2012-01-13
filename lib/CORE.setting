@@ -24,6 +24,7 @@ my class FatRat   { ... }
 my class Junction { ... }
 my class Enum     { ... }
 my class Range    { ... }
+my class Whatever { ... }
 # }}}
 # Important inlinable definitions {{{
 sub infix:<+>($l,$r) is pure is Niecza::builtin('plus',2,2) { $l + $r }
@@ -199,10 +200,6 @@ my class Mu {
     method new(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
     method clone(*%_) { Q:CgOp { (ns (repr_clone (@ {self}) (unbox varhash (@ {%_})))) } }
     method dispatch:<::>(|$) { Q:CgOp { (dispatch_fromtype) } }
-}
-
-my class Whatever {
-    method ACCEPTS(\$x) { defined(self) || $x.^isa(Whatever) }
 }
 
 my class Any is Mu {
@@ -1551,6 +1548,12 @@ my class Hash does Associative {
          self.pairs.map({ .fmt($format) }).join($sep)
     }
 }
+
+my class Whatever {
+    method ACCEPTS(\$x) { defined(self) || $x.^isa(Whatever) }
+}
+# XXX use an unshadowable name
+BEGIN my $__Whatever := Q:CgOp { (blackhole {Whatever.new}) };
 
 my class Enum is Cool {
     has $.key;

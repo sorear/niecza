@@ -27,6 +27,10 @@ $GLOBAL::DEBUG_STD = (%*ENV<NIECZA_STD_DEBUG> ?? -1 !! 0);
 # }
 # }
 
+augment class Op::Whatever {
+    method code($) { CgOp.corelex('$__Whatever') }
+}
+
 augment class Op::GetSlot {
     method to_bind($/, $ro, $rhs) {
         return ::Op::SetSlot.new(:$!object, :$!name, :$!type,

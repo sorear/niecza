@@ -2623,4 +2623,34 @@ again:
         int rty = o.Fetch().mo.mo.type;
         return (rty == P6how.ROLE || rty == P6how.CURRIED_ROLE || rty == P6how.PARAMETRIZED_ROLE) ? Kernel.TrueV : Kernel.FalseV;
     }
+
+    public class Blackhole : Variable {
+        P6any value;
+
+        private Blackhole() {}
+        public Blackhole(P6any value) { this.value = value; rw = true; }
+
+        public override P6any Fetch() { return value; }
+        public override void Store(P6any v) { }
+
+        public override Variable GetVar() {
+            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
+        }
+
+        public override void Freeze(Niecza.Serialization.FreezeBuffer fb) {
+            fb.Byte((byte)Niecza.Serialization.SerializationCode.Blackhole);
+            fb.ObjRef(value);
+        }
+        internal static object Thaw(Niecza.Serialization.ThawBuffer tb) {
+            var n = new Blackhole();
+            tb.Register(n);
+            n.value = (P6any) tb.ObjRef();
+            n.rw = true;
+            return n;
+        }
+    }
+
+    public static Variable blackhole(Variable o) {
+        return new Blackhole(o.Fetch());
+    }
 }
