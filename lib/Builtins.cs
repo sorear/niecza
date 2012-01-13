@@ -2273,9 +2273,9 @@ again:
     public static Variable sysquery(int ix) {
         switch (ix) {
             case 0: return BoxLoS(Kernel.commandArgs);
-            case 1: return Kernel.BoxAnyMO(programName ?? AppDomain.CurrentDomain.FriendlyName, Kernel.StrMO);
-            case 2: return Kernel.BoxAnyMO(execName, Kernel.StrMO);
-            case 3: return Kernel.BoxAnyMO(AppDomain.CurrentDomain.BaseDirectory, Kernel.StrMO);
+            case 1: return MakeStr(programName ?? AppDomain.CurrentDomain.FriendlyName);
+            case 2: return MakeStr(execName);
+            case 3: return MakeStr(AppDomain.CurrentDomain.BaseDirectory);
             case 4: {
                 VarHash ret = new VarHash();
                 foreach (System.Collections.DictionaryEntry de in Environment.GetEnvironmentVariables()) {
@@ -2283,6 +2283,8 @@ again:
                 }
                 return Kernel.BoxAnyMO(ret, Kernel.HashMO);
             }
+            case 5: return MakeStr(Environment.OSVersion.Platform.ToString());
+            case 6: return MakeStr(Environment.OSVersion.Version.ToString());
             default: return null;
         }
     }
