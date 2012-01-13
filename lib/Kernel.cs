@@ -3784,6 +3784,8 @@ tryagain:
 
     class IxHashBindKey : BindHandler {
         public override Variable Bind(Variable obj, Variable key, Variable to) {
+            if (key.islist)
+                throw new NieczaException("Cannot bind to a hash slice");
             P6any ks = key.Fetch();
             P6any os = obj.Fetch();
             if (!os.IsDefined())
@@ -3890,6 +3892,8 @@ tryagain:
 
     class IxListBindPos : BindHandler {
         public override Variable Bind(Variable obj, Variable key, Variable to) {
+            if (key.islist)
+                throw new NieczaException("Cannot bind to a list slice");
             P6any ks = key.Fetch();
             P6any os = obj.Fetch();
             if (!os.IsDefined())
