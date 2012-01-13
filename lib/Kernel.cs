@@ -3960,19 +3960,34 @@ tryagain:
             return true;
         }
 
+        // It seems more useful to me to have *.foo($CALLER::x) interpret
+        // CALLER as foo($CALLER::x) would; so, this always uses OUTER
+        // semantics.
+        // TODO: account for the possibility of transparent inline frames
+        void SkipTransparent() {
+            if (p2 != 0) return;
+            if (p1 == null) return;
+            while (p1 != null) {
+                Frame f = ((Frame) p1);
+                if ((f.info.special & SubInfo.TRANSPARENT) == 0)
+                    return;
+                p1 = f.outer;
+            }
+        }
+
         StashCursor ToCaller() {
             StashCursor r = this;
             Frame f = (Frame)p1;
             if (r.p2 > 0) r.p2--;
             else {
                 f = f.caller;
-                if (f != null && f.info == Kernel.ExitRunloopSI) f = f.caller;
                 if (f == null)
                     throw new NieczaException("No more calling frames");
                 r.p1 = f;
                 r.p2 = f.info.FindControlEnt(f.ip, SubInfo.ON_VARLOOKUP, null);
                 if (r.p2 < 0) r.p2 = 0;
             }
+            r.SkipTransparent();
             return r;
         }
 
@@ -3988,6 +4003,7 @@ tryagain:
                     throw new NieczaException("No more outer frames");
                 r.p2 = 0;
             }
+            r.SkipTransparent();
             return r;
         }
 
@@ -4127,6 +4143,7 @@ tryagain:
                         key == "SETTING" || key == "CALLER") {
                     StashCursor n = sc;
                     n.type = LEX;
+                    n.SkipTransparent();
                     n.Core(key, final, out sc, out v, bind_to);
                     return;
                 } else if (key == "CORE") {
@@ -4136,9 +4153,10 @@ tryagain:
                     goto have_sc;
                 } else if (key == "MY") {
                     sc.type = LEX;
+                    sc.SkipTransparent();
                     goto have_sc;
                 } else if (key == "COMPILING") {
-                    throw new NieczaException("Cannot use COMPILING outside BEGIN scope");
+                    throw new NieczaException("COMPILING NYI");
                 } else if (key == "DYNAMIC") {
                     sc.type = DYNA;
                     goto have_sc;
@@ -4525,6 +4543,7 @@ saveme:
                     SubInfo.AutoThreadSubC);
             dogather_SI   = new SubInfo("KERNEL dogather", dogather);
             ExitRunloopSI = new SubInfo("ExitRunloop", ExitRunloopC);
+            ExitRunloopSI.special = SubInfo.TRANSPARENT;
             IF_SI         = new SubInfo("iter_flatten", IF_C);
             JunctionFallbackSI = new SubInfo("Junction.FALLBACK",
                     JunctionFallbackC);
