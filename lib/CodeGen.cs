@@ -3764,6 +3764,9 @@ dynamic:
                 SubInfo.UNSAFE;
             return null;
         }
+        public static object sub_arity(object[] args) {
+            return Builtins.get_arity((SubInfo)Handle.Unbox(args[1]));
+        }
         public static object sub_is_inlinable(object[] args) {
             return ((SubInfo)Handle.Unbox(args[1])).IsInlinable();
         }

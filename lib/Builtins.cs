@@ -1868,12 +1868,9 @@ flat_enough:;
         return arity;
     }
 
-    public static Variable arity(P6any fcni) {
-        if (!fcni.Isa(Kernel.CodeMO))
-            return MakeInt(1); // can't introspect fake subs (?)
-        SubInfo si = (SubInfo) Kernel.GetInfo(fcni);
+    public static int get_arity(SubInfo si) {
         if (si.sig == null)
-            return MakeInt(1);
+            return 1;
         int arity = 0;
         foreach (Parameter p in si.sig.parms) {
             int fl = p.flags;
@@ -1885,7 +1882,13 @@ flat_enough:;
             if ((fl & Parameter.POSITIONAL) == 0) continue;
             arity++;
         }
-        return MakeInt(arity);
+        return arity;
+    }
+    public static Variable arity(P6any fcni) {
+        if (!fcni.Isa(Kernel.CodeMO))
+            return MakeInt(1); // can't introspect fake subs (?)
+        SubInfo si = (SubInfo) Kernel.GetInfo(fcni);
+        return MakeInt(get_arity(si));
     }
 
     class ItemSource {
