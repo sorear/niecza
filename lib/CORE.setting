@@ -2479,6 +2479,7 @@ our sub Niecza::series-listop(Parcel $lists, $exclude-limit) {
     @l
 }
 
+sub undefine(Mu \$x) { $x = Any }
 sub infix:<%%> is Niecza::absprec<u=> is pure ($x,$y) { $x % $y == 0 }
 sub infix:<?&> is Niecza::absprec<u=> is pure ($a, $b) { ?($a && $b) }
 sub infix:<?|> ($a, $b) is pure { ?($a || $b) }
