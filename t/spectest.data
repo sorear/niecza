@@ -263,6 +263,7 @@ S05-grammar/parse_and_parsefile.t
 S05-grammar/protoregex.t
 S05-grammar/signatures.t
 S05-interpolation/lexicals.t
+S05-interpolation/regex-in-variable.t
 S05-mass/named-chars.t
 S05-mass/properties-block.t
 S05-mass/properties-derived.t
