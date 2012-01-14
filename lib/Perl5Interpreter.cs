@@ -1,6 +1,7 @@
 using Niecza;
 using System.Runtime.InteropServices;
 using System;
+using Niecza.Serialization;
 
 public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_initialize")]
@@ -83,6 +84,9 @@ public class SVVariable : Variable {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
 
     }
+    public override void Freeze(FreezeBuffer fb) {
+            throw new NieczaException("Freezing perl5 SV* NYI.");
+    }
 }
 public class SVany : P6any {
         [DllImport("obj/p5embed.so", EntryPoint="p5method_call")]
@@ -91,6 +95,10 @@ public class SVany : P6any {
             IntPtr[] arguments,
             int argument_n
         );
+
+        public override void Freeze(FreezeBuffer fb) {
+                throw new NieczaException("Freezing perl5 SV* NYI.");
+        }
 
         public static IntPtr VariableToSV(Variable var) {
             P6any obj = var.Fetch();
@@ -149,6 +157,8 @@ public class SVany : P6any {
 
                 return caller;
         }
+
+        public override string ReprName() { return "P6opaque"; }
 
         public SVany(IntPtr _sv) {
             mo = Kernel.AnyMO;

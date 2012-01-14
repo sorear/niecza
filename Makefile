@@ -56,8 +56,8 @@ obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel)) lib/unidata
 	    /res:lib/unidata $(patsubst %,lib/%,$(cskernel))
 
 perl5: obj/Perl5Interpreter.dll obj/p5embed.so
-obj/Perl5Interpreter.dll: obj/Kernel.dll lib/Perl5Interpreter.cs
-	$(CSC) /target:library /lib:obj /out:obj/Perl5Interpreter.dll /r:Kernel.dll lib/Perl5Interpreter.cs
+obj/Perl5Interpreter.dll: obj/Run.Kernel.dll lib/Perl5Interpreter.cs
+	$(CSC) /target:library /lib:obj /out:obj/Perl5Interpreter.dll /r:Run.Kernel.dll lib/Perl5Interpreter.cs
 
 obj/p5embed.so: lib/p5embed.c
 	cc -shared -o obj/p5embed.so lib/p5embed.c `perl -MExtUtils::Embed -e ccopts -e ldopts`
