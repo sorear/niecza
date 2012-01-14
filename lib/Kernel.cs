@@ -1292,6 +1292,7 @@ namespace Niecza {
             P6any proto = null;
             string filter = name + ":";
             string pn = name + ":(!proto)";
+            //Console.WriteLine("MakeDispatch {0}", name);
 
             Frame f = into;
             for (SubInfo csr = into.info; ; csr = csr.outer) {
@@ -1299,17 +1300,18 @@ namespace Niecza {
                 foreach (KeyValuePair<string,LexInfo> kp in csr.dylex) {
                     if (Utils.StartsWithInvariant(filter, kp.Key) &&
                             kp.Key != pn &&
-                            kp.Value is LISub &&
                             !names.Contains(kp.Key)) {
                         names.Add(kp.Key);
                         brk = true;
-                        cands.Add(((LISub)kp.Value).def.protosub);
+                        //Console.WriteLine("cand {0}", kp.Key);
+                        cands.Add(((Variable)kp.Value.Get(f)).Fetch());
                     }
                 }
                 if (csr.outer == null) break;
                 // don't go above nearest proto
                 if (csr.dylex.ContainsKey(pn)) {
-                    proto = ((LISub)csr.dylex[pn]).def.protosub;
+                    //Console.WriteLine("proto {0}", pn);
+                    proto = ((Variable)csr.dylex[pn].Get(f)).Fetch();
                     break;
                 }
                 if (brk) cands.Add(null);
@@ -1777,6 +1779,7 @@ namespace Niecza {
 
                 int ix = name.LastIndexOf(':');
                 LexInfo disp;
+                //Console.WriteLine("AddLexical {0}", name);
                 if (ix >= 0 && dylex.TryGetValue(name.Substring(0, ix),
                             out disp) && disp is LIDispatch) {
                     ((LIDispatch)disp).MakeDispatch(protopad);
