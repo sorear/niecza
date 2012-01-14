@@ -295,7 +295,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
 
         if $bindlex && $multiness eq 'multi' {
             my $pname = $symbol;
-            $pname ~~ s/\: .*/:(!proto)/;
+            $pname ~~ s/\:\( .*/:(!proto)/;
             if $sub.outer.has_lexical($pname) {
                 my @oinfo = $sub.outer.lookup_lex($pname);
                 if @oinfo && @oinfo[0] eq 'sub' && @oinfo[4].get_extend('exported') -> @ex {
@@ -341,7 +341,7 @@ method process_block_traits($/, @tr) {
             $sub.outer.add_exports($pack.name, $pack, @exports);
         } elsif !$pack && $tr<export> {
             my @exports = @( $tr<export> );
-            $sub.outer.add_exports('&'~$sub.name, $sub, @exports);
+            $sub.outer.add_exports($sub.outervar, $sub, @exports);
             $sub.set_extend('exported', @exports);
             $sub.outer.create_static_pad;
             $/.CURSOR.mark_used($sub.outervar)
