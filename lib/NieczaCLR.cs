@@ -151,7 +151,7 @@ namespace Niecza {
 
                 return Kernel.Die(th, "No candidates for dispatch to " + name +
                     "; candidates are:" + Console.Out.NewLine + "    " +
-                    Kernel.JoinS(Console.Out.NewLine + "    ", avail));
+                    Kernel.JoinS(Console.Out.NewLine + "    ", orig));
             }
 
             foreach (int ci in avail[last_ix].conflictors) {
