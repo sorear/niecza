@@ -1,9 +1,11 @@
+integration/error-reporting.t
 integration/lazy-bentley-generator.t
 integration/lexical-array-in-inner-block.t
 integration/method-calls-and-instantiation.t
 integration/no-indirect-new.t
 integration/passing-pair-class-to-sub.t
 integration/substr-after-match-in-gather-in-for.t
+integration/weird-errors.t
 integration/99problems-01-to-10.t
 integration/99problems-11-to-20.t
 integration/99problems-31-to-40.t
@@ -316,6 +318,7 @@ S06-multi/proto.t
 S06-multi/syntax.t
 S06-multi/type-based.t
 S06-multi/unpackability.t
+S06-operator-overloading/methods.t
 S06-operator-overloading/sub.t
 S06-other/anon-hashes-vs-blocks.t
 S06-other/main-eval.t
@@ -417,10 +420,14 @@ S16-filehandles/io_in_for_loops.t
 S16-filehandles/io_in_while_loops.t
 S16-filehandles/open.t
 S16-filehandles/unlink.t
+S16-io/bare-say.t
 S16-io/basic-open.t
 S16-io/getc.t
 S16-io/say.t
+S16-io/say-and-ref.t
 S16-unfiled/slurp.t
+S19-command-line/dash-e.t
+S19-command-line/help.t
 S24-testing/0-compile.t
 S28-named-variables/inc.t
 S29-any/cmp.t
@@ -442,6 +449,7 @@ S32-array/push.t
 S32-array/rotate.t
 S32-array/shift.t
 S32-array/unshift.t
+S32-basics/warn.t
 S32-container/zip.t
 S32-hash/delete.t
 S32-hash/delete_adverb.t
