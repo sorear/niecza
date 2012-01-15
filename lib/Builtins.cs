@@ -306,6 +306,11 @@ public partial class Builtins {
         if (o.mo.num_rank >= 0) {
             rank = o.mo.num_rank;
         } else {
+            if (o.Does(Kernel.RealMO)) {
+                rank = NR_FLOAT;
+                o = Kernel.RunInferior(o.InvokeMethod(Kernel.GetInferiorRoot(), "Bridge", new Variable[] { v }, null)).Fetch();
+                return o;
+            }
             o = o.mo.mro_Numeric.Get(v).Fetch();
             rank = o.mo.num_rank;
             if (rank < 0)
