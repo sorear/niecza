@@ -39,9 +39,12 @@ SV* p5embed_eval(char* code) {
 
 void p5embed_dispose()
 {
+  /* Disable temorarly as it seems to cause segfaults */
+  /* 
   perl_destruct(my_perl);
   perl_free(my_perl);
   PERL_SYS_TERM();
+  */
 }
 
 
