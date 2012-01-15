@@ -1,7 +1,8 @@
+our $PassSimplifier;
+
 class NieczaBackendDotnet;
 
 use JSYNC;
-use NieczaPassSimplifier;
 
 has $.safemode = False;
 has $.obj_dir;
@@ -223,7 +224,7 @@ class StaticSub {
     }
 
     method finish($ops) {
-        $ops := NieczaPassSimplifier.invoke_incr(self, $ops);
+        $ops := $PassSimplifier.invoke_incr(self, $ops);
         self.set_extend('onlystub', True) if $ops.onlystub;
         Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.Finish {self} {$ops.cgop(self)}) }
     }

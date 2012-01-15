@@ -7,6 +7,7 @@
 
 # note: rather heavily modified -sorear
 
+our ($Sig, $SigParameter);
 grammar STD:ver<6.0.0.alpha>:auth<cpan:SOREAR>;
 
 sub mnode($M) {
@@ -5145,7 +5146,7 @@ method getsig {
         my @parms;
         if %method{$*CURLEX<!sub>.class} {
             my $cl = $*CURLEX<!sub>.methodof;
-            push @parms, ::Sig::Parameter.new(name => 'self',
+            push @parms, $SigParameter.new(name => 'self',
                 flags => $Sig::INVOCANT + $Sig::POSITIONAL, tclass => $cl);
             $*CURLEX<!sub>.add_my_name('self', :noinit);
         }
@@ -5161,25 +5162,25 @@ method getsig {
                 }
                 my $list = substr($pn,0,1) eq '@' ?? $Sig::IS_LIST !! 0;
                 my $hash = substr($pn,0,1) eq '%' ?? $Sig::IS_HASH !! 0;
-                push @parms, ::Sig::Parameter.new(slot => $pn,
+                push @parms, $SigParameter.new(slot => $pn,
                     flags => $list + $hash + $positional,
                     name => $pn, names => [ substr($pn,1) ]);
             }
             if $a_ {
-                push @parms, ::Sig::Parameter.new(slot => '@_', name => '*@_',
+                push @parms, $SigParameter.new(slot => '@_', name => '*@_',
                     flags => $Sig::SLURPY_POS + $Sig::IS_LIST);
             }
             if $h_ {
-                push @parms, ::Sig::Parameter.new(slot => '%_', name => '*%_',
+                push @parms, $SigParameter.new(slot => '%_', name => '*%_',
                     flags => $Sig::SLURPY_NAM + $Sig::IS_HASH);
             }
         }
         else {
-            push @parms, ::Sig::Parameter.new(name => '$_', slot => '$_',
+            push @parms, $SigParameter.new(name => '$_', slot => '$_',
                 flags => $Sig::DEFOUTER + $Sig::RWTRANS + $Sig::POSITIONAL);
             $*CURLEX<!sub>.parameterize_topic;
         }
-        $*CURLEX<!sub>.set_signature(::GLOBAL::Sig.new(params => @parms));
+        $*CURLEX<!sub>.set_signature($Sig.new(params => @parms));
     }
 
     my regex interesting () {

@@ -1,16 +1,11 @@
+our $Actions;
+
 class NieczaFrontendSTD;
 
 use STD;
 use NieczaGrammar;
-use NieczaActions;
 
 use MONKEY_TYPING;
-augment class Match {
-    method CURSOR() { Q:CgOp { (ns (rawcall UnMatch (cast cursor (@ {self})))) } }
-    method cursor() { Q:CgOp { (ns (rawcall UnMatch (cast cursor (@ {self})))) } }
-    method reduced() { Q:CgOp { (box Str (rawcall Reduced (cast cursor (@ {self})))) } }
-    method trim_heredoc () { self } # NYI
-}
 
 augment class STD {
 my %term            = (:dba('term')            , :prec<z=>);
@@ -252,7 +247,7 @@ method parse(:$unitname, :$filename, :$source, :$outer, :$run, :$main, :$evalmod
     $*unit.abs_pkg('GLOBAL', :auto);
     $*unit.abs_pkg('PROCESS', :auto);
 
-    NieczaGrammar.parse($source, actions => NieczaActions);
+    NieczaGrammar.parse($source, actions => $Actions);
 
     @STD::herestub_queue = @save_herestub;
 

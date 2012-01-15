@@ -1,3 +1,4 @@
+our $Sig;
 use STD;
 
 grammar NieczaGrammar is STD;
@@ -40,11 +41,11 @@ grammar P6 is STD::P6 {
                 $*settingref.run_once);
         $*CURLEX<!sub>.set_return_pass;
         $*CURLEX{'!sub'}.add_my_name('$_') if !$*settingref;
-        $*CURLEX{'!sub'}.set_signature(::GLOBAL::Sig.simple());
+        $*CURLEX{'!sub'}.set_signature($Sig.simple());
         $*unit.set_mainline($*CURLEX<!sub>);
 
-        %*LANG<Q> = ::NieczaGrammar::Q ;
-        %*LANG<MAIN> = ::NieczaGrammar::P6 ;
+        %*LANG<Q>    = NieczaGrammar::Q  ;
+        %*LANG<MAIN> = NieczaGrammar::P6 ;
 
         my $h = self;
         loop (my $C = $*CURLEX<!sub>; $C && $C.unit.name ne 'CORE'; $C.=outer) {

@@ -1,3 +1,6 @@
+our ($OpSimplePair, $OpCallSub, $OpLexical, $OpBuiltin, $OpTake,
+     $OpControl, $OpMakeJunction, $OpGeneralConst);
+
 class NieczaPassSimplifier;
 
 # This optimization pass handles lowering calls to well-known functions
@@ -17,9 +20,9 @@ method invoke_incr($sub, $ops) {
 sub no_named_params($op) {
     if defined $op.args {
         for @( $op.args ) -> $a {
-            if $a.^isa(::Op::SimplePair) {
+            if $a.^isa($OpSimplePair) {
                 return Any;
-            } elsif $a.^isa(::Op::CallSub) && $a.invocant.^isa(::Op::Lexical)
+            } elsif $a.^isa($OpCallSub) && $a.invocant.^isa($OpLexical)
                     && $a.invocant.name eq '&prefix:<|>' {
                 return Any;
             }
@@ -37,9 +40,9 @@ sub capture_params($op) {
     my @pos;
 
     for @( $op.args ) -> $a {
-        if $a.^isa(::Op::SimplePair) {
+        if $a.^isa($OpSimplePair) {
             push @named, $a.key => $a.value;
-        } elsif $a.^isa(::Op::CallSub) && $a.invocant.^isa(::Op::Lexical)
+        } elsif $a.^isa($OpCallSub) && $a.invocant.^isa($OpLexical)
                 && $a.invocant.name eq '&prefix:<|>' {
             return Nil;
         } else {
@@ -76,30 +79,30 @@ our %funcs = (
 sub do_builtin($name, $expect) { sub ($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args ~~ $expect;
-    return ::Op::Builtin.new(name => $name, args => $args);
+    return $OpBuiltin.new(name => $name, args => $args);
 } }
 
 sub do_return_take($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     my $parcel = ($args == 1 ?? $args[0] !!
-        $args == 0 ?? ::Op::Lexical.new(name => 'Nil') !!
-        ::Op::CallSub.new(invocant => ::Op::Lexical.new(name => '&infix:<,>'),
+        $args == 0 ?? $OpLexical.new(name => 'Nil') !!
+        $OpCallSub.new(invocant => $OpLexical.new(name => '&infix:<,>'),
             positionals => [@$args]));
     return ($invname eq '&take' ??
-        ::Op::Take.new(value => $parcel) !!
-        ::Op::Control.new(payload => $parcel,
+        $OpTake.new(value => $parcel) !!
+        $OpControl.new(payload => $parcel,
             number => $invname eq '&return' ?? 4 !! 6));
 }
 
 sub do_nullary_control($number) { sub ($body, $nv, $ , $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args == 0;
-    return ::Op::Control.new(:$number, payload => ::Op::Lexical.new(name => 'Nil'));
+    return $OpControl.new(:$number, payload => $OpLexical.new(name => 'Nil'));
 } }
 
 sub do_makejunction($typecode) { sub ($body, $nv, $ , $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
-    return ::Op::MakeJunction.new(:$typecode, zyg => @$args);
+    return $OpMakeJunction.new(:$typecode, zyg => @$args);
 } }
 
 sub do_atkey($body, $nv, $invname, $op) { #OK not used
@@ -108,17 +111,17 @@ sub do_atkey($body, $nv, $invname, $op) { #OK not used
     my $delete = %named<delete>:delete;
     my $exists = %named<exists>:delete;
     return $op if %named;
-    return $op if $delete && (!$delete.^isa(::Op::Lexical) || $delete.name ne 'True');
-    return $op if $exists && (!$exists.^isa(::Op::Lexical) || $exists.name ne 'True');
+    return $op if $delete && (!$delete.^isa($OpLexical) || $delete.name ne 'True');
+    return $op if $exists && (!$exists.^isa($OpLexical) || $exists.name ne 'True');
     return $op if $delete && $exists;
-    return ::Op::Builtin.new(name => ($delete ?? 'delete_key' !!
+    return $OpBuiltin.new(name => ($delete ?? 'delete_key' !!
             $exists ?? 'exists_key' !! 'at_key'), args => $args);
 }
 
 sub do_atpos($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args == 2;
-    return ::Op::Builtin.new(name => 'at_pos', args => $args);
+    return $OpBuiltin.new(name => 'at_pos', args => $args);
 }
 
 # XXX should support folding of SimplePair, SimpleParcel too
@@ -126,7 +129,7 @@ sub check_folding($sub, $op) {
     my @evargs;
     for $op.getargs -> $aop {
         my $name;
-        if $aop.^isa(::Op::SimplePair) {
+        if $aop.^isa($OpSimplePair) {
             $name = $aop.key;
             $aop := $aop.value;
         }
@@ -134,7 +137,7 @@ sub check_folding($sub, $op) {
     }
 
     my $ret = $*unit.constant_fold($sub, @evargs) // return;
-    ::Op::GeneralConst.new(value => $ret);
+    $OpGeneralConst.new(value => $ret);
 }
 
 sub run_optree($body, $op, $nv) {
@@ -146,9 +149,9 @@ sub run_optree($body, $op, $nv) {
         $i = $i + 2;
     }
 
-    return $op unless $op.^isa(::Op::CallSub);
+    return $op unless $op.^isa($OpCallSub);
     my $inv = $op.invocant;
-    return $op unless $inv.^isa(::Op::Lexical);
+    return $op unless $inv.^isa($OpLexical);
     my $invname = $inv.name;
     my @inv_lex = $body.lookup_lex($invname);
     return $op unless @inv_lex;
@@ -165,7 +168,7 @@ sub run_optree($body, $op, $nv) {
         return $op unless defined my $args = no_named_params($op);
         return $op unless $args >= $B[1] &&
             (!defined($B[2]) || $args <= $B[2]);
-        return ::Op::Builtin.new(name => $B[0], args => $args);
+        return $OpBuiltin.new(name => $B[0], args => $args);
     }
 
     return $op unless @inv_lex[4].unit.name eq 'CORE';

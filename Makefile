@@ -117,25 +117,15 @@ help:
 boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.CompilerBlob.dll
 
 # grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/Run.\1.ser: boot/obj/Run.\2.ser|' | grep -v MONKEY_TYPING
-boot/obj/Run.NieczaActions.ser: boot/obj/Run.CgOp.ser
-boot/obj/Run.NieczaActions.ser: boot/obj/Run.Op.ser
-boot/obj/Run.NieczaActions.ser: boot/obj/Run.RxOp.ser
-boot/obj/Run.NieczaActions.ser: boot/obj/Run.Sig.ser
-boot/obj/Run.NieczaActions.ser: boot/obj/Run.CClass.ser
 boot/obj/Run.NieczaActions.ser: boot/obj/Run.OpHelpers.ser
-boot/obj/Run.NieczaActions.ser: boot/obj/Run.Operator.ser
-boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.JSYNC.ser
-boot/obj/Run.NieczaBackendDotnet.ser: boot/obj/Run.NieczaPassSimplifier.ser
-boot/obj/Run.NieczaCompiler.ser: boot/obj/Run.JSYNC.ser
-boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.STD.ser
 boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.NieczaGrammar.ser
-boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.NieczaActions.ser
+boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.STD.ser
 boot/obj/Run.NieczaGrammar.ser: boot/obj/Run.STD.ser
-boot/obj/Run.Operator.ser: boot/obj/Run.Sig.ser
 boot/obj/Run.Operator.ser: boot/obj/Run.OpHelpers.ser
+boot/obj/Run.Operator.ser: boot/obj/Run.Sig.ser
 boot/obj/Run.Op.ser: boot/obj/Run.CgOp.ser
 boot/obj/Run.OptBeta.ser: boot/obj/Run.CgOp.ser
 boot/obj/Run.OptRxSimple.ser: boot/obj/Run.RxOp.ser
-boot/obj/Run.RxOp.ser: boot/obj/Run.CgOp.ser
 boot/obj/Run.RxOp.ser: boot/obj/Run.CClass.ser
+boot/obj/Run.RxOp.ser: boot/obj/Run.CgOp.ser
 boot/obj/Run.Sig.ser: boot/obj/Run.CgOp.ser
