@@ -214,6 +214,30 @@ class GetSlot is Op {
         }
         CgOp.getslot($kl, $.name, 'var', CgOp.fetch($.object.cgop($body)));
     }
+
+    method to_bind($/, $ro, $rhs) {
+        return ::Op::SetSlot.new(:$!object, :$!name, :$!type,
+            value => $ro ?? ::Op::ROify.new(child => $rhs) !! $rhs);
+    }
+}
+
+class Op::SetSlot is Op {
+    has Op $.object = die "Op::SetSlot.object required";
+    has Str $.name = die "Op::SetSlot.name required";
+    has $.type = die "Op::SetSlot.type required";
+    has Op $.value = die "Op::SetSlot.value required";
+
+    method zyg() { $!object, $!value }
+
+    method code($body) {
+        my $kl = CgOp.class_ref('mo', $!type);
+        if $!type.kind eq 'prole' {
+            $kl = CgOp.obj_llhow(CgOp.fetch(CgOp.scopedlex('$?CLASS')));
+        }
+        CgOp.let($!value.cgop($body), -> $v {
+            CgOp.prog(CgOp.setslot($kl, $!name,
+                CgOp.fetch($!object.cgop($body)), $v), $v) });
+    }
 }
 
 class Paren is Op {
@@ -609,7 +633,7 @@ class Attribute is Op {
 class Whatever is Op {
     has $.slot = die "Whatever.slot required"; # Str
 
-    method code($) { CgOp.methodcall(CgOp.corelex('Whatever'), 'new') }
+    method code($) { CgOp.corelex('$__Whatever') }
 }
 
 class WhateverCode is Op {

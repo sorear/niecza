@@ -117,6 +117,9 @@ class Method is Operator {
                 } else {
                     $/.CURSOR.sorry("Cannot resolve class for private method");
                 }
+                if $pclass && !$pclass.trusts($*CURLEX<!sub>.cur_pkg) {
+                    $/.CURSOR.sorry("Cannot call private method '$.name' on $pclass.name() because it does not trust $*CURLEX<!sub>.cur_pkg.name()");
+                }
             } else {
                 $pclass = $.package;
             }

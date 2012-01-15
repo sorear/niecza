@@ -1286,6 +1286,10 @@ namespace Niecza {
         }
 
         // synchronize with NamProcessor.MakeDispatch
+        static P6any GetProtoSub(LexInfo li, Frame f) {
+            return (li is LISub) ? ((LISub)li).def.protosub :
+                ((Variable)li.Get(f)).Fetch();
+        }
         internal void MakeDispatch(Frame into) {
             HashSet<string> names = new HashSet<string>();
             List<P6any> cands = new List<P6any>();
@@ -1304,14 +1308,14 @@ namespace Niecza {
                         names.Add(kp.Key);
                         brk = true;
                         //Console.WriteLine("cand {0}", kp.Key);
-                        cands.Add(((Variable)kp.Value.Get(f)).Fetch());
+                        cands.Add(GetProtoSub(kp.Value,f));
                     }
                 }
                 if (csr.outer == null) break;
                 // don't go above nearest proto
                 if (csr.dylex.ContainsKey(pn)) {
                     //Console.WriteLine("proto {0}", pn);
-                    proto = ((Variable)csr.dylex[pn].Get(f)).Fetch();
+                    proto = GetProtoSub(csr.dylex[pn], f);
                     break;
                 }
                 if (brk) cands.Add(null);

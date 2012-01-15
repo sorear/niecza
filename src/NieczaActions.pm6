@@ -1356,6 +1356,8 @@ method circumfix:sym<[ ]> ($/) {
 method check_hash($/) {
     my $do = $<pblock><blockoid>.ast;
 
+    return False if $<pblock>.ast.arity;
+
     return False unless $do.^isa(::Op::StatementList);
     return True if $do.children == 0;
     return False if $do.children > 1;
@@ -1801,8 +1803,7 @@ method whatever_postcheck($/, $st, $term) {
             cur_pkg => $*CURLEX<!sub>.cur_pkg);
 
         $body.add_my_name($_, :noinit) for @$st;
-        $body.set_signature(::GLOBAL::Sig.new(params => [
-            map { ::Sig::Parameter.new(slot => $_, name => $_) }, @$st ]));
+        $body.set_signature(::GLOBAL::Sig.simple(@$st));
         $body.set_transparent;
         $body.finish($term);
 
@@ -1976,14 +1977,18 @@ method do_variable_reference($M, $v) {
         my $pclass;
         if $v<pkg> {
             $pclass = $v<pkg>;
+        } elsif $*CURLEX<!sub>.lookup_lex($sl) {
+            return mklex($M, $sl);
         } elsif $*CURLEX<!sub>.in_class -> $c {
             $pclass = $c;
         } else {
             $M.CURSOR.sorry("Cannot resolve class for private method");
         }
-        self.docontext($M, $v<sigil>, ::Op::CallMethod.new(pos=>$M,
-            name => $v<name>, private => True, receiver => mklex($M, 'self'),
-            :$pclass));
+        if $pclass && !$pclass.trusts($*CURLEX<!sub>.cur_pkg) {
+            $M.CURSOR.sorry("Cannot call private method '$v<name>' on $pclass.name() because it does not trust $*CURLEX<!sub>.cur_pkg.name()");
+        }
+        ::Op::GetSlot.new(pos=>$M, object => mklex($M, 'self'),
+            type => $pclass, name => $sl);
     }
     elsif $tw eq '.' {
         if defined $v<pkg> {
@@ -2597,6 +2602,33 @@ method multi_declarator:multi ($/) { make ($<declarator> // $<routine_def>).ast}
 method multi_declarator:proto ($/) { make ($<declarator> // $<routine_def>).ast}
 method multi_declarator:only  ($/) { make ($<declarator> // $<routine_def>).ast}
 
+method add_accessor($/, $name, $store_name, $lexical, $public) {
+    my $ns = $*CURLEX<!sub>.body_of;
+    my $nb = $*unit.create_sub(
+        outer      => $*CURLEX<!sub>,
+        name       => $name,
+        cur_pkg    => $*CURLEX<!sub>.cur_pkg,
+        class      => 'Method');
+    $nb.set_transparent;
+    $nb.add_my_name('self', noinit => True);
+    $nb.set_signature(Sig.simple('self'));
+    $nb.finish($lexical ?? ::Op::Lexical.new(name => $store_name) !!
+        ::Op::GetSlot.new(name => $store_name, type => $ns,
+            object => ::Op::Lexical.new(name => 'self')));
+    $*CURLEX<!sub>.create_static_pad; # for protosub instance
+
+    $/.CURSOR.trymop({
+        my $ac = self.gensym;
+        $nb.set_outervar($ac);
+        $*CURLEX<!sub>.add_my_sub($ac, $nb, |mnode($/));
+        $ns.add_method($*backend.sub_visibility("private"), $name, $nb,
+            |mnode($/));
+        if $public {
+            $ns.add_method(0, $name, $nb, |mnode($/));
+        }
+    });
+}
+
 method add_attribute($/, $barename, $sigil, $accessor, $type) {
     my $ns = $*CURLEX<!sub>.body_of;
     my $name = $sigil ~ '!' ~ $barename;
@@ -2610,34 +2642,12 @@ method add_attribute($/, $barename, $sigil, $accessor, $type) {
         return ::Op::StatementList.new
     }
 
-    my $nb = $*unit.create_sub(
-        outer      => $*CURLEX<!sub>,
-        name       => $barename,
-        cur_pkg    => $*CURLEX<!sub>.cur_pkg,
-        class      => 'Method');
-    $nb.set_transparent;
-    $nb.add_my_name('self', noinit => True);
-    $nb.set_signature(Sig.simple('self'));
-    $nb.finish(::Op::GetSlot.new(name => $name, type => $ns,
-        object => ::Op::Lexical.new(name => 'self')));
-    $*CURLEX<!sub>.create_static_pad; # for protosub instance
-    my $at;
-
+    self.add_accessor($/, $barename, $name, False, $accessor);
     $/.CURSOR.trymop({
-        my $ac = self.gensym;
-        $nb.set_outervar($ac);
-        $*CURLEX<!sub>.add_my_sub($ac, $nb, |mnode($/));
         $ns.add_attribute($name, $sigil, +$accessor, $type, |mnode($/));
-        $ns.add_method($*backend.sub_visibility("private"), $barename, $nb,
-            |mnode($/));
-        if $accessor {
-            $ns.add_method(0, $barename, $nb, |mnode($/));
-        }
-        $at = True;
     });
 
-    $at ?? ::Op::Attribute.new(name => $name, initializer => $ns) !!
-        ::Op::StatementList.new;
+    ::Op::Attribute.new(name => $name, initializer => $ns);
 }
 
 method variable_declarator($/) {
@@ -2687,12 +2697,14 @@ method variable_declarator($/) {
              "automatically as parameters to the current block."));
     }
 
-    if $scope ne 'has' && ($t eq '.' || $t eq '!') {
-        $/.CURSOR.sorry("Twigil $t is only valid on attribute definitions ('has').");
+    if ($scope ne any <has our my>) && ($t eq '.' || $t eq '!') {
+        $/.CURSOR.sorry("Twigil $t is only valid with scopes has, our, or my.");
+        $scope = 'has';
     }
 
-    if !defined($v<name>) && $scope ne any < my anon state > {
+    if !defined($v<name>) && ($scope ne any < my anon state >) {
         $/.CURSOR.sorry("Scope $scope requires a name");
+        $v<name> = "anon";
     }
 
     if defined($v<pkg>) || defined($v<iname>) {
@@ -2703,6 +2715,11 @@ method variable_declarator($/) {
     # otherwise identical to my
     my $slot = ($scope eq 'anon' || !defined($v<name>))
         ?? self.gensym !! $name;
+
+    if ($scope eq any <our my>) && $t eq any < . ! > {
+        $slot = $name = $v<sigil> ~ '!' ~ $v<name>;
+        self.add_accessor($/, $v<name>, $slot, True, $t eq '.');
+    }
 
     if $scope eq 'has' {
         make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.',
@@ -2948,6 +2965,17 @@ method package_declarator:require ($/) {
     make ::Op::Require.new(pos=>$/, unit => ~$<module_name>);
 }
 
+method package_declarator:trusts ($/) {
+    if defined $<module_name>.ast<args> {
+        $/.CURSOR.sorry("Cannot trust a specific role instance");
+    }
+    my ($trustee) = self.process_name($<module_name><longname>);
+    $/.CURSOR.trymop({
+        $*CURLEX<!sub>.cur_pkg.add_trustee($trustee) if $trustee;
+    });
+    make ::Op::StatementList.new;
+}
+
 method process_block_traits($/, @tr) {
     my $sub = $*CURLEX<!sub>;
     my $pack = $sub.body_of;
@@ -2984,7 +3012,8 @@ method process_block_traits($/, @tr) {
             $sub.outer.add_exports($pack.name, $pack, @exports);
         } elsif !$pack && $tr<export> {
             my @exports = @( $tr<export> );
-            $sub.outer.add_exports('&'~$sub.name, $sub, @exports);
+            $sub.outer.add_exports($sub.outervar, $sub, @exports);
+            $sub.set_extend('exported', @exports);
             $sub.outer.create_static_pad;
             $/.CURSOR.mark_used($sub.outervar)
                 if defined $sub.outervar;
@@ -3313,12 +3342,18 @@ method statement_control:use ($/) {
     return unless $exp;
 
     my $h = $/.CURSOR;
+    my $mnode = mnode($/);
     for $*unit.list_stash($exp.who) -> $uname, $obj {
         if !$obj || $obj.kind eq 'sub' {
             $*CURLEX<!sub>.add_common_name($uname, $exp, $uname);
         } else {
             $*CURLEX<!sub>.add_my_stash($uname, $obj);
         }
+        if $uname ~~ /\:\(/ && !$*CURLEX<!sub>.has_lexical($/.prematch) {
+            $*CURLEX<!sub>.create_static_pad;
+            $*CURLEX<!sub>.add_dispatcher($/.prematch, |$mnode);
+        }
+
         $h.check_categorical($uname);
         $h = $h.cursor_fresh(%*LANG<MAIN>);
     }
@@ -3577,6 +3612,12 @@ method inliney_call($/, $block, *@parms) {
 # this is intended to be called after parsing the longname for a sub,
 # but before the signature.  export, etc are handled by the sub/package
 # trait handler
+# Try to make binary ordering DTRT; also, global uniqueness
+method multi_suffix() {
+    my $num = self.genid;
+    $*UNITNAME.subst('::','.',:g) ~ " " ~ chr(ord('a')+chars($num)) ~ $num
+}
+
 method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         :$longname, :$method_type is copy, :$contextual is copy) {
 
@@ -3690,7 +3731,7 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
             }
 
             given $multiness {
-                when 'multi' { $symbol ~= ":({ self.gensym })"; }
+                when 'multi' { $symbol ~= ":({ self.multi_suffix })"; }
                 when 'proto' { $symbol ~= ":(!proto)"; }
                 default {
                     $/.CURSOR.check_categorical($symbol);
@@ -3703,6 +3744,12 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         $sub.set_outervar($symbol);
         $sub.set_methodof(defined($method_type) ?? $method_targ !! Any);
         $sub.outer.add_my_sub($symbol, $sub, |mnode($/));
+
+        # make recursion easier
+        if defined($name) && $scope eq 'anon' {
+            $sub.add_alias('&' ~ $name, $symbol, |mnode($/));
+            $/.CURSOR.mark_used('&' ~ $name); # no real need to use the alias
+        }
 
         if $multiness ne 'only' || $scope eq 'our' || $method_type {
             $/.CURSOR.mark_used($symbol);
@@ -3736,6 +3783,18 @@ method install_sub($/, $sub, :$multiness is copy, :$scope is copy, :$class,
         if $scope eq 'our' {
             $*unit.bind(($pkg // $sub.outer.cur_pkg).who,
                 "&$name", $sub);
+        }
+
+
+        if $bindlex && $multiness eq 'multi' {
+            my $pname = $symbol;
+            $pname ~~ s/\:\( .*/:(!proto)/;
+            if $sub.outer.has_lexical($pname) {
+                my @oinfo = $sub.outer.lookup_lex($pname);
+                if @oinfo && @oinfo[0] eq 'sub' && @oinfo[4].get_extend('exported') -> @ex {
+                    $sub.outer.add_exports($symbol, $sub, @ex);
+                }
+            }
         }
     });
 }
