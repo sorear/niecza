@@ -1,3 +1,4 @@
+our ($CClass);
 class CClass;
 
 has $.terms;
@@ -90,3 +91,4 @@ our &internal = sub ($name) {
     die "unknown internal cclass $name";
 }
 method internal($name) { &internal($name) }
+INIT { $CClass = CClass }

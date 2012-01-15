@@ -1,6 +1,18 @@
-class Op;
+our ($CgOp, $Actions, $OptBeta);
+our ($Op, $OpAttribute, $OpBareBlock, $OpBuiltin, $OpCallLike, $OpCallMethod,
+     $OpCallSub, $OpCatchyWrapper, $OpCgOp, $OpConditional, $OpConstantDecl,
+     $OpContextVar, $OpDoOnceLoop, $OpForLoop, $OpGather, $OpGeneralConst,
+     $OpGeneralLoop, $OpGetBlock, $OpGetSlot, $OpHereStub, $OpImmedForLoop,
+     $OpIndirectVar, $OpLabelled, $OpLetVar, $OpLexical, $OpMakeCursor, $OpNum,
+     $OpParen, $OpRegexBody, $OpRequire, $OpShortCircuit, $OpSimplePair,
+     $OpSimpleParcel, $OpStart, $OpStateDecl, $OpStatementList,
+     $OpStringLiteral, $OpTemporize, $OpTry, $OpWhatever, $OpWhateverCode,
+     $OpWhen, $OpWhileLoop, $OpYada, $OpYouAreHere, $OpROify, $OpSetSlot,
+     $OpLexicalBind, $OpInterrogative, $OpShortCircuitAssign, $OpControl,
+     $OpMakeJunction, $OpSubDef, $OpTake, $OpAssign, $OpLet, $OpLetScope,
+     $OpTopicalHook, $OpLeaveHook, $OpLabelHook, $OpFlipFlop);
 
-use CgOp;
+class Op;
 
 has Match $.pos;
 
@@ -12,7 +24,7 @@ method ctxzyg($) { map { $_, 1 }, self.zyg }
 
 method cgop($body) {
     if $!pos -> $p {
-        CgOp.ann($p.CURSOR.lineof($p.pos), self.code($body));
+        $CgOp.ann($p.CURSOR.lineof($p.pos), self.code($body));
     } else {
         self.code($body);
     }
@@ -20,13 +32,13 @@ method cgop($body) {
 
 method to_bind($/, $ro, $rhs) { #OK not used
     $/.CURSOR.sorry("Cannot use bind operator with this LHS");
-    ::Op::StatementList.new;
+    $OpStatementList.new;
 }
 
 # ick
 method cgop_labelled($body, $label) {
     if $!pos -> $p {
-        CgOp.ann($p.CURSOR.lineof($p.pos), self.code_labelled($body, $label));
+        $CgOp.ann($p.CURSOR.lineof($p.pos), self.code_labelled($body, $label));
     } else {
         self.code_labelled($body, $label);
     }
@@ -57,10 +69,10 @@ method const_value() { }
             return $node.cgop($body) if $node ~~ Op;
             return $node if $node !~~ List;
             my ($cmd, @vals) = @$node;
-            if ::GLOBAL::CgOp.^can($cmd) {
-                ::GLOBAL::CgOp."$cmd"(|(map &rec, @vals));
+            if $CgOp.^can($cmd) {
+                $CgOp."$cmd"(|(map &rec, @vals));
             } else {
-                ::GLOBAL::CgOp._cgop($cmd, |(map &rec, @vals));
+                $CgOp._cgop($cmd, |(map &rec, @vals));
             }
         }
         rec($.optree);
@@ -82,9 +94,9 @@ class StatementList is Op {
     method const_value() { $!children[0].const_value if $!children == 1 }
     method code($body) {
         my @ch = map { $_.cgop($body) }, @$.children;
-        my $end = @ch ?? pop(@ch) !! CgOp.corelex('Nil');
+        my $end = @ch ?? pop(@ch) !! $CgOp.corelex('Nil');
 
-        CgOp.prog((map { CgOp.sink($_) }, @ch), $end);
+        $CgOp.prog((map { $CgOp.sink($_) }, @ch), $end);
     }
 }
 
@@ -100,19 +112,19 @@ class CallLike is Op {
     }
 
     method getargs() {
-        $.args ?? @$.args !! (map { ::Op::Paren.new(inside => $_) },
+        $.args ?? @$.args !! (map { $OpParen.new(inside => $_) },
             @$.positionals );
     }
 
     sub parsearglist($body, @args) {
         my @out;
         for @args -> $a {
-            if $a.^isa(::Op::SimplePair) {
+            if $a.^isa($OpSimplePair) {
                 push @out, ":" ~ $a.key, $a.value.cgop($body);
-            } elsif $a.^isa(::Op::CallSub) && $a.invocant.^isa(::Op::Lexical)
+            } elsif $a.^isa($OpCallSub) && $a.invocant.^isa($OpLexical)
                     && $a.invocant.name eq '&prefix:<|>'
                     && $a.positionals == 1 {
-                push @out, 'flatcap', CgOp.fetch(CgOp.methodcall(
+                push @out, 'flatcap', $CgOp.fetch($CgOp.methodcall(
                     $a.positionals[0].cgop($body), 'Capture'));
             } else {
                 push @out, $a.cgop($body);
@@ -134,18 +146,18 @@ class CallSub is CallLike {
     method zyg() { $.invocant, @( $.args // $.positionals ) } # XXX callsame
 
     method adverb($adv) {
-        Op::CallSub.new(invocant => $.invocant, args => [ self.getargs, $adv ])
+        $OpCallSub.new(invocant => $.invocant, args => [ self.getargs, $adv ])
     }
 
     method code($body) {
-        CgOp.subcall(CgOp.fetch($.invocant.cgop($body)), self.argblock($body));
+        $CgOp.subcall($CgOp.fetch($.invocant.cgop($body)), self.argblock($body));
     }
 
     method to_bind($/, $ro, $rhs) {
-        if $!invocant ~~ ::Op::Lexical && substr($!invocant.name, 0, 15)
+        if $!invocant ~~ $OpLexical && substr($!invocant.name, 0, 15)
                 eq '&postcircumfix:' {
-            return self.adverb(::Op::SimplePair.new(key => 'BIND_VALUE',
-                value => $ro ?? ::Op::ROify.new(child => $rhs) !! $rhs));
+            return self.adverb($OpSimplePair.new(key => 'BIND_VALUE',
+                value => $ro ?? $OpROify.new(child => $rhs) !! $rhs));
         }
         nextsame;
     }
@@ -159,7 +171,7 @@ class CallMethod is CallLike {
     has $.ismeta = ''; # Str
 
     method adverb($adv) {
-        Op::CallMethod.new(receiver => $.receiver, name => $.name,
+        $OpCallMethod.new(receiver => $.receiver, name => $.name,
             private => $.private, pclass => $.pclass,
             ismeta => $!ismeta, args => [ self.getargs, $adv ])
     }
@@ -168,34 +180,34 @@ class CallMethod is CallLike {
         @( $.args // $.positionals ) } # XXX callsame
 
     method code($body) {
-        my $name = ($.name ~~ Op) ?? CgOp.obj_getstr($.name.cgop($body))
-            !! CgOp.str($.name);
+        my $name = ($.name ~~ Op) ?? $CgOp.obj_getstr($.name.cgop($body))
+            !! $CgOp.str($.name);
         my $meta = $!ismeta // '';
         if $.private {
-            my $kl = CgOp.class_ref('mo', $!pclass);
+            my $kl = $CgOp.class_ref('mo', $!pclass);
             if $!pclass.kind eq 'prole' {
-                $kl = CgOp.obj_llhow(CgOp.fetch(CgOp.scopedlex('$?CLASS')));
+                $kl = $CgOp.obj_llhow($CgOp.fetch($CgOp.scopedlex('$?CLASS')));
             }
-            CgOp.subcall(CgOp.stab_privatemethod($kl, $name),
+            $CgOp.subcall($CgOp.stab_privatemethod($kl, $name),
                 $.receiver.cgop($body), self.argblock($body));
         } elsif $meta eq '^' {
-            CgOp.let($.receiver.cgop($body), -> $r {
-                CgOp.methodcall(CgOp.newscalar(CgOp.how(CgOp.fetch($r))),
+            $CgOp.let($.receiver.cgop($body), -> $r {
+                $CgOp.methodcall($CgOp.newscalar($CgOp.how($CgOp.fetch($r))),
                     $name, $r, self.argblock($body))});
         } elsif $meta eq '?' {
             # TODO maybe use a lower-level check
-            CgOp.let($.receiver.cgop($body), -> $r { CgOp.let($name, -> $n {
-                CgOp.ternary(
-                    CgOp.obj_getbool(CgOp.methodcall(CgOp.newscalar(CgOp.how(
-                        CgOp.fetch($r))), "can", $r, CgOp.box('Str',$n))),
-                    CgOp.methodcall($r, $n, self.argblock($body)),
-                    CgOp.scopedlex('Nil'))})});
+            $CgOp.let($.receiver.cgop($body), -> $r { $CgOp.let($name, -> $n {
+                $CgOp.ternary(
+                    $CgOp.obj_getbool($CgOp.methodcall($CgOp.newscalar($CgOp.how(
+                        $CgOp.fetch($r))), "can", $r, $CgOp.box('Str',$n))),
+                    $CgOp.methodcall($r, $n, self.argblock($body)),
+                    $CgOp.scopedlex('Nil'))})});
         } elsif $!pclass {
-            CgOp.methodcall($.receiver.cgop($body), 'dispatch:<::>',
-                CgOp.class_ref('typeVar', $!pclass), CgOp.box("Str",$name),
+            $CgOp.methodcall($.receiver.cgop($body), 'dispatch:<::>',
+                $CgOp.class_ref('typeVar', $!pclass), $CgOp.box("Str",$name),
                 self.argblock($body));
         } else {
-            CgOp.methodcall($.receiver.cgop($body),
+            $CgOp.methodcall($.receiver.cgop($body),
                 $name, self.argblock($body));
         }
     }
@@ -208,16 +220,16 @@ class GetSlot is Op {
     method zyg() { $.object }
 
     method code($body) {
-        my $kl = CgOp.class_ref('mo', $!type);
+        my $kl = $CgOp.class_ref('mo', $!type);
         if $!type.kind eq 'prole' {
-            $kl = CgOp.obj_llhow(CgOp.fetch(CgOp.scopedlex('$?CLASS')));
+            $kl = $CgOp.obj_llhow($CgOp.fetch($CgOp.scopedlex('$?CLASS')));
         }
-        CgOp.getslot($kl, $.name, 'var', CgOp.fetch($.object.cgop($body)));
+        $CgOp.getslot($kl, $.name, 'var', $CgOp.fetch($.object.cgop($body)));
     }
 
     method to_bind($/, $ro, $rhs) {
-        return ::Op::SetSlot.new(:$!object, :$!name, :$!type,
-            value => $ro ?? ::Op::ROify.new(child => $rhs) !! $rhs);
+        return $OpSetSlot.new(:$!object, :$!name, :$!type,
+            value => $ro ?? $OpROify.new(child => $rhs) !! $rhs);
     }
 }
 
@@ -230,13 +242,13 @@ class Op::SetSlot is Op {
     method zyg() { $!object, $!value }
 
     method code($body) {
-        my $kl = CgOp.class_ref('mo', $!type);
+        my $kl = $CgOp.class_ref('mo', $!type);
         if $!type.kind eq 'prole' {
-            $kl = CgOp.obj_llhow(CgOp.fetch(CgOp.scopedlex('$?CLASS')));
+            $kl = $CgOp.obj_llhow($CgOp.fetch($CgOp.scopedlex('$?CLASS')));
         }
-        CgOp.let($!value.cgop($body), -> $v {
-            CgOp.prog(CgOp.setslot($kl, $!name,
-                CgOp.fetch($!object.cgop($body)), $v), $v) });
+        $CgOp.let($!value.cgop($body), -> $v {
+            $CgOp.prog($CgOp.setslot($kl, $!name,
+                $CgOp.fetch($!object.cgop($body)), $v), $v) });
     }
 }
 
@@ -257,7 +269,7 @@ class SimplePair is Op {
     method zyg() { $.value }
 
     method code($body) {
-        CgOp._cgop("pair", CgOp.const(CgOp.string_var($.key)), $.value.cgop($body));
+        $CgOp._cgop("pair", $CgOp.const($CgOp.string_var($.key)), $.value.cgop($body));
     }
 }
 
@@ -270,7 +282,7 @@ class SimpleParcel is Op {
     }
 
     method code($body) {
-        CgOp._cgop("comma", map { $_.cgop($body) }, @$.items);
+        $CgOp._cgop("comma", map { $_.cgop($body) }, @$.items);
     }
 }
 
@@ -283,15 +295,15 @@ class Interrogative is Op {
         my $c;
         given $!name {
             when "VAR" {
-                return CgOp.var_get_var($!receiver.cgop($body));
+                return $CgOp.var_get_var($!receiver.cgop($body));
             }
-            $c = CgOp.fetch($.receiver.cgop($body));
-            when "HOW" { $c = CgOp.how($c); }
-            when "WHO" { $c = CgOp.who($c); }
-            when "WHAT" { $c = CgOp.obj_what($c); }
+            $c = $CgOp.fetch($.receiver.cgop($body));
+            when "HOW" { $c = $CgOp.how($c); }
+            when "WHO" { $c = $CgOp.who($c); }
+            when "WHAT" { $c = $CgOp.obj_what($c); }
             default { die "Invalid interrogative $_"; }
         }
-        CgOp.newscalar($c);
+        $CgOp.newscalar($c);
     }
 }
 
@@ -310,7 +322,7 @@ class Yada is Op {
     has $.kind = die "Yada.kind required"; #Str
 
     method onlystub() { True }
-    method code($ ) { CgOp.die(">>>Stub code executed") }
+    method code($ ) { $CgOp.die(">>>Stub code executed") }
 }
 
 class ShortCircuit is Op {
@@ -323,16 +335,16 @@ class ShortCircuit is Op {
 
     method red2($sym, $o2) {
         if $!kind eq '&&' {
-            CgOp.ternary(CgOp.obj_getbool($sym), $o2, $sym);
+            $CgOp.ternary($CgOp.obj_getbool($sym), $o2, $sym);
         }
         elsif $!kind eq '||' {
-            CgOp.ternary(CgOp.obj_getbool($sym), $sym, $o2);
+            $CgOp.ternary($CgOp.obj_getbool($sym), $sym, $o2);
         }
         elsif $!kind eq 'andthen' {
-            CgOp.ternary(CgOp.obj_getdef($sym), $o2, $sym);
+            $CgOp.ternary($CgOp.obj_getdef($sym), $o2, $sym);
         }
         elsif $!kind eq '//' {
-            CgOp.ternary(CgOp.obj_getdef($sym), $sym, $o2);
+            $CgOp.ternary($CgOp.obj_getdef($sym), $sym, $o2);
         }
         else {
             die "That's not a sensible short circuit, now is it?";
@@ -344,7 +356,7 @@ class ShortCircuit is Op {
         my $acc = (shift @r).cgop($body);
 
         for @r {
-            $acc = CgOp.let($_.cgop($body), -> $v { self.red2($v, $acc) });
+            $acc = $CgOp.let($_.cgop($body), -> $v { self.red2($v, $acc) });
         }
 
         $acc;
@@ -358,32 +370,32 @@ class ShortCircuitAssign is Op {
     method zyg() { $.lhs, $.rhs }
 
     method code($body) {
-        my $sym   = ::GLOBAL::NieczaActions.gensym;
-        my $assn  = CgOp.assign(CgOp.letvar($sym), $.rhs.cgop($body));
-        my $cond  = CgOp.letvar($sym);
+        my $sym   = $Actions.gensym;
+        my $assn  = $CgOp.assign($CgOp.letvar($sym), $.rhs.cgop($body));
+        my $cond  = $CgOp.letvar($sym);
         my $cassn;
 
         if $.kind eq '&&' {
-            $cassn = CgOp.ternary(CgOp.obj_getbool($cond), $assn, $cond);
+            $cassn = $CgOp.ternary($CgOp.obj_getbool($cond), $assn, $cond);
         }
         elsif $.kind eq '||' {
-            $cassn = CgOp.ternary(CgOp.obj_getbool($cond), $cond, $assn);
+            $cassn = $CgOp.ternary($CgOp.obj_getbool($cond), $cond, $assn);
         }
         elsif $.kind eq 'andthen' {
-            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), $assn, $cond);
+            $cassn = $CgOp.ternary($CgOp.obj_getdef($cond), $assn, $cond);
         }
         elsif $.kind eq '//' {
-            $cassn = CgOp.ternary(CgOp.obj_getdef($cond), $cond, $assn);
+            $cassn = $CgOp.ternary($CgOp.obj_getdef($cond), $cond, $assn);
         }
 
-        CgOp.letn($sym, $.lhs.cgop($body), $cassn);
+        $CgOp.letn($sym, $.lhs.cgop($body), $cassn);
     }
 }
 
 class StringLiteral is Op {
     has $.text = die "StringLiteral.text required"; # Str
 
-    method code($) { CgOp.const(CgOp.string_var($.text)); }
+    method code($) { $CgOp.const($CgOp.string_var($.text)); }
     method const_value() { $*unit.string_constant(~$!text) }
 }
 
@@ -399,10 +411,10 @@ class Conditional is Op {
     }
 
     method code($body) {
-        CgOp.ternary(
-            CgOp.obj_getbool($.check.cgop($body)),
-            ($.true ?? $.true.cgop($body) !! CgOp.corelex('Nil')),
-            ($.false ?? $.false.cgop($body) !! CgOp.corelex('Nil')));
+        $CgOp.ternary(
+            $CgOp.obj_getbool($.check.cgop($body)),
+            ($.true ?? $.true.cgop($body) !! $CgOp.corelex('Nil')),
+            ($.false ?? $.false.cgop($body) !! $CgOp.corelex('Nil')));
     }
 }
 
@@ -417,21 +429,21 @@ class WhileLoop is Op {
 
     method code($body) { self.code_labelled($body,'') }
     method code_labelled($body, $l) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
         my $cond = $!need_cond ?? 
-            CgOp.prog(CgOp.letvar('!cond', $.check.cgop($body)),
-                CgOp.obj_getbool(CgOp.letvar('!cond'))) !!
-            CgOp.obj_getbool($.check.cgop($body));
+            $CgOp.prog($CgOp.letvar('!cond', $.check.cgop($body)),
+                $CgOp.obj_getbool($CgOp.letvar('!cond'))) !!
+            $CgOp.obj_getbool($.check.cgop($body));
         my @loop =
-            CgOp.whileloop(+$.until, +$.once, $cond,
-                CgOp.sink(CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
+            $CgOp.whileloop(+$.until, +$.once, $cond,
+                $CgOp.sink($CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
                     1, $l, "next$id", 2, $l, "last$id", 3, $l, "redo$id"))),
-            CgOp.label("last$id"),
-            CgOp.corelex('Nil');
+            $CgOp.label("last$id"),
+            $CgOp.corelex('Nil');
 
-        $!need_cond ?? CgOp.letn('!cond', CgOp.scopedlex('Any'), @loop) !!
-            CgOp.prog(@loop)
+        $!need_cond ?? $CgOp.letn('!cond', $CgOp.scopedlex('Any'), @loop) !!
+            $CgOp.prog(@loop)
     }
 }
 
@@ -451,20 +463,20 @@ class GeneralLoop is Op {
 
     method code($body) { self.code_labelled($body,'') }
     method code_labelled($body, $l) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
-        CgOp.prog(
-            ($.init ?? CgOp.sink($.init.cgop($body)) !! ()),
-            CgOp.whileloop(0, 0,
-                ($.cond ?? CgOp.obj_getbool($.cond.cgop($body)) !!
-                    CgOp.bool(1)),
-                CgOp.prog(
-                    CgOp.sink(CgOp.xspan("redo$id", "next$id", 0,
+        $CgOp.prog(
+            ($.init ?? $CgOp.sink($.init.cgop($body)) !! ()),
+            $CgOp.whileloop(0, 0,
+                ($.cond ?? $CgOp.obj_getbool($.cond.cgop($body)) !!
+                    $CgOp.bool(1)),
+                $CgOp.prog(
+                    $CgOp.sink($CgOp.xspan("redo$id", "next$id", 0,
                             $.body.cgop($body), 1, $l, "next$id",
                             2, $l, "last$id", 3, $l, "redo$id")),
-                    ($.step ?? CgOp.sink($.step.cgop($body)) !! ()))),
-            CgOp.label("last$id"),
-            CgOp.corelex('Nil'));
+                    ($.step ?? $CgOp.sink($.step.cgop($body)) !! ()))),
+            $CgOp.label("last$id"),
+            $CgOp.corelex('Nil'));
     }
 }
 
@@ -474,17 +486,17 @@ class ForLoop is Op {
     method zyg() { $.source, $.sink }
 
     method code($body) {
-        CgOp.methodcall(CgOp.subcall(CgOp.fetch(CgOp.corelex('&flat')),
-                $.source.cgop($body)), 'map', CgOp.scopedlex($!sin));
+        $CgOp.methodcall($CgOp.subcall($CgOp.fetch($CgOp.corelex('&flat')),
+                $.source.cgop($body)), 'map', $CgOp.scopedlex($!sin));
     }
 
     method statement_level() {
         my $body = $*CURLEX<!sub>.lookup_lex($!sink)[4];
-        my $var = [ map { ::GLOBAL::NieczaActions.gensym },
+        my $var = [ map { $Actions.gensym },
             0 ..^ $body.count ];
-        ::Op::ImmedForLoop.new(source => $!source, var => $var,
-            sink => ::GLOBAL::OptBeta.make_call($!sink,
-                map { ::Op::LetVar.new(name => $_) }, @$var));
+        $OpImmedForLoop.new(source => $!source, var => $var,
+            sink => $OptBeta.make_call($!sink,
+                map { $OpLetVar.new(name => $_) }, @$var));
     }
 }
 
@@ -502,24 +514,24 @@ class ImmedForLoop is Op {
 
     method code($body) { self.code_labelled($body, '') }
     method code_labelled($body, $l) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
-        CgOp.rnull(CgOp.letn(
-            "!iter$id", CgOp.start_iter($.source.cgop($body)),
-            (map { $_, CgOp.null('var') }, @$.var),
-            CgOp.label("again$id"),
+        $CgOp.rnull($CgOp.letn(
+            "!iter$id", $CgOp.start_iter($.source.cgop($body)),
+            (map { $_, $CgOp.null('var') }, @$.var),
+            $CgOp.label("again$id"),
             (map {
-                CgOp.ncgoto("last$id",
-                    CgOp.iter_hasflat(CgOp.letvar("!iter$id"))),
-                CgOp.letvar($_, CgOp.vvarlist_shift(CgOp.letvar("!iter$id")))
+                $CgOp.ncgoto("last$id",
+                    $CgOp.iter_hasflat($CgOp.letvar("!iter$id"))),
+                $CgOp.letvar($_, $CgOp.vvarlist_shift($CgOp.letvar("!iter$id")))
             }, @$.var),
-            CgOp.sink(CgOp.xspan("redo$id", "next$id", 0,
+            $CgOp.sink($CgOp.xspan("redo$id", "next$id", 0,
                 $.sink.cgop($body),
                 1, $l, "next$id",
                 2, $l, "last$id",
                 3, $l, "redo$id")),
-            CgOp.goto("again$id"),
-            CgOp.label("last$id")));
+            $CgOp.goto("again$id"),
+            $CgOp.label("last$id")));
     }
 }
 
@@ -529,7 +541,7 @@ class Labelled is Op {
     method zyg() { $.stmt }
 
     method code($body) {
-        CgOp.prog(CgOp.label("goto_$.name"),$.stmt.cgop_labelled($body,$.name));
+        $CgOp.prog($CgOp.label("goto_$.name"),$.stmt.cgop_labelled($body,$.name));
     }
 
     method statement_level() {
@@ -543,15 +555,15 @@ class When is Op {
     method zyg() { $.match, $.body }
 
     method code($body) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
-        CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
-                $.match.cgop($body), 'ACCEPTS', CgOp.scopedlex('$_'))),
-            CgOp.xspan("start$id", "end$id", 0, CgOp.prog(
-                    CgOp.control(6, CgOp.null('frame'), CgOp.int(-1),
-                        CgOp.null('str'), $.body.cgop($body))),
+        $CgOp.ternary($CgOp.obj_getbool($CgOp.methodcall(
+                $.match.cgop($body), 'ACCEPTS', $CgOp.scopedlex('$_'))),
+            $CgOp.xspan("start$id", "end$id", 0, $CgOp.prog(
+                    $CgOp.control(6, $CgOp.null('frame'), $CgOp.int(-1),
+                        $CgOp.null('str'), $.body.cgop($body))),
                 7, '', "end$id"),
-            CgOp.corelex('Nil'));
+            $CgOp.corelex('Nil'));
     }
 }
 
@@ -564,12 +576,12 @@ class Start is Op {
     method ctxzyg($f) { $.body, $f }
 
     method code($body) {
-        CgOp.ternary(
-            CgOp.obj_getbool(CgOp.scopedlex($.condvar)),
-            CgOp.corelex('Nil'),
-            CgOp.prog(
-                CgOp.sink(CgOp.assign(CgOp.scopedlex($.condvar),
-                    CgOp.box('Bool', CgOp.bool(1)))),
+        $CgOp.ternary(
+            $CgOp.obj_getbool($CgOp.scopedlex($.condvar)),
+            $CgOp.corelex('Nil'),
+            $CgOp.prog(
+                $CgOp.sink($CgOp.assign($CgOp.scopedlex($.condvar),
+                    $CgOp.box('Bool', $CgOp.bool(1)))),
                 $.body.cgop($body)));
     }
 }
@@ -579,9 +591,9 @@ class Try is Op {
     method zyg() { $.body }
 
     method code($body) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
-        CgOp.xspan("start$id", "end$id", 1, $.body.cgop($body),
+        $CgOp.xspan("start$id", "end$id", 1, $.body.cgop($body),
             5, '', "end$id");
     }
 }
@@ -594,8 +606,8 @@ class Control is Op {
     method zyg() { $.payload }
 
     method code($body) {
-        CgOp.control($.number, CgOp.null('frame'), CgOp.int(-1),
-            ($.name eq '' ?? CgOp.null('str') !! CgOp.str($.name)),
+        $CgOp.control($.number, $CgOp.null('frame'), $CgOp.int(-1),
+            ($.name eq '' ?? $CgOp.null('str') !! $CgOp.str($.name)),
             $.payload.cgop($body));
     }
 }
@@ -605,7 +617,7 @@ class MakeJunction is Op {
     has @.zyg;
 
     method code($body) {
-        CgOp.makejunction($!typecode, map *.cgop($body), @!zyg)
+        $CgOp.makejunction($!typecode, map *.cgop($body), @!zyg)
     }
 }
 
@@ -614,9 +626,9 @@ class MakeJunction is Op {
 
     method code($) {
         if $.value ~~ Array {
-            CgOp.const(CgOp.exactnum(|$.value))
+            $CgOp.const($CgOp.exactnum(|$.value))
         } else {
-            CgOp.const(CgOp.box('Num', CgOp.double($.value)))
+            $CgOp.const($CgOp.box('Num', $CgOp.double($.value)))
         }
     }
     method const_value() { $*unit.numeric_constant(@($!value)) }
@@ -627,13 +639,13 @@ class Attribute is Op {
     has $.name; # Str
     has $.initializer; # Metamodel::Attribute
 
-    method code($) { CgOp.corelex('Nil') }
+    method code($) { $CgOp.corelex('Nil') }
 }
 
 class Whatever is Op {
     has $.slot = die "Whatever.slot required"; # Str
 
-    method code($) { CgOp.corelex('$__Whatever') }
+    method code($) { $CgOp.corelex('$__Whatever') }
 }
 
 class WhateverCode is Op {
@@ -641,17 +653,17 @@ class WhateverCode is Op {
     has $.vars = die "WhateverCode.vars required"; # Array of Str
     has $.slot = die "WhateverCode.slot required"; # Str
 
-    method code($) { CgOp.scopedlex($.slot) }
+    method code($) { $CgOp.scopedlex($.slot) }
 }
 
 class BareBlock is Op {
     has $.var = die "BareBlock.var required"; # Str
 
-    method code($) { CgOp.scopedlex($!var) }
+    method code($) { $CgOp.scopedlex($!var) }
 
     method statement_level() {
         $*CURLEX<!sub>.lookup_lex($!var).[4].set_run_once;
-        ::GLOBAL::OptBeta.make_call($!var);
+        $OptBeta.make_call($!var);
     }
 }
 
@@ -660,7 +672,7 @@ class SubDef is Op {
     has $.symbol; # Str, is rw
     has $.once = False; # is rw, Bool
 
-    method code($) { CgOp.scopedlex($.symbol) }
+    method code($) { $CgOp.scopedlex($.symbol) }
 }
 
 class Lexical is Op {
@@ -670,12 +682,12 @@ class Lexical is Op {
     has $.list; # Bool
     has $.hash; # Bool
 
-    method code($) { CgOp.scopedlex($.name) }
+    method code($) { $CgOp.scopedlex($.name) }
 
     method to_bind($/, $ro, $rhs) {
         my @lex = $*CURLEX<!sub>.lookup_lex($!name) or
             ($/.CURSOR.sorry("Cannot find definition for binding???"),
-                return ::Op::StatementList.new);
+                return $OpStatementList.new);
         my $list = False;
         my $type = $*CURLEX<!sub>.compile_get_pkg('Mu');
         given @lex[0] {
@@ -690,7 +702,7 @@ class Lexical is Op {
                 nextsame;
             }
         }
-        ::Op::LexicalBind.new(name => $!name, :$ro, :$rhs, :$list, :$type);
+        $OpLexicalBind.new(name => $!name, :$ro, :$rhs, :$list, :$type);
     }
 }
 
@@ -698,27 +710,27 @@ class ConstantDecl is Op {
     has $.name = die "ConstantDecl.name required"; # Str
     has $.init; # Op, is rw
 
-    method code($ ) { CgOp.scopedlex($.name) }
+    method code($ ) { $CgOp.scopedlex($.name) }
 }
 
 class ContextVar is Op {
     has $.name = die "ContextVar.name required"; # Str
     has $.uplevel = 0; # Int
 
-    method code($ ) { CgOp.context_get($!name, +$!uplevel); }
+    method code($ ) { $CgOp.context_get($!name, +$!uplevel); }
 }
 
 class Require is Op {
     has $.unit = die "Require.unit required"; # Str
 
-    method code($ ) { CgOp.rnull(CgOp.do_require($.unit)) }
+    method code($ ) { $CgOp.rnull($CgOp.do_require($.unit)) }
 }
 
 class Take is Op {
     has $.value = die "Take.value required"; # Op
     method zyg() { $.value }
 
-    method code($body) { CgOp.take($.value.cgop($body)) }
+    method code($body) { $CgOp.take($.value.cgop($body)) }
 }
 
 class Gather is Op {
@@ -729,17 +741,17 @@ class Gather is Op {
         # construct a GatherIterator with said frame
         # construct a List from the iterator
 
-        CgOp.subcall(CgOp.fetch(CgOp.corelex('&_gather')),
-            CgOp.newscalar(CgOp.startgather(
-                    CgOp.fetch(CgOp.scopedlex($.var)))));
+        $CgOp.subcall($CgOp.fetch($CgOp.corelex('&_gather')),
+            $CgOp.newscalar($CgOp.startgather(
+                    $CgOp.fetch($CgOp.scopedlex($.var)))));
     }
 }
 
 class MakeCursor is Op {
     method code($ ) {
-        CgOp.prog(
-            CgOp.scopedlex('$/', CgOp.newscalar(CgOp.rxcall('MakeCursor'))),
-            CgOp.scopedlex('$/'));
+        $CgOp.prog(
+            $CgOp.scopedlex('$/', $CgOp.newscalar($CgOp.rxcall('MakeCursor'))),
+            $CgOp.scopedlex('$/'));
     }
 }
 
@@ -750,7 +762,7 @@ class MakeCursor is Op {
 class LetVar is Op {
     has $.name = die "LetVar.name required"; # Str
 
-    method code($ ) { CgOp.letvar($.name) }
+    method code($ ) { $CgOp.letvar($.name) }
 }
 
 class RegexBody is Op {
@@ -770,22 +782,22 @@ class RegexBody is Op {
         for keys $u {
             push @mcaps, $_ if $u{$_} >= 2;
         }
-        my @pre = map { CgOp.sink($_.cgop($body)) }, @$.pre;
+        my @pre = map { $CgOp.sink($_.cgop($body)) }, @$.pre;
         my @core = $.rxop.code($body);
-        unshift @pre, CgOp.scopedlex('$*GOAL',
-            CgOp.context_get('$*GOAL', 1)) if $body.has_lexical('$*GOAL');
+        unshift @pre, $CgOp.scopedlex('$*GOAL',
+            $CgOp.context_get('$*GOAL', 1)) if $body.has_lexical('$*GOAL');
 
-        CgOp.prog(
+        $CgOp.prog(
             @pre,
-            CgOp.rxinit(CgOp.str($.name),
-                    CgOp.cast('cursor', CgOp.fetch(CgOp.scopedlex('self'))),
+            $CgOp.rxinit($CgOp.str($.name),
+                    $CgOp.cast('cursor', $CgOp.fetch($CgOp.scopedlex('self'))),
                     +$.passcut),
-            CgOp.rxpushcapture(CgOp.null('var'), @mcaps),
+            $CgOp.rxpushcapture($CgOp.null('var'), @mcaps),
             @core,
-            ($.canback ?? CgOp.rxend !! CgOp.rxfinalend),
-            CgOp.label('backtrack'),
-            CgOp.rxbacktrack,
-            CgOp.null('var'));
+            ($.canback ?? $CgOp.rxend !! $CgOp.rxfinalend),
+            $CgOp.label('backtrack'),
+            $CgOp.rxbacktrack,
+            $CgOp.null('var'));
     }
 }
 
@@ -793,7 +805,7 @@ class YouAreHere is Op {
     has $.unitname; # Str
 
     method code($ ) {
-        CgOp.you_are_here(CgOp.str($.unitname))
+        $CgOp.you_are_here($CgOp.str($.unitname))
     }
 }
 
@@ -801,15 +813,15 @@ class GetBlock is Op {
     has Bool $.routine;
     method code($body is copy) {
         constant %good = (:Routine, :Submethod, :Regex, :Method, :Sub); #OK
-        my $op = CgOp.callframe;
+        my $op = $CgOp.callframe;
         loop {
             die "No current routine" if !$body;
             last if !$body.transparent &&
                 (!$!routine || %good{$body.class});
             $body .= outer;
-            $op = CgOp.frame_outer($op);
+            $op = $CgOp.frame_outer($op);
         }
-        CgOp.newscalar(CgOp.frame_sub($op));
+        $CgOp.newscalar($CgOp.frame_sub($op));
     }
 }
 
@@ -824,7 +836,7 @@ class Assign is Op {
     method zyg() { $.lhs, $.rhs }
 
     method code($body) {
-        CgOp.assign($.lhs.cgop($body), $.rhs.cgop($body));
+        $CgOp.assign($.lhs.cgop($body), $.rhs.cgop($body));
     }
 }
 
@@ -838,7 +850,7 @@ class Builtin is Op {
 
     method code($body) {
         my @a = (map { $_.cgop($body) }, @$.args);
-        CgOp._cgop($!name, |@a);
+        $CgOp._cgop($!name, |@a);
     }
 }
 
@@ -851,7 +863,7 @@ class Let is Op {
     method zyg() { ($.to // Nil), $.in }
 
     method code($body) {
-        CgOp.letn($.var, ($.to ?? $.to.cgop($body) !! CgOp.null($.type)),
+        $CgOp.letn($.var, ($.to ?? $.to.cgop($body) !! $CgOp.null($.type)),
             $.in.cgop($body));
     }
 }
@@ -864,7 +876,7 @@ class LetScope is Op {
     method zyg() { $.inner }
 
     method code($body) {
-        CgOp.letscope(+$.transparent, @($.names), $.inner.cgop($body));
+        $CgOp.letscope(+$.transparent, @($.names), $.inner.cgop($body));
     }
 }
 
@@ -874,9 +886,9 @@ class TopicalHook is Op {
     method zyg() { $.inner }
 
     method code($body) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
-        CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
+        $CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
             6, '', "end$id");
     }
 }
@@ -886,9 +898,9 @@ class LeaveHook is Op {
     method zyg() { $.inner }
 
     method code($body) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
-        CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
+        $CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
             11, '', "end$id");
     }
 }
@@ -899,9 +911,9 @@ class LabelHook is Op {
     method zyg() { $.inner }
 
     method code($body) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
-        CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
+        $CgOp.xspan("start$id", "end$id", 0, $.inner.cgop($body),
             map({ 8, $_, "goto_$_" }, @$.labels));
     }
 }
@@ -915,18 +927,18 @@ class LexicalBind is Op {
     method zyg() { $.rhs }
 
     method code($body) {
-        CgOp.prog(
-            CgOp.scopedlex($!name, !defined($!type) ?? $!rhs.cgop($body) !!
-                    CgOp.newboundvar(+$!ro, +$!list,
-                        CgOp.class_ref('mo', @($!type)), $!rhs.cgop($body))),
-            CgOp.scopedlex($!name))
+        $CgOp.prog(
+            $CgOp.scopedlex($!name, !defined($!type) ?? $!rhs.cgop($body) !!
+                    $CgOp.newboundvar(+$!ro, +$!list,
+                        $CgOp.class_ref('mo', @($!type)), $!rhs.cgop($body))),
+            $CgOp.scopedlex($!name))
     }
 }
 
 class ROify is Op {
     has $.child;
     method zyg() { $.child }
-    method code($body) { CgOp.newscalar(CgOp.fetch($!child.cgop($body))) }
+    method code($body) { $CgOp.newscalar($CgOp.fetch($!child.cgop($body))) }
 }
 
 class Op::StateDecl is Op {
@@ -944,9 +956,9 @@ class Op::DoOnceLoop is Op {
 
     method code($body) { self.code_labelled($body,'') }
     method code_labelled($body, $l) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
-        CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
+        $CgOp.xspan("redo$id", "next$id", 0, $.body.cgop($body),
             1, $l, "next$id", 2, $l, "next$id", 3, $l, "redo$id");
     }
 }
@@ -965,54 +977,54 @@ class Op::FlipFlop is Op {
 
     method code($body) {
         my @code;
-        my $flop  = "flop" ~ ::GLOBAL::NieczaActions.genid;
-        my $check = "check" ~ ::GLOBAL::NieczaActions.genid;
-        my $end   = "end" ~ ::GLOBAL::NieczaActions.genid;
+        my $flop  = "flop" ~ $Actions.genid;
+        my $check = "check" ~ $Actions.genid;
+        my $end   = "end" ~ $Actions.genid;
 
         my $use_hide = $!excl_lhs && !$!sedlike;
 
-        push @code, CgOp.cgoto($flop,
-            CgOp.obj_getbool(CgOp.scopedlex($!state_var)));
-        push @code, CgOp.ncgoto($end, CgOp.obj_getbool($!lhs.cgop($body)));
+        push @code, $CgOp.cgoto($flop,
+            $CgOp.obj_getbool($CgOp.scopedlex($!state_var)));
+        push @code, $CgOp.ncgoto($end, $CgOp.obj_getbool($!lhs.cgop($body)));
 
         if $!sedlike {
-            push @code, CgOp.sink(CgOp._cgop("preinc",
-                CgOp.scopedlex($!state_var)));
-            push @code, CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
-                CgOp.scopedlex($!state_var))) unless $!excl_lhs;
-            push @code, CgOp.goto($end);
+            push @code, $CgOp.sink($CgOp._cgop("preinc",
+                $CgOp.scopedlex($!state_var)));
+            push @code, $CgOp.sink($CgOp.assign($CgOp.letvar("!ret"),
+                $CgOp.scopedlex($!state_var))) unless $!excl_lhs;
+            push @code, $CgOp.goto($end);
         }
         else {
-            push @code, CgOp.letvar("!hide", CgOp.int(1)) if $use_hide;
+            push @code, $CgOp.letvar("!hide", $CgOp.int(1)) if $use_hide;
         }
 
-        push @code, CgOp.label($flop);
-        push @code, CgOp.sink(CgOp._cgop("preinc",
-            CgOp.scopedlex($!state_var)));
-        push @code, CgOp.ncgoto($check, CgOp.obj_getbool($!rhs.cgop($body)));
-        push @code, CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
-            CgOp.scopedlex($!state_var))) unless $!excl_rhs;
-        push @code, CgOp.sink(CgOp.assign(CgOp.scopedlex($!state_var),
-            CgOp.const(CgOp.exactnum(10, 0))));
-        push @code, CgOp.goto($end);
+        push @code, $CgOp.label($flop);
+        push @code, $CgOp.sink($CgOp._cgop("preinc",
+            $CgOp.scopedlex($!state_var)));
+        push @code, $CgOp.ncgoto($check, $CgOp.obj_getbool($!rhs.cgop($body)));
+        push @code, $CgOp.sink($CgOp.assign($CgOp.letvar("!ret"),
+            $CgOp.scopedlex($!state_var))) unless $!excl_rhs;
+        push @code, $CgOp.sink($CgOp.assign($CgOp.scopedlex($!state_var),
+            $CgOp.const($CgOp.exactnum(10, 0))));
+        push @code, $CgOp.goto($end);
 
-        push @code, CgOp.label($check);
+        push @code, $CgOp.label($check);
         # reached if !flopping, !ret will NOT be set at this point, we
         # may be in a lhs if !sedlike
-        push @code, CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
-            CgOp.scopedlex($!state_var)));
+        push @code, $CgOp.sink($CgOp.assign($CgOp.letvar("!ret"),
+            $CgOp.scopedlex($!state_var)));
 
-        push @code, CgOp.label($end);
-        push @code, CgOp.ternary(
-                CgOp.compare('==', CgOp.letvar('!hide'), CgOp.int(1)),
-                CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),CgOp.string_var(''))),
-                CgOp.prog()) if $use_hide;
+        push @code, $CgOp.label($end);
+        push @code, $CgOp.ternary(
+                $CgOp.compare('==', $CgOp.letvar('!hide'), $CgOp.int(1)),
+                $CgOp.sink($CgOp.assign($CgOp.letvar("!ret"),$CgOp.string_var(''))),
+                $CgOp.prog()) if $use_hide;
 
-        CgOp.letn(
-            '!ret', CgOp.newrwscalar(CgOp.fetch(CgOp.string_var(''))),
-            ($use_hide ?? ('!hide', CgOp.int(0)) !! ()),
+        $CgOp.letn(
+            '!ret', $CgOp.newrwscalar($CgOp.fetch($CgOp.string_var(''))),
+            ($use_hide ?? ('!hide', $CgOp.int(0)) !! ()),
             @code,
-            CgOp.letvar('!ret'));
+            $CgOp.letvar('!ret'));
     }
 }
 
@@ -1020,8 +1032,8 @@ class Op::Temporize is Op {
     has Op $.var;
     has Int $.mode;
     method zyg() { $!var }
-    method code($body) { CgOp.temporize($!var.code($body), CgOp.callframe,
-        CgOp.int($!mode)) }
+    method code($body) { $CgOp.temporize($!var.code($body), $CgOp.callframe,
+        $CgOp.int($!mode)) }
 }
 
 class Op::IndirectVar is Op {
@@ -1031,9 +1043,9 @@ class Op::IndirectVar is Op {
     method zyg() { $!name }
 
     method code($body) {
-        CgOp.sc_indir(CgOp.sc_root(), CgOp.obj_getstr($!name.cgop($body)),
-            CgOp.bool($!bind_ro ?? 1 !! 0),
-            $!bind ?? $!bind.cgop($body) !! CgOp.null('var'))
+        $CgOp.sc_indir($CgOp.sc_root(), $CgOp.obj_getstr($!name.cgop($body)),
+            $CgOp.bool($!bind_ro ?? 1 !! 0),
+            $!bind ?? $!bind.cgop($body) !! $CgOp.null('var'))
     }
 
     method to_bind($/, $ro, $rhs) { self.new(name => $!name, bind_ro => $ro,
@@ -1045,13 +1057,13 @@ class Op::CatchyWrapper is Op {
     method zyg() { $!inner }
 
     method code($body) {
-        my $id = ::GLOBAL::NieczaActions.genid;
+        my $id = $Actions.genid;
 
-        CgOp.xspan("start$id", "end$id", 0, CgOp.prog(
-                CgOp.sink($!inner.cgop($body)),
-                CgOp.return(CgOp.scopedlex('False')),
-                CgOp.label("caught$id"),
-                CgOp.scopedlex('True')),
+        $CgOp.xspan("start$id", "end$id", 0, $CgOp.prog(
+                $CgOp.sink($!inner.cgop($body)),
+                $CgOp.return($CgOp.scopedlex('False')),
+                $CgOp.label("caught$id"),
+                $CgOp.scopedlex('True')),
             6, '', "caught$id");
     }
 }
@@ -1059,5 +1071,69 @@ class Op::CatchyWrapper is Op {
 class Op::GeneralConst is Op {
     has $.value;
     method const_value() { $!value }
-    method code($) { CgOp.const($!value) }
+    method code($) { $CgOp.const($!value) }
+}
+
+INIT {
+    $Op = Op;
+    $OpCgOp = Op::CgOp;
+    $OpStatementList = Op::StatementList;
+    $OpCallLike = Op::CallLike;
+    $OpCallSub = Op::CallSub;
+    $OpCallMethod = Op::CallMethod;
+    $OpGetSlot = Op::GetSlot;
+    $OpSetSlot = Op::SetSlot;
+    $OpParen = Op::Paren;
+    $OpSimplePair = Op::SimplePair;
+    $OpSimpleParcel = Op::SimpleParcel;
+    $OpInterrogative = Op::Interrogative;
+    $OpHereStub = Op::HereStub;
+    $OpYada = Op::Yada;
+    $OpShortCircuit = Op::ShortCircuit;
+    $OpShortCircuitAssign = Op::ShortCircuitAssign;
+    $OpStringLiteral = Op::StringLiteral;
+    $OpConditional = Op::Conditional;
+    $OpWhileLoop = Op::WhileLoop;
+    $OpGeneralLoop = Op::GeneralLoop;
+    $OpForLoop = Op::ForLoop;
+    $OpImmedForLoop = Op::ImmedForLoop;
+    $OpLabelled = Op::Labelled;
+    $OpWhen = Op::When;
+    $OpStart = Op::Start;
+    $OpTry = Op::Try;
+    $OpControl = Op::Control;
+    $OpMakeJunction = Op::MakeJunction;
+    $OpNum = Op::Num;
+    $OpAttribute = Op::Attribute;
+    $OpWhatever = Op::Whatever;
+    $OpWhateverCode = Op::WhateverCode;
+    $OpBareBlock = Op::BareBlock;
+    $OpSubDef = Op::SubDef;
+    $OpLexical = Op::Lexical;
+    $OpConstantDecl = Op::ConstantDecl;
+    $OpContextVar = Op::ContextVar;
+    $OpRequire = Op::Require;
+    $OpTake = Op::Take;
+    $OpGather = Op::Gather;
+    $OpMakeCursor = Op::MakeCursor;
+    $OpLetVar = Op::LetVar;
+    $OpRegexBody = Op::RegexBody;
+    $OpYouAreHere = Op::YouAreHere;
+    $OpGetBlock = Op::GetBlock;
+    $OpAssign = Op::Assign;
+    $OpBuiltin = Op::Builtin;
+    $OpLet = Op::Let;
+    $OpLetScope = Op::LetScope;
+    $OpTopicalHook = Op::TopicalHook;
+    $OpLeaveHook = Op::LeaveHook;
+    $OpLabelHook = Op::LabelHook;
+    $OpLexicalBind = Op::LexicalBind;
+    $OpROify = Op::ROify;
+    $OpStateDecl = Op::StateDecl;
+    $OpDoOnceLoop = Op::DoOnceLoop;
+    $OpFlipFlop = Op::FlipFlop;
+    $OpTemporize = Op::Temporize;
+    $OpIndirectVar = Op::IndirectVar;
+    $OpCatchyWrapper = Op::CatchyWrapper;
+    $OpGeneralConst = Op::GeneralConst;
 }

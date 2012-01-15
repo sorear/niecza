@@ -1,3 +1,6 @@
+our ($Actions, $OpLetVar, $OpLexical, $Op, $OpLet, $OpCallSub, $OpLexicalBind,
+     $OpStatementList, $OpStringLiteral);
+
 module OpHelpers;
 
 sub mnode($M) is export {
@@ -7,55 +10,55 @@ sub mnode($M) is export {
 }
 
 sub mklet($value, $body) is export {
-    my $var = ::GLOBAL::NieczaActions.gensym;
-    ::Op::Let.new(var => $var, to => $value,
-        in => $body(::Op::LetVar.new(name => $var)));
+    my $var = $Actions.gensym;
+    $OpLet.new(var => $var, to => $value,
+        in => $body($OpLetVar.new(name => $var)));
 }
 
 sub mkcall($/, $name, *@positionals) is export {
     $/.CURSOR.mark_used($name);
     $*CURLEX<!sub>.noninlinable if $name eq '&eval'; # HACK
-    ::Op::CallSub.new(pos=>$/,
-        invocant => ::Op::Lexical.new(pos=>$/, :$name), :@positionals);
+    $OpCallSub.new(pos=>$/,
+        invocant => $OpLexical.new(pos=>$/, :$name), :@positionals);
 }
 
 sub mklex($/, $name, *%_) is export {
     $/.CURSOR.mark_used($name);
     $*CURLEX<!sub>.noninlinable if $name eq '&eval'; # HACK
-    ::Op::Lexical.new(pos=>$/, :$name, |%_);
+    $OpLexical.new(pos=>$/, :$name, |%_);
 }
 
-sub mkbool($i) is export { ::Op::Lexical.new(name => $i ?? 'True' !! 'False') }
+sub mkbool($i) is export { $OpLexical.new(name => $i ?? 'True' !! 'False') }
 
 sub mktemptopic($/, $item, $expr) is export {
     mklet(mklex($/, '$_'), -> $old_ {
-        ::Op::StatementList.new(pos=>$/, children => [
-            ::Op::LexicalBind.new(:name<$_>, rhs => $item),
+        $OpStatementList.new(pos=>$/, children => [
+            $OpLexicalBind.new(:name<$_>, rhs => $item),
             mklet($expr, -> $result {
-                ::Op::StatementList.new(children => [
-                    ::Op::LexicalBind.new(:name<$_>, rhs => $old_),
+                $OpStatementList.new(children => [
+                    $OpLexicalBind.new(:name<$_>, rhs => $old_),
                     $result]) }) ]) });
 }
 
 sub mkstringycat($/, *@strings) is export {
     my @a;
     for @strings -> $s {
-        my $i = ($s !~~ ::GLOBAL::Op) ?? ::Op::StringLiteral.new(pos=>$/,
+        my $i = ($s !~~ $Op) ?? $OpStringLiteral.new(pos=>$/,
             text => $s) !! $s;
 
         # this *might* belong in an optimization pass
-        if @a && @a[*-1] ~~ ::Op::StringLiteral &&
-                $i ~~ ::Op::StringLiteral {
-            @a[*-1] = ::Op::StringLiteral.new(pos=>$/,
+        if @a && @a[*-1] ~~ $OpStringLiteral &&
+                $i ~~ $OpStringLiteral {
+            @a[*-1] = $OpStringLiteral.new(pos=>$/,
                 text => (@a[*-1].text ~ $i.text));
         } else {
             push @a, $i;
         }
     }
     if @a == 0 {
-        return ::Op::StringLiteral.new(pos=>$/, text => "");
+        return $OpStringLiteral.new(pos=>$/, text => "");
     } elsif  @a == 1 {
-        return (@a[0] ~~ ::Op::StringLiteral) ?? @a[0] !!
+        return (@a[0] ~~ $OpStringLiteral) ?? @a[0] !!
             mkcall($/, '&prefix:<~>', @a[0]);
     } else {
         return mkcall($/, '&infix:<~>', @a);

@@ -29,6 +29,8 @@ our $Actions = NieczaActions;
 our $PassSimplifier = NieczaPassSimplifier;
 our $CgOp = CgOp;
 our $CClass = CClass;
+our $OptBeta = OptBeta;
+our $OptRxSimple = OptRxSimple;
 
 our $Op = Op;
 our $OpCgOp = Op::CgOp;

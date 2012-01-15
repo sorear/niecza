@@ -1,5 +1,6 @@
 our ($OpSimplePair, $OpCallSub, $OpLexical, $OpBuiltin, $OpTake,
      $OpControl, $OpMakeJunction, $OpGeneralConst);
+our ($PassSimplifier);
 
 class NieczaPassSimplifier;
 
@@ -176,3 +177,5 @@ sub run_optree($body, $op, $nv) {
 
     $func($body, $nv, $invname, $op);
 }
+
+INIT { $PassSimplifier = NieczaPassSimplifier; }

@@ -23,7 +23,7 @@ our ($Operator, $Operator_Method, $Operator_Replicate, $Operator_FlipFlop,
      $Operator_DotEq, $Operator_Mixin, $Operator_Let, $Operator_PostCall,
      $Operator_Function, $Operator_CompoundAssign);
 
-our ($CgOp, $CClass, $Sig, $SigParameter);
+our ($CgOp, $CClass, $Sig, $SigParameter, $OptRxSimple, $OptBeta, $Actions);
 
 class NieczaActions;
 
@@ -459,8 +459,8 @@ method rxembed($/, $op, $) {
 
 method op_for_regex($/, $rxop) {
     my @lift = $rxop.oplift;
-    my $ltm = ::GLOBAL::OptRxSimple.run_lad($rxop.lad);
-    my ($orxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
+    my $ltm = $OptRxSimple.run_lad($rxop.lad);
+    my ($orxop, $mb) = $OptRxSimple.run($rxop);
     my $sub = self.thunk_sub($OpRegexBody.new(pos=>$/,
             canback => $mb, pre => @lift, rxop => $orxop),
         class => 'Regex', params => ['self'], :$ltm);
@@ -484,7 +484,7 @@ method quote:m  ($/) {
 method encapsulate_regex($/, $rxop, :$passcut = False) {
     my @lift = $rxop.oplift;
     my $lad = $rxop.lad;
-    my ($nrxop, $mb) = ::GLOBAL::OptRxSimple.run($rxop);
+    my ($nrxop, $mb) = $OptRxSimple.run($rxop);
     my $subop = self.thunk_sub(
         $OpRegexBody.new(canback => $mb, pre => @lift, :$passcut,
             rxop => $nrxop), ltm => $lad, class => 'Regex', params => ['self']);
@@ -545,9 +545,9 @@ method regex_def($/) {
     }
 
     my @lift = $ast.oplift;
-    my $ltm = ::GLOBAL::OptRxSimple.run_lad($ast.lad);
+    my $ltm = $OptRxSimple.run_lad($ast.lad);
     $*CURLEX<!sub>.set_ltm($ltm);
-    ($ast, my $mb) = ::GLOBAL::OptRxSimple.run($ast);
+    ($ast, my $mb) = $OptRxSimple.run($ast);
     if $<regex_block><onlystar> {
         $*CURLEX<!sub>.finish_dispatcher('regex');
     } else {
@@ -1410,7 +1410,7 @@ method circumfix:sym<{ }> ($/) {
 
     if self.check_hash($/) {
         make mkcall($/, '&_hash_constructor',
-            ::GLOBAL::OptBeta.make_call($var));
+            $OptBeta.make_call($var));
     }
 }
 
@@ -3627,7 +3627,7 @@ method block_expr($/, $pb) {
 method inliney_call($/, $block, *@parms) {
     my $sym = self.gensym;
     $*CURLEX<!sub>.add_my_sub($sym, $block);
-    ::GLOBAL::OptBeta.make_call($sym, @parms);
+    $OptBeta.make_call($sym, @parms);
 }
 
 # this is intended to be called after parsing the longname for a sub,
@@ -3981,3 +3981,5 @@ method comp_unit($/) {
 
     make $*unit;
 }
+
+INIT { $Actions = NieczaActions }

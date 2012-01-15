@@ -1,6 +1,5 @@
+our ($Sig, $SigParameter);
 class Sig;
-
-use CgOp;
 
 # Value processing
 our constant $HASTYPE    = 1; #OK not used
@@ -48,4 +47,9 @@ has $.params = die "Sig.params required"; # Array of Sig::Parameter
 
 method simple(*@names) {
     Sig.new(params => [map { Sig::Parameter.simple($_) }, @names]);
+}
+
+INIT {
+    $Sig = Sig;
+    $SigParameter = Sig::Parameter;
 }

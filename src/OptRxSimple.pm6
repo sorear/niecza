@@ -1,3 +1,4 @@
+our ($OptRxSimple);
 class OptRxSimple;
 
 use MONKEY_TYPING;
@@ -77,7 +78,7 @@ augment class RxOp::Sequence { #OK exist
 
 augment class RxOp::Alt { #OK exist
     method rxsimp($cut) {
-        my @lads = map { ::GLOBAL::OptRxSimple.run_lad($_.lad) }, @$.zyg;
+        my @lads = map { OptRxSimple.run_lad($_.lad) }, @$.zyg;
         my @kids = map *.rxsimp($cut), @$.zyg;
         ::RxOp::Alt.new(
             optimized_lads => @lads,
@@ -225,3 +226,4 @@ augment class RxOp::BeforeString { #OK exist
 augment class RxOp::NotBeforeString { #OK exist
     method mayback() { False }
 }
+INIT { $OptRxSimple = OptRxSimple }

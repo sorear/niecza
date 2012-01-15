@@ -2,9 +2,20 @@
 # they abstract functions, macros, and some syntactic forms like
 # method calls.
 #
+our ($Operator, $Operator_Method, $Operator_Replicate, $Operator_FlipFlop,
+     $Operator_SmartMatch, $Operator_Comma, $Operator_Binding,
+     $Operator_ShortCircuit, $Operator_Ternary, $Operator_Temp,
+     $Operator_DotEq, $Operator_Mixin, $Operator_Let, $Operator_PostCall,
+     $Operator_Function, $Operator_CompoundAssign, $Operator_MetaNot);
+
+our ($OpCallSub, $OpCallMethod, $OpConditional, $OpContextVar, $OpFlipFlop,
+     $OpInterrogative, $OpLexical, $OpShortCircuit, $OpSimplePair,
+     $OpSimpleParcel, $OpStatementList, $OpTemporize, $OpWhatever);
+
+our ($Actions);
+
 class Operator;
 
-use Sig;
 use OpHelpers;
 
 method with_args ($/, *@_) { !!! }
@@ -17,24 +28,24 @@ method as_function($/) {
 method whatever_curry() { False }
 method assignish() { False }
 
-method meta_assign() { ::Operator::CompoundAssign.new(base => self); }
-method meta_not() { ::Operator::MetaNot.new(base => self); }
+method meta_assign() { $Operator_CompoundAssign.new(base => self); }
+method meta_not() { $Operator_MetaNot.new(base => self); }
 method meta_fun($/, $fun, $arity, *@extra) {
-    ::Operator::Function.new(function => mklex($/, $fun), :$arity,
+    $Operator_Function.new(function => mklex($/, $fun), :$arity,
         preargs => [ @extra, self.as_function($/) ])
 }
 
 method funop($/, $name, $arity, *@args) {
-    ::Operator::Function.new(function => mklex($/, $name), :@args, :$arity)
+    $Operator_Function.new(function => mklex($/, $name), :@args, :$arity)
 }
 
 method wrap_in_function($/) {
     my @args;
     my $i = -self.arity;
-    while $i++ { push @args, ::GLOBAL::NieczaActions.gensym }
+    while $i++ { push @args, $Actions.gensym }
     my $do = self.with_args($/, map { mklex($/, $_) }, @args);
-    ::GLOBAL::NieczaActions.block_expr($/,
-        ::GLOBAL::NieczaActions.thunk_sub($do, params => @args));
+    $Actions.block_expr($/,
+        $Actions.thunk_sub($do, params => @args));
 }
 
 class Function is Operator {
@@ -53,12 +64,12 @@ class Function is Operator {
     }
 
     method with_args($/, *@args) {
-        ::Op::CallSub.new(pos=>$/, invocant => $.function,
+        $OpCallSub.new(pos=>$/, invocant => $.function,
             positionals => [ @$.preargs, @args, @$.args ])
     }
 
     method !name() {
-        $.function.^isa(::Op::Lexical) ?? $.function.name !! ""
+        $.function.^isa($OpLexical) ?? $.function.name !! ""
     }
 
     method assignish() { self!name eq '&infix:<=>' }
@@ -74,7 +85,7 @@ class PostCall is Operator {
     has $.args = [];
 
     method with_args($/, *@args) {
-        ::Op::CallSub.new(pos=>$/,
+        $OpCallSub.new(pos=>$/,
             invocant => @args[0],
             args => [ @$.args ]);
     }
@@ -102,9 +113,9 @@ class Method is Operator {
         if $!name eq any(< HOW WHAT WHO VAR >) && !$!private && !$!meta {
             if $!args {
                 $/.CURSOR.sorry("Interrogative operator $.name does not take arguments");
-                return ::Op::StatementList.new;
+                return $OpStatementList.new;
             }
-            ::Op::Interrogative.new(pos=>$/, receiver => @args[0],
+            $OpInterrogative.new(pos=>$/, receiver => @args[0],
                 name => $.name);
         } else {
             $*CURLEX<!sub>.noninlinable if $!name eq 'eval';
@@ -123,7 +134,7 @@ class Method is Operator {
             } else {
                 $pclass = $.package;
             }
-            ::Op::CallMethod.new(pos=>$/,
+            $OpCallMethod.new(pos=>$/,
                 receiver => @args[0],
                 ismeta   => $.meta,
                 name     => $.name,
@@ -141,10 +152,10 @@ class Operator::FlipFlop is Operator {
     has Bool $.sedlike;
 
     method with_args($/, *@args) {
-        my $state_var = ::GLOBAL::NieczaActions.gensym;
+        my $state_var = $Actions.gensym;
         $*CURLEX<!sub>.add_state_name(Str, $state_var);
-        @args[1] := mklex($/, 'False') if @args[1].^isa(::Op::Whatever);
-        ::Op::FlipFlop.new(pos=>$/, :$state_var, :$!excl_lhs, :$!excl_rhs,
+        @args[1] := mklex($/, 'False') if @args[1].^isa($OpWhatever);
+        $OpFlipFlop.new(pos=>$/, :$state_var, :$!excl_lhs, :$!excl_rhs,
             :$!sedlike, :lhs(@args[0]), :rhs(@args[1]))
     }
 
@@ -155,7 +166,7 @@ class ShortCircuit is Operator {
     has $.kind; # Str
 
     method with_args($/, *@args) {
-        ::Op::ShortCircuit.new(pos=>$/, kind => $.kind, args => [ @args ])
+        $OpShortCircuit.new(pos=>$/, kind => $.kind, args => [ @args ])
     }
 
     method whatever_curry() { True }
@@ -166,8 +177,8 @@ class CompoundAssign is Operator {
 
     method with_args($/, *@rest) {
         my $left = shift @rest;
-        if $left.^isa(::Op::Lexical) {
-            my $nlft = ::Op::Lexical.new(pos=>$/, name => $left.name);
+        if $left.^isa($OpLexical) {
+            my $nlft = $OpLexical.new(pos=>$/, name => $left.name);
             mkcall($/, '&infix:<=>', $left, $.base.with_args($/, $nlft, @rest));
         } else {
             mklet($left, -> $ll {
@@ -209,9 +220,9 @@ class Comma is Operator {
     method with_args($/, *@args) {
         my @bits;
         for @args -> $a {
-            push @bits, $a.^isa(::Op::SimpleParcel) ?? @( $a.items ) !! $a;
+            push @bits, $a.^isa($OpSimpleParcel) ?? @( $a.items ) !! $a;
         }
-        ::Op::SimpleParcel.new(pos=>$/, items => @bits);
+        $OpSimpleParcel.new(pos=>$/, items => @bits);
     }
     method as_function($/) { mklex($/, '&infix:<,>') }
 }
@@ -219,7 +230,7 @@ class Comma is Operator {
 class Ternary is Operator {
     has $.middle; # Op
     method with_args($/, *@args) {
-        ::Op::Conditional.new(pos=>$/, check => @args[0], true => $.middle,
+        $OpConditional.new(pos=>$/, check => @args[0], true => $.middle,
             false => @args[1]);
     }
 }
@@ -227,30 +238,30 @@ class Ternary is Operator {
 class Temp is Operator {
     method with_args($/, *@args) {
         my $rarg = @args[0];
-        if !$rarg.^isa(::Op::ContextVar) || $rarg.uplevel {
+        if !$rarg.^isa($OpContextVar) || $rarg.uplevel {
             $*CURLEX<!sub>.noninlinable;
-            return ::Op::Temporize.new(pos=>$/, mode => 0, var => $rarg);
+            return $OpTemporize.new(pos=>$/, mode => 0, var => $rarg);
         }
         my $hash = substr($rarg.name,0,1) eq '%';
         my $list = substr($rarg.name,0,1) eq '@';
         $*CURLEX<!sub>.add_my_name($rarg.name, :$hash, :$list);
         mkcall($/, '&infix:<=>',
-            ::Op::Lexical.new(name => $rarg.name, :$hash, :$list),
-            ::Op::ContextVar.new(name => $rarg.name, uplevel => 1));
+            $OpLexical.new(name => $rarg.name, :$hash, :$list),
+            $OpContextVar.new(name => $rarg.name, uplevel => 1));
     }
 }
 
 class Operator::Let is Operator {
     method with_args($/, *@args) {
         $*CURLEX<!sub>.noninlinable;
-        return ::Op::Temporize.new(pos=>$/, mode => 1, var => @args[0]);
+        return $OpTemporize.new(pos=>$/, mode => 1, var => @args[0]);
     }
 }
 
 class SmartMatch is Operator {
     method as_function($/) { mklex($/, '&infix:<~~>') }
     method with_args($/, *@args) {
-        mktemptopic($/, @args[0], ::Op::CallMethod.new(receiver => @args[1],
+        mktemptopic($/, @args[0], $OpCallMethod.new(receiver => @args[1],
             name => 'ACCEPTS', args => [ mklex($/, '$_') ]));
     }
 }
@@ -267,22 +278,42 @@ class DotEq is Operator {
 class Operator::Replicate is Operator {
     method as_function($/) { mklex($/, '&infix:<xx>') }
     method with_args($/, *@args) {
-        mkcall($/, '&_doreplicate', ::GLOBAL::NieczaActions.block_expr($/,
-            ::GLOBAL::NieczaActions.thunk_sub(@args[0])), @args[1]);
+        mkcall($/, '&_doreplicate', $Actions.block_expr($/,
+            $Actions.thunk_sub(@args[0])), @args[1]);
     }
 }
 
 # A bit hackish; handles the macro aspects of $foo does Role(23)
 class Operator::Mixin is Operator::Function {
     method with_args($/, *@args) {
-        if @args[1] ~~ ::Op::CallSub {
-            nextsame if @args[1].invocant ~~ ::Op::Lexical && @args[1].invocant.name eq '&_param_role_inst';
+        if @args[1] ~~ $OpCallSub {
+            nextsame if @args[1].invocant ~~ $OpLexical && @args[1].invocant.name eq '&_param_role_inst';
             $/.CURSOR.sorry("Can only provide exactly one initial value to a mixin") unless @args[1].getargs.elems == 1;
-            ::Op::CallSub.new(pos=>$/, invocant => $.function,
-                args => [@args[0], @args[1].invocant, ::Op::SimplePair.new(
+            $OpCallSub.new(pos=>$/, invocant => $.function,
+                args => [@args[0], @args[1].invocant, $OpSimplePair.new(
                     key => 'value', value => @args[1].getargs[0] // mklex($/,'Nil'))]);
         } else {
             nextsame;
         }
     }
+}
+
+INIT {
+    $Operator = Operator;
+    $Operator_Function = Operator::Function;
+    $Operator_PostCall = Operator::PostCall;
+    $Operator_Method = Operator::Method;
+    $Operator_FlipFlop = Operator::FlipFlop;
+    $Operator_ShortCircuit = Operator::ShortCircuit;
+    $Operator_CompoundAssign = Operator::CompoundAssign;
+    $Operator_MetaNot = Operator::MetaNot;
+    $Operator_Binding = Operator::Binding;
+    $Operator_Comma = Operator::Comma;
+    $Operator_Ternary = Operator::Ternary;
+    $Operator_Temp = Operator::Temp;
+    $Operator_Let = Operator::Let;
+    $Operator_SmartMatch = Operator::SmartMatch;
+    $Operator_DotEq = Operator::DotEq;
+    $Operator_Replicate = Operator::Replicate;
+    $Operator_Mixin = Operator::Mixin;
 }

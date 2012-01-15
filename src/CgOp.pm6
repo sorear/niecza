@@ -1,3 +1,4 @@
+our ($CgOp);
 class CgOp;
 
 method _cgop(*@bits) {
@@ -115,3 +116,5 @@ method methodcall($obj, $name, *@args) {
     my ($sig, $aout) = CgOp._process_arglist(@args);
     CgOp._cgop('methodcall', $name, $sig, $obj, @$aout);
 }
+
+INIT { $CgOp = CgOp }

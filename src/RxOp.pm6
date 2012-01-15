@@ -1,7 +1,16 @@
-class RxOp;
+our ($RxOp, $RxOpCapturing, $RxOpSym, $RxOpString, $RxOpVarString,
+     $RxOpQuantifier, $RxOpSequence, $RxOpConj, $RxOpAltBase, $RxOpSeqAlt,
+     $RxOpConfineLang, $RxOpCut, $RxOpBeforeString, $RxOpZeroWidthCCs,
+     $RxOpNotBeforeString, $RxOpZeroWidth, $RxOpNotBefore, $RxOpBefore,
+     $RxOpTilde, $RxOpSubrule, $RxOpSigspace, $RxOpCutLTM, $RxOpCutRule,
+     $RxOpCutBrack, $RxOpSetLang, $RxOpAlt, $RxOpCheckBlock, $RxOpSaveValue,
+     $RxOpVoidBlock, $RxOpStatement, $RxOpProtoRedis, $RxOpAny,
+     $RxOpQuantCClass, $RxOpCClassElem, $RxOpNone, $RxOpNewline,
+     $RxOpStringCap, $RxOpListPrim, $RxOpEndpoint);
 
-use CgOp;
-use CClass;
+our ($CgOp, $CClass);
+
+class RxOp;
 
 has $.zyg = []; # Array of RxOp
 
@@ -10,7 +19,7 @@ method ctxopzyg() { map *.ctxopzyg, @$!zyg }
 method oplift()   { map *.oplift, @$!zyg }
 method uncut()    { self }
 
-method tocclist() { CClass }
+method tocclist() { $CClass }
 
 # all that matters is 0-1-infty; $*in_quant valid here
 method used_caps() {
@@ -58,18 +67,18 @@ class Sym is Capturing {
         my $t = $.text;
         # We aren't going to make a real Match unless somebody comes up with
         # a good reason.
-        my $p = CgOp.rxpushcapture(CgOp.string_var($t), @$.captures);
+        my $p = $CgOp.rxpushcapture($CgOp.string_var($t), @$.captures);
         my $ic = $.igcase ?? "NoCase" !! "";
         my @e = !defined($.endsym) ?? () !!
             ::RxOp::Subrule.new(method => $.endsym, :selfcut).code($body);
         if chars($t) == 1 {
-            $p, CgOp.rxbprim("ExactOne$ic", CgOp.char($t)), @e;
+            $p, $CgOp.rxbprim("ExactOne$ic", $CgOp.char($t)), @e;
         } else {
-            $p, CgOp.rxbprim("Exact$ic", CgOp.str($t)), @e;
+            $p, $CgOp.rxbprim("Exact$ic", $CgOp.str($t)), @e;
         }
     }
 
-    method tocclist() { $!text.comb.map({ CClass.enum($_) }) }
+    method tocclist() { $!text.comb.map({ $CClass.enum($_) }) }
 
     method lad() {
         my $m = [ ($!igcase ?? 'StrNoCase' !! 'Str'), $!text ];
@@ -85,13 +94,13 @@ class String is RxOp {
         my $t = $!text;
         my $ic = $!igcase ?? "NoCase" !! "";
         if chars($t) == 1 {
-            CgOp.rxbprim("ExactOne$ic", CgOp.char($t));
+            $CgOp.rxbprim("ExactOne$ic", $CgOp.char($t));
         } else {
-            CgOp.rxbprim("Exact$ic", CgOp.str($t));
+            $CgOp.rxbprim("Exact$ic", $CgOp.str($t));
         }
     }
 
-    method tocclist() { $!text.comb.map({ CClass.enum($_) }) }
+    method tocclist() { $!text.comb.map({ $CClass.enum($_) }) }
 
     method lad() {
         [ ($!igcase ?? 'StrNoCase' !! 'Str'), $!text ];
@@ -104,7 +113,7 @@ class VarString is RxOp {
     method opzyg() { $!ops }
 
     method code($body) {
-        CgOp.rxbprim('Exact', CgOp.obj_getstr($!ops.cgop($body)));
+        $CgOp.rxbprim('Exact', $CgOp.obj_getstr($!ops.cgop($body)));
     }
 
     method lad() { ['Imp'] }
@@ -134,8 +143,8 @@ class Quantifier is RxOp {
     }
 
     method code($body) {
-        my $rmin = $!closure ?? CgOp.letvar('!min') !! CgOp.int($!min);
-        my $rmax = $!closure ?? CgOp.letvar('!max') !! CgOp.int($!max//2**31-1);
+        my $rmin = $!closure ?? $CgOp.letvar('!min') !! $CgOp.int($!min);
+        my $rmax = $!closure ?? $CgOp.letvar('!max') !! $CgOp.int($!max//2**31-1);
 
         my $exit   = self.label;
         my $repeat = self.label;
@@ -143,59 +152,59 @@ class Quantifier is RxOp {
 
         my @code;
 
-        push @code, CgOp.cgoto('backtrack',
-            CgOp.compare('>', CgOp.int(0), $rmax)) if $!closure ||
+        push @code, $CgOp.cgoto('backtrack',
+            $CgOp.compare('>', $CgOp.int(0), $rmax)) if $!closure ||
                 defined($!max) && $!max < 0;
-        push @code, CgOp.rxopenquant;
+        push @code, $CgOp.rxopenquant;
 
         sub exit($label, $cond) {
             if $!minimal {
-                push @code, CgOp.ternary($cond,
-                    CgOp.prog(CgOp.rxpushb('QUANT', $label),
-                        CgOp.goto($exit)), CgOp.prog());
+                push @code, $CgOp.ternary($cond,
+                    $CgOp.prog($CgOp.rxpushb('QUANT', $label),
+                        $CgOp.goto($exit)), $CgOp.prog());
             } else {
-                push @code, CgOp.ternary($cond,
-                    CgOp.rxpushb('QUANT', $exit), CgOp.prog());
+                push @code, $CgOp.ternary($cond,
+                    $CgOp.rxpushb('QUANT', $exit), $CgOp.prog());
             }
         }
 
         # Allow 0-time exit matching null string
-        exit($repeat, CgOp.compare('<', $rmin, CgOp.int(1)));
+        exit($repeat, $CgOp.compare('<', $rmin, $CgOp.int(1)));
 
         # We have to match something now
-        push @code, CgOp.label($repeat);
-        push @code, CgOp.cgoto('backtrack',
-            CgOp.compare('>=', CgOp.rxgetquant, $rmax));
+        push @code, $CgOp.label($repeat);
+        push @code, $CgOp.cgoto('backtrack',
+            $CgOp.compare('>=', $CgOp.rxgetquant, $rmax));
         push @code, $.zyg[0].code($body);
-        push @code, CgOp.rxincquant;
+        push @code, $CgOp.rxincquant;
 
         if $.zyg[1] {
-            exit($sep, CgOp.compare('>=', CgOp.rxgetquant, $rmin));
+            exit($sep, $CgOp.compare('>=', $CgOp.rxgetquant, $rmin));
 
-            push @code, CgOp.label($sep);
+            push @code, $CgOp.label($sep);
             push @code, $.zyg[1].code($body);
 
             # Allow exiting here if a trailing separator is allowed
             if $!opsep {
-                exit($repeat, CgOp.compare('>=', CgOp.rxgetquant, $rmin));
+                exit($repeat, $CgOp.compare('>=', $CgOp.rxgetquant, $rmin));
             }
         } else {
-            exit($repeat, CgOp.compare('>=', CgOp.rxgetquant, $rmin));
+            exit($repeat, $CgOp.compare('>=', $CgOp.rxgetquant, $rmin));
         }
 
-        push @code, CgOp.goto($repeat);
+        push @code, $CgOp.goto($repeat);
 
-        push @code, CgOp.label($exit);
-        push @code, CgOp.sink(CgOp.rxclosequant);
+        push @code, $CgOp.label($exit);
+        push @code, $CgOp.sink($CgOp.rxclosequant);
 
         return @code unless $!closure;
 
-        return CgOp.letn(
+        return $CgOp.letn(
             '!range', $!closure.code($body),
-            '!min', CgOp.cast('int', CgOp.obj_getnum(CgOp.methodcall(
-                        CgOp.letvar('!range'), 'niecza_quantifier_min'))),
-            '!max', CgOp.cast('int', CgOp.obj_getnum(CgOp.methodcall(
-                        CgOp.letvar('!range'), 'niecza_quantifier_max'))),
+            '!min', $CgOp.cast('int', $CgOp.obj_getnum($CgOp.methodcall(
+                        $CgOp.letvar('!range'), 'niecza_quantifier_min'))),
+            '!max', $CgOp.cast('int', $CgOp.obj_getnum($CgOp.methodcall(
+                        $CgOp.letvar('!range'), 'niecza_quantifier_max'))),
             @code);
     }
 
@@ -214,7 +223,7 @@ class Quantifier is RxOp {
 class Sequence is RxOp {
     # zyg * N
 
-    method code($body) { CgOp.prog(map { $_.code($body) }, @$.zyg); }
+    method code($body) { $CgOp.prog(map { $_.code($body) }, @$.zyg); }
 
     method lad() { [ 'Sequence', [ map { $_.lad }, @$.zyg ] ] }
 
@@ -229,20 +238,20 @@ class Conj is RxOp {
         my @code;
         return () unless @z;
 
-        push @code, CgOp.rxcall('PushConjStart');
+        push @code, $CgOp.rxcall('PushConjStart');
         push @code, shift(@z).code($body);
-        push @code, CgOp.rxcall('PushConjEnd');
+        push @code, $CgOp.rxcall('PushConjEnd');
 
         for @z -> $subseq {
-            push @code, CgOp.rxcall('GotoConjStart');
+            push @code, $CgOp.rxcall('GotoConjStart');
             push @code, $subseq.code($body);
-            push @code, CgOp.rxbprim('CheckConjEnd');
+            push @code, $CgOp.rxbprim('CheckConjEnd');
         }
 
-        push @code, CgOp.rxcall('EndConj');
+        push @code, $CgOp.rxcall('EndConj');
 
 
-        CgOp.prog(map { $_.code($body) }, @$.zyg);
+        $CgOp.prog(map { $_.code($body) }, @$.zyg);
     }
 
     method lad() { [ 'Imp' ] }
@@ -273,10 +282,10 @@ class SeqAlt is AltBase {
 
         my $i = 0;
         while $i < $n {
-            push @code, CgOp.rxpushb("SEQALT", @ends[$i]) unless $i == $n - 1;
+            push @code, $CgOp.rxpushb("SEQALT", @ends[$i]) unless $i == $n - 1;
             push @code, $.zyg[$i].code($body);
-            push @code, CgOp.goto(@ends[$n-1]) unless $i == $n-1;
-            push @code, CgOp.label(@ends[$i]);
+            push @code, $CgOp.goto(@ends[$n-1]) unless $i == $n-1;
+            push @code, $CgOp.label(@ends[$i]);
             $i++;
         }
 
@@ -290,9 +299,9 @@ class ConfineLang is RxOp {
     # Note that BRACK automatically confines the language change
     method code($body) {
         my @code;
-        push @code, CgOp.pushcut("BRACK");
+        push @code, $CgOp.pushcut("BRACK");
         push @code, $.zyg[0].code($body);
-        push @code, CgOp.popcut;
+        push @code, $CgOp.popcut;
         @code;
     }
 
@@ -306,10 +315,10 @@ class Cut is RxOp {
 
     method code($body) {
         my @code;
-        push @code, CgOp.pushcut("CUTGRP");
+        push @code, $CgOp.pushcut("CUTGRP");
         push @code, $.zyg[0].code($body);
-        push @code, CgOp.rxcommitgroup(CgOp.str("CUTGRP"));
-        push @code, CgOp.popcut;
+        push @code, $CgOp.rxcommitgroup($CgOp.str("CUTGRP"));
+        push @code, $CgOp.popcut;
 
         @code;
     }
@@ -319,21 +328,21 @@ class BeforeString is RxOp {
     has $.str = die "RxOp::BeforeString.str required"; # Str
 
     method code($) {
-        CgOp.rxbprim('BeforeStr', CgOp.bool(0), CgOp.str($.str));
+        $CgOp.rxbprim('BeforeStr', $CgOp.bool(0), $CgOp.str($.str));
     }
 }
 
 class ZeroWidthCCs is RxOp {
-    has $.ccs   = die "ZeroWidthCCs.ccs required"; # Array of CClass
+    has $.ccs   = die "ZeroWidthCCs.ccs required"; # Array of $CClass
     has $.after = die "ZeroWidthCCs.after required"; # Bool
     has $.neg   = die "ZeroWidthCCs.neg required"; # Bool
 
     method lad() { [ 'Null' ] }
 
     method code($) {
-        CgOp.rxbprim(($!after ?? 'AfterCCs' !! 'BeforeCCs'),
-            CgOp.bool(+$!neg), CgOp.const(CgOp.fcclist_new(
-                    map { CgOp.cc_expr($_) }, @$!ccs)));
+        $CgOp.rxbprim(($!after ?? 'AfterCCs' !! 'BeforeCCs'),
+            $CgOp.bool(+$!neg), $CgOp.const($CgOp.fcclist_new(
+                    map { $CgOp.cc_expr($_) }, @$!ccs)));
     }
 }
 
@@ -341,7 +350,7 @@ class NotBeforeString is RxOp {
     has $.str = die "NotBeforeString.str required"; # Str
 
     method code($body) { #OK not used
-        CgOp.rxbprim('BeforeStr', CgOp.bool(1), CgOp.str($!str));
+        $CgOp.rxbprim('BeforeStr', $CgOp.bool(1), $CgOp.str($!str));
     }
 }
 
@@ -349,7 +358,7 @@ class ZeroWidth is RxOp {
     has $.type = die "ZeroWidth.type required"; # Str
 
     my %map = '<<' => 0, '>>' => 1, '^' => 2, '$' => 3, '^^' => 4, '$$' => 5;
-    method code($) { CgOp.rxbprim('ZeroWidth', CgOp.int(%map{$!type})); }
+    method code($) { $CgOp.rxbprim('ZeroWidth', $CgOp.int(%map{$!type})); }
     method lad() { [ 'Null' ] }
 }
 
@@ -357,13 +366,13 @@ class NotBefore is RxOp {
     method code($body) {
         my $pass = self.label;
         my @code;
-        push @code, CgOp.pushcut("NOTBEFORE");
-        push @code, CgOp.rxpushb("NOTBEFORE", $pass);
+        push @code, $CgOp.pushcut("NOTBEFORE");
+        push @code, $CgOp.rxpushb("NOTBEFORE", $pass);
         push @code, $.zyg[0].code($body);
-        push @code, CgOp.rxcall('CommitGroup', CgOp.str("NOTBEFORE"));
-        push @code, CgOp.goto('backtrack');
-        push @code, CgOp.label($pass);
-        push @code, CgOp.popcut;
+        push @code, $CgOp.rxcall('CommitGroup', $CgOp.str("NOTBEFORE"));
+        push @code, $CgOp.goto('backtrack');
+        push @code, $CgOp.label($pass);
+        push @code, $CgOp.popcut;
 
         @code;
     }
@@ -391,18 +400,18 @@ class Tilde is RxOp {
 
         $body.add_my_name('$*GOAL') unless $body.has_lexical('$*GOAL');
 
-        push @code, CgOp.rxcall("PushGoal", CgOp.callframe, CgOp.str($!closer));
+        push @code, $CgOp.rxcall("PushGoal", $CgOp.callframe, $CgOp.str($!closer));
         push @code, $.zyg[0].code($body);
-        push @code, CgOp.rxpushb("TILDE", $fail);
-        push @code, CgOp.rxbprim('Exact', CgOp.str($!closer));
-        push @code, CgOp.goto($pass);
-        push @code, CgOp.label($fail);
-        push @code, CgOp.sink(CgOp.methodcall(CgOp.newscalar(
-                CgOp.rxcall("MakeCursor")), 'FAILGOAL',
-            CgOp.string_var($!closer), CgOp.string_var($!dba),
-            CgOp.box('Num', CgOp.cast('num', CgOp.rxgetquant))));
-        push @code, CgOp.label($pass);
-        push @code, CgOp.rxcall("PopGoal", CgOp.callframe);
+        push @code, $CgOp.rxpushb("TILDE", $fail);
+        push @code, $CgOp.rxbprim('Exact', $CgOp.str($!closer));
+        push @code, $CgOp.goto($pass);
+        push @code, $CgOp.label($fail);
+        push @code, $CgOp.sink($CgOp.methodcall($CgOp.newscalar(
+                $CgOp.rxcall("MakeCursor")), 'FAILGOAL',
+            $CgOp.string_var($!closer), $CgOp.string_var($!dba),
+            $CgOp.box('Num', $CgOp.cast('num', $CgOp.rxgetquant))));
+        push @code, $CgOp.label($pass);
+        push @code, $CgOp.rxcall("PopGoal", $CgOp.callframe);
 
         @code;
     }
@@ -429,20 +438,20 @@ class Subrule is Capturing {
 
     method code($body) {
         my $callf = $!regex ?? $!regex.cgop($body) !!
-            CgOp.methodcall(CgOp.rxcall("MakeCursorV"),
+            $CgOp.methodcall($CgOp.rxcall("MakeCursorV"),
                 $!method);
 
         my @code;
 
         if $!selfcut {
-            push @code, CgOp.rxincorpcut($.captures, +?$!zerowidth,
+            push @code, $CgOp.rxincorpcut($.captures, +?$!zerowidth,
                 +?$!negative, $callf);
         } else {
             my $bt = self.label;
 
-            push @code, CgOp.rxcall("InitCursorList", $callf);
-            push @code, CgOp.label($bt);
-            push @code, CgOp.rxincorpshift($.captures, $bt);
+            push @code, $CgOp.rxcall("InitCursorList", $callf);
+            push @code, $CgOp.label($bt);
+            push @code, $CgOp.rxincorpshift($.captures, $bt);
         }
 
         @code;
@@ -464,17 +473,17 @@ class Sigspace is RxOp {
 }
 
 class CutLTM is RxOp {
-    method code($) { CgOp.rxcall('CommitGroup', CgOp.str("LTM")) }
+    method code($) { $CgOp.rxcall('CommitGroup', $CgOp.str("LTM")) }
     method lad() { [ 'Imp' ]; } #special case
 }
 
 class CutRule is RxOp {
-    method code($) { CgOp.rxcall('CommitRule') }
+    method code($) { $CgOp.rxcall('CommitRule') }
     method lad() { [ 'Null' ]; }
 }
 
 class CutBrack is RxOp {
-    method code($) { CgOp.rxcall('CommitGroup', CgOp.str("BRACK")) }
+    method code($) { $CgOp.rxcall('CommitGroup', $CgOp.str("BRACK")) }
     method lad() { [ 'Null' ]; }
 }
 
@@ -484,7 +493,7 @@ class SetLang is RxOp {
     method opzyg() { $!expr }
 
     method code($body) {
-        CgOp.rxsetclass(CgOp.obj_llhow(CgOp.fetch($!expr.cgop($body))));
+        $CgOp.rxsetclass($CgOp.obj_llhow($CgOp.fetch($!expr.cgop($body))));
     }
 
     method lad() { ['Imp'] }
@@ -498,17 +507,17 @@ class Alt is AltBase {
         my $end = self.label;
 
         my @code;
-        push @code, CgOp.ltm_push_alts([@lads], $.dba, [@ls]);
-        push @code, CgOp.goto('backtrack');
+        push @code, $CgOp.ltm_push_alts([@lads], $.dba, [@ls]);
+        push @code, $CgOp.goto('backtrack');
         my $i = 0;
         while $i < @ls {
-            push @code, CgOp.label(@ls[$i]);
+            push @code, $CgOp.label(@ls[$i]);
             push @code, $.zyg[$i].code($body);
-            push @code, CgOp.goto($end) unless $i == @ls - 1;
+            push @code, $CgOp.goto($end) unless $i == @ls - 1;
             $i++;
         }
-        push @code, CgOp.label($end);
-        push @code, CgOp.popcut;
+        push @code, $CgOp.label($end);
+        push @code, $CgOp.popcut;
         @code;
     }
 
@@ -523,7 +532,7 @@ class CheckBlock is RxOp {
 
     method code($body) {
         my $m = $!negate ?? "cgoto" !! "ncgoto";
-        CgOp."$m"('backtrack', CgOp.obj_getbool($!block.cgop($body)));
+        $CgOp."$m"('backtrack', $CgOp.obj_getbool($!block.cgop($body)));
     }
 
     method lad() { ['Null'] }
@@ -539,7 +548,7 @@ class SaveValue is RxOp {
         { $.capid => ($*in_quant ?? 2 !! 1) }
     }
 
-    method code($body) { CgOp.rxpushcapture($!block.cgop($body), $!capid); }
+    method code($body) { $CgOp.rxpushcapture($!block.cgop($body), $!capid); }
     method lad() { ['Imp'] }
 }
 
@@ -548,7 +557,7 @@ class VoidBlock is RxOp {
     method ctxopzyg() { $!block, 0 }
     method opzyg() { $!block }
 
-    method code($body) { CgOp.sink($!block.cgop($body)); }
+    method code($body) { $CgOp.sink($!block.cgop($body)); }
     method lad() { ['Imp'] }
 }
 
@@ -556,7 +565,7 @@ class Statement is RxOp {
     has $.stmt = die "Statement.stmt required"; # Op
     method oplift() { $!stmt }
 
-    method code($) { CgOp.prog() }
+    method code($) { $CgOp.prog() }
     method lad() { ['Null'] }
 }
 
@@ -569,10 +578,10 @@ class ProtoRedis is RxOp::Capturing {
         my $bt = self.label;
 
         my @code;
-        push @code, CgOp.rxcall("InitCursorList",
-            CgOp.rxlprim('proto_dispatch', CgOp.scopedlex('Any')));
-        push @code, CgOp.label($bt);
-        push @code, CgOp.rxincorpshift($.captures, $bt);
+        push @code, $CgOp.rxcall("InitCursorList",
+            $CgOp.rxlprim('proto_dispatch', $CgOp.scopedlex('Any')));
+        push @code, $CgOp.label($bt);
+        push @code, $CgOp.rxincorpshift($.captures, $bt);
         @code;
     }
 
@@ -580,7 +589,7 @@ class ProtoRedis is RxOp::Capturing {
 }
 
 class Any is RxOp {
-    method code($) { CgOp.rxbprim("AnyChar") }
+    method code($) { $CgOp.rxbprim("AnyChar") }
     method lad() { ['Dot'] }
 }
 
@@ -591,27 +600,27 @@ class QuantCClass is RxOp {
     has $.max;
 
     method code($) {
-        CgOp.rxbprim("ScanCClass", CgOp.int($.min),
-            CgOp.int($.max // 0x7FFF_FFFF),
-            CgOp.const(CgOp.cc_expr($.cc)));
+        $CgOp.rxbprim("ScanCClass", $CgOp.int($.min),
+            $CgOp.int($.max // 0x7FFF_FFFF),
+            $CgOp.const($CgOp.cc_expr($.cc)));
     }
 }
 
 class CClassElem is RxOp {
     has $.cc = die "CClassElem.cc required"; # CClass
 
-    method code($) { CgOp.rxbprim("CClass", CgOp.const(CgOp.cc_expr($.cc))); }
+    method code($) { $CgOp.rxbprim("CClass", $CgOp.const($CgOp.cc_expr($.cc))); }
     method tocclist { $.cc }
     method lad() { [ 'CC', @( $.cc.terms ) ] }
 }
 
 class None is RxOp {
-    method code($) { CgOp.goto('backtrack') }
+    method code($) { $CgOp.goto('backtrack') }
     method lad() { ['None'] }
 }
 
 class RxOp::Newline is RxOp {
-    method code($) { CgOp.rxbprim('Newline') }
+    method code($) { $CgOp.rxbprim('Newline') }
     method lad() {
         ['Any', [ ['Str', "\x0D\x0A"],
                   [ 'CC', @( $CClass::VSpace.terms ) ] ] ]
@@ -628,11 +637,11 @@ class RxOp::StringCap is RxOp::Capturing {
     method code($body) { #OK not used
         my @code;
 
-        push @code, CgOp.pushcut("CAP");
-        push @code, CgOp.rxsetquant(CgOp.rxgetpos);
+        push @code, $CgOp.pushcut("CAP");
+        push @code, $CgOp.rxsetquant($CgOp.rxgetpos);
         push @code, $.zyg[0].code($body);
-        push @code, CgOp.rxpushcapture(CgOp.rxcall("StringCapture"), @$.captures);
-        push @code, CgOp.popcut;
+        push @code, $CgOp.rxpushcapture($CgOp.rxcall("StringCapture"), @$.captures);
+        push @code, $CgOp.popcut;
 
         @code;
     }
@@ -657,10 +666,10 @@ class RxOp::ListPrim is RxOp::Capturing {
         my $bt = self.label;
 
         my @code;
-        push @code, CgOp.rxcall("InitCursorList",
-            CgOp.rxlprim($!type, $!ops.cgop($body)));
-        push @code, CgOp.label($bt);
-        push @code, CgOp.rxincorpshift($.captures, $bt);
+        push @code, $CgOp.rxcall("InitCursorList",
+            $CgOp.rxlprim($!type, $!ops.cgop($body)));
+        push @code, $CgOp.label($bt);
+        push @code, $CgOp.rxincorpshift($.captures, $bt);
         @code;
     }
 
@@ -670,6 +679,48 @@ class RxOp::ListPrim is RxOp::Capturing {
 class RxOp::Endpoint is RxOp {
     has Str $.type = die "Endpoint.type required";
 
-    method code($) { CgOp.rxcall('SetEndpoint', CgOp.str($!type)); }
+    method code($) { $CgOp.rxcall('SetEndpoint', $CgOp.str($!type)); }
     method lad() { [ 'Null' ] }
+}
+
+INIT {
+    $RxOp = RxOp;
+    $RxOpCapturing = RxOp::Capturing;
+    $RxOpSym = RxOp::Sym;
+    $RxOpString = RxOp::String;
+    $RxOpVarString = RxOp::VarString;
+    $RxOpQuantifier = RxOp::Quantifier;
+    $RxOpSequence = RxOp::Sequence;
+    $RxOpConj = RxOp::Conj;
+    $RxOpAltBase = RxOp::AltBase;
+    $RxOpSeqAlt = RxOp::SeqAlt;
+    $RxOpConfineLang = RxOp::ConfineLang;
+    $RxOpCut = RxOp::Cut;
+    $RxOpBeforeString = RxOp::BeforeString;
+    $RxOpZeroWidthCCs = RxOp::ZeroWidthCCs;
+    $RxOpNotBeforeString = RxOp::NotBeforeString;
+    $RxOpZeroWidth = RxOp::ZeroWidth;
+    $RxOpNotBefore = RxOp::NotBefore;
+    $RxOpBefore = RxOp::Before;
+    $RxOpTilde = RxOp::Tilde;
+    $RxOpSubrule = RxOp::Subrule;
+    $RxOpSigspace = RxOp::Sigspace;
+    $RxOpCutLTM = RxOp::CutLTM;
+    $RxOpCutRule = RxOp::CutRule;
+    $RxOpCutBrack = RxOp::CutBrack;
+    $RxOpSetLang = RxOp::SetLang;
+    $RxOpAlt = RxOp::Alt;
+    $RxOpCheckBlock = RxOp::CheckBlock;
+    $RxOpSaveValue = RxOp::SaveValue;
+    $RxOpVoidBlock = RxOp::VoidBlock;
+    $RxOpStatement = RxOp::Statement;
+    $RxOpProtoRedis = RxOp::ProtoRedis;
+    $RxOpAny = RxOp::Any;
+    $RxOpQuantCClass = RxOp::QuantCClass;
+    $RxOpCClassElem = RxOp::CClassElem;
+    $RxOpNone = RxOp::None;
+    $RxOpNewline = RxOp::Newline;
+    $RxOpStringCap = RxOp::StringCap;
+    $RxOpListPrim = RxOp::ListPrim;
+    $RxOpEndpoint = RxOp::Endpoint;
 }
