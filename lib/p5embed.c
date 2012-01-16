@@ -90,9 +90,9 @@ SV* p5embed_subcall(int context,SV** args,int args_count) {
 
   /* HACK - list context is NYI */
   if (context == 1 || context == 0) {
-    int count = call_sv(args[0],G_SCALAR);
+    int count = call_sv(args[0],context == 1 ? G_SCALAR : G_ARRAY);
     SPAGAIN;
-    if (count != 1) croak("Big trouble\n");
+    if (count != 1) croak("We do not support returning multiple return values yet.\n");
 
     SV* ret = POPs;
 
