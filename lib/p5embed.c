@@ -126,6 +126,17 @@ double p5embed_SvNV(SV* sv) {
 char* p5embed_SvPV_nolen(SV* sv) {
     return SvPV_nolen(sv);
 }
+
+char* p5embed_SvPVutf8_nolen(SV* sv) {
+    return SvPVutf8_nolen(sv);
+}
+
+int p5embed_SvPVutf8_length(SV* sv) {
+    int length;
+    SvPVutf8(sv,length);
+    return length;
+}
+
 SV* p5embed_newSVpvn(char* str,int len) {
     return newSVpvn(str,len);
 }

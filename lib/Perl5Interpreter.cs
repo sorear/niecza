@@ -19,6 +19,12 @@ public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPV_nolen")]
     public static extern string SvPV_nolen(IntPtr sv);
 
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPVutf8_nolen")]
+    public static extern IntPtr SvPVutf8_nolen(IntPtr sv);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPVutf8_length")]
+    public static extern int SvPVutf8_length(IntPtr sv);
+
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvNV")]
     public static extern double SvNV(IntPtr sv);
 
@@ -44,6 +50,15 @@ public class Perl5Interpreter : IForeignInterpreter {
         int argument_n
     );
 
+    // We can't use the standard char* conversion because some strings can contain nulls
+    public static string UnmarshalString(IntPtr sv) {
+        int len = SvPVutf8_length(sv);
+        byte[] target = new byte[len];
+        IntPtr data = SvPVutf8_nolen(sv);
+        Marshal.Copy(data, target, 0, len);
+        return System.Text.Encoding.UTF8.GetString(target);
+    }
+
     public static Variable SVToVariable(IntPtr sv) {
         if (sv == IntPtr.Zero) {
             //TODO: check - cargo culted
@@ -54,7 +69,7 @@ public class Perl5Interpreter : IForeignInterpreter {
         } else if (SvNOKp(sv) != 0) {
             return Builtins.MakeFloat(SvNV(sv));
         } else if (SvPOKp(sv) != 0) {
-            string s = SvPV_nolen(sv);
+            string s = UnmarshalString(sv); //SvPV_nolen(sv);
             return Kernel.BoxAnyMO(s, Kernel.StrMO);
         } else {
             return new SVVariable(sv);
@@ -104,6 +119,7 @@ public class SVany : P6any {
         }
 
         
+        // We can't use the standard char* conversion because some strings can contain nulls
         public static IntPtr MarshalString(string s) {
             byte[] array = System.Text.Encoding.UTF8.GetBytes(s);
             int size = Marshal.SizeOf(typeof(byte)) * (array.Length + 1);
@@ -120,7 +136,8 @@ public class SVany : P6any {
             Perl5Interpreter.SvUTF8_on(sv);
             Marshal.FreeHGlobal(ptr);
             return sv;
-         }
+        }
+
 
 
         public static IntPtr VariableToSV(Variable var) {
