@@ -32,7 +32,10 @@ public class Perl5Interpreter : IForeignInterpreter {
     public static extern int SvPOKp(IntPtr sv);
 
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_newSVpvn")]
-    public static extern IntPtr newSVpvn(string s,int length);
+    public static extern IntPtr newSVpvn(IntPtr s,int length);
+
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvUTF8_on")]
+    public static extern void SvUTF8_on(IntPtr sv);
 
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_subcall")]
     public static extern IntPtr SubCall(
@@ -100,13 +103,32 @@ public class SVany : P6any {
                 throw new NieczaException("Freezing perl5 SV* NYI.");
         }
 
+        
+        public static IntPtr MarshalString(string s) {
+            byte[] array = System.Text.Encoding.UTF8.GetBytes(s);
+            int size = Marshal.SizeOf(typeof(byte)) * (array.Length + 1);
+
+            IntPtr ptr = Marshal.AllocHGlobal(size);
+
+            /* This is a hack not to crash on mono!!! */
+            //allocated.Add(ptr, null);
+
+            Marshal.Copy(array, 0, ptr, array.Length);
+            Marshal.WriteByte(ptr, array.Length, 0);
+
+            IntPtr sv = Perl5Interpreter.newSVpvn(ptr,array.Length);
+            Perl5Interpreter.SvUTF8_on(sv);
+            return sv;
+         }
+
+
         public static IntPtr VariableToSV(Variable var) {
             P6any obj = var.Fetch();
             if (obj is SVany) {
                 return ((SVany)obj).sv;
             } else if (obj.Does(Kernel.StrMO)) {
                 string s = Kernel.UnboxAny<string>(obj);
-                return Perl5Interpreter.newSVpvn(s,s.Length);
+                return MarshalString(s);
             } else {
                 throw new NieczaException("can't convert argument to p5 type");
             }

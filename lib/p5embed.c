@@ -129,3 +129,7 @@ char* p5embed_SvPV_nolen(SV* sv) {
 SV* p5embed_newSVpvn(char* str,int len) {
     return newSVpvn(str,len);
 }
+
+void p5embed_SvUTF8_on(SV* sv) {
+    SvUTF8_on(sv);
+}
