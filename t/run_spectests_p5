@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e
+
+if [ -e t/spec ] ; then
+    echo 'Updating spectest checkout in t/spec ...'
+    (cd t/spec ; git pull)
+else
+    echo 'Downloading spectests into t/spec ...'
+    git clone git://github.com/perl6/roast.git t/spec
+fi
+
+jobs=1
+if [ -z "$TEST_JOBS" ] ; then
+    jobs=1
+else
+    jobs=$TEST_JOBS
+fi
+
+grep -v "^#" t/spectest_p5.data |
+sed 's|^|t/spec/|' | 
+xargs prove -e 't/fudgeandrun' -j $jobs "$@"
