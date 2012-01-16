@@ -118,6 +118,7 @@ public class SVany : P6any {
 
             IntPtr sv = Perl5Interpreter.newSVpvn(ptr,array.Length);
             Perl5Interpreter.SvUTF8_on(sv);
+            Marshal.FreeHGlobal(ptr);
             return sv;
          }
 
