@@ -1385,6 +1385,18 @@ my class List is Cool does Positional {
         %result.pairs;
     }
 
+    method categorize(&test) {
+        my %result;
+        for @(self) {
+            my @k = test $_;
+            for @k -> $k {
+                %result{$k} //= [];
+                %result{$k}.push: $_;
+            }
+        }
+        %result.pairs;
+    }
+
     method min($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
         if $cmp_.count == 1 {
@@ -1735,6 +1747,7 @@ sub reverse(*@array) {
 }
 
 sub classify($mapper, *@values) { @values.classify($mapper) }
+sub categorize($mapper, *@values) { @values.categorize($mapper) }
 sub min(*@args, :&by = &infix:<cmp>) { @args.min(&by) }
 sub max(*@args, :&by = &infix:<cmp>) { @args.max(&by) }
 sub minmax(*@args, :&by = &infix:<cmp>) { @args.minmax(&by) }
