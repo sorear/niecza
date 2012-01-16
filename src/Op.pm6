@@ -695,7 +695,7 @@ class Lexical is Op {
                 $list = ?(@lex[4] +& 24); # LIST | HASH from LISimple
                 $type = @lex[5] // $type;
             }
-            when 'common' {
+            when 'common' | 'attralias' {
                 $list = substr(@lex[5],0,1) eq '%' || substr(@lex[5],0,1) eq '@';
             }
             default {

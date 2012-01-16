@@ -211,6 +211,10 @@ class StaticSub {
             ($list ?? 8 !! 0) + ($hash ?? 16 !! 0),
             $backing));
     }
+    method add_attr_alias($name, $type, $aname, :$file, :$line, :$pos) {
+        self._addlex_result(downcall("add_attr_alias", self, ~$name,
+            ~($file//''), +($line//0), +($pos// -1), $type, $aname));
+    }
     method add_alias($name, $to, :$file, :$line, :$pos) {
         self._addlex_result(downcall("add_alias", self, ~$name,
             ~($file//''), +($line//0), +($pos// -1), $to));

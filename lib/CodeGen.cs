@@ -2007,8 +2007,8 @@ namespace Niecza.CLRBackend {
         public static CpsOp LexAccess(LexInfo l, int up, CpsOp[] zyg) {
             return Primitive(zyg, delegate(ClrOp[] heads) {
                 return new CpsOp((heads.Length >= 1)
-                    ? l.SetCode(up, heads[0])
-                    : l.GetCode(up));
+                    ? l.SetCode(up, heads[0], EmitUnit.Current.np.sub)
+                    : l.GetCode(up, EmitUnit.Current.np.sub));
             });
         }
 
@@ -2152,7 +2152,7 @@ namespace Niecza.CLRBackend {
     }
 
     class NamProcessor {
-        SubInfo sub;
+        internal SubInfo sub;
         public readonly CpsBuilder cpb;
         Dictionary<string, Type> let_types = new Dictionary<string, Type>();
         List<List<ClrEhSpan>> eh_stack = new List<List<ClrEhSpan>>();
@@ -3967,6 +3967,9 @@ dynamic:
             var lalias = li as LIAlias;
             if (lalias != null)
                 r = new object[] { "alias",null,null,null, lalias.to };
+            var lattralias = li as LIAttrAlias;
+            if (lattralias != null)
+                r = new object[] { "attralias",null,null,null, new Handle(lattralias.atype), lattralias.aname };
             var lsub   = li as LISub;
             if (lsub != null)
                 r = new object[] { "sub",null,null,null, new Handle(lsub.def) };
@@ -4443,6 +4446,10 @@ dynamic:
         }
         public static object add_alias(object[] args) {
             return AddLexical(args, new LIAlias((string)args[6]));
+        }
+        public static object add_attr_alias(object[] args) {
+            return AddLexical(args, new LIAttrAlias((STable)Handle.Unbox(args[6]),
+                        (string)args[7]));
         }
         public static object add_my_stash(object[] args) {
             STable  type  = (STable)Handle.Unbox(args[6]);

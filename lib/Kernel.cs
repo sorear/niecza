@@ -399,6 +399,7 @@ namespace Niecza {
         public TypeBuilder type_builder;
         public int nextid;
         public Dictionary<object, FieldInfo> constants;
+        public NamProcessor np;
         Dictionary<string, CpsOp> val_constants;
 
         List<NamProcessor> fill = new List<NamProcessor>();
@@ -453,11 +454,12 @@ namespace Niecza {
                         sub.name, sub.GetHashCode());
             Current = this;
             try {
-                var n = new NamProcessor(new CpsBuilder(this,
+                np = new NamProcessor(new CpsBuilder(this,
                             "C" + fill.Count + sub.name, true), sub);
-                n.MakeBody(Reader.Read(sub.nam_str, sub.nam_refs));
-                fill.Add(n);
+                np.MakeBody(Reader.Read(sub.nam_str, sub.nam_refs));
+                fill.Add(np);
             } finally {
+                np = null;
                 Current = oc;
             }
             if (erase) {
@@ -1076,15 +1078,23 @@ namespace Niecza {
         public int pos;
 
         public abstract void Init(Frame f);
-        public abstract object Get(Frame f);
-        public virtual void Set(Frame f, object to) {
-            throw new NieczaException("Variable cannot be bound");
+        public virtual object Get(Frame f) {
+            return Get(f,null);
         }
+        public virtual void Set(Frame f, object to) { Set(f,to,null); }
+        public virtual object Get(Frame f, Frame orig) { return Get(f); }
+        public virtual void Set(Frame f, object to, Frame orig) { Set(f,to); }
 
         internal virtual ClrOp SetCode(int up, ClrOp head) {
-            throw new Exception("Lexicals of type " + this + " cannot be bound");
+            return SetCode(up, head, null);
         }
-        internal abstract ClrOp GetCode(int up);
+        internal virtual ClrOp SetCode(int up, ClrOp head, SubInfo orig) {
+            return SetCode(up, head);
+        }
+        internal virtual ClrOp GetCode(int up) { return GetCode(up, null); }
+        internal virtual ClrOp GetCode(int up, SubInfo orig) {
+            return GetCode(up);
+        }
 
         // names that are forced to dynamism for quick access
         public static bool IsDynamicName(string name) {
@@ -1099,7 +1109,15 @@ namespace Niecza {
 
         internal abstract void DoFreeze(FreezeBuffer fb);
         internal enum LexSerCode {
-            Simple, Sub, Label, Dispatch, Common, Constant, Package, Alias
+            Simple, Sub, Label, Dispatch, Common, Constant, Package, Alias,
+            AttrAlias
+        }
+
+        internal ClrOp DieCode(Type rty, string msg) {
+            return new ClrOperator(rty, OpCodes.Throw, new [] {
+                new ClrConstructorCall(typeof(NieczaException).
+                    GetConstructor(new [] { typeof(string) }),
+                    new [] { new ClrStringLiteral(msg) }) });
         }
     }
 
@@ -1186,20 +1204,16 @@ namespace Niecza {
         public override void BindFields() { }
 
         public override object Get(Frame f) { return value; }
-        public override void Set(Frame f, object to) {
-            throw new NieczaException("Cannot bind to constant " + name);
-        }
 
         internal override ClrOp GetCode(int up) {
             return EmitUnit.Current.RefConstant(name, "", value, typeof(Variable)).head;
         }
 
-        // XXX should die() with constant improvements
+        public override void Set(Frame f, object to) {
+            throw new NieczaException("Cannot bind to constant " + name);
+        }
         internal override ClrOp SetCode(int up, ClrOp to) {
-            return new ClrOperator(Tokens.Void, OpCodes.Throw, new [] {
-                new ClrConstructorCall(typeof(NieczaException).
-                    GetConstructor(new [] { typeof(string) }),
-                    new [] { new ClrStringLiteral("Cannot bind to constant " + name) }) });
+            return DieCode(Tokens.Void, "Cannot bind to constant " + name);
         }
 
         internal override void DoFreeze(FreezeBuffer fb) {
@@ -1288,7 +1302,7 @@ namespace Niecza {
         // synchronize with NamProcessor.MakeDispatch
         static P6any GetProtoSub(LexInfo li, Frame f) {
             return (li is LISub) ? ((LISub)li).def.protosub :
-                ((Variable)li.Get(f)).Fetch();
+                ((Variable)li.Get(f,null)).Fetch();
         }
         internal void MakeDispatch(Frame into) {
             HashSet<string> names = new HashSet<string>();
@@ -1331,40 +1345,101 @@ namespace Niecza {
         public string to;
         public LIAlias(string to) { this.to = to; }
         public override void Init(Frame f) { }
-        object Common(Frame f, bool set, object bind) {
+        object Common(Frame f, bool set, object bind, Frame orig) {
             Frame cr = f;
             LexInfo li = null;
             while (cr.info.dylex == null ||
                     !cr.info.dylex.TryGetValue(to, out li))
                 cr = cr.outer;
-            if (!set) return li.Get(cr);
-            else { li.Set(cr, bind); return null; }
+            if (!set) return li.Get(cr, orig);
+            else { li.Set(cr, bind, orig); return null; }
         }
-        public override object Get(Frame f) { return Common(f,false,null); }
-        public override void Set(Frame f, object bind) { Common(f,true,bind); }
+        public override object Get(Frame f, Frame orig) { return Common(f,false,null,orig); }
+        public override void Set(Frame f, object bind, Frame orig) { Common(f,true,bind,orig); }
 
-        internal override ClrOp GetCode(int up) {
+        internal override ClrOp GetCode(int up, SubInfo orig) {
             LexInfo real;
             SubInfo sc = owner;
             while (!sc.dylex.TryGetValue(to, out real)) {
                 sc = sc.outer;
                 up++;
             }
-            return real.GetCode(up);
+            return real.GetCode(up, orig);
         }
 
-        internal override ClrOp SetCode(int up, ClrOp bind) {
+        internal override ClrOp SetCode(int up, ClrOp bind, SubInfo orig) {
             LexInfo real;
             SubInfo sc = owner;
             while (!sc.dylex.TryGetValue(to, out real)) {
                 sc = sc.outer;
                 up++;
             }
-            return real.SetCode(up, bind);
+            return real.SetCode(up, bind, orig);
         }
         internal override void DoFreeze(FreezeBuffer fb) {
             fb.Byte((byte)LexSerCode.Alias);
             fb.String(to);
+        }
+    }
+
+    public class LIAttrAlias : LexInfo {
+        public STable atype;
+        public string aname;
+        public LIAttrAlias(STable atype, string aname) {
+            this.atype = atype;
+            this.aname = aname;
+        }
+        public override void Init(Frame f) { }
+        P6any GetSelf(Frame f) {
+            SubInfo sc = owner;
+            LexInfo self;
+            while (sc != null && !sc.dylex.TryGetValue("self", out self)) {
+                sc = sc.outer;
+                f  = f.outer;
+            }
+            if (sc == null)
+                throw new NieczaException("No 'self' available in this scope to resolve reference to attribute '{0}'", name);
+            return ((Variable)self.Get(f)).Fetch();
+        }
+        ClrOp GetSelfCode(SubInfo orig) {
+            SubInfo sc = orig;
+            LexInfo self;
+            int up = 0;
+            while (sc != null && !sc.dylex.TryGetValue("self", out self)) {
+                sc = sc.outer;
+                up++;
+            }
+            if (sc == null)
+                return DieCode(Tokens.P6any, string.Format("No 'self' available in this scope to resolve reference to attribute '{0}'", name));
+            return new ClrMethodCall(false, Tokens.Variable_Fetch,
+                    self.GetCode(up, orig));
+        }
+        public override object Get(Frame f, Frame orig) {
+            if (orig == null) throw new NieczaException("Indirect access to attribute aliases NYI");
+            return GetSelf(orig).GetSlot(atype, aname);
+        }
+        public override void Set(Frame f, object bind, Frame orig) {
+            if (orig == null) throw new NieczaException("Indirect access to attribute aliases NYI");
+            GetSelf(orig).SetSlot(atype, aname, bind);
+        }
+
+        internal override ClrOp GetCode(int up, SubInfo orig) {
+            return new ClrUnboxAny(Tokens.Variable,
+                new ClrMethodCall(false, Tokens.P6any_GetSlot,
+                    GetSelfCode(orig),EmitUnit.Current.TypeConstant(atype).head,
+                    new ClrStringLiteral(aname)));
+        }
+
+        internal override ClrOp SetCode(int up, ClrOp bind, SubInfo orig) {
+            return new ClrMethodCall(false, Tokens.P6any_SetSlot,
+                GetSelfCode(orig),EmitUnit.Current.TypeConstant(atype).head,
+                new ClrStringLiteral(aname), bind);
+        }
+
+        internal override void DoFreeze(FreezeBuffer fb) {
+            fb.Byte((byte)LexSerCode.AttrAlias);
+            fb.ObjRef(atype);
+            fb.String(aname);
         }
     }
 
@@ -1379,6 +1454,13 @@ namespace Niecza {
         internal override void DoFreeze(FreezeBuffer fb) {
             fb.Byte((byte)LexSerCode.Package);
             fb.ObjRef(pkg);
+        }
+
+        public override void Set(Frame f, object to) {
+            throw new NieczaException("Cannot bind to constant " + name);
+        }
+        internal override ClrOp SetCode(int up, ClrOp to) {
+            return DieCode(Tokens.Void, "Cannot bind to constant " + name);
         }
     }
 
@@ -2049,6 +2131,9 @@ namespace Niecza {
                         break;
                     case (int) LexInfo.LexSerCode.Alias:
                         li = new LIAlias(tb.String());
+                        break;
+                    case (int) LexInfo.LexSerCode.AttrAlias:
+                        li = new LIAttrAlias((STable)tb.ObjRef(), tb.String());
                         break;
                     default:
                         throw new ArgumentException(type.ToString());
