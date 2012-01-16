@@ -386,6 +386,7 @@ S12-enums/anonymous.t
 S12-enums/basic.t
 S12-enums/misc.t
 S12-introspection/can.t
+S12-methods/attribute-params.t
 S12-methods/calling_syntax.t
 S12-methods/chaining.t
 S12-methods/class-and-instance.t
