@@ -361,6 +361,7 @@ S10-packages/basic.t
 S12-attributes/augment-and-initialization.t
 S12-attributes/class.t
 S12-attributes/clone.t
+S12-attributes/defaults.t
 S12-attributes/inheritance.t
 S12-attributes/instance.t
 S12-attributes/recursive.t
