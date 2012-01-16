@@ -23,135 +23,6 @@ augment class Any {
     submethod new(|$) { die "Attempted to instantiate undefined class." }
 }
 
-our $Sig = Sig;
-our $SigParameter = Sig::Parameter;
-our $Actions = NieczaActions;
-our $PassSimplifier = NieczaPassSimplifier;
-our $CgOp = CgOp;
-our $CClass = CClass;
-our $OptBeta = OptBeta;
-our $OptRxSimple = OptRxSimple;
-
-our $Op = Op;
-our $OpCgOp = Op::CgOp;
-our $OpStatementList = Op::StatementList;
-our $OpCallLike = Op::CallLike;
-our $OpCallSub = Op::CallSub;
-our $OpCallMethod = Op::CallMethod;
-our $OpGetSlot = Op::GetSlot;
-our $OpSetSlot = Op::SetSlot;
-our $OpParen = Op::Paren;
-our $OpSimplePair = Op::SimplePair;
-our $OpSimpleParcel = Op::SimpleParcel;
-our $OpInterrogative = Op::Interrogative;
-our $OpHereStub = Op::HereStub;
-our $OpYada = Op::Yada;
-our $OpShortCircuit = Op::ShortCircuit;
-our $OpShortCircuitAssign = Op::ShortCircuitAssign;
-our $OpStringLiteral = Op::StringLiteral;
-our $OpConditional = Op::Conditional;
-our $OpWhileLoop = Op::WhileLoop;
-our $OpGeneralLoop = Op::GeneralLoop;
-our $OpForLoop = Op::ForLoop;
-our $OpImmedForLoop = Op::ImmedForLoop;
-our $OpLabelled = Op::Labelled;
-our $OpWhen = Op::When;
-our $OpStart = Op::Start;
-our $OpTry = Op::Try;
-our $OpControl = Op::Control;
-our $OpMakeJunction = Op::MakeJunction;
-our $OpNum = Op::Num;
-our $OpAttribute = Op::Attribute;
-our $OpWhatever = Op::Whatever;
-our $OpWhateverCode = Op::WhateverCode;
-our $OpBareBlock = Op::BareBlock;
-our $OpSubDef = Op::SubDef;
-our $OpLexical = Op::Lexical;
-our $OpConstantDecl = Op::ConstantDecl;
-our $OpContextVar = Op::ContextVar;
-our $OpRequire = Op::Require;
-our $OpTake = Op::Take;
-our $OpGather = Op::Gather;
-our $OpMakeCursor = Op::MakeCursor;
-our $OpLetVar = Op::LetVar;
-our $OpRegexBody = Op::RegexBody;
-our $OpYouAreHere = Op::YouAreHere;
-our $OpGetBlock = Op::GetBlock;
-our $OpAssign = Op::Assign;
-our $OpBuiltin = Op::Builtin;
-our $OpLet = Op::Let;
-our $OpLetScope = Op::LetScope;
-our $OpTopicalHook = Op::TopicalHook;
-our $OpLeaveHook = Op::LeaveHook;
-our $OpLabelHook = Op::LabelHook;
-our $OpLexicalBind = Op::LexicalBind;
-our $OpROify = Op::ROify;
-our $OpStateDecl = Op::StateDecl;
-our $OpDoOnceLoop = Op::DoOnceLoop;
-our $OpFlipFlop = Op::FlipFlop;
-our $OpTemporize = Op::Temporize;
-our $OpIndirectVar = Op::IndirectVar;
-our $OpCatchyWrapper = Op::CatchyWrapper;
-our $OpGeneralConst = Op::GeneralConst;
-
-our $RxOp = RxOp;
-our $RxOpCapturing = RxOp::Capturing;
-our $RxOpSym = RxOp::Sym;
-our $RxOpString = RxOp::String;
-our $RxOpVarString = RxOp::VarString;
-our $RxOpQuantifier = RxOp::Quantifier;
-our $RxOpSequence = RxOp::Sequence;
-our $RxOpConj = RxOp::Conj;
-our $RxOpAltBase = RxOp::AltBase;
-our $RxOpSeqAlt = RxOp::SeqAlt;
-our $RxOpConfineLang = RxOp::ConfineLang;
-our $RxOpCut = RxOp::Cut;
-our $RxOpBeforeString = RxOp::BeforeString;
-our $RxOpZeroWidthCCs = RxOp::ZeroWidthCCs;
-our $RxOpNotBeforeString = RxOp::NotBeforeString;
-our $RxOpZeroWidth = RxOp::ZeroWidth;
-our $RxOpNotBefore = RxOp::NotBefore;
-our $RxOpBefore = RxOp::Before;
-our $RxOpTilde = RxOp::Tilde;
-our $RxOpSubrule = RxOp::Subrule;
-our $RxOpSigspace = RxOp::Sigspace;
-our $RxOpCutLTM = RxOp::CutLTM;
-our $RxOpCutRule = RxOp::CutRule;
-our $RxOpCutBrack = RxOp::CutBrack;
-our $RxOpSetLang = RxOp::SetLang;
-our $RxOpAlt = RxOp::Alt;
-our $RxOpCheckBlock = RxOp::CheckBlock;
-our $RxOpSaveValue = RxOp::SaveValue;
-our $RxOpVoidBlock = RxOp::VoidBlock;
-our $RxOpStatement = RxOp::Statement;
-our $RxOpProtoRedis = RxOp::ProtoRedis;
-our $RxOpAny = RxOp::Any;
-our $RxOpQuantCClass = RxOp::QuantCClass;
-our $RxOpCClassElem = RxOp::CClassElem;
-our $RxOpNone = RxOp::None;
-our $RxOpNewline = RxOp::Newline;
-our $RxOpStringCap = RxOp::StringCap;
-our $RxOpListPrim = RxOp::ListPrim;
-our $RxOpEndpoint = RxOp::Endpoint;
-
-our $Operator = Operator;
-our $Operator_Function = Operator::Function;
-our $Operator_PostCall = Operator::PostCall;
-our $Operator_Method = Operator::Method;
-our $Operator_FlipFlop = Operator::FlipFlop;
-our $Operator_ShortCircuit = Operator::ShortCircuit;
-our $Operator_CompoundAssign = Operator::CompoundAssign;
-our $Operator_MetaNot = Operator::MetaNot;
-our $Operator_Binding = Operator::Binding;
-our $Operator_Comma = Operator::Comma;
-our $Operator_Ternary = Operator::Ternary;
-our $Operator_Temp = Operator::Temp;
-our $Operator_Let = Operator::Let;
-our $Operator_SmartMatch = Operator::SmartMatch;
-our $Operator_DotEq = Operator::DotEq;
-our $Operator_Replicate = Operator::Replicate;
-our $Operator_Mixin = Operator::Mixin;
-
 # augment class RxOp {
 # method oplift() {
 #     say "oplift: {self.typename}";
@@ -160,7 +31,135 @@ our $Operator_Mixin = Operator::Mixin;
 # }
 # }
 
-augment class NieczaActions {
+our ($Sig, $SigParameter, $OpGeneralConst);
+
+our $Actions; $Actions = $Actions but role {
+method parameter($/) {
+    my $sorry;
+    my $p = $<param_var> // $<named_param>;
+    my $p_ast = $p ?? $p.ast !! { names => [], flags => $Sig::POSITIONAL };
+    my $flags = $p_ast<flags>;
+
+    $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $flags +|= $Sig::READWRITE }
+        elsif $trait.ast<copy> { $flags +|= $Sig::IS_COPY }
+        elsif $trait.ast<parcel> { $flags +|= $Sig::RWTRANS }
+        elsif $trait.ast<readonly> { $flags +&= +^$Sig::READWRITE }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    my $default = $<default_value> ?? $<default_value>.ast !! Any;
+    $default.set_name("$/ init") if $default;
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $flags +|= ($flags +& $Sig::IS_HASH) ?? $Sig::SLURPY_NAM !! $Sig::SLURPY_POS }
+    elsif $tag eq '|:*'  { $flags +|= $Sig::SLURPY_CAP }
+    elsif $tag eq '\\:!' { $flags +|= $Sig::RWTRANS }
+    elsif $tag eq '\\:?' { $flags +|= ($Sig::RWTRANS + $Sig::OPTIONAL) }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '?:*'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq ':?'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '?:?'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+
+    if defined $p_ast<slot> {
+        # TODO: type constraint here
+    }
+
+    make $SigParameter.new(name => ~$/, mdefault => $default,
+        |$p_ast, :$flags);
+
+    for @<type_constraint> -> $tc {
+        if $tc.ast<where> {
+            push ($/.ast.where //= []), self.thunk_sub($tc.ast<where>.ast);
+        } elsif $tc.ast<value> {
+            $/.ast.tclass = $tc.ast<value>.get_type;
+            push ($/.ast.where //= []), self.thunk_sub(
+                $OpGeneralConst.new(value => $tc.ast<value>));
+        } else {
+            $/.CURSOR.sorry("Parameter coercion NYI") if $tc.ast<as>;
+            my $type = $tc.ast<type>;
+            if $type.kind eq 'subset' {
+                push ($/.ast.where //= []), self.thunk_sub(
+                    $OpGeneralConst.new(value => $type.get_type_var));
+                $type = $type.get_basetype while $type.kind eq 'subset';
+            }
+            $/.ast.tclass = $type;
+            $/.ast.flags +|= $tc.ast<tmode>;
+        }
+    }
+
+    for @<post_constraint> -> $pc {
+        # XXX this doesn't seem to be specced anywhere, but it's
+        # Rakudo-compatible and shouldn't hurt
+        if $pc<bracket> {
+            $/.ast.flags +&= +^$Sig::IS_HASH;
+            $/.ast.flags +|= $Sig::IS_LIST;
+        }
+
+        if $pc<signature> -> $ssig {
+            $ssig.CURSOR.sorry('Cannot have more than one sub-signature for a pparameter') if $/.ast.subsig;
+            $/.ast.subsig = $pc<signature>.ast;
+        } else {
+            push ($/.ast.where //= []), self.thunk_sub($pc<EXPR>.ast);
+        }
+    }
+}
+method param_var($/) {
+    if $<signature> {
+        make { slot => Any, names => [], subsig => $<signature>.ast,
+            flags => $Sig::POSITIONAL +
+                (substr($/,0,1) eq '[' ?? $Sig::IS_LIST !! 0) };
+        return;
+    }
+    my $twigil = $<twigil> ?? ~$<twigil> !! '';
+    my $sigil = ~$<sigil>;
+    my $list = $sigil eq '@';
+    my $hash = $sigil eq '%';
+    my $name = $<name> ?? ~$<name> !! Any;
+    my $where;
+
+    my $flags = ($list ?? $Sig::IS_LIST !! 0) + ($hash ?? $Sig::IS_HASH !! 0) +
+        ($sigil eq '&' ?? $Sig::CALLABLE !! 0) + $Sig::POSITIONAL;
+    my $slot;
+    if $twigil eq '' {
+        $slot = defined($name) ?? ($sigil ~ $name) !! Any;
+    } elsif $twigil eq '*' {
+        $slot = "$sigil*" ~ "$name";
+    } elsif $twigil eq ('!' | '.') {
+        make { :$flags, :$slot, attribute => "$sigil$twigil$name",
+            names => [ $name ], attribute_type => $*CURLEX<!sub>.cur_pkg };
+        return;
+    } else {
+        $/.CURSOR.sorry("Unhandled parameter twigil $twigil");
+        make { };
+        return Nil;
+    }
+
+    if ($sigil ne '$' && $sigil ne '@' && $sigil ne '%' && $sigil ne '&') {
+        $/.CURSOR.sorry('Non bare scalar targets NYI');
+        make { }
+        return Nil;
+    }
+
+    $/.CURSOR.trymop({
+        $/.CURSOR.check_categorical($slot);
+        $*CURLEX<!sub>.add_my_name($slot, :$list, :$hash, |mnode($/),
+            noinit => ?($*SIGNUM)) if defined($slot);
+    });
+
+    make { :$slot, names => defined($name) ?? [ $name ] !! [], :$flags };
+}
 }
 
 # remove run_dispatch

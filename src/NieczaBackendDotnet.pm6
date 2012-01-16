@@ -123,7 +123,8 @@ class StaticSub {
         my @args;
         for @( $sig.params ) {
             push @args, downcall("param_new", self, .flags, .name, .slot,
-                @( .names ), Str, .mdefault, .tclass);
+                @( .names ), Str, .mdefault, .tclass, .attribute,
+                .attribute_type);
             @args[*-1].subsig(self!signature(.subsig)) if .subsig;
             @args[*-1].constraints(@(.where)) if .where;
         }

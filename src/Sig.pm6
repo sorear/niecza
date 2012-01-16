@@ -17,6 +17,7 @@ our constant $INVOCANT   = 8192; #OK not used
 our constant $IS_COPY    = 32768; #OK not used
 our constant $IS_LIST    = 65536; #OK not used
 our constant $IS_HASH    = 131072; #OK not used
+our constant $CALLABLE   = 0x20_0000; #OK
 
 # Value source
 our constant $HASDEFAULT = 32; #OK not used
@@ -39,6 +40,9 @@ class Parameter {
     has $.where is rw; # List of (Type | StaticSub); lazily created
     has Sig $.subsig is rw;
     has $.typecap is rw; # List of Str; lazily created
+
+    has Str $.attribute;
+    has $.attribute_type;
 
     method simple($n) { self.new(name => $n, slot => $n, flags => $RWTRANS + $POSITIONAL) }
 }

@@ -4475,17 +4475,20 @@ dynamic:
             STable  type  = (STable)Handle.Unbox(args[ix++]);
             if (deflt != null) flags |= Parameter.HASDEFAULT;
             if (type != null) flags |= Parameter.HASTYPE;
+            string attr = (string)args[ix++];
+            STable atype = (STable)Handle.Unbox(args[ix++]);
 
             return Handle.Wrap(new Parameter(flags,
                 (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
                 name, (names.Count == 0 ? null : names.ToArray()),
-                deflt, type ?? Kernel.AnyMO));
+                deflt, type ?? Kernel.AnyMO, attr, atype));
         }
         public static object param_constraints(object[] args) {
             Parameter tgt = (Parameter)Handle.Unbox(args[1]);
             tgt.post_constraints = new object[args.Length - 2];
             for (int ix = 2; ix != args.Length; ix++)
-                tgt.post_constraints[ix-2] = Handle.Unbox(args[ix]);
+                tgt.post_constraints[ix-2] = (args[ix] is Handle) ?
+                    Handle.Unbox(args[ix]) : args[ix];
             return null;
         }
         public static object param_subsig(object[] args) {

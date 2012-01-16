@@ -1390,13 +1390,18 @@ namespace Niecza {
         public SubInfo  def;
         public STable   type;
 
+        // XXX I don't really like dangling two extra fields on every param...
+        public string   attribute;
+        public STable   attribute_type;
+
         public object[]  post_constraints; // Signature | SubInfo
 
         public override string ReprName() { return "P6parameter"; }
 
         private Parameter() { }
         public Parameter(int flags, int slot, string name,
-                string[] names, SubInfo def, STable type) {
+                string[] names, SubInfo def, STable type, string attr,
+                STable atype) {
             this.mo = Kernel.ParameterMO;
             this.flags = flags;
             this.name = name;
@@ -1404,16 +1409,18 @@ namespace Niecza {
             this.names = names;
             this.def = def;
             this.type = type;
+            this.attribute = attr;
+            this.attribute_type = atype;
         }
 
         public static Parameter TPos(string name, int slot) {
             return new Parameter(RWTRANS | POSITIONAL, slot, name,
-                    null, null, Kernel.AnyMO);
+                    null, null, Kernel.AnyMO, null, null);
         }
 
         public static Parameter TNamedOpt(string name, int slot) {
             return new Parameter(RWTRANS | OPTIONAL, slot, name,
-                    new string[] { name }, null, Kernel.AnyMO);
+                    new string[] { name }, null, Kernel.AnyMO, null, null);
         }
 
         // Value processing
@@ -1434,6 +1441,7 @@ namespace Niecza {
         public const int IS_COPY    = 32768;
         public const int IS_LIST    = 65536;
         public const int IS_HASH    = 131072;
+        public const int CALLABLE   = 0x200000;
 
         // Value source
         public const int HASDEFAULT = 32;
@@ -1455,6 +1463,9 @@ namespace Niecza {
             fb.ObjRef(def);
             fb.ObjRef(type);
             fb.Refs(post_constraints);
+            fb.String(attribute);
+            if (attribute != null)
+                fb.ObjRef(attribute_type);
         }
 
         internal static Parameter Thaw(ThawBuffer tb) {
@@ -1469,6 +1480,9 @@ namespace Niecza {
             n.def   = (SubInfo)tb.ObjRef();
             n.type  = (STable)tb.ObjRef();
             n.post_constraints = tb.RefsA<object>();
+            n.attribute = tb.String();
+            if (n.attribute != null)
+                n.attribute_type = (STable)tb.ObjRef();
 
             return n;
         }
@@ -2617,6 +2631,8 @@ gotit:
                         type = Kernel.PositionalMO;
                     if ((flags & Parameter.IS_HASH) != 0)
                         type = Kernel.AssociativeMO;
+                    if ((flags & Parameter.CALLABLE) != 0)
+                        type = Kernel.CallableMO;
                     if (!srco.Does(type)) {
                         if (quiet) return false;
                         if (srco.mo.HasType(Kernel.JunctionMO) && obj_src != -1 && (mode & NO_JUNCTION) == 0) {
@@ -2648,6 +2664,23 @@ gotit:
                         src = new SimpleVariable(islist, srco);
                     }
 bound: ;
+                }
+                if (param.attribute != null) {
+                    object self;
+                    if (!th.TryGetDynamic("self", 0, out self))
+                        throw new NieczaException("No 'self' available for attributive?");
+                    Variable selfv = (Variable)self;
+                    if (param.attribute[1] == '!') {
+                        Kernel.Assign(((Variable)(selfv.Fetch().
+                            GetSlot(param.attribute_type, param.attribute))),
+                                src);
+                    } else {
+                        Variable dest = Kernel.RunInferior(selfv.Fetch().
+                            InvokeMethod(Kernel.GetInferiorRoot(),
+                                param.attribute.Substring(2),
+                                new Variable[] { selfv }, null));
+                        Kernel.Assign(dest, src);
+                    }
                 }
                 if ((flags & Parameter.INVOCANT) != 0 && th.info.self_key >= 0)
                     th.SetDynamic(th.info.self_key, src);
@@ -4611,6 +4644,7 @@ saveme:
         [CORESaved] public static STable GrammarMO;
         [CORESaved] public static STable PositionalMO;
         [CORESaved] public static STable AssociativeMO;
+        [CORESaved] public static STable CallableMO;
         [CORESaved] public static STable CodeMO;
         [CORESaved] public static STable WhateverCodeMO;
         [CORESaved] public static STable RoutineMO;
@@ -5400,7 +5434,7 @@ slow:
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
                     WrapPushycb);
             si.sig = new Signature(Parameter.TPos("self", 0),
-                new Parameter(Parameter.RWTRANS | Parameter.SLURPY_PCL, 1, "$args", null, null, null)
+                new Parameter(Parameter.RWTRANS | Parameter.SLURPY_PCL, 1, "$args", null, null, null, null, null)
             );
             si.param = new object[] { null, cv };
             kl.AddMethod(0, name, MakeSub(si, null));
