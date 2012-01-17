@@ -2962,9 +2962,11 @@ sub cwd() is unsafe {
 
 sub chdir($filename) is unsafe {
     my $ok_code = True;
-    Q:CgOp { (rnull (path_chdir (obj_getstr {$filename}))) };
-    $PROCESS::CWD ::= Q:CgOp { (box Str (cwd_path)) };
-    CATCH { $ok_code = False; }
+    {
+        Q:CgOp { (rnull (path_chdir (obj_getstr {$filename}))) };
+        $PROCESS::CWD ::= Q:CgOp { (box Str (cwd_path)) };
+        CATCH { $ok_code = False; }
+    }
     $ok_code;
 }
 
