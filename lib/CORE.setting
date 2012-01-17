@@ -2794,12 +2794,14 @@ role Niecza::Dualvar is Niecza::PseudoStr {
 class IntStr is Int does Niecza::Dualvar { }
 class RatStr is Rat does Niecza::Dualvar { }
 class NumStr is Num does Niecza::Dualvar { }
+class ComplexStr is Complex does Niecza::Dualvar { }
 
 sub val($str) is pure {
     $_ = Niecza::NumSyntax.str2num($str);
     when Num { return NumStr.new($_, $str) }
     when Rat { return RatStr.new($_, $str) }
     when Int { return IntStr.new($_, $str) }
+    when Complex { return ComplexStr.new($_, $str) }
 fail:
     return $str;
     CATCH { goto fail; }
