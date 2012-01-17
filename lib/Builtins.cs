@@ -1668,6 +1668,14 @@ flat_enough:;
         File.Delete(path);
     }
 
+    public static string cwd_path() {
+        return Directory.GetCurrentDirectory();
+    }
+
+    public static void path_chdir(string path) {
+        Directory.SetCurrentDirectory(path);
+    }
+
     public static void path_mkdir(string path) {
         Directory.CreateDirectory(path);
     }

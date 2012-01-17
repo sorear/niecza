@@ -2955,9 +2955,21 @@ sub unlink(*@filenames) is unsafe {
     True; # is there a way to actually detect problems with File.Delete?
 }
 
+sub cwd() is unsafe {
+    Q:CgOp { (box Str (cwd_path)) };
+}
+
+sub chdir($filename) is unsafe {
+    my $ok_code = True;
+    Q:CgOp { (rnull (path_chdir (obj_getstr {$filename}))) };
+    $PROCESS::CWD ::= Q:CgOp { (box Str (cwd_path)) };
+    CATCH { $ok_code = False; }
+    $ok_code;
+}
+
 sub mkdir($filename) is unsafe {
     Q:CgOp { (rnull (path_mkdir (obj_getstr {$filename}))) };
-    True; # is there a way to actually detect problems with File.Delete?
+    True; # is there a way to actually detect problems with path_mkdir?
 }
 
 sub shell($command) is unsafe {
@@ -3045,6 +3057,7 @@ INIT {
     $PROCESS::PROGRAM_NAME ::= Q:CgOp { (sysquery (i 1)) };
     $PROCESS::BASE_DIRECTORY ::= Q:CgOp { (sysquery (i 3)) };
     $PROCESS::OS ::= Q:CgOp { (sysquery (i 5)) };
+    $PROCESS::CWD ::= Q:CgOp { (box Str (cwd_path)) };
     @GLOBAL::INC = ();
 }
 # }}}
