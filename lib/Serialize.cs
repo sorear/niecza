@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using Niecza.CLRBackend;
 
@@ -63,8 +64,11 @@ namespace Niecza.Serialization {
 
         internal static HashAlgorithm NewHash() { return new SHA256Managed(); }
 
+        internal Dictionary<string,Dictionary<string,MethodInfo>> methods =
+            new Dictionary<string,Dictionary<string,MethodInfo>>();
+
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 23;
+        static readonly int version = 24;
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,
@@ -524,7 +528,6 @@ namespace Niecza.Serialization {
         List<object> revalidate = new List<object>();
 
         public Type type;
-        public Dictionary<string,System.Reflection.MethodInfo> methods;
 
         internal ThawBuffer(ObjectRegistry reg, SerUnit unit, byte[] data) {
             this.data = data;

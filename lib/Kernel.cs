@@ -1015,9 +1015,11 @@ namespace Niecza {
                     var fields = new Dictionary<string,FieldInfo>();
                     foreach (FieldInfo fi in n.type.GetFields())
                         fields[fi.Name] = fi;
-                    tb.methods = new Dictionary<string,MethodInfo>();
+                    var meth = new Dictionary<string,MethodInfo>();
+
                     foreach (MethodInfo mi in n.type.GetMethods())
-                        tb.methods[mi.Name] = mi;
+                        meth[mi.Name] = mi;
+                    RuntimeUnit.reg.methods[n.asm_name] = meth;
                     while (ncon-- > 0) {
                         FieldInfo fi = fields[tb.String()];
                         object val = tb.ObjRef();
@@ -2021,8 +2023,13 @@ namespace Niecza {
             if (code != null) {
                 Type t = code.Method.DeclaringType;
                 if (t.Assembly == typeof(Kernel).Assembly) {
-                    tn = t.FullName;
+                    fb.Byte(1);
+                } else {
+                    fb.Byte(0);
+                    if (t.Assembly.GetName().Name != t.FullName)
+                        throw new NieczaException("violation of naming protocols? {0} != {1}", t.Assembly.GetName().Name, t.FullName);
                 }
+                tn = t.FullName;
                 mn = code.Method.Name;
             }
             fb.String(mn);
@@ -2077,18 +2084,25 @@ namespace Niecza {
         internal static SubInfo Thaw(ThawBuffer tb) {
             SubInfo n = new SubInfo();
             tb.Register(n);
+            bool kernel = tb.Byte() != 0;
             string mn = tb.String();
             string tn = tb.String();
-            if (mn != null) {
-                Type t = tn == null ? tb.type :
-                    typeof(Kernel).Assembly.GetType(tn, true);
+            if (mn != null && (kernel || !Backend.cross_level_load)) {
+                MethodInfo mi;
+                if (kernel) {
+                    mi = typeof(Kernel).Assembly.GetType(tn, true)
+                        .GetMethod(mn, BindingFlags.Public |
+                            BindingFlags.NonPublic | BindingFlags.Static);
+                } else {
+                    Dictionary<string,MethodInfo> t1;
 
-                n.code = t == null ? null :
-                    (DynBlockDelegate) Delegate.CreateDelegate(
-                    typeof(DynBlockDelegate),
-                    t == tb.type ? tb.methods[mn] :
-                        t.GetMethod(mn, BindingFlags.Public |
-                            BindingFlags.NonPublic | BindingFlags.Static));
+                    if (!RuntimeUnit.reg.methods.TryGetValue(tn, out t1) ||
+                            !t1.TryGetValue(mn, out mi)) {
+                        throw new Exception("Thawed sub references nonexistant method " + tn + "::" + mn);
+                    }
+                }
+                n.code = (DynBlockDelegate) Delegate.CreateDelegate(
+                    typeof(DynBlockDelegate), mi);
             }
 
             n.nspill = tb.Int();
