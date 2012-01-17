@@ -2780,6 +2780,8 @@ grammar Niecza::NumSyntax {
         $a ~~ FatRat ?? $a.numerator / $a.denominator !! $a
     }
 }
+
+class Niecza::PseudoStr is Str { has $!value }
 # }}}
 # I/O stuff {{{
 sub slurp($path) is unsafe { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) } }

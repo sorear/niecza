@@ -4547,7 +4547,17 @@ saveme:
         }
 
         public static T UnboxAny<T>(P6any o) {
-            return ((BoxObject<T>)o).value;
+            var co = o as BoxObject<T>;
+            if (co != null) {
+                return co.value;
+            } else {
+                if (typeof(T) == typeof(string) && o.Does(Kernel.PseudoStrMO)) {
+                    // Truly vile hack to make dualvars work.
+                    return (T)o.GetSlot(Kernel.PseudoStrMO, "$!value");
+                } else {
+                    throw new NieczaException("Cannot unbox a {0} from an object of repr {1}", typeof(T).Name, o.ReprName());
+                }
+            }
         }
 
         public static Frame Take(Frame th, Variable payload) {
@@ -4739,6 +4749,7 @@ saveme:
         [CORESaved] public static STable BlockMO;
         [CORESaved] public static STable RegexMO;
         [CORESaved] public static STable StrMO;
+        [CORESaved] public static STable PseudoStrMO;
         [CORESaved] public static STable NumMO;
         [CORESaved] public static STable IntMO;
         [CORESaved] public static STable RatMO;

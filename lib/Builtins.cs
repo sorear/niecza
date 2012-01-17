@@ -2554,6 +2554,14 @@ again:
         }
     }
 
+    public static Variable dualvar(Variable obj, Variable type, Variable str) {
+        P6any nobj = obj.Fetch().ReprClone();
+        nobj.ChangeType(type.Fetch().mo);
+        nobj.SetSlot(Kernel.PseudoStrMO, "$!value",
+                Kernel.UnboxAny<string>(str.Fetch()));
+        return Kernel.NewROScalar(nobj);
+    }
+
     public static void EstablishSlot(P6any n, P6how.AttrInfo ai,
             Variable vx) {
         Variable obj;
