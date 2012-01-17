@@ -25,6 +25,7 @@ my class Junction { ... }
 my class Enum     { ... }
 my class Range    { ... }
 my class Whatever { ... }
+grammar Niecza::NumSyntax { ... }
 # }}}
 # Important inlinable definitions {{{
 sub infix:<+>($l,$r) is pure is Niecza::builtin('plus',2,2) { $l + $r }
@@ -357,7 +358,7 @@ sub Niecza::autopun($pun, $name) {
 }
 
 my class Cool {
-    method FatRat () { ::Niecza::NumSyntax.str2num(~self, :fatrat) }
+    method FatRat () { Niecza::NumSyntax.str2num(~self, :fatrat) }
     method Rat($eps = 1e-6) { Q:CgOp { (rat_approx {self} {$eps}) } }
     method Int() { Q:CgOp { (coerce_to_int {self}) } }
     method Num() { Q:CgOp { (coerce_to_num {self}) } }
@@ -837,7 +838,7 @@ my class Str is Cool {
     }
 
     method gist() { defined(self) ?? self !! nextsame }
-    method Numeric () { ::Niecza::NumSyntax.str2num(~self) }
+    method Numeric () { Niecza::NumSyntax.str2num(~self) }
     method perl() {
         self // nextsame;
         my $str = self;
@@ -2782,6 +2783,27 @@ grammar Niecza::NumSyntax {
 }
 
 class Niecza::PseudoStr is Str { has $!value }
+
+role Niecza::Dualvar is Niecza::PseudoStr {
+    method new($val, Str $str) { Q:CgOp { (dualvar {$val} {self} {$str}) } }
+    method Str()  { self // nextsame; Q:CgOp { (box Str (unbox str (@ {self}))) } }
+    method gist() { self // nextsame; Q:CgOp { (box Str (unbox str (@ {self}))) } }
+    method Numeric() { 0 + self }
+    method perl() { "val({(~self).perl})" }
+}
+class IntStr is Int does Niecza::Dualvar { }
+class RatStr is Rat does Niecza::Dualvar { }
+class NumStr is Num does Niecza::Dualvar { }
+
+sub val($str) is pure {
+    $_ = Niecza::NumSyntax.str2num($str);
+    when Num { return NumStr.new($_, $str) }
+    when Rat { return RatStr.new($_, $str) }
+    when Int { return IntStr.new($_, $str) }
+fail:
+    return $str;
+    CATCH { goto fail; }
+}
 # }}}
 # I/O stuff {{{
 sub slurp($path) is unsafe { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) } }
