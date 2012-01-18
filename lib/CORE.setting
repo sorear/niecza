@@ -2869,6 +2869,7 @@ my class IO {
     method but-extension($ext) { Q:CgOp { (box Str (path_change_ext (obj_getstr {self}) (obj_getstr {$ext}))) }.IO }
     method realpath() is unsafe { Q:CgOp { (box Str (path_realpath (obj_getstr {self}))) }.IO }
     method modified() is unsafe { Instant.new(val => Q:CgOp { (path_modified (obj_getstr {self})) }) }
+    method copy($dest) is unsafe { Q:CgOp { (rnull (path_copy (obj_getstr {self}) (obj_getstr {$dest})))}}
 }
 
 augment class Str {

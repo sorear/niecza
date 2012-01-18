@@ -1680,6 +1680,10 @@ flat_enough:;
         Directory.CreateDirectory(path);
     }
 
+    public static void path_copy(string from_path, string to_path) {
+        System.IO.File.Copy(from_path, to_path, true);
+    }
+
     public static int command_system(string command) {
         return PosixWrapper.system(command);
     }
