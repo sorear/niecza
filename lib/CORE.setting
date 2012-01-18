@@ -2908,6 +2908,7 @@ my class IO {
     method realpath() is unsafe { Q:CgOp { (box Str (path_realpath (obj_getstr {self}))) }.IO }
     method modified() is unsafe { Instant.new(val => Q:CgOp { (path_modified (obj_getstr {self})) }) }
     method copy($dest) is unsafe { Q:CgOp { (rnull (path_copy (obj_getstr {self}) (obj_getstr {$dest})))}}
+    method chmod($mode) is unsafe { Q:CgOp { (box Int (path_chmod (obj_getstr {self}) (obj_getnum {$mode}))) } }
 }
 
 augment class Str {
@@ -3016,10 +3017,6 @@ sub mkdir($filename) is unsafe {
 
 sub shell($command) is unsafe {
     Q:CgOp { (box Int (command_system (obj_getstr {$command}))) };
-}
-
-sub chmod($filename, $mode) is unsafe {
-    Q:CgOp { (box Int (path_chmod (obj_getstr {$filename}) (obj_getnum {$mode}))) };
 }
 
 multi sub open($filename, :$w?, :$a?, :$r?, :$rw?) is unsafe {
