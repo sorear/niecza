@@ -116,6 +116,9 @@ int p5embed_SvNOKp(SV* sv) {
 int p5embed_SvPOKp(SV* sv) {
     return SvPOKp(sv);
 }
+int p5embed_SvOK(SV* sv) {
+    return SvOK(sv);
+}
 
 int p5embed_SvIV(SV* sv) {
     return SvIV(sv);

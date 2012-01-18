@@ -37,6 +37,9 @@ public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPOKp")]
     public static extern int SvPOKp(IntPtr sv);
 
+    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvOK")]
+    public static extern int SvOK(IntPtr sv);
+
     [DllImport("obj/p5embed.so", EntryPoint="p5embed_newSVpvn")]
     public static extern IntPtr newSVpvn(IntPtr s,int length);
 
@@ -64,6 +67,10 @@ public class Perl5Interpreter : IForeignInterpreter {
             //TODO: check - cargo culted
             return Kernel.NilP.mo.typeVar;
         }
+        if (SvOK(sv) == 0) {
+            return Kernel.NilP.mo.typeVar;
+        }
+
         if (SvIOKp(sv) != 0) {
             return Builtins.MakeInt(SvIV(sv));
         } else if (SvNOKp(sv) != 0) {
