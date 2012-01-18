@@ -2966,7 +2966,7 @@ sub chdir($filename) is unsafe {
     {
         Q:CgOp { (rnull (path_chdir (obj_getstr {$filename}))) };
         $PROCESS::CWD ::= Q:CgOp { (box Str (cwd_path)) };
-        CATCH { $ok_code = False; }
+        CATCH { default { $ok_code = False; } }
     }
     $ok_code;
 }
