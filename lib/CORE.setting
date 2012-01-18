@@ -3018,6 +3018,10 @@ sub shell($command) is unsafe {
     Q:CgOp { (box Int (command_system (obj_getstr {$command}))) };
 }
 
+sub chmod($filename, $mode) is unsafe {
+    Q:CgOp { (box Int (path_chmod (obj_getstr {$filename}) (obj_getnum {$mode}))) };
+}
+
 multi sub open($filename, :$w?, :$a?, :$r?, :$rw?) is unsafe {
     die "Not yet able to open both :r and :w" if ($r && $w) || $rw;
     if $a {

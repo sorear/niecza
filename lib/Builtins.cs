@@ -19,7 +19,7 @@ namespace Niecza {
     // Of course actually trying to use the POSIX stuff on Windows will die.
     class PosixWrapper {
         static readonly Assembly Mono_Posix;
-        static readonly Type Syscall, AccessModes, Stat, Signum, Stdlib;
+        static readonly Type Syscall, AccessModes, FilePermissions, Stat, Signum, Stdlib;
 
         // copied from Mono.Posix.dll; constant values are part of the
         // stable ABI so these can't change
@@ -34,7 +34,7 @@ namespace Niecza {
         public readonly static Func<string,int> system;
 
         // methods and fields that must be used through wrappers
-        static readonly MethodInfo m_stat, m_access, m_raise;
+        static readonly MethodInfo m_stat, m_access, m_raise, m_chmod;
         static readonly FieldInfo  f_dev, f_ino, f_mode, f_nlink, f_uid, f_gid,
             f_rdev, f_size, f_blksize, f_blocks, f_atime, f_mtime, f_ctime;
 
@@ -71,11 +71,17 @@ namespace Niecza {
             return res;
         }
 
+        public static int chmod(string pathname, int mode) {
+            return (int) m_chmod.Invoke(null, new object[] {
+                pathname, Enum.ToObject(FilePermissions, mode) });
+        }
+
         static PosixWrapper() {
             Mono_Posix = Assembly.Load("Mono.Posix, Version=2.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756");
             Syscall = Mono_Posix.GetType("Mono.Unix.Native.Syscall", true);
             AccessModes = Mono_Posix.GetType("Mono.Unix.Native.AccessModes", true);
             Stat = Mono_Posix.GetType("Mono.Unix.Native.Stat", true);
+            FilePermissions = Mono_Posix.GetType("Mono.Unix.Native.FilePermissions", true);
             Signum = Mono_Posix.GetType("Mono.Unix.Native.Signum", true);
             Stdlib = Mono_Posix.GetType("Mono.Unix.Native.Stdlib", true);
 
@@ -99,6 +105,7 @@ namespace Niecza {
             m_stat = Syscall.GetMethod("stat");
             m_access = Syscall.GetMethod("access");
             m_raise = Stdlib.GetMethod("raise", new Type[] { Signum });
+            m_chmod = Syscall.GetMethod("chmod");
 
             f_dev = Stat.GetField("st_dev");
             f_ino = Stat.GetField("st_ino");
@@ -1686,6 +1693,10 @@ flat_enough:;
 
     public static int command_system(string command) {
         return PosixWrapper.system(command);
+    }
+
+    public static int path_chmod(string path, double mode) {
+        return PosixWrapper.chmod(path, (int) mode);
     }
 
     public static bool emulate_eaccess(string path, int mode) {
