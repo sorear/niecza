@@ -2177,11 +2177,17 @@ method param_var($/) {
     my $hash = $sigil eq '%';
     my $name = $<name> ?? ~$<name> !! Any;
 
+    my $flags = ($list ?? $Sig::IS_LIST !! 0) + ($hash ?? $Sig::IS_HASH !! 0) +
+        ($sigil eq '&' ?? $Sig::CALLABLE !! 0) + $Sig::POSITIONAL;
     my $slot;
     if $twigil eq '' {
         $slot = defined($name) ?? ($sigil ~ $name) !! Any;
     } elsif $twigil eq '*' {
         $slot = "$sigil*" ~ "$name";
+    } elsif $twigil eq ('!' | '.') {
+        make { :$flags, :$slot, attribute => "$sigil$twigil$name",
+            names => [ $name ], attribute_type => $*CURLEX<!sub>.cur_pkg };
+        return;
     } else {
         $/.CURSOR.sorry("Unhandled parameter twigil $twigil");
         make { };
@@ -2200,9 +2206,7 @@ method param_var($/) {
             noinit => ?($*SIGNUM)) if defined($slot);
     });
 
-    make { :$slot, names => defined($name) ?? [ $name ] !! [],
-        flags => ($list ?? $Sig::IS_LIST !! 0) + ($hash?? $Sig::IS_HASH !! 0) +
-            $Sig::POSITIONAL };
+    make { :$slot, names => defined($name) ?? [ $name ] !! [], :$flags };
 }
 
 method parameter($/) {
@@ -2234,6 +2238,7 @@ method parameter($/) {
     elsif $tag eq '\\:?' { $flags +|= ($Sig::RWTRANS + $Sig::OPTIONAL) }
     elsif $tag eq ':!'   { }
     elsif $tag eq ':*'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '?:*'  { $flags +|= $Sig::OPTIONAL }
     elsif $tag eq ':?'   { $flags +|= $Sig::OPTIONAL }
     elsif $tag eq '?:?'  { $flags +|= $Sig::OPTIONAL }
     elsif $tag eq '!:!'  { }
@@ -2650,7 +2655,7 @@ method add_accessor($/, $name, $store_name, $lexical, $public) {
     });
 }
 
-method add_attribute($/, $barename, $sigil, $accessor, $type) {
+method add_attribute($/, $barename, $sigil, $accessor, $type, $bare) {
     my $ns = $*CURLEX<!sub>.body_of;
     my $name = $sigil ~ '!' ~ $barename;
     $/.CURSOR.sorry("Attribute $name declared outside of any class"),
@@ -2666,6 +2671,8 @@ method add_attribute($/, $barename, $sigil, $accessor, $type) {
     self.add_accessor($/, $barename, $name, False, $accessor);
     $/.CURSOR.trymop({
         $ns.add_attribute($name, $sigil, +$accessor, $type, |mnode($/));
+        $*CURLEX<!sub>.add_attr_alias($sigil ~ $barename, $ns, $name)
+            if $bare;
     });
 
     $OpAttribute.new(name => $name, initializer => $ns);
@@ -2744,7 +2751,7 @@ method variable_declarator($/) {
 
     if $scope eq 'has' {
         make self.add_attribute($/, $v<name>, $v<sigil>, $t eq '.',
-            $typeconstraint);
+            $typeconstraint, $t eq '');
     } elsif $scope eq 'state' {
         $/.CURSOR.trymop({
             $/.CURSOR.check_categorical($slot);
