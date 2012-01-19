@@ -3783,6 +3783,10 @@ dynamic:
         public static object value_get_type(object[] args) {
             return Handle.Wrap(((Variable)Handle.Unbox(args[1])).Fetch().mo);
         }
+        public static object value_to_string(object[] args) {
+            var v = (Variable)Handle.Unbox(args[1]);
+            return v.Fetch().mo.mro_raw_Str.Get(v);
+        }
         public static object value_starts_with_pair(object[] args) {
             var ob = ((Variable)Handle.Unbox(args[1])).Fetch();
             if (ob.Isa(Kernel.PairMO))
@@ -3824,6 +3828,10 @@ dynamic:
                 double d = (args[2] is double) ? (double)args[2] : (int)args[2];
                 return Handle.Wrap(Builtins.MakeFloat(d));
             }
+        }
+        public static object sub_run_BEGIN_raw(object[] args) {
+            SubInfo  si = (SubInfo)Handle.Unbox(args[1]);
+            return new Handle(si.RunBEGIN());
         }
         public static object sub_run_BEGIN_CC(object[] args) {
             SubInfo  si = (SubInfo)Handle.Unbox(args[1]);

@@ -23,9 +23,151 @@ augment class Any {
     submethod new(|$) { die "Attempted to instantiate undefined class." }
 }
 
-our ($Sig, $SigParameter, $OpGeneralConst, $OpStateDecl, $OpLexical, $OpStatementList, $OpStart, $OpAttribute);
+our ($Op, $OpAttribute, $OpBareBlock, $OpBuiltin, $OpCallLike, $OpCallMethod,
+     $OpCallSub, $OpCatchyWrapper, $OpCgOp, $OpConditional, $OpConstantDecl,
+     $OpContextVar, $OpDoOnceLoop, $OpForLoop, $OpGather, $OpGeneralConst,
+     $OpGeneralLoop, $OpGetBlock, $OpGetSlot, $OpHereStub, $OpImmedForLoop,
+     $OpIndirectVar, $OpLabelled, $OpLetVar, $OpLexical, $OpMakeCursor, $OpNum,
+     $OpParen, $OpRegexBody, $OpRequire, $OpShortCircuit, $OpSimplePair,
+     $OpSimpleParcel, $OpStart, $OpStateDecl, $OpStatementList,
+     $OpStringLiteral, $OpTemporize, $OpTry, $OpWhatever, $OpWhateverCode,
+     $OpWhen, $OpWhileLoop, $OpYada, $OpYouAreHere); #OK
+
+our ($Sig, $SigParameter, $PassSimplifier); #OK
 
 our $Actions; $Actions = $Actions but role {
+# may throw!
+method eval_ast($/, $ast) {
+    # XXX simplification _should_ be idempotent but I don't how how true
+    $ast := $PassSimplifier.invoke_incr($*CURLEX<!sub>, $ast);
+    if $ast.const_value -> $cv { return $cv }
+    my $sub = self.thunk_sub($ast);
+    $*CURLEX<!sub>.create_static_pad;
+    $sub.run_BEGIN_raw;
+}
+# DELETE qpvalue
+method subshortname($/) {
+    if $<colonpair> {
+        my $n = ~$<category>;
+        for @( $<colonpair> ) {
+            $n ~= self.get_cp_ext($_);
+        }
+        make { name => $n };
+    } else {
+        make $<desigilname>.ast;
+    }
+}
+
+method process_name($/, :$declaring, :$defer, :$clean) {
+    return () unless defined $/;
+
+    my @ns = @( $<name>.ast<names> );
+    my $ext = '';
+    my $trail = @ns && !defined @ns[*-1];
+    pop @ns if $trail;
+
+    if !$clean {
+        for @( $<colonpair> ) {
+            $ext ~= self.get_cp_ext($_);
+        }
+    }
+
+    for $defer ?? () !! @ns.grep($Op) {
+        $_ = ~self.trivial_eval($/, $_);
+        # XXX should this always stringify?
+        if $_ ~~ Cool {
+            $_ = ~$_;
+        } else {
+            $_ = "XXX";
+            $/.CURSOR.sorry("Name components must evaluate to strings");
+        }
+    }
+
+    if $declaring {
+        # class :: is ... { } is a placeholder for a lack of name
+        return () if $trail && !@ns;
+        $/.CURSOR.sorry("Illegal explicit declaration of a symbol table")
+            if $trail;
+        die "Unimplemented" if $defer;
+        return () unless @ns;
+        my $head = pop(@ns) ~ $ext;
+        return Any, $head unless @ns;
+
+        # the remainder is assumed to name an existing or new package
+        my $pkg;
+        $/.CURSOR.trymop({
+            $pkg = $*CURLEX<!sub>.compile_get_pkg(@ns, :auto);
+        });
+        return $pkg, $head;
+    }
+    else {
+        if $defer {
+            # The stuff returned here is processed by the variable rule,
+            # and also by method call generation
+
+            goto "dyn" if $trail;
+            goto "dyn" if $_.^isa($Op) for @ns;
+            my $pkg;
+            my @tail = @ns;
+            my $head = pop(@tail) ~ $ext;
+            unless @tail {
+                return { name => $head } unless @tail;
+            }
+            try { $pkg = $*CURLEX<!sub>.compile_get_pkg(@tail, :auto) };
+            goto "dyn" unless $pkg;
+
+            return { name => $head, pkg => $pkg };
+dyn:
+            my @bits = map { $_, '::' }, @ns;
+            pop @bits if @bits;
+            push @bits, '::' if $trail;
+            push @bits, $ext;
+            return { iname => mkstringycat($/, @bits) };
+        }
+
+        $/.CURSOR.sorry("Class required, but symbol table name used instead")
+            if $trail;
+        return () unless @ns;
+        my $head = pop(@ns) ~ $ext;
+        my $pkg;
+        $/.CURSOR.trymop({
+            $pkg = $*CURLEX<!sub>.compile_get_pkg(@ns, $head);
+        });
+        return $pkg;
+    }
+}
+method get_cp_ext($/) {
+    if $/ eq any <:_ :U :D :T> {
+        return "";
+    } elsif !$<v>.^isa(Match) {
+        return ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
+    } else {
+        my $suf = ~$<v>;
+        $/.CURSOR.trymop({
+            $suf = self.eval_ast($/, $<v>.ast).to_string if $<v>.ast;
+        });
+        return ":" ~ $<k> ~ "<" ~ $suf ~ ">";
+    }
+}
+method colonpair($/) {
+    my $tv = $<v>.^isa(Match) ?? ($<v>.ast // ~$<v>) !!
+        $OpLexical.new(name => $<v> ?? 'True' !! 'False');
+
+    if $tv ~~ Str {
+        if substr($<v>,1,1) eq '<' {
+            $tv = mkcall($/, '&postcircumfix:<{ }>',
+                $OpLexical.new(name => '$/'),
+                $OpStringLiteral.new(text => ~$<k>));
+        } else {
+            $tv = self.do_variable_reference($/,
+                { sigil => ~$<v><sigil>,
+                    twigil => ($<v><twigil> ?? ~$<v><twigil> !! ''),
+                    name => $<k> });
+        }
+    }
+
+    make { term => $OpSimplePair.new(key => $<k>, value => $tv) };
+}
 }
 
 # remove run_dispatch

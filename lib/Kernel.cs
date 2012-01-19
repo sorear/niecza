@@ -3194,6 +3194,20 @@ bound: ;
             return Kernel.NewRWListVar(l);
         }
     }
+    // used for both
+    class CtxParcelListStr : ContextHandler<string> {
+        public override string Get(Variable obj) {
+            P6any o = obj.Fetch();
+            VarDeque itr = o.mo.mro_raw_iterator.Get(obj);
+            StringBuilder sb = new StringBuilder();
+            while (Kernel.IterHasFlat(itr, true)) {
+                var n = itr.Shift();
+                sb.Append(n.Fetch().mo.mro_raw_Str.Get(n)).Append(' ');
+            }
+            sb.Length--;
+            return sb.ToString();
+        }
+    }
 
     class CtxBoxify<T> : ContextHandler<Variable> {
         ContextHandler<T> inner;
@@ -6129,6 +6143,7 @@ slow:
             ParcelMO = new STable("Parcel");
             Handler_PandBox(ParcelMO, "iterator", new CtxParcelIterator(),
                     IteratorMO);
+            Handler_PandBox(ParcelMO, "Str", new CtxParcelListStr(), StrMO);
             WrapHandler1(ParcelMO, "LISTSTORE", new IxParcelLISTSTORE());
             Handler_Vonly(ParcelMO, "list", new CtxParcelList(), null);
             ParcelMO.FillProtoClass(AnyMO);
@@ -6136,6 +6151,7 @@ slow:
             ListMO = new STable("List");
             WrapIndexy(ListMO, "postcircumfix:<[ ]>", new IxListAtPos(false),
                     null, null, new IxListBindPos());
+            Handler_PandBox(ListMO, "Str", new CtxParcelListStr(), StrMO);
             Handler_Vonly(ListMO, "pop", new PopList(), null);
             Handler_Vonly(ListMO, "shift", new ShiftList(), null);
             WrapPushy(ListMO, "push", new PushList());

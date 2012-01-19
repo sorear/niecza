@@ -1264,7 +1264,6 @@ my class Parcel is Cool does Positional {
 
     method elems  () { + @(self) }
     method Numeric() { + @(self) }
-    method Str    () { ~ @(self) }
     method Bool   () { ? @(self) }
     method gist   () {
         self // nextsame;
@@ -1360,7 +1359,6 @@ my class List is Cool does Positional {
         True;
     }
 
-    method Str()  { defined(self) ?? self.join(" ") !! nextsame }
     method gist() { defined(self) ?? self.map(*.gist).join(" ") !! nextsame }
 
     method sort($cmp_ = &infix:<cmp>) {
