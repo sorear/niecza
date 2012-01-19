@@ -3204,7 +3204,7 @@ bound: ;
                 var n = itr.Shift();
                 sb.Append(n.Fetch().mo.mro_raw_Str.Get(n)).Append(' ');
             }
-            sb.Length--;
+            if (sb.Length != 0) sb.Length--;
             return sb.ToString();
         }
     }
