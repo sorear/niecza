@@ -441,6 +441,7 @@ S24-testing/0-compile.t
 S28-named-variables/cwd.t
 S28-named-variables/inc.t
 S29-any/cmp.t
+S29-any/isa.t
 S29-context/die.t
 S29-context/exit-in-if.t
 S29-context/eval.t
