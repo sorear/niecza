@@ -48,7 +48,7 @@ CgOp._register_ops: <
         outerlex path_any_exists path_change_ext path_combine
         path_dir_exists path_file_exists path_modified path_realpath
         popcut print prog promote_to_list pushcut rawcall rawnew rawnewarr
-        rawnewzarr rawscall rawsget rawsset return role_apply run_dispatch
+        rawnewzarr rawscall rawsget rawsset return role_apply
         rxbacktrack rxbprim rxcall rxclosequant rxcommitgroup rxend
         rxfinalend rxframe rxgetpos rxgetquant rxincorpcut rxincorpshift
         rxincquant rxinit rxopenquant rxpushb rxpushcapture rxsetcapsfrom
@@ -68,7 +68,7 @@ CgOp._register_ops: <
         vvarlist_unshift vvarlist_unshiftn whileloop xspan times
         divop obj_can sqrt push pop unshift shift
         newarray newhash you_are_here frame_outer frame_sub makejunction
-        >;
+        who sc_root sc_indir temporize _addmethod _invalidate rxlprim >;
 
 method double($x) {
     # Hack - prevent JSON syntax errors

@@ -23,7 +23,8 @@ our ($Operator, $Operator_Method, $Operator_Replicate, $Operator_FlipFlop,
      $Operator_DotEq, $Operator_Mixin, $Operator_Let, $Operator_PostCall,
      $Operator_Function, $Operator_CompoundAssign);
 
-our ($CgOp, $CClass, $Sig, $SigParameter, $OptRxSimple, $OptBeta, $Actions);
+our ($CgOp, $CClass, $Sig, $SigParameter, $OptRxSimple, $OptBeta, $Actions,
+     $PassSimplifier);
 
 class NieczaActions;
 
@@ -326,22 +327,12 @@ method process_name($/, :$declaring, :$defer, :$clean) {
 
     if !$clean {
         for @( $<colonpair> ) {
-            $ext ~= $_.ast<ext> // (
-                $_.CURSOR.sorry("Invalid colonpair for name extension");
-                "";
-            )
+            $ext ~= self.get_cp_ext($_);
         }
     }
 
     for $defer ?? () !! @ns.grep($Op) {
-        $_ = ~self.trivial_eval($/, $_);
-        # XXX should this always stringify?
-        if $_ ~~ Cool {
-            $_ = ~$_;
-        } else {
-            $_ = "XXX";
-            $/.CURSOR.sorry("Name components must evaluate to strings");
-        }
+        $_ = self.eval_ast_str($/, $_) // "XXX";
     }
 
     if $declaring {
@@ -401,10 +392,7 @@ method subshortname($/) {
     if $<colonpair> {
         my $n = ~$<category>;
         for @( $<colonpair> ) {
-            $n ~= $_.ast<ext> // (
-                $_.CURSOR.sorry("Invalid colonpair for name extension");
-                "";
-            );
+            $n ~= self.get_cp_ext($_);
         }
         make { name => $n };
     } else {
@@ -1748,27 +1736,34 @@ method dotty:sym<.*> ($/) {
 
 method coloncircumfix($/) { make $<circumfix>.ast }
 
-sub qpvalue($ast) {
-    if $ast.^isa($OpSimpleParcel) {
-        join " ", map &qpvalue, @( $ast.items )
-    } elsif $ast.^isa($OpStringLiteral) {
-        $ast.text;
-    } elsif $ast.^isa($OpParen) {
-        qpvalue($ast.inside);
+# may throw!
+method eval_ast($/, $ast) {
+    # XXX simplification _should_ be idempotent but I don't how how true
+    $ast := $PassSimplifier.invoke_incr($*CURLEX<!sub>, $ast);
+    if $ast.const_value -> $cv { return $cv }
+    my $sub = self.thunk_sub($ast);
+    $*CURLEX<!sub>.create_static_pad;
+    $sub.run_BEGIN_raw;
+}
+method eval_ast_str($/, $ast) {
+    my $val;
+    $/.CURSOR.trymop({
+        $val = self.eval_ast($/, $ast).to_string;
+    });
+    $val;
+}
+method get_cp_ext($/) {
+    if $/ eq any <:_ :U :D :T> {
+        return "";
+    } elsif !$<v>.^isa(Match) {
+        return ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
     } else {
-        "XXX"
+        my $suf = ~$<v>;
+        $suf = self.eval_ast_str($/, $<v>.ast) // $suf if $<v>.ast;
+        return ":" ~ $<k> ~ "<" ~ $suf ~ ">";
     }
 }
-
 method colonpair($/) {
-    my $n;
-    if $/ eq any <:_ :U :D :T> {
-        $n = "";
-    } elsif !$<v>.^isa(Match) {
-        $n = ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
-    } else {
-        $n = ":" ~ $<k> ~ "<" ~ qpvalue($<v>.ast // ~$<v>) ~ ">";
-    }
     my $tv = $<v>.^isa(Match) ?? ($<v>.ast // ~$<v>) !!
         $OpLexical.new(name => $<v> ?? 'True' !! 'False');
 
@@ -1785,7 +1780,7 @@ method colonpair($/) {
         }
     }
 
-    make { ext => $n, term => $OpSimplePair.new(key => $<k>, value => $tv) };
+    make { term => $OpSimplePair.new(key => $<k>, value => $tv) };
 }
 
 method fatarrow($/) {
@@ -2781,29 +2776,6 @@ method variable_declarator($/) {
     }
 }
 
-method trivial_eval($/, $ast) {
-    if $ast.^isa($OpSimpleParcel) {
-        [,] map { self.trivial_eval($/, $_) }, @( $ast.items )
-    } elsif $ast.^isa($OpSimplePair) {
-        $ast.key => self.trivial_eval($/, $ast.value)
-    } elsif $ast.^isa($OpStringLiteral) {
-        $ast.text;
-    } elsif $ast.^isa($OpParen) {
-        self.trivial_eval($/, $ast.inside);
-    } elsif $ast.^isa($OpStatementList) {
-        my @l = @( $ast.children ); pop @l;
-        self.trivial_eval($/, $_) for @l;
-        $ast.children ?? self.trivial_eval($/, $ast.children[*-1]) !! Nil;
-    } elsif $ast.^isa($OpNum) && $ast.value !~~ Array {
-        $ast.value.Num
-    } elsif $ast.^isa($OpNum) && $ast.value ~~ Array && $ast.value[0] == 10 {
-        (+$ast.value[1]).Int # well not quite
-    } else {
-        $/.CURSOR.sorry("Compile time expression is insufficiently trivial {$ast.WHAT.perl}");
-        "XXX"
-    }
-}
-
 method type_declarator:subset ($/) {
     my ($basetype) = self.process_name($*OFTYPE<longname>);
     $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', 'Any');
@@ -2894,28 +2866,16 @@ method type_declarator:enum ($/) {
         }
     }
 
-    my @pairs = self.trivial_eval($/, $<term>.ast);
-    my $last = -1;
-    my ($has_ints, $has_strs);
-    for @pairs {
-        if $_ !~~ Pair {
-            my $key = $_;
-            my $value = $last.succ;
-            $_ = $key => $value;
-        }
-        given $last = .value {
-            when Int { $has_ints = True; }
-            when Str { $has_strs = True; }
-            default  { $/.CURSOR.sorry("Enum values must be Int or Str"); }
-        }
-    }
-    if $has_ints && $has_strs {
-        $/.CURSOR.sorry("Enum may not contain both Int and Str values");
-    }
+    my $map;
+    $/.CURSOR.trymop({
+        $map = self.eval_ast($/, $OpCallMethod.new(name => 'new',
+                receiver => mklex($/, 'EnumMap'), args => [ $<term>.ast ]));
+    });
+    unless $map { make $OpStatementList.new; return }
 
     my ($basetype) = self.process_name($*OFTYPE<longname>);
-    $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', $has_strs ?? 'Str' !! 'Int');
-    my $kindtype = $has_strs ?? 'StrBasedEnum' !! 'IntBasedEnum';
+    $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', $map.enum_type);
+    my $kindtype = $map.enum_type ~ 'BasedEnum';
 
     if $<name> && $<name>.reduced eq 'longname' && $scope ne 'anon' {
         # Longnamed enum is a kind of type definition
@@ -2925,8 +2885,8 @@ method type_declarator:enum ($/) {
             ($lexvar, $obj) = self.do_new_package($/, :$scope,
                 class => 'class', name => $<longname>, :@exports);
 
-            $obj.add_super($*CURLEX<!sub>.compile_get_pkg($kindtype));
             $obj.add_super($basetype);
+            $obj.add_role($*CURLEX<!sub>.compile_get_pkg($kindtype));
 
             my $nb = $*unit.create_sub(
                 outer      => $*CURLEX<!sub>,
@@ -2939,25 +2899,20 @@ method type_declarator:enum ($/) {
             my $nbvar = self.gensym;
             $nb.add_my_name('self', noinit => True);
             $nb.set_signature($Sig.simple('self'));
-            $nb.finish(self.init_constant(
-                self.make_constant($/, 'anon', Any),
-                $OpCallMethod.new(name => 'new',
-                    receiver => mklex($/, 'EnumMap'), args => [$<term>.ast])));
+            $nb.finish($OpGeneralConst.new(value => $map));
             $*CURLEX<!sub>.create_static_pad;
             $*CURLEX<!sub>.add_my_sub($nbvar, $nb, |mnode($/));
             $obj.add_method(0, 'enums', $nb, |mnode($/));
             $obj.close;
 
-            for @pairs {
-                self.make_constant_into($/, $obj, .key, rhs =>
+            for $map.enum_keys {
+                self.make_constant_into($/, $obj, $_, rhs =>
                     $OpCallSub.new(invocant => mklex($/, $lexvar),
-                        args => [ $OpStringLiteral.new(text => .key) ]));
-            }
+                        args => [ $OpStringLiteral.new(text => $_) ]));
 
-            for @pairs {
-                self.init_constant(self.make_constant($/, $scope, .key),
+                self.init_constant(self.make_constant($/, $scope, $_),
                     $OpCallSub.new(invocant => mklex($/, $lexvar),
-                        args => [ $OpStringLiteral.new(text => .key) ]));
+                        args => [ $OpStringLiteral.new(text => $_) ]));
             }
         });
 
@@ -2965,9 +2920,7 @@ method type_declarator:enum ($/) {
     } else {
         make self.init_constant(
             self.make_constant($/, $<name> ?? $scope !! 'anon', ~$<name>),
-            $OpCallMethod.new(pos=>$/, name => 'new',
-                receiver => mklex($/, 'EnumMap'),
-                args => [$<term>.ast])),
+            $OpGeneralConst.new(value => $map));
     }
 }
 
@@ -3083,7 +3036,7 @@ method process_block_traits($/, @tr) {
                 $sub.set_extend('prec', %prec.kv);
             }
         } elsif !$pack && $tr<assoc> {
-            my $arg = ~self.trivial_eval($T, $tr<assoc>);
+            my $arg = self.eval_ast_str($T, $tr<assoc>) // '';
             my %prec = $sub.get_extend('prec');
             unless %prec {
                 $T.CURSOR.sorry("Target does not seem to be an operator");
@@ -3096,7 +3049,7 @@ method process_block_traits($/, @tr) {
             %prec<assoc> = $arg;
             $sub.set_extend('prec', %prec.kv);
         } elsif !$pack && $tr<Niecza::absprec> {
-            my $arg = ~self.trivial_eval($T, $tr<Niecza::absprec>);
+            my $arg = self.eval_ast_str($T, $tr<Niecza::absprec>) // '';
             my %prec = $sub.get_extend('prec');
             unless %prec {
                 $T.CURSOR.sorry("Target does not seem to be an operator");
@@ -3106,8 +3059,9 @@ method process_block_traits($/, @tr) {
             %prec<dba> = "like $sub.name()";
             $sub.set_extend('prec', %prec.kv);
         } elsif !$pack && $tr<Niecza::builtin> {
-            $sub.set_extend('builtin',
-                self.trivial_eval($T, $tr<Niecza::builtin>));
+            # XXX this is a smidge ugly
+            my ($name, @rest) = (self.eval_ast_str($T, $tr<Niecza::builtin>) // "a").words;
+            $sub.set_extend('builtin', $name, map +*, @rest);
         } elsif !$pack && $tr<return_pass> {
             $sub.set_return_pass;
         } elsif !$pack && $tr<of> {
@@ -3958,6 +3912,7 @@ method statement_prefix:INIT ($/) { phaser($/, 'INIT', :csp) }
 
 method statement_prefix:BEGIN ($/) {
     # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work
+    # Should go away later once the spec is less slushy
     repeat while False {
         my $c = ($<blast><statement> || $<blast><block><blockoid>).ast;
 
@@ -3970,7 +3925,7 @@ method statement_prefix:BEGIN ($/) {
         last if $d.private || $d.ismeta;
         last unless $d.name eq any <push unshift>;
         last unless +$d.getargs == 1;
-        last unless defined my $str = self.trivial_eval($/, $d.getargs.[0]);
+        last unless defined my $str = self.eval_ast_str($/, $d.getargs.[0]);
         @*INC."$d.name()"($str);
         make $OpStatementList.new;
         return;
