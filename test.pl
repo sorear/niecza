@@ -1319,7 +1319,7 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 
 {
     my class A { method foo(:$x) { $x * 2 } }
-    my class B is A { method foo() { nextwith( self, x => 5 ) } }
+    my class B is A { method foo() { nextwith( x => 5 ) } }
     is B.foo, 10, "nextwith works";
 }
 

@@ -2386,7 +2386,14 @@ namespace Niecza {
 
         public Variable GetArgs() {
             P6any nw = new P6opaque(Kernel.CaptureMO);
-            nw.SetSlot(Kernel.CaptureMO, "$!positionals", pos ?? new Variable[0]);
+            var poscap = pos ?? new Variable[0];
+            if (sub != null && poscap.Length > 0 && sub.Does(Kernel.MethodMO)) {
+                // Hide the self value so that using |callframe.args in a
+                // nextwith call will DTRT
+                poscap = new Variable[pos.Length - 1];
+                Array.Copy(pos, 1, poscap, 0, poscap.Length);
+            }
+            nw.SetSlot(Kernel.CaptureMO, "$!positionals", poscap);
             nw.SetSlot(Kernel.CaptureMO, "$!named", named);
             return Kernel.NewROScalar(nw);
         }
@@ -6423,8 +6430,12 @@ slow:
                     Variable[] p = tf.pos;
                     VarHash n = tf.named;
                     if (o != null) {
-                        p = (Variable[]) o.slots[0];
+                        var tp = (Variable[]) o.slots[0];
                         n = o.slots[1] as VarHash;
+                        // nextdispatch copies over the old self
+                        p = new Variable[tp.Length + 1];
+                        Array.Copy(tp, 0, p, 1, tp.Length);
+                        p[0] = tf.pos[0];
                     }
                     return de.info.SetupCall(tf.caller, de.outer, de.ip6, p, n,
                             false, de);
