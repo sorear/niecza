@@ -309,6 +309,94 @@ method statement_prefix:BEGIN ($/) {
     $con.init = True;
     make $con;
 }
+method type_declarator:enum ($/) {
+    my $scope = $*SCOPE || 'our';
+
+    my @exports;
+    for map *.ast, @$<trait> -> $t {
+        if $t<export> {
+            push @exports, @( $t<export> );
+        } else {
+            $/.CURSOR.sorry("Unsupported enum trait $t.keys()");
+        }
+    }
+
+    my @pairs = self.trivial_eval($/, $<term>.ast);
+    my $last = -1;
+    my ($has_ints, $has_strs);
+    for @pairs {
+        if $_ !~~ Pair {
+            my $key = $_;
+            my $value = $last.succ;
+            $_ = $key => $value;
+        }
+        given $last = .value {
+            when Int { $has_ints = True; }
+            when Str { $has_strs = True; }
+            default  { $/.CURSOR.sorry("Enum values must be Int or Str"); }
+        }
+    }
+    if $has_ints && $has_strs {
+        $/.CURSOR.sorry("Enum may not contain both Int and Str values");
+    }
+
+    my ($basetype) = self.process_name($*OFTYPE<longname>);
+    $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', $has_strs ?? 'Str' !! 'Int');
+    my $kindtype = $has_strs ?? 'StrBasedEnum' !! 'IntBasedEnum';
+
+    if $<name> && $<name>.reduced eq 'longname' && $scope ne 'anon' {
+        # Longnamed enum is a kind of type definition
+
+        my ($lexvar, $obj);
+        $/.CURSOR.trymop({
+            ($lexvar, $obj) = self.do_new_package($/, :$scope,
+                class => 'class', name => $<longname>, :@exports);
+
+            $obj.add_super($basetype);
+            $obj.add_role($*CURLEX<!sub>.compile_get_pkg($kindtype));
+
+            my $nb = $*unit.create_sub(
+                outer      => $*CURLEX<!sub>,
+                name       => $obj.name ~ '.enums',
+                cur_pkg    => $*CURLEX<!sub>.cur_pkg,
+                class      => 'Method');
+
+            $nb.set_transparent;
+
+            my $nbvar = self.gensym;
+            $nb.add_my_name('self', noinit => True);
+            $nb.set_signature($Sig.simple('self'));
+            $nb.finish(self.init_constant(
+                self.make_constant($/, 'anon', Any),
+                $OpCallMethod.new(name => 'new',
+                    receiver => mklex($/, 'EnumMap'), args => [$<term>.ast])));
+            $*CURLEX<!sub>.create_static_pad;
+            $*CURLEX<!sub>.add_my_sub($nbvar, $nb, |mnode($/));
+            $obj.add_method(0, 'enums', $nb, |mnode($/));
+            $obj.close;
+
+            for @pairs {
+                self.make_constant_into($/, $obj, .key, rhs =>
+                    $OpCallSub.new(invocant => mklex($/, $lexvar),
+                        args => [ $OpStringLiteral.new(text => .key) ]));
+            }
+
+            for @pairs {
+                self.init_constant(self.make_constant($/, $scope, .key),
+                    $OpCallSub.new(invocant => mklex($/, $lexvar),
+                        args => [ $OpStringLiteral.new(text => .key) ]));
+            }
+        });
+
+        make mklex($/, $lexvar);
+    } else {
+        make self.init_constant(
+            self.make_constant($/, $<name> ?? $scope !! 'anon', ~$<name>),
+            $OpCallMethod.new(pos=>$/, name => 'new',
+                receiver => mklex($/, 'EnumMap'),
+                args => [$<term>.ast])),
+    }
+}
 
 }
 

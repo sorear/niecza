@@ -620,6 +620,21 @@ my class Cool {
     }
 }
 
+my class Nil is Cool {
+    method new() { Nil }
+    method iterator() { ().iterator }
+    method gist() { 'Nil' }
+    method Str() { '' }
+    method flat() { self.iterator.flat }
+    method list() { self.iterator.list }
+    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
+    method at_pos($key) { @(self).[$key] }
+    method Capture () { ().Capture }
+    method elems  () { 0 }
+    method Numeric() { 0 }
+    method Bool   () { ?0 }
+}
+
 my role Positional { Any }
 my role Associative { Any }
 
@@ -894,8 +909,7 @@ my class ClassHOW {
     } }
 }
 
-# These should be refactored as roles once those become available
-my class CommonEnum {
+my role CommonEnum {
     has $!index;
 
     method perl()  {
@@ -931,29 +945,29 @@ my class CommonEnum {
     method roll($count = 1) { self.enums.map({ self.($_.key) }).roll($count) }
 }
 
-my class IntBasedEnum is CommonEnum {
+my role IntBasedEnum does CommonEnum {
     method Numeric() { Q:CgOp { (box Int (unbox int (@ {self}))) } }
     method Int() { self.Numeric }
     method Str() { defined(self) ?? self.key !! nextsame }
     method Stringy() { defined(self) ?? self.key !! nextsame }
     method _create($ix,$val) { Q:CgOp {
         (letn obj (box (@ {self}) (unbox int (@ {$val.Int})))
-          (setslot CommonEnum $!index (@ (l obj)) {$ix.Int})
+          (setslot (obj_llhow (@ (l obj))) $!index (@ (l obj)) {$ix.Int})
           (l obj))
     } }
 }
 
-my class StrBasedEnum is CommonEnum {
+my role StrBasedEnum does CommonEnum {
     method _create($ix,$val) { Q:CgOp {
         (letn obj (box (@ {self}) (unbox str (@ {$val.Str})))
-          (setslot CommonEnum $!index (@ (l obj)) {$ix.Int})
+          (setslot (obj_llhow (@ (l obj))) $!index (@ (l obj)) {$ix.Int})
           (l obj))
     } }
 }
 
 # Using the "enum" type declarator would require a compile time reference
 # to the EnumMap type, which depends on Bool; ick.
-my class Bool is IntBasedEnum is Int {
+my class Bool is Int does IntBasedEnum {
     our $_enums;
     method enums() { $_enums }
     our constant True = Q:CgOp { (box Bool (bool 1)) };
@@ -1203,21 +1217,6 @@ sub hash(|$cap) {
 }
 
 my class EMPTY { }
-
-my class Nil is Cool {
-    method new() { Nil }
-    method iterator() { ().iterator }
-    method gist() { 'Nil' }
-    method Str() { '' }
-    method flat() { self.iterator.flat }
-    method list() { self.iterator.list }
-    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
-    method at_pos($key) { @(self).[$key] }
-    method Capture () { ().Capture }
-    method elems  () { 0 }
-    method Numeric() { 0 }
-    method Bool   () { False }
-}
 
 my class Parcel is Cool does Positional {
     method ACCEPTS(\$what) { defined(self) ?? self.flat.ACCEPTS($what) !! nextsame }
@@ -2573,7 +2572,7 @@ multi sub exp($x) { $x.exp }
 multi sub exp($x, $base) { $base ** $x }
 
 # 'Order' type
-my class Order is IntBasedEnum is Int {
+my class Order is Int does IntBasedEnum {
     our $_enums;
     method enums() { $_enums }
     our constant Increase = -1;
