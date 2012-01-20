@@ -585,6 +585,23 @@ public partial class Builtins {
         return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
     }
 
+    public static Variable InvokeSub(P6any obj, params Variable[] pos) {
+        return Kernel.RunInferior(obj.Invoke(Kernel.GetInferiorRoot(), pos,
+                    null));
+    }
+
+    public static Variable InvokeMethod(string name, params Variable[] pos) {
+        return Kernel.RunInferior(pos[0].Fetch().InvokeMethod(
+            Kernel.GetInferiorRoot(), name, pos, null));
+    }
+
+    public static string ToStr(Variable v) {
+        return v.Fetch().mo.mro_raw_Str.Get(v);
+    }
+    public static double ToNum(Variable v) {
+        return v.Fetch().mo.mro_raw_Numeric.Get(v);
+    }
+
     // Most of the following functions get used for inline calls, so they
     // must use HandleSpecialX
     static readonly Func<Variable,Variable,Variable> numeq_d = numeq;

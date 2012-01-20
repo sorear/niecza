@@ -3784,8 +3784,15 @@ dynamic:
             return Handle.Wrap(((Variable)Handle.Unbox(args[1])).Fetch().mo);
         }
         public static object value_to_string(object[] args) {
+            return Builtins.ToStr((Variable)Handle.Unbox(args[1]));
+        }
+        public static object value_enum_type(object[] args) {
             var v = (Variable)Handle.Unbox(args[1]);
-            return v.Fetch().mo.mro_raw_Str.Get(v);
+            return Builtins.ToStr(Builtins.InvokeMethod("data-type", v));
+        }
+        public static object value_enum_keys(object[] args) {
+            var v = (Variable)Handle.Unbox(args[1]);
+            return Builtins.UnboxLoS(Builtins.InvokeMethod("keys", v));
         }
         public static object value_starts_with_pair(object[] args) {
             var ob = ((Variable)Handle.Unbox(args[1])).Fetch();

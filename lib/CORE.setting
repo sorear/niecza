@@ -1674,19 +1674,27 @@ my class EnumMap does Associative {
     has %!by-value;
     has @!values;
     has @!keys;
+    has $.data-type;
 
     method new(*@pairs) {
         self := self.bless(*);
         my $last = -1;
         my $ixn = 0;
+        my $str;
+        my $int;
         for @pairs -> $p {
             my ($k, $v);
             if $p ~~ Pair {
-                $k ::= $p.key;
+                $k ::= ~$p.key;
                 $v ::= $p.value;
             } else {
-                $k ::= $p;
+                $k ::= ~$p;
                 $v ::= $last.succ;
+            }
+            if $v ~~ Int { $int = 1; }
+            elsif $v ~~ Str { $str = 1; }
+            else {
+                die "Enum values must be Int or Str, but got $v.typename()";
             }
             $last = $v;
             %!by-key{$k} = $ixn;
@@ -1695,6 +1703,9 @@ my class EnumMap does Associative {
             push @!values, $v;
             $ixn++;
         }
+        die "Enum must have at least one value" unless $int || $str;
+        die "Enum must contain integer or string values, not both" if $int && $str;
+        $!data-type := $int ?? 'Int' !! 'Str';
         unitem(self);
     }
 
@@ -1717,6 +1728,7 @@ my class EnumMap does Associative {
     method exists_key($k) { self{$k}:exists }
 }
 BEGIN { $Bool::_enums ::= EnumMap.new("False" => 0, "True" => 1) }
+my enum Order (:Increase(-1), :Same(0), :Decrease(1));
 
 my class Junction is Mu {
     has $!kind_;
@@ -2570,16 +2582,6 @@ sub truncate($x) is pure { $x.Int }
 sub sign($x) is pure { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
 multi sub exp($x) { $x.exp }
 multi sub exp($x, $base) { $base ** $x }
-
-# 'Order' type
-my class Order is Int does IntBasedEnum {
-    our $_enums;
-    method enums() { $_enums }
-    our constant Increase = -1;
-    our constant Same = 0;
-    our constant Decrease = 1;
-    # method ACCEPTS(\$t) { defined(self) ?? self !! $t.^does(self) }
-}
 
 sub infix:« <=> » is equiv<leg> ($a, $b) is pure { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
 # XXX polymorphic equality

@@ -321,28 +321,16 @@ method type_declarator:enum ($/) {
         }
     }
 
-    my @pairs = self.trivial_eval($/, $<term>.ast);
-    my $last = -1;
-    my ($has_ints, $has_strs);
-    for @pairs {
-        if $_ !~~ Pair {
-            my $key = $_;
-            my $value = $last.succ;
-            $_ = $key => $value;
-        }
-        given $last = .value {
-            when Int { $has_ints = True; }
-            when Str { $has_strs = True; }
-            default  { $/.CURSOR.sorry("Enum values must be Int or Str"); }
-        }
-    }
-    if $has_ints && $has_strs {
-        $/.CURSOR.sorry("Enum may not contain both Int and Str values");
-    }
+    my $map;
+    $/.CURSOR.trymop({
+        $map = self.eval_ast($/, $OpCallMethod.new(name => 'new',
+                receiver => mklex($/, 'EnumMap'), args => [ $<term>.ast ]));
+    });
+    unless $map { make $OpStatementList.new; return }
 
     my ($basetype) = self.process_name($*OFTYPE<longname>);
-    $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', $has_strs ?? 'Str' !! 'Int');
-    my $kindtype = $has_strs ?? 'StrBasedEnum' !! 'IntBasedEnum';
+    $basetype //= $*CURLEX<!sub>.compile_get_pkg('CORE', $map.enum_type);
+    my $kindtype = $map.enum_type ~ 'BasedEnum';
 
     if $<name> && $<name>.reduced eq 'longname' && $scope ne 'anon' {
         # Longnamed enum is a kind of type definition
@@ -366,25 +354,20 @@ method type_declarator:enum ($/) {
             my $nbvar = self.gensym;
             $nb.add_my_name('self', noinit => True);
             $nb.set_signature($Sig.simple('self'));
-            $nb.finish(self.init_constant(
-                self.make_constant($/, 'anon', Any),
-                $OpCallMethod.new(name => 'new',
-                    receiver => mklex($/, 'EnumMap'), args => [$<term>.ast])));
+            $nb.finish($OpGeneralConst.new(value => $map));
             $*CURLEX<!sub>.create_static_pad;
             $*CURLEX<!sub>.add_my_sub($nbvar, $nb, |mnode($/));
             $obj.add_method(0, 'enums', $nb, |mnode($/));
             $obj.close;
 
-            for @pairs {
-                self.make_constant_into($/, $obj, .key, rhs =>
+            for $map.enum_keys {
+                self.make_constant_into($/, $obj, $_, rhs =>
                     $OpCallSub.new(invocant => mklex($/, $lexvar),
-                        args => [ $OpStringLiteral.new(text => .key) ]));
-            }
+                        args => [ $OpStringLiteral.new(text => $_) ]));
 
-            for @pairs {
-                self.init_constant(self.make_constant($/, $scope, .key),
+                self.init_constant(self.make_constant($/, $scope, $_),
                     $OpCallSub.new(invocant => mklex($/, $lexvar),
-                        args => [ $OpStringLiteral.new(text => .key) ]));
+                        args => [ $OpStringLiteral.new(text => $_) ]));
             }
         });
 
@@ -392,9 +375,7 @@ method type_declarator:enum ($/) {
     } else {
         make self.init_constant(
             self.make_constant($/, $<name> ?? $scope !! 'anon', ~$<name>),
-            $OpCallMethod.new(pos=>$/, name => 'new',
-                receiver => mklex($/, 'EnumMap'),
-                args => [$<term>.ast])),
+            $OpGeneralConst.new(value => $map));
     }
 }
 
