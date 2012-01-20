@@ -73,14 +73,7 @@ method process_name($/, :$declaring, :$defer, :$clean) {
     }
 
     for $defer ?? () !! @ns.grep($Op) {
-        $_ = ~self.trivial_eval($/, $_);
-        # XXX should this always stringify?
-        if $_ ~~ Cool {
-            $_ = ~$_;
-        } else {
-            $_ = "XXX";
-            $/.CURSOR.sorry("Name components must evaluate to strings");
-        }
+        $_ = self.eval_ast_str($/, $_) // "XXX";
     }
 
     if $declaring {
@@ -136,6 +129,13 @@ dyn:
         return $pkg;
     }
 }
+method eval_ast_str($/, $ast) {
+    my $val;
+    $/.CURSOR.trymop({
+        $val = self.eval_ast($/, $ast).to_string;
+    });
+    $val;
+}
 method get_cp_ext($/) {
     if $/ eq any <:_ :U :D :T> {
         return "";
@@ -143,9 +143,7 @@ method get_cp_ext($/) {
         return ":" ~ ($<v> ?? '' !! '!') ~ $<k>;
     } else {
         my $suf = ~$<v>;
-        $/.CURSOR.trymop({
-            $suf = self.eval_ast($/, $<v>.ast).to_string if $<v>.ast;
-        });
+        $suf = self.eval_ast_str($/, $<v>.ast) // $suf if $<v>.ast;
         return ":" ~ $<k> ~ "<" ~ $suf ~ ">";
     }
 }
@@ -168,6 +166,150 @@ method colonpair($/) {
 
     make { term => $OpSimplePair.new(key => $<k>, value => $tv) };
 }
+method process_block_traits($/, @tr) {
+    my $sub = $*CURLEX<!sub>;
+    my $pack = $sub.body_of;
+    for @tr -> $T {
+        my $tr = $T.ast;
+        if $pack && $tr<name> {
+            my $super = $tr<name>;
+
+            $T.CURSOR.sorry("superclass $super.name() declared outside of any class"),
+                next unless $sub.body_of;
+            $T.CURSOR.sorry("superclass $super.name() declared in an augment"),
+                next if defined $*AUGMENT_BUFFER;
+            $T.CURSOR.sorry("cannot declare a superclass in this kind of package"),
+                next if !$pack.CAN('add_super');
+
+            $T.CURSOR.trymop({
+                $pack.add_super($super);
+            });
+        } elsif $pack && $tr<does> {
+            my $role = $tr<does>;
+
+            $T.CURSOR.sorry("role $role.name() used outside of any class"), next
+                unless $sub.body_of;
+            $T.CURSOR.sorry("role $role.name() used in an augment"),
+                next if defined $*AUGMENT_BUFFER;
+            $T.CURSOR.sorry("cannot use a role in this kind of package"),
+                next if !$pack.CAN('add_role');
+
+            $T.CURSOR.trymop({
+                $pack.add_role($role);
+            });
+        } elsif $pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports($pack.name, $pack, @exports);
+        } elsif !$pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports($sub.outervar, $sub, @exports);
+            $sub.set_extend('exported', @exports);
+            $sub.outer.create_static_pad;
+            $/.CURSOR.mark_used($sub.outervar)
+                if defined $sub.outervar;
+        } elsif !$pack && $tr<nobinder> {
+            $sub.set_signature(Any);
+        } elsif !$pack && $tr<pure> {
+            $sub.outer.create_static_pad;
+            $sub.set_extend('pure', True);
+        } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
+            my $rel = $tr.keys.[0];
+            my $to  = $tr.values.[0];
+            $to = $to.inside if $to ~~ $OpParen;
+            $to = $to.children[0] if $to ~~ $OpStatementList && $to.children == 1;
+
+            my $oprec;
+            if $to ~~ $OpLexical {
+                $oprec = $T.CURSOR.function_O($to.name);
+            } elsif $to ~~ $OpStringLiteral && $sub.name ~~ /^(\w+)\:\<.*\>$/ {
+                $oprec = $T.CURSOR.cat_O(~$0, $to.text);
+            } else {
+                $T.CURSOR.sorry("Cannot interpret operator reference");
+                next;
+            }
+            unless $sub.get_extend('prec') {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            unless $oprec {
+                $T.CURSOR.sorry("No precedence available for reference target");
+                next;
+            }
+            if $rel eq 'equiv' {
+                $sub.set_extend('prec', $oprec.kv);
+            } else {
+                my %prec = $sub.get_extend('prec');
+                %prec<prec> = $oprec.<prec>;
+                %prec<prec> ~~ s/\=/<=/ if $rel eq 'looser';
+                %prec<prec> ~~ s/\=/>=/ if $rel eq 'tighter';
+                $sub.set_extend('prec', %prec.kv);
+            }
+        } elsif !$pack && $tr<assoc> {
+            my $arg = self.eval_ast_str($T, $tr<assoc>) // '';
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            unless $arg eq any < left right non list unary chain > {
+                $T.CURSOR.sorry("Invalid associativity $arg");
+                next;
+            }
+            %prec<assoc> = $arg;
+            $sub.set_extend('prec', %prec.kv);
+        } elsif !$pack && $tr<Niecza::absprec> {
+            my $arg = self.eval_ast_str($T, $tr<Niecza::absprec>) // '';
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            %prec<prec> = $arg;
+            %prec<dba> = "like $sub.name()";
+            $sub.set_extend('prec', %prec.kv);
+        } elsif !$pack && $tr<Niecza::builtin> {
+            # XXX this is a smidge ugly
+            my ($name, @rest) = (self.eval_ast_str($T, $tr<Niecza::builtin>) // "a").words;
+            $sub.set_extend('builtin', $name, map +*, @rest);
+        } elsif !$pack && $tr<return_pass> {
+            $sub.set_return_pass;
+        } elsif !$pack && $tr<of> {
+        } elsif !$pack && $tr<rw> {
+        } elsif !$pack && $tr<unsafe> {
+            $sub.set_unsafe;
+        } else {
+            $T.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
+        }
+    }
+}
+method statement_prefix:BEGIN ($/) {
+    # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work
+    # Should go away later once the spec is less slushy
+    repeat while False {
+        my $c = ($<blast><statement> || $<blast><block><blockoid>).ast;
+
+        last unless $c ~~ $OpStatementList;
+        last unless $c.children == 1;
+        my $d = $c.children.[0];
+        last unless $d ~~ $OpCallMethod;
+        last unless $d.receiver ~~ $OpContextVar;
+        last unless $d.receiver.name eq '@*INC';
+        last if $d.private || $d.ismeta;
+        last unless $d.name eq any <push unshift>;
+        last unless +$d.getargs == 1;
+        last unless defined my $str = self.eval_ast_str($/, $d.getargs.[0]);
+        @*INC."$d.name()"($str);
+        make $OpStatementList.new;
+        return;
+    }
+
+    $*CURLEX<!sub>.create_static_pad;
+    my $con = self.make_constant($/, 'anon', 'BEGIN');
+    $<blast>.ast.run_BEGIN($con.name);
+    $con.init = True;
+    make $con;
+}
+
 }
 
 # remove run_dispatch
