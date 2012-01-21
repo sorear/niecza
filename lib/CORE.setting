@@ -488,7 +488,8 @@ my class Cool {
                 unless defined($nth) && !_match_nth(++$index, $nth) {
                     $changes++;
                     push @out, substr($str,$to,$M.from-$to);
-                    push @out, ($replacement ~~ Str ?? $replacement !! $replacement());
+                    push @out, ($replacement ~~ Str ?? $replacement
+                                                    !! $replacement.count == 1 ?? $replacement($M) !! $replacement());
                     $to = $i = $M.to;
                     $limctr = $limctr - 1;
                 }
