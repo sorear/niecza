@@ -366,6 +366,7 @@ my class Cool {
     method Rat($eps = 1e-6) { Q:CgOp { (rat_approx {self} {$eps}) } }
     method Int() { Q:CgOp { (coerce_to_int {self}) } }
     method Num() { Q:CgOp { (coerce_to_num {self}) } }
+    method IO() { self.Str.IO }
     method abs() { abs self }
     method floor() { floor self }
     method ceiling() { ceiling self }
