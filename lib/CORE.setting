@@ -2089,6 +2089,11 @@ my grammar Cursor is Any does Associative does Positional {
         (box Str (cursor_backing (cast cursor (@ {self})))) } }
     method ws() { Q:CgOp { (cursor_dows (cast cursor (@ {self}))) } }
     method CURSOR() { self }
+    method FAILGOAL ($stop, $name, $startpos) { #OK not used
+        my $s = "'$stop'";
+        $s = '"\'"' if $s eq "'''";
+        die("Unable to parse $name\nCouldn't find final $s; gave up");
+    }
     # definitions from UTS18
     token alpha { <:Alphabetic + [_]> } # XXX: STD expects to include _
     token lower { <:Lowercase> }

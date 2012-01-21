@@ -146,7 +146,6 @@ method line {
     self.lineof(self.pos);
 }
 
-method SETGOAL { }
 method FAILGOAL ($stop, $name, $startpos) {
     my $s = "'$stop'";
     $s = '"\'"' if $s eq "'''";
