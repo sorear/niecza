@@ -3783,6 +3783,10 @@ dynamic:
         public static object value_get_type(object[] args) {
             return Handle.Wrap(((Variable)Handle.Unbox(args[1])).Fetch().mo);
         }
+        public static object value_to_sub(object[] args) {
+            var v = ((Variable)Handle.Unbox(args[1])).Fetch();
+            return Handle.Wrap(v.Isa(Kernel.CodeMO) ? Kernel.GetInfo(v) : null);
+        }
         public static object value_to_string(object[] args) {
             return Builtins.ToStr((Variable)Handle.Unbox(args[1]));
         }

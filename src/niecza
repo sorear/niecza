@@ -119,15 +119,17 @@ method process_block_traits($/, @tr) {
             $sub.set_extend('pure', True);
         } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
             my $rel = $tr.keys.[0];
-            my $to  = $tr.values.[0];
-            $to = $to.inside if $to ~~ $OpParen;
-            $to = $to.children[0] if $to ~~ $OpStatementList && $to.children == 1;
+            my $to;
+            $T.CURSOR.trymop({ $to = self.eval_ast($T, $tr.values.[0]) });
+            $to // next;
 
             my $oprec;
-            if $to ~~ $OpLexical {
-                $oprec = $T.CURSOR.function_O($to.name);
-            } elsif $to ~~ $OpStringLiteral && $sub.name ~~ /^(\w+)\:\<.*\>$/ {
-                $oprec = $T.CURSOR.cat_O(~$0, $to.text);
+            if $to.to_sub -> $to_sub {
+                $oprec = %( $to_sub.get_extend('prec') // () );
+            } elsif $sub.name ~~ /^(\w+)\:\<.*\>$/ {
+                $T.CURSOR.trymop({
+                    $oprec = $T.CURSOR.cat_O(~$0, $to.to_string);
+                });
             } else {
                 $T.CURSOR.sorry("Cannot interpret operator reference");
                 next;
