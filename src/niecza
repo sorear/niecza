@@ -36,6 +36,134 @@ our ($Op, $OpAttribute, $OpBareBlock, $OpBuiltin, $OpCallLike, $OpCallMethod,
 our ($Sig, $SigParameter, $PassSimplifier); #OK
 
 our $Actions; $Actions = $Actions but role {
+method process_block_traits($/, @tr) {
+    my $sub = $*CURLEX<!sub>;
+    my $pack = $sub.body_of;
+    for @tr -> $T {
+        my $tr = $T.ast;
+        if $pack && $tr<name> {
+            my $super = $tr<name>;
+
+            $T.CURSOR.sorry("superclass $super.name() declared outside of any class"),
+                next unless $sub.body_of;
+            $T.CURSOR.sorry("superclass $super.name() declared in an augment"),
+                next if defined $*AUGMENT_BUFFER;
+            $T.CURSOR.sorry("cannot declare a superclass in this kind of package"),
+                next if !$pack.CAN('add_super');
+
+            $T.CURSOR.trymop({
+                $pack.add_super($super);
+            });
+        } elsif $pack && $tr<does> {
+            my $role = $tr<does>;
+
+            $T.CURSOR.sorry("role $role.name() used outside of any class"), next
+                unless $sub.body_of;
+            $T.CURSOR.sorry("role $role.name() used in an augment"),
+                next if defined $*AUGMENT_BUFFER;
+            $T.CURSOR.sorry("cannot use a role in this kind of package"),
+                next if !$pack.CAN('add_role');
+
+            $T.CURSOR.trymop({
+                $pack.add_role($role);
+            });
+        } elsif $pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports($pack.name, $pack, @exports);
+        } elsif !$pack && $tr<export> {
+            my @exports = @( $tr<export> );
+            $sub.outer.add_exports($sub.outervar, $sub, @exports);
+            $sub.set_extend('exported', @exports);
+            $sub.outer.create_static_pad;
+            $/.CURSOR.mark_used($sub.outervar)
+                if defined $sub.outervar;
+        } elsif !$pack && $tr<nobinder> {
+            $sub.set_signature(Any);
+        } elsif !$pack && $tr<pure> {
+            $sub.outer.create_static_pad;
+            $sub.set_extend('pure', True);
+        } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
+            my $rel = $tr.keys.[0];
+            my $to  = $tr.values.[0];
+            $to = $to.inside if $to ~~ $OpParen;
+            $to = $to.children[0] if $to ~~ $OpStatementList && $to.children == 1;
+
+            my $oprec;
+            if $to ~~ $OpLexical {
+                $oprec = $T.CURSOR.function_O($to.name);
+            } elsif $to ~~ $OpStringLiteral && $sub.name ~~ /^(\w+)\:\<.*\>$/ {
+                $oprec = $T.CURSOR.cat_O(~$0, $to.text);
+            } else {
+                $T.CURSOR.sorry("Cannot interpret operator reference");
+                next;
+            }
+            unless $sub.get_extend('prec') {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            unless $oprec {
+                $T.CURSOR.sorry("No precedence available for reference target");
+                next;
+            }
+            if $rel eq 'equiv' {
+                $sub.set_extend('prec', $oprec.kv);
+            } else {
+                my %prec = $sub.get_extend('prec');
+                %prec<prec> = $oprec.<prec>;
+                %prec<prec> ~~ s/\=/<=/ if $rel eq 'looser';
+                %prec<prec> ~~ s/\=/>=/ if $rel eq 'tighter';
+                $sub.set_extend('prec', %prec.kv);
+            }
+        } elsif !$pack && ($tr<assoc> // $tr<uassoc>) {
+            my $arg = self.eval_ast_str($T, ($tr<assoc> // $tr<uassoc>)) // '';
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            unless $arg eq any < left right non list unary chain > {
+                $T.CURSOR.sorry("Invalid associativity $arg");
+                next;
+            }
+            %prec{$tr.keys.[0]} = $arg;
+            $sub.set_extend('prec', %prec.kv);
+        } elsif !$pack && ($tr<iffy> || $tr<fiddly> || $tr<diffy>) {
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            %prec{$tr.keys.[0]} = True;
+            $sub.set_extend('prec', %prec.kv);
+        } elsif !$pack && $tr<Niecza::absprec> {
+            my @arg = (self.eval_ast_str($T, $tr<Niecza::absprec>) // '').words;
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            %prec = ();
+            %prec<prec> = @arg[0];
+            %prec<assoc> = @arg[1] // 'left';
+            %prec<uassoc> = @arg[2] // 'non' if %prec<assoc> eq 'unary';
+            %prec<dba> = "like $sub.name()";
+            $sub.set_extend('prec', %prec.kv);
+        } elsif !$pack && $tr<Niecza::builtin> {
+            # XXX this is a smidge ugly
+            my ($name, @rest) = (self.eval_ast_str($T, $tr<Niecza::builtin>) // "a").words;
+            $sub.set_extend('builtin', $name, map +*, @rest);
+        } elsif !$pack && $tr<return_pass> {
+            $sub.set_return_pass;
+        } elsif !$pack && $tr<of> {
+        } elsif !$pack && $tr<rw> {
+        } elsif !$pack && $tr<unsafe> {
+            $sub.set_unsafe;
+        } else {
+            $T.CURSOR.sorry("Unhandled trait $tr.keys[0] for this context");
+        }
+    }
+}
+
 }
 
 my $usage = q:to/EOM/;
