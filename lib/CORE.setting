@@ -1036,7 +1036,7 @@ sub infix:<x> is pure is Niecza::absprec<s=> ($str, $ct) {
 }
 
 sub infix:<leg> is pure is Niecza::absprec<n=> is assoc<non> ($s1, $s2) {
-    (Q:CgOp { (box Num (cast num (strcmp (obj_getstr {$s1}) (obj_getstr {$s2})))) }).sign
+    (Q:CgOp { (box Num (cast num (strcmp (obj_getstr {$s1}) (obj_getstr {$s2})))) }) <=> 0
 }
 
 sub lc($string)    is pure { (~$string).lc }
@@ -2583,24 +2583,26 @@ sub sign($x) is pure { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
 multi sub exp($x) { $x.exp }
 multi sub exp($x, $base) { $base ** $x }
 
-sub infix:« <=> » is equiv<leg> ($a, $b) is pure { $a < $b ?? -1 !! $a > $b ?? 1 !! 0 }
+sub infix:« <=> » is equiv<leg> ($a, $b) is pure {
+    $a < $b ?? Order::Increase !! $a > $b ?? Order::Decrease !! Order::Same
+}
 # XXX polymorphic equality
 sub infix:<cmp> is equiv<leg> ($a, $b) {
-    return ($a - $b).sign if $a ~~ Real && $b ~~ Real;
+    return $a <=> $b if $a ~~ Real && $b ~~ Real;
     if $a ~~ Real {
-        return -1 if $a == -Inf;
-        return +1 if $a == Inf;
+        return Order::Increase if $a == -Inf;
+        return Order::Decrease if $a == Inf;
     }
     if $b ~~ Real {
-        return -1 if $b == Inf;
-        return +1 if $b == -Inf;
+        return Order::Increase if $b == Inf;
+        return Order::Decrease if $b == -Inf;
     }
     return ($a ~~ Real ?? "Real" !! $a.WHAT.gist) leg
            ($b ~~ Real ?? "Real" !! $b.WHAT.gist)
                 unless $a.WHAT === $b.WHAT;
     return $a leg $b if $a ~~ Str;
     return $a.key cmp $b.key || $a.value cmp $b.value if $a ~~ Pair;
-    return ($a - $b).sign;
+    return $a <=> $b;
 }
 sub infix:<eqv> is equiv<==> ($a, $b) { ($a cmp $b) == 0 }
 sub infix:<before> ($a, $b) is equiv<==> { ($a cmp $b) < 0 }
