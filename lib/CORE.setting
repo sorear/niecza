@@ -465,7 +465,7 @@ my class Cool {
         die ":x may not be used with :global" if defined($x) && $global;
 
         my $old := CALLER::<$/>;
-        LEAVE OUTER::CALLER::<$/> := $old unless $inplace;
+        LEAVE CALLER::<$/> := $old unless $inplace;
 
         my $str = ~self;
         my $C = Cursor.cursor_start($str);

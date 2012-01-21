@@ -36,6 +36,41 @@ our ($Op, $OpAttribute, $OpBareBlock, $OpBuiltin, $OpCallLike, $OpCallMethod,
 our ($Sig, $SigParameter, $PassSimplifier); #OK
 
 our $Actions; $Actions = $Actions but role {
+method typename($/) {
+    state %masks = ':_' => $Sig::ANY_DEF, ':T' => $Sig::UNDEF_ONLY,
+        ':U' => $Sig::UNDEF_ONLY, ':D' => $Sig::DEF_ONLY;
+
+    $/.CURSOR.sorry('WHENCE blocks not allowed on declarative type names')
+        if $<whence>;
+
+    if $<ident> {
+        $/.CURSOR.sorry('::?CLASS syntax NYI');
+        make { tmode => 0, type => self.get_Any };
+        return;
+    }
+
+    my $tmode = 0;
+    my $long = $<longname>;
+    my ($type) = self.process_name($long);
+
+    if !$type {
+        $/.CURSOR.sorry('A type must be provided');
+        $type = self.get_Any;
+    }
+
+    if $<typename> {
+        $/.CURSOR.sorry('Coercive declarations NYI');
+    }
+
+    for @( $long<colonpair> ) -> $cp {
+        if %masks{$cp} -> $mask {
+            $/.CURSOR.sorry("You may only specify one of :_ :D :U :T") if $tmode;
+            $tmode +|= $mask;
+        }
+    }
+
+    make { :$type, :$tmode };
+}
 method process_block_traits($/, @tr) {
     my $sub = $*CURLEX<!sub>;
     my $pack = $sub.body_of;
