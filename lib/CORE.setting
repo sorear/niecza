@@ -560,6 +560,7 @@ my class Cool {
     method words($limit = 1_000_000_000) {
         self.comb(/ \S+ /, $limit);
     }
+    method words-val() { map &val, self.words }
     method say() { (~self).say }
     method chars() { chars(self) }
     method codes() { codes(self) }
@@ -2842,6 +2843,12 @@ sub val($str) is pure {
     when Rat { return RatStr.new($_, $str) }
     when Int { return IntStr.new($_, $str) }
     when Complex { return ComplexStr.new($_, $str) }
+fail:
+    return $str;
+    CATCH { goto fail; }
+}
+sub val_nospace($str) is pure {
+    return Niecza::NumSyntax.str2num($str);
 fail:
     return $str;
     CATCH { goto fail; }

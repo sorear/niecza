@@ -3790,6 +3790,9 @@ dynamic:
         public static object value_to_string(object[] args) {
             return Builtins.ToStr((Variable)Handle.Unbox(args[1]));
         }
+        public static object value_to_string_list(object[] args) {
+            return Builtins.UnboxLoS((Variable)Handle.Unbox(args[1]));
+        }
         public static object value_enum_type(object[] args) {
             var v = (Variable)Handle.Unbox(args[1]);
             return Builtins.ToStr(Builtins.InvokeMethod("data-type", v));

@@ -1704,6 +1704,7 @@ namespace Niecza {
             string ty = (type < controls.Length) ? controls[type] : "unknown";
             if (name != null) {
                 return ty + "(" + name + (tgt != null ? ", lexotic)" : ", dynamic)");
+                //return ty + "(" + name + (tgt != null ? string.Format(", lexotic [{0:X}])", tgt.GetHashCode()) : ", dynamic)");
             } else {
                 return ty;
             }
@@ -5950,9 +5951,17 @@ slow:
             if (lfn.compartment != Compartment.Top)
                 l = null; // hide other objects
             rlstack = lfn.next;
+            lfn.next.compartment = Compartment.Top;
             return lfn.next.cur = lfn.next.root = ((l == null ?
                         new Frame(null, null, ExitRunloopSI, Kernel.AnyP) :
                         l.MakeChild(null, ExitRunloopSI, AnyP)));
+            //lfn.next.cur = lfn.next.root = ((l == null ?
+            //            new Frame(null, null, ExitRunloopSI, Kernel.AnyP) :
+            //            l.MakeChild(null, ExitRunloopSI, AnyP)));
+            //Console.WriteLine("Created exit-runloop {0:X} caller={1:X}",
+            //    lfn.next.cur.GetHashCode(), lfn.next.cur.caller == null ? 0 :
+            //    lfn.next.cur.caller.GetHashCode());
+            //return lfn.next.cur;
         }
 
         public static Variable RunInferior(Frame f) {
@@ -6271,6 +6280,8 @@ slow:
             Frame unf = null;
             int unip = 0;
 
+            //Console.WriteLine("Entering SearchForHandler(th={0:X}, type={1}, tgt={2:X}, name={3}", th.GetHashCode(), type, tgt == null ? 0 : tgt.GetHashCode(), name);
+
             // make sure we have a list for RunCATCH
             // TODO: possibly should make X::AdHoc?
             if (type == SubInfo.ON_DIE) {
@@ -6280,6 +6291,7 @@ slow:
 
             HashSet<Frame> visited = new HashSet<Frame>();
             for (csr = th; ; csr = csr.DynamicCaller()) {
+                //Console.WriteLine("looking at {0:X} (caller: {1:X}) ...", csr == null ? 0 : csr.GetHashCode(), (csr == null || csr.caller == null) ? 0 : csr.caller.GetHashCode());
                 if (csr == null)
                     break; // unhandled exception, Unwind handles
                 if (visited.Contains(csr))
@@ -6347,6 +6359,7 @@ slow:
                     }
                 }
             }
+            //Console.WriteLine("done[{0:X}]", unf == null ? 0 : unf.GetHashCode());
 
             if (unf == null && type == SubInfo.ON_WARNING) {
                 Console.Error.WriteLine(name + DescribeBacktrace(th, null));
@@ -6375,6 +6388,7 @@ slow:
                 } catch (Exception ex) {
                     sb.AppendFormat("  (frame display failed: {0})", ex);
                 }
+                //sb.AppendFormat(" [{0:X}]", from.GetHashCode());
                 from = from.DynamicCaller();
             }
             return sb.ToString();

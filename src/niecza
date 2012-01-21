@@ -32,10 +32,153 @@ our ($Op, $OpAttribute, $OpBareBlock, $OpBuiltin, $OpCallLike, $OpCallMethod,
      $OpSimpleParcel, $OpStart, $OpStateDecl, $OpStatementList,
      $OpStringLiteral, $OpTemporize, $OpTry, $OpWhatever, $OpWhateverCode,
      $OpWhen, $OpWhileLoop, $OpYada, $OpYouAreHere); #OK
+our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
+     $RxOpCutBrack, $RxOpCutRule, $RxOpConfineLang, $RxOpCapturing,
+     $RxOpCClassElem, $RxOpCheckBlock, $RxOpEndpoint, $RxOpListPrim,
+     $RxOpNone, $RxOpNotBefore, $RxOpNewline, $RxOpProtoRedis, $RxOpQuantifier,
+     $RxOpSubrule, $RxOpString, $RxOpSequence, $RxOpSigspace, $RxOpSeqAlt,
+     $RxOpSaveValue, $RxOpStringCap, $RxOpSym, $RxOpStatement, $RxOpSetLang,
+     $RxOpTilde, $RxOpVoidBlock, $RxOpVarString, $RxOpZeroWidth,
+     $RxOpZeroWidthCCs); #OK
 
-our ($Sig, $SigParameter, $PassSimplifier); #OK
+our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
+method variable($/) {
+    my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
+    my $twigil = $<twigil> ?? $<twigil><sym> !! '';
+
+    my ($name, $pkg);
+    my ($dsosl) = $<desigilname> ?? $<desigilname>.ast !!
+        $<sublongname> ?? $<sublongname>.ast !!
+        $<longname> ?? self.process_name($<longname>, :defer) !!
+        Any;
+    if defined($dsosl<ind>) {
+        make { term => self.docontext($/, $sigil, $dsosl<ind>) };
+        return;
+    } elsif defined($dsosl<iname>) {
+        make { term => $OpIndirectVar.new(pos=>$/,
+            name => mkstringycat($/, $sigil ~ $twigil, $dsosl<iname>)) };
+        return;
+    } elsif defined $dsosl {
+        ($name, $pkg) = $dsosl<name pkg>;
+    } elsif $<infixish> {
+        make { term => $<infixish>.ast.as_function($/) };
+        return;
+    } elsif $<special_variable> {
+        $name = substr(~$<special_variable>, 1);
+    } elsif $<index> {
+        make { capid => $<index>.ast, term =>
+            self.docontextif($/, $sigil,
+                mkcall($/, '&postcircumfix:<[ ]>',
+                    $OpLexical.new(name => '$/'),
+                    $OpNum.new(value => $<index>.ast)))
+        };
+        return Nil;
+    } elsif $<postcircumfix>[0] {
+        if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
+            make { capid => self.eval_ast_str($/, $<postcircumfix>[0].ast.args[0]) // '', term =>
+                self.docontextif($/, $sigil,
+                    mkcall($/, '&postcircumfix:<{ }>',
+                        $OpLexical.new(name => '$/'),
+                        @( $<postcircumfix>[0].ast.args)))
+            };
+            return;
+        } else {
+            if $<postcircumfix>[0].ast.args[0] -> $arg {
+                make { term => self.docontext($/, $sigil, $arg) };
+            } elsif $sigil eq '$' {
+                make { term => $OpShortCircuit.new(pos=>$/, kind => '//',
+                    args => [ $OpCallMethod.new(name => 'ast',
+                                receiver => mklex($/, '$/')),
+                              $OpCallMethod.new(name => 'Str',
+                                receiver => mklex($/, '$/')) ] ) };
+            } elsif $sigil eq any < @ % > {
+                make { term => self.docontext($/, $sigil, mklex($/, '$/')) };
+            } else {
+                make { term => mklex($/, 'Mu') };
+                $/.CURSOR.sorry("Missing argument for contextualizer");
+            }
+            return;
+        }
+    } else {
+        $name = '';
+    }
+
+    make {
+        sigil => $sigil, twigil => $twigil, name => $name, pkg => $pkg
+    };
+}
+method metachar:qw ($/) {
+    my @words;
+    $/.CURSOR.trymop({ @words = self.eval_ast($/.$<circumfix>.ast).to_string_list });
+
+    make $RxOpAlt.new(zyg => [ map { $RxOpString.new(text => $_,
+            igcase => %*RX<i>, igmark => %*RX<a>) }, @words ], dba => %*RX<dba>);
+}
+method process_nibble($/, @bits, $prefix?) {
+    my @acc;
+    for @bits -> $n {
+        my $ast = ($n.ast // ~$n);
+
+        if $ast ~~ $CClass {
+            $n.CURSOR.sorry("Cannot use a character class in a string");
+            $ast = "";
+        }
+
+        if $ast !~~ $Op && defined($prefix) && $prefix ne "" {
+            my $start_nl = !$n.from || "\r\n".index(
+                substr($n.orig, $n.from-1, 1)).defined;
+            $ast = $ast.split(/ ^^ [ <?{ $start_nl }> || <?after <[\x0A\x0D]> > ]
+                <before \h>[ $prefix || \h+ ]/).join("");
+        }
+
+        push @acc, $ast;
+    }
+
+    my $post = $/.CURSOR.postprocessor;
+    make mkstringycat($/, @acc);
+
+    if $post eq 'null' {
+        # already OK
+    }
+    # actually quotewords is a bit trickier than this...
+    elsif $post eq 'words' || $post eq 'quotewords' {
+        my $sl = $/.ast;
+        if !$sl.^isa($OpStringLiteral) {
+            make $OpCallMethod.new(pos=>$/, :name<words-val>, receiver => $sl);
+        }
+        else {
+            my @tok = $sl.text.words;
+            if @tok == 1 && @tok[0] eq $sl.text && $post eq 'words' {
+                # <1/2> special case...
+                make $OpStringLiteral.new(text => @tok[0]);
+                make mkcall($/, '&val_nospace', $/.ast)
+                    if $*CURLEX<!sub>.lookup_lex('&val_nospace');
+            }
+            else {
+                @tok = map { $OpStringLiteral.new(pos=>$/, text => $_) }, @tok;
+                @tok = map { mkcall($/, '&val', $_) }, @tok
+                    if $*CURLEX<!sub>.lookup_lex('&val');
+
+                make ((@tok == 1) ?? @tok[0] !! $OpParen.new(pos=>$/,
+                    inside => $OpSimpleParcel.new(pos=>$/, items => @tok)));
+            }
+        }
+    }
+    elsif $post eq 'path' {
+        # TODO could stand to be a lot fancier.
+        make $OpCallMethod.new(pos=>$/, receiver => $/.ast, :name<IO>);
+    }
+    elsif $post eq 'run' {
+        make mkcall($/, '&rungather', $/.ast);
+    }
+    else {
+        $/.CURSOR.sorry("Unhandled postprocessor $post");
+    }
+
+    $/.ast;
+}
 method typename($/) {
     state %masks = ':_' => $Sig::ANY_DEF, ':T' => $Sig::UNDEF_ONLY,
         ':U' => $Sig::UNDEF_ONLY, ':D' => $Sig::DEF_ONLY;
