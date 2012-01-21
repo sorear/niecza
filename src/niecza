@@ -44,6 +44,52 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
 our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
+sub from_base($str, $base) {
+    my $acc = 0;
+    my $punto = -1;
+    for $str.lc.comb -> $ch {
+        next if $ch eq '_';
+        if $ch eq '.' { $punto = 0; next; }
+        $punto++ if $punto >= 0;
+        $acc = $acc * $base + ($ch ge 'a' ?? ord($ch) - 87 !! ord($ch) - 48);
+    }
+    $punto >= 0 ?? $acc / ($base ** $punto) !! $acc
+}
+method value:number ($/){ make $<number>.ast }
+method number($/) {
+    my $child = $<integer> // $<dec_number> // $<rad_number>;
+    if !defined $child {
+        make $/ eq 'NaN' ?? (0e0/0e0) !! Inf;
+    } else {
+        given $child.ast {
+            when $Op { make $_ }
+            when Num { make $_ }
+            when Int { make [ 10, ~$_ ] }
+            when Rat { make [ 10, "{.numerator}/{.denominator}" ] }
+        }
+    }
+    make $OpNum.new(value => $/.ast) unless $/.ast ~~ $Op;
+}
+
+method rad_number ($/) {
+    my $radix = +$<radix>;
+    if $<circumfix> {
+        # STD guarantees this can never happen from within radint; only number
+        # can see this
+        make mkcall($/, '&unbase', $OpNum.new(value => [10, ~$radix]), $<circumfix>.ast);
+        return;
+    }
+    my $value = $<int> ?? from_base($<int>, $radix) !! 0;
+    if $<frac> -> $fr {
+        my $shift = $fr.chars - $fr.comb(/_/);
+        $value += (from_base($fr, $radix) / ($radix ** $shift));
+    }
+    if $<base> {
+        $value = $value * $<base>.ast ** ($<exp> ?? $<exp>.ast !! 0);
+        $value = $value.Num; # exponential notation is always imprecise here
+    }
+    make $value;
+}
 method variable($/) {
     my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
     my $twigil = $<twigil> ?? $<twigil><sym> !! '';

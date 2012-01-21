@@ -2859,6 +2859,22 @@ fail:
     return $str;
     CATCH { goto fail; }
 }
+
+# the opposite of Real.base, used for :16($hex_str)
+sub unbase(Int:D $base, Cool:D $str) is pure {
+    if $str ~~ Array {
+        die ":16[...] syntax NYI";
+    }
+    if $str ~~ Numeric {
+        die 'Numbers may not be passed :base(); if you wanted to render the number in the given base, use $number.base($radix); if you want to treat the number as a string, explicitly coerce it first';
+    }
+    $str := ~$str;
+    if $str ~~ m:pos(0) /\s* [ ':' || '0' (<[bdox]>) <?{ ord($0)-97+10 >= $base }> ] / {
+        $str.Numeric;
+    } else {
+        ":{$base}<$str>".Numeric;
+    }
+}
 # }}}
 # I/O stuff {{{
 sub slurp($path) is unsafe { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) } }
