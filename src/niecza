@@ -111,7 +111,7 @@ method variable($/) {
 }
 method metachar:qw ($/) {
     my @words;
-    $/.CURSOR.trymop({ @words = self.eval_ast($/.$<circumfix>.ast).to_string_list });
+    $/.CURSOR.trymop({ @words = self.eval_ast($/,$<circumfix>.ast).to_string_list });
 
     make $RxOpAlt.new(zyg => [ map { $RxOpString.new(text => $_,
             igcase => %*RX<i>, igmark => %*RX<a>) }, @words ], dba => %*RX<dba>);
