@@ -82,7 +82,7 @@ method const_value() { }
 class StatementList is Op {
     has $.children = []; # Array of Op
     method new(:$children = [], *%_) {
-        nextwith(self, children => [ @$children ], |%_);
+        self.bless(*, children => [ @$children ], |%_);
     }
     method zyg() { @$.children }
     method ctxzyg($f) {
@@ -106,7 +106,7 @@ class CallLike is Op {
     method zyg() { @( $.args // $.positionals ) }
 
     method new(:$positionals = [], :$args, *%_) {
-        nextwith(self,
+        self.bless(*,
             positionals => ($positionals andthen [@$positionals]),
             args => ($args andthen [@$args]), |%_);
     }
@@ -278,7 +278,7 @@ class SimpleParcel is Op {
     method zyg() { @$.items }
 
     method new(:$items, *%_) {
-        nextwith(self, items => [@$items], |%_);
+        self.bless(*, items => [@$items], |%_);
     }
 
     method code($body) {
@@ -330,7 +330,7 @@ class ShortCircuit is Op {
     has $.args = die "ShortCircuit.args required"; # Array of Op
     method zyg() { @$.args }
     method new(:$args, *%_) {
-        nextwith(self, args => [@$args], |%_);
+        self.bless(*, args => [@$args], |%_);
     }
 
     method red2($sym, $o2) {
@@ -845,7 +845,7 @@ class Builtin is Op {
     has $.name = die "Builtin.name required"; # Str
     method zyg() { @$.args }
     method new(:$args, *%_) {
-        nextwith(self, args => [@$args], |%_);
+        self.bless(*, args => [@$args], |%_);
     }
 
     method code($body) {
