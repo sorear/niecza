@@ -2993,7 +2993,11 @@ class IO::ArgFiles {
 
 sub unlink(*@filenames) is unsafe {
     for @filenames -> $filename {
-        Q:CgOp { (rnull (path_unlink (obj_getstr {$filename}))) };
+        if $filename.IO ~~ :d {
+            Q:CgOp { (box Int (path_rmdir (obj_getstr {$filename}))) };
+        } else {
+            Q:CgOp { (rnull (path_unlink (obj_getstr {$filename}))) };
+        }
     }
     True; # is there a way to actually detect problems with File.Delete?
 }
