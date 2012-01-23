@@ -165,12 +165,13 @@ method radint($/) {
     $<integer> && make $<integer>.ast;
 }
 method rad_number ($/) {
+    my $radix = +$<radix>;
     if $<circumfix> {
-        $/.CURSOR.sorry("Runtime base conversions NYI");
-        make 0;
+        # STD guarantees this can never happen from within radint; only number
+        # can see this
+        make mkcall($/, '&unbase', $OpNum.new(value => [10, ~$radix]), $<circumfix>.ast);
         return;
     }
-    my $radix = +$<radix>;
     my $value = $<int> ?? from_base($<int>, $radix) !! 0;
     if $<frac> -> $fr {
         my $shift = $fr.chars - $fr.comb(/_/);
@@ -189,11 +190,13 @@ method number($/) {
         make $/ eq 'NaN' ?? (0e0/0e0) !! Inf;
     } else {
         given $child.ast {
+            when $Op { make $_ }
             when Num { make $_ }
             when Int { make [ 10, ~$_ ] }
             when Rat { make [ 10, "{.numerator}/{.denominator}" ] }
         }
     }
+    make $OpNum.new(value => $/.ast) unless $/.ast ~~ $Op;
 }
 
 method charname($/) {
@@ -225,7 +228,7 @@ method charspec($/) {
 
 # Value :: Op
 method value($ ) { }
-method value:number ($/){ make $OpNum.new(pos=>$/, value => $<number>.ast)}
+method value:number ($/){ make $<number>.ast }
 method value:quote ($/) { make $<quote>.ast }
 
 method ident($ ) { }
@@ -722,9 +725,8 @@ method metachar:sym<{*}> ($/) {
 }
 
 method metachar:qw ($/) {
-    my $cif = $<circumfix>.ast;
-    my @words = $cif.^isa($OpParen) ?? @( $cif.inside.items ) !! $cif;
-    @words = map *.text, @words;
+    my @words;
+    $/.CURSOR.trymop({ @words = self.eval_ast($/,$<circumfix>.ast).to_string_list });
 
     make $RxOpAlt.new(zyg => [ map { $RxOpString.new(text => $_,
             igcase => %*RX<i>, igmark => %*RX<a>) }, @words ], dba => %*RX<dba>);
@@ -1239,14 +1241,24 @@ method process_nibble($/, @bits, $prefix?) {
     elsif $post eq 'words' || $post eq 'quotewords' {
         my $sl = $/.ast;
         if !$sl.^isa($OpStringLiteral) {
-            make $OpCallMethod.new(pos=>$/, :name<words>, receiver => $sl);
+            make $OpCallMethod.new(pos=>$/, :name<words-val>, receiver => $sl);
         }
         else {
             my @tok = $sl.text.words;
-            @tok = map { $OpStringLiteral.new(pos=>$/, text => $_) }, @tok;
+            if @tok == 1 && @tok[0] eq $sl.text && $post eq 'words' {
+                # <1/2> special case...
+                make $OpStringLiteral.new(text => @tok[0]);
+                make mkcall($/, '&val_nospace', $/.ast)
+                    if $*CURLEX<!sub>.lookup_lex('&val_nospace');
+            }
+            else {
+                @tok = map { $OpStringLiteral.new(pos=>$/, text => $_) }, @tok;
+                @tok = map { mkcall($/, '&val', $_) }, @tok
+                    if $*CURLEX<!sub>.lookup_lex('&val');
 
-            make ((@tok == 1) ?? @tok[0] !! $OpParen.new(pos=>$/,
-                inside => $OpSimpleParcel.new(pos=>$/, items => @tok)));
+                make ((@tok == 1) ?? @tok[0] !! $OpParen.new(pos=>$/,
+                    inside => $OpSimpleParcel.new(pos=>$/, items => @tok)));
+            }
         }
     }
     elsif $post eq 'path' {
@@ -2096,7 +2108,7 @@ method variable($/) {
         return Nil;
     } elsif $<postcircumfix>[0] {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
-            make { capid => $<postcircumfix>[0].ast.args[0].text, term =>
+            make { capid => self.eval_ast_str($/, $<postcircumfix>[0].ast.args[0]) // '', term =>
                 self.docontextif($/, $sigil,
                     mkcall($/, '&postcircumfix:<{ }>',
                         $OpLexical.new(name => '$/'),
@@ -2222,7 +2234,7 @@ method parameter($/) {
     }
 
     my $default = $<default_value> ?? $<default_value>.ast !! Any;
-    $default.set_name("$/ init") if $default;
+    $default.set_name("$/ init") if $default && $default.kind eq 'sub';
 
     my $tag = $<quant> ~ ':' ~ $<kind>;
     if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
@@ -2250,11 +2262,11 @@ method parameter($/) {
 
     for @<type_constraint> -> $tc {
         if $tc.ast<where> {
+            # Should we detect $foo where 5 here?
             push ($/.ast.where //= []), self.thunk_sub($tc.ast<where>.ast);
         } elsif $tc.ast<value> {
             $/.ast.tclass = $tc.ast<value>.get_type;
-            push ($/.ast.where //= []), self.thunk_sub(
-                $OpGeneralConst.new(value => $tc.ast<value>));
+            push ($/.ast.where //= []), $tc.ast<value>;
         } else {
             $/.CURSOR.sorry("Parameter coercion NYI") if $tc.ast<as>;
             my $type = $tc.ast<type>;
@@ -3004,15 +3016,17 @@ method process_block_traits($/, @tr) {
             $sub.set_extend('pure', True);
         } elsif !$pack && grep { defined $tr{$_} }, <looser tighter equiv> {
             my $rel = $tr.keys.[0];
-            my $to  = $tr.values.[0];
-            $to = $to.inside if $to ~~ $OpParen;
-            $to = $to.children[0] if $to ~~ $OpStatementList && $to.children == 1;
+            my $to;
+            $T.CURSOR.trymop({ $to = self.eval_ast($T, $tr.values.[0]) });
+            $to // next;
 
             my $oprec;
-            if $to ~~ $OpLexical {
-                $oprec = $T.CURSOR.function_O($to.name);
-            } elsif $to ~~ $OpStringLiteral && $sub.name ~~ /^(\w+)\:\<.*\>$/ {
-                $oprec = $T.CURSOR.cat_O(~$0, $to.text);
+            if $to.to_sub -> $to_sub {
+                $oprec = %( $to_sub.get_extend('prec') // () );
+            } elsif $sub.name ~~ /^(\w+)\:\<.*\>$/ {
+                $T.CURSOR.trymop({
+                    $oprec = $T.CURSOR.cat_O(~$0, $to.to_string);
+                });
             } else {
                 $T.CURSOR.sorry("Cannot interpret operator reference");
                 next;
@@ -3034,8 +3048,8 @@ method process_block_traits($/, @tr) {
                 %prec<prec> ~~ s/\=/>=/ if $rel eq 'tighter';
                 $sub.set_extend('prec', %prec.kv);
             }
-        } elsif !$pack && $tr<assoc> {
-            my $arg = self.eval_ast_str($T, $tr<assoc>) // '';
+        } elsif !$pack && ($tr<assoc> // $tr<uassoc>) {
+            my $arg = self.eval_ast_str($T, ($tr<assoc> // $tr<uassoc>)) // '';
             my %prec = $sub.get_extend('prec');
             unless %prec {
                 $T.CURSOR.sorry("Target does not seem to be an operator");
@@ -3045,16 +3059,27 @@ method process_block_traits($/, @tr) {
                 $T.CURSOR.sorry("Invalid associativity $arg");
                 next;
             }
-            %prec<assoc> = $arg;
+            %prec{$tr.keys.[0]} = $arg;
             $sub.set_extend('prec', %prec.kv);
-        } elsif !$pack && $tr<Niecza::absprec> {
-            my $arg = self.eval_ast_str($T, $tr<Niecza::absprec>) // '';
+        } elsif !$pack && ($tr<iffy> || $tr<fiddly> || $tr<diffy>) {
             my %prec = $sub.get_extend('prec');
             unless %prec {
                 $T.CURSOR.sorry("Target does not seem to be an operator");
                 next;
             }
-            %prec<prec> = $arg;
+            %prec{$tr.keys.[0]} = True;
+            $sub.set_extend('prec', %prec.kv);
+        } elsif !$pack && $tr<Niecza::absprec> {
+            my @arg = (self.eval_ast_str($T, $tr<Niecza::absprec>) // '').words;
+            my %prec = $sub.get_extend('prec');
+            unless %prec {
+                $T.CURSOR.sorry("Target does not seem to be an operator");
+                next;
+            }
+            %prec = ();
+            %prec<prec> = @arg[0];
+            %prec<assoc> = @arg[1] // 'left';
+            %prec<uassoc> = @arg[2] // 'non' if %prec<assoc> eq 'unary';
             %prec<dba> = "like $sub.name()";
             $sub.set_extend('prec', %prec.kv);
         } elsif !$pack && $tr<Niecza::builtin> {
@@ -3079,7 +3104,14 @@ method termish($/) { make $<term>.ast }
 method nulltermish($/) {}
 method EXPR($/) { make $<root>.ast }
 method modifier_expr($/) { make $<EXPR>.ast }
-method default_value($/) { make self.thunk_sub($<EXPR>.ast) }
+method default_value($/) {
+    my $ast = $PassSimplifier.invoke_incr($*CURLEX<!sub>, $<EXPR>.ast);
+    if $ast.const_value($*CURLEX<!sub>) -> $cv {
+        make $cv
+    } else {
+        make self.thunk_sub($ast, :nosimpl);
+    }
+}
 method thunk_sub($code, :$params = [], :$name, :$class, :$ltm, :$nosimpl) {
     my $n = $*unit.create_sub(
         name => $name // 'ANON',
