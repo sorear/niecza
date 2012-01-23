@@ -9,6 +9,23 @@ use MONKEY_TYPING;
 # is excluded.
 # However, slurpy arguments are ok.  If an object is claimed to be immutable
 # but implements variable methods for Bool,Str,Int,etc, no rules apply.
+#
+# There are three senses of 'immutability' currently used in Niecza.  For an
+# expression, being immutable means that the same Variable will always be
+# returned (that is, =:=) and there are no side effects, so that expression
+# can effectively be constant-folded.  const_value will return either a
+# Value downvalue or Nil depending on (an approximation to) such immutability.
+#
+# For values, immutability is measured by the 'immutable' method, and is true
+# if none of the object's state, as seen by perl, eqv, or other such accesors,
+# can be changed.  Variables are immutable if they are read-only and their
+# value is immutable.  Note that an immutable expression can return a mutable
+# variable!
+#
+# Known suboptimalities of this system: it doesn't make a whole lot of sense
+# to be forbidding (3 => 5) but, but allowing (3 => $x) but.  Also, we could
+# usefully fold some cases like "foo" => &bar, even though &bar is not
+# immutable.
 
 # Predeclarations of types {{{
 my class Mu       { ... }
@@ -25,6 +42,7 @@ my class Junction { ... }
 my class Enum     { ... }
 my class Range    { ... }
 my class Whatever { ... }
+my class IO       { ... }
 grammar Niecza::NumSyntax { ... }
 # }}}
 # Important inlinable definitions {{{
@@ -173,6 +191,8 @@ sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
 sub Niecza::toggle_mono_trace() { Q:CgOp { (prog (raise (s "SIGUSR2")) {0}) } }
 # }}}
 # Fundamental types {{{
+my constant True  = 1.Bool;
+my constant False = 0.Bool;
 my class Mu {
     method head() { @(self).head }
     method flattens(\$self:) {
@@ -204,6 +224,7 @@ my class Mu {
     method new(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
     method clone(*%_) { Q:CgOp { (ns (repr_clone (@ {self}) (unbox varhash (@ {%_})))) } }
     method dispatch:<::>(|$) { Q:CgOp { (dispatch_fromtype) } }
+    method immutable() { !defined(self) }
 }
 
 my class Any is Mu {
@@ -359,6 +380,8 @@ my class Any is Mu {
 sub Niecza::autopun($pun, $name) {
     -> |$ { Q:CgOp { (rnull (pun_helper {$pun} {$name} (callframe))) }; nextsame }
 }
+
+sub IMMUTABLE(\$x) { Q:CgOp { (ternary (var_is_rw {$x}) {False} {$x.immutable}) } }
 
 my class Cool {
     method FatRat () { Niecza::NumSyntax.str2num(~self, :fatrat) }
@@ -622,6 +645,9 @@ my class Cool {
     }
 }
 
+my role Positional { Any }
+my role Associative { Any }
+
 my class Nil is Cool {
     method new() { Nil }
     method iterator() { ().iterator }
@@ -636,9 +662,6 @@ my class Nil is Cool {
     method Numeric() { 0 }
     method Bool   () { ?0 }
 }
-
-my role Positional { Any }
-my role Associative { Any }
 
 my class Capture does Positional does Associative {
     has $!positionals;
@@ -658,6 +681,11 @@ my class Capture does Positional does Associative {
             $pos ~= "|" ~ $h.perl;
         }
         '\(' ~ $pos ~ ')';
+    }
+    method immutable() {
+        self // return True;
+        self.Parcel.immutable &&
+            (!self.hash || self.hash.values.Capture.Parcel.immutable);
     }
 
     method Capture () { self }
@@ -704,6 +732,7 @@ my role Real does Numeric {
 my role Integral does Real { Any }
 my class Num does Real {
     method new() { 0e0 }
+    method immutable() { True }
     our constant pi = 3.14159_26535_89793_238e0;
     our constant e  = 2.71828_18284_59045_235e0;
     our constant i  = Q:CgOp { (complex_new {0} {1}) };
@@ -725,6 +754,7 @@ our constant e  = 2.71828_18284_59045_235e0;
 our constant i  = Num::i;
 my class Int does Integral {
     method new() { 0 }
+    method immutable() { True }
     method niecza_quantifier_max() { self }
     method niecza_quantifier_min() { self }
     method Bridge() { self.Num }
@@ -748,6 +778,7 @@ my class Int does Integral {
 }
 my class Rat does Real {
     method new($n,$d) { $n / $d }
+    method immutable() { True }
     method perl() { defined(self) ?? "<" ~ self.numerator ~ "/" ~ self.denominator ~ ">" !! self.typename }
     method gist() { self // nextsame; self.Str }
     method numerator() { Q:CgOp { (rat_nu {self}) } }
@@ -757,6 +788,7 @@ my class Rat does Real {
 }
 my class Complex does Numeric {
     method new($re,$im) { Q:CgOp { (complex_new {$re} {$im}) } }
+    method immutable() { True }
     method perl() { defined(self) ?? "<" ~ self ~ ">" !! self.typename }
     method gist() { self // nextsame; self.Str }
     method Complex() { self }
@@ -767,6 +799,7 @@ my class Complex does Numeric {
 }
 my class FatRat does Real {
     method new($n,$d) { FatRat.succ * $n / $d }
+    method immutable() { True }
     method perl() { defined(self) ?? "FatRat.new({self.numerator}, {self.denominator})" !! self.typename }
     method FatRat() { self }
     method gist() { self // nextsame; self.Str }
@@ -777,8 +810,10 @@ my class FatRat does Real {
 
 my class Str is Cool {
     method new() { "" }
+    method immutable() { True }
     method ACCEPTS(\$t) { defined(self) ?? self eq $t !! $t.^does(self) }
     method chars() { chars(self) }
+    method IO() { IO.new(path => self) }
     method say() { $PROCESS::OUTPUT_USED := 1; Q:CgOp {
         (prog [say (unbox str (@ {self}))]
               [box Bool (bool 1)]
@@ -976,8 +1011,6 @@ my class Bool is Int does IntBasedEnum {
     our constant False = Q:CgOp { (box Bool (bool 0)) };
     method ACCEPTS(\$t) { defined(self) ?? self !! $t.^does(self) }
 }
-my constant True = Q:CgOp { (box Bool (bool 1)) };
-my constant False = Q:CgOp { (box Bool (bool 0)) };
 # }}}
 # Fundamental scalar operators {{{
 sub infix:<~> is Niecza::absprec<r= list> is pure (\|$bits) { Q:CgOp {
@@ -1068,9 +1101,10 @@ sub _param_role_inst(\|$t) {
 }
 
 sub infix:<does>($obj, \$roles, :$clone, :$value) is rw {
-    # XXX fail if $obj is a value object and !$clone
     die "Cannot use 'does' operator with a type object"
         if !$clone && !$obj.defined;
+    die "Cannot use 'does' operator with an immutable object"
+        if !$clone && $obj.immutable;
     $obj := $obj.clone if $clone && defined($obj);
 
     my Mu $newtype;
@@ -1136,6 +1170,7 @@ sub die($msg = "Died") { Q:CgOp { (die (@ {$msg})) } }
 my class Label {
     has $!target;
     has $!name;
+    method immutable() { True }
 
     method goto() { _lexotic(8, self, ()) }
     method next() { _lexotic(1, self, ()) }
@@ -1232,6 +1267,15 @@ my class Parcel is Cool does Positional {
     } }
     method raw_at($ix) {
         Q:CgOp { (fvarlist_item (cast int (obj_getnum {$ix})) (unbox fvarlist (@ {self}))) }
+    }
+    method immutable() {
+        self // return True;
+        my $ix := 0;
+        my $max := self.raw_elems;
+        while $ix < $max {
+            IMMUTABLE(self.raw_at($ix++)) || return False;
+        }
+        True;
     }
 
     method unwrap-single(@self:) { Q:CgOp {
@@ -1621,6 +1665,7 @@ my class Hash does Associative {
 }
 
 my class Whatever {
+    method immutable() { True }
     method ACCEPTS(\$x) { defined(self) || $x.^isa(Whatever) }
 }
 # XXX use an unshadowable name
@@ -1640,6 +1685,11 @@ my class Enum is Cool {
                 (l d) {$!value})
               (ns (l n)))
         }
+    }
+
+    method immutable() {
+        self // return True;
+        IMMUTABLE($!key) || IMMUTABLE($!value);
     }
 
     method kv() {
@@ -1750,6 +1800,7 @@ my class Junction is Mu {
         defined(self) ?? (@kinds[self!kind] ~ (anon @ := self!eigenstates).perl)
             !! "Junction"
     }
+    method immutable() { self // return True; self!eigenstates.immutable }
 
     method Str() { defined(self) ?? self.perl !! "Junction()" }
 
@@ -2289,6 +2340,8 @@ my class Range is Cool does Positional {
         $min = -Inf if $min.^isa(Whatever);
         unitem(self.bless(*, :$min, :$max, :$excludes_min, :$excludes_max));
     }
+
+    method immutable() { self // return True; $!min.immutable && $!max.immutable }
 
     method list() { self.iterator.list }
     method flat() { self.iterator.flat }
@@ -2887,6 +2940,7 @@ sub dir($directory = '.', Mu :$test = none('.','..')) is unsafe {
 
 my class Instant {
     has $.val;
+    method immutable() { True }
     method to-posix() { ($!val, False) }
 }
 sub term:« now »() {
@@ -2939,10 +2993,6 @@ my class IO {
     method modified() is unsafe { Instant.new(val => Q:CgOp { (path_modified (obj_getstr {self})) }) }
     method copy($dest) is unsafe { Q:CgOp { (rnull (path_copy (obj_getstr {self}) (obj_getstr {$dest})))}}
     method chmod($mode) is unsafe { Q:CgOp { (box Int (path_chmod (obj_getstr {self}) (obj_getnum {$mode}))) } }
-}
-
-augment class Str {
-    method IO() { IO.new(path => self) }
 }
 
 my class TextReader {

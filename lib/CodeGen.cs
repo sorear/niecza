@@ -3031,6 +3031,7 @@ dynamic:
                 return CpsOp.CpsCall(cpsrt, mi, JScalar.A<CpsOp>(2, z, th.Scan)); };
 
             thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
+            thandlers["var_is_rw"] = FieldGet(Tokens.Variable, "rw");
             thandlers["llhow_name"] = FieldGet(Tokens.STable, "name");
             thandlers["stab_what"] = FieldGet(Tokens.STable, "typeObject");
             thandlers["obj_llhow"] = FieldGet(Tokens.P6any, "mo");
