@@ -228,8 +228,8 @@ class StaticSub {
             ~($file//''), +($line//0), +($pos// -1), $body));
     }
 
-    method finish($ops) {
-        $ops := $PassSimplifier.invoke_incr(self, $ops);
+    method finish($ops, $done?) {
+        $ops := $PassSimplifier.invoke_incr(self, $ops) unless $done;
         self.set_extend('onlystub', True) if $ops.onlystub;
         Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.Finish {self} {$ops.cgop(self)}) }
     }

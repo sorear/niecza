@@ -1738,10 +1738,9 @@ method coloncircumfix($/) { make $<circumfix>.ast }
 
 # may throw!
 method eval_ast($/, $ast) {
-    # XXX simplification _should_ be idempotent but I don't how how true
     $ast := $PassSimplifier.invoke_incr($*CURLEX<!sub>, $ast);
     if $ast.const_value($*CURLEX<!sub>) -> $cv { return $cv }
-    my $sub = self.thunk_sub($ast);
+    my $sub = self.thunk_sub($ast, :nosimpl);
     $*CURLEX<!sub>.create_static_pad;
     $sub.run_BEGIN_raw;
 }
@@ -3081,7 +3080,7 @@ method nulltermish($/) {}
 method EXPR($/) { make $<root>.ast }
 method modifier_expr($/) { make $<EXPR>.ast }
 method default_value($/) { make self.thunk_sub($<EXPR>.ast) }
-method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
+method thunk_sub($code, :$params = [], :$name, :$class, :$ltm, :$nosimpl) {
     my $n = $*unit.create_sub(
         name => $name // 'ANON',
         class => $class // 'Block',
@@ -3092,7 +3091,7 @@ method thunk_sub($code, :$params = [], :$name, :$class, :$ltm) {
     $n.set_ltm($ltm) if $ltm;
     $n.add_my_name($_, :noinit) for @$params;
     $n.set_signature($Sig.simple(@$params));
-    $n.finish($code);
+    $n.finish($code, $nosimpl);
     $n;
 }
 

@@ -4510,7 +4510,7 @@ dynamic:
                 if (a_name == null) break;
                 names.Add(a_name);
             }
-            SubInfo deflt = (SubInfo)Handle.Unbox(args[ix++]);
+            object deflt = Handle.Unbox(args[ix++]);
             STable  type  = (STable)Handle.Unbox(args[ix++]);
             if (deflt != null) flags |= Parameter.HASDEFAULT;
             if (type != null) flags |= Parameter.HASTYPE;

@@ -1471,7 +1471,7 @@ namespace Niecza {
         public int      slot;
         public string   name;
         public string[] names;
-        public SubInfo  def;
+        public object   def; // SubInfo or Variable
         public STable   type;
 
         // XXX I don't really like dangling two extra fields on every param...
@@ -1484,7 +1484,7 @@ namespace Niecza {
 
         private Parameter() { }
         public Parameter(int flags, int slot, string name,
-                string[] names, SubInfo def, STable type, string attr,
+                string[] names, object def, STable type, string attr,
                 STable atype) {
             this.mo = Kernel.ParameterMO;
             this.flags = flags;
@@ -1561,7 +1561,7 @@ namespace Niecza {
             n.slot  = tb.Int();
             n.name  = tb.String();
             n.names = tb.Strings();
-            n.def   = (SubInfo)tb.ObjRef();
+            n.def   = tb.ObjRef();
             n.type  = (STable)tb.ObjRef();
             n.post_constraints = tb.RefsA<object>();
             n.attribute = tb.String();
@@ -2585,6 +2585,12 @@ namespace Niecza {
                     throw new NieczaException("Constraint type check failed for parameter " + param.name + " in " + signame);
                 return res;
             }
+            if (c is Variable) {
+                bool res = Kernel.ACCEPTS(arg, (Variable)c);
+                if (!res && !quiet)
+                    throw new NieczaException("Constraint type check failed for parameter " + param.name + " in " + signame);
+                return res;
+            }
             throw new NieczaException("funny object in post-constraint list");
         }
 
@@ -2666,11 +2672,15 @@ namespace Niecza {
                 }
 get_default:
                 if ((flags & Parameter.HASDEFAULT) != 0) {
-                    Frame thn = Kernel.GetInferiorRoot()
-                        .MakeChild(th, param.def, Kernel.AnyP);
-                    src = Kernel.RunInferior(thn);
-                    if (src == null)
-                        throw new Exception("Improper null return from sub default for " + param.name + " in " + signame);
+                    if (param.def is Variable) {
+                        src = (Variable)param.def;
+                    } else {
+                        Frame thn = Kernel.GetInferiorRoot()
+                            .MakeChild(th, (SubInfo)param.def, Kernel.AnyP);
+                        src = Kernel.RunInferior(thn);
+                        if (src == null)
+                            throw new Exception("Improper null return from sub default for " + param.name + " in " + signame);
+                    }
                     goto gotit;
                 }
                 if ((flags & Parameter.DEFOUTER) != 0) {

@@ -44,6 +44,97 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
 our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
+method default_value($/) {
+    my $ast = $PassSimplifier.invoke_incr($*CURLEX<!sub>, $<EXPR>.ast);
+    if $ast.const_value($*CURLEX<!sub>) -> $cv {
+        make $cv
+    } else {
+        make self.thunk_sub($ast, :nosimpl);
+    }
+}
+
+method parameter($/) {
+    my $sorry;
+    my $p = $<param_var> // $<named_param>;
+    my $p_ast = $p ?? $p.ast !! { names => [], flags => $Sig::POSITIONAL };
+    my $flags = $p_ast<flags>;
+
+    $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $flags +|= $Sig::READWRITE }
+        elsif $trait.ast<copy> { $flags +|= $Sig::IS_COPY }
+        elsif $trait.ast<parcel> { $flags +|= $Sig::RWTRANS }
+        elsif $trait.ast<readonly> { $flags +&= +^$Sig::READWRITE }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    my $default = $<default_value> ?? $<default_value>.ast !! Any;
+    $default.set_name("$/ init") if $default && $default.kind eq 'sub';
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $flags +|= ($flags +& $Sig::IS_HASH) ?? $Sig::SLURPY_NAM !! $Sig::SLURPY_POS }
+    elsif $tag eq '|:*'  { $flags +|= $Sig::SLURPY_CAP }
+    elsif $tag eq '\\:!' { $flags +|= $Sig::RWTRANS }
+    elsif $tag eq '\\:?' { $flags +|= ($Sig::RWTRANS + $Sig::OPTIONAL) }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '?:*'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq ':?'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '?:?'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+
+    if defined $p_ast<slot> {
+        # TODO: type constraint here
+    }
+
+    make $SigParameter.new(name => ~$/, mdefault => $default,
+        |$p_ast, :$flags);
+
+    for @<type_constraint> -> $tc {
+        if $tc.ast<where> {
+            # Should we detect $foo where 5 here?
+            push ($/.ast.where //= []), self.thunk_sub($tc.ast<where>.ast);
+        } elsif $tc.ast<value> {
+            $/.ast.tclass = $tc.ast<value>.get_type;
+            push ($/.ast.where //= []), $tc.ast<value>;
+        } else {
+            $/.CURSOR.sorry("Parameter coercion NYI") if $tc.ast<as>;
+            my $type = $tc.ast<type>;
+            if $type.kind eq 'subset' {
+                push ($/.ast.where //= []), self.thunk_sub(
+                    $OpGeneralConst.new(value => $type.get_type_var));
+                $type = $type.get_basetype while $type.kind eq 'subset';
+            }
+            $/.ast.tclass = $type;
+            $/.ast.flags +|= $tc.ast<tmode>;
+        }
+    }
+
+    for @<post_constraint> -> $pc {
+        # XXX this doesn't seem to be specced anywhere, but it's
+        # Rakudo-compatible and shouldn't hurt
+        if $pc<bracket> {
+            $/.ast.flags +&= +^$Sig::IS_HASH;
+            $/.ast.flags +|= $Sig::IS_LIST;
+        }
+
+        if $pc<signature> -> $ssig {
+            $ssig.CURSOR.sorry('Cannot have more than one sub-signature for a pparameter') if $/.ast.subsig;
+            $/.ast.subsig = $pc<signature>.ast;
+        } else {
+            push ($/.ast.where //= []), self.thunk_sub($pc<EXPR>.ast);
+        }
+    }
+}
+
 sub from_base($str, $base) {
     my $acc = 0;
     my $punto = -1;
