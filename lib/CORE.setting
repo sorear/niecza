@@ -1270,7 +1270,7 @@ my class Parcel is Cool does Positional {
     }
     method immutable() {
         self // return True;
-        my $ix := 0;
+        my $ix = 0;
         my $max := self.raw_elems;
         while $ix < $max {
             IMMUTABLE(self.raw_at($ix++)) || return False;

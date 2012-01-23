@@ -126,7 +126,7 @@ sub do_atpos($body, $nv, $invname, $op) { #OK not used
 }
 
 # XXX should support folding of SimplePair, SimpleParcel too
-sub check_folding($sub, $op) {
+sub check_folding($body, $sub, $op) {
     my @evargs;
     for $op.getargs -> $aop {
         my $name;
@@ -134,7 +134,7 @@ sub check_folding($sub, $op) {
             $name = $aop.key;
             $aop := $aop.value;
         }
-        push @evargs, $name, ($aop.const_value // return);
+        push @evargs, $name, ($aop.const_value($body) // return);
     }
 
     my $ret = $*unit.constant_fold($sub, @evargs) // return;
@@ -162,7 +162,7 @@ sub run_optree($body, $op, $nv) {
     return $op unless @inv_lex[0] eq 'sub';
 
     if @inv_lex[4].get_extend('pure') {
-        if check_folding(@inv_lex[4], $op) -> $nop { return $nop }
+        if check_folding($body, @inv_lex[4], $op) -> $nop { return $nop }
     }
 
     if @inv_lex[4].get_extend('builtin') -> $B {

@@ -597,6 +597,9 @@ public partial class Builtins {
             Kernel.GetInferiorRoot(), name, pos, null));
     }
 
+    public static bool ToBool(Variable v) {
+        return v.Fetch().mo.mro_raw_Bool.Get(v);
+    }
     public static string ToStr(Variable v) {
         return v.Fetch().mo.mro_raw_Str.Get(v);
     }

@@ -246,9 +246,9 @@ method get_Any() { $*CURLEX<!sub>.compile_get_pkg('CORE', 'Any') }
 method post_constraint($/) { }
 method type_constraint($/) {
     if $<value> {
-        my $val = $<value>.ast.const_value;
+        my $val = $<value>.ast.const_value($*CURLEX<!sub>);
         $val // $/.CURSOR.sorry("Value constraint is not constant");
-        make { value => $val // $OpNum.new(value => 0).const_value };
+        make { value => $val // $OpNum.new(value => 0).const_value(Any) };
     } elsif $<typename> {
         make $<typename>.ast;
     } else {
@@ -1740,7 +1740,7 @@ method coloncircumfix($/) { make $<circumfix>.ast }
 method eval_ast($/, $ast) {
     # XXX simplification _should_ be idempotent but I don't how how true
     $ast := $PassSimplifier.invoke_incr($*CURLEX<!sub>, $ast);
-    if $ast.const_value -> $cv { return $cv }
+    if $ast.const_value($*CURLEX<!sub>) -> $cv { return $cv }
     my $sub = self.thunk_sub($ast);
     $*CURLEX<!sub>.create_static_pad;
     $sub.run_BEGIN_raw;

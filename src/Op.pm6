@@ -48,7 +48,7 @@ method code_labelled($body, $label) { self.code($body) } #OK not used
 
 method statement_level() { self }
 method onlystub() { False }
-method const_value() { }
+method const_value($) { }
 
 { class CgOp is Op {
     has $.op;
@@ -91,7 +91,7 @@ class StatementList is Op {
     }
 
     method onlystub() { $!children && $!children[0].onlystub }
-    method const_value() { $!children[0].const_value if $!children == 1 }
+    method const_value($body) { $!children[0].const_value($body) if $!children == 1 }
     method code($body) {
         my @ch = map { $_.cgop($body) }, @$.children;
         my $end = @ch ?? pop(@ch) !! $CgOp.corelex('Nil');
@@ -259,7 +259,7 @@ class Paren is Op {
 
     method code($body) { $.inside.cgop($body) }
     method to_bind($/, $ro, $rhs) { $!inside.to_bind($/, $ro, $rhs); }
-    method const_value() { $!inside.const_value }
+    method const_value($body) { $!inside.const_value($body) }
 }
 
 class SimplePair is Op {
@@ -396,7 +396,7 @@ class StringLiteral is Op {
     has $.text = die "StringLiteral.text required"; # Str
 
     method code($) { $CgOp.const($CgOp.string_var($.text)); }
-    method const_value() { $*unit.string_constant(~$!text) }
+    method const_value($) { $*unit.string_constant(~$!text) }
 }
 
 class Conditional is Op {
@@ -631,7 +631,7 @@ class MakeJunction is Op {
             $CgOp.const($CgOp.box('Num', $CgOp.double($.value)))
         }
     }
-    method const_value() { $*unit.numeric_constant(@($!value)) }
+    method const_value($) { $*unit.numeric_constant(@($!value)) }
 }; }
 
 # just a little hook for rewriting
@@ -683,6 +683,12 @@ class Lexical is Op {
     has $.hash; # Bool
 
     method code($) { $CgOp.scopedlex($.name) }
+
+    method const_value($body) {
+        my @vec = $body.lookup_lex($!name);
+        (@vec && @vec[0] eq 'hint') ?? @vec[4] !!
+            (@vec && @vec[0] eq 'common') ?? @vec[6] !! Nil
+    }
 
     method to_bind($/, $ro, $rhs) {
         my @lex = $*CURLEX<!sub>.lookup_lex($!name) or
@@ -1070,7 +1076,7 @@ class Op::CatchyWrapper is Op {
 
 class Op::GeneralConst is Op {
     has $.value;
-    method const_value() { $!value }
+    method const_value($) { $!value }
     method code($) { $CgOp.const($!value) }
 }
 

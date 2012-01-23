@@ -3817,6 +3817,12 @@ dynamic:
 
             for (int ix = 3; ix < args.Length; ix += 2) {
                 var v = (Variable)Handle.Unbox(args[ix+1]);
+                if (v.rw) return null;
+                // this next one is a bit of a hack to get the right results
+                // while compiling the setting...
+                if (v.Fetch().mo.FindMethod("immutable") != null &&
+                        !Builtins.ToBool(Builtins.InvokeMethod("immutable", v)))
+                    return null;
                 if (args[ix] == null) {
                     pos.Add(v);
                 } else {
@@ -4010,10 +4016,13 @@ dynamic:
                 r = new object[] { "label",null,null,null };
             var lhint  = li as LIConstant;
             if (lhint != null)
-                r = new object[] { "hint",null,null,null };
+                r = new object[] { "hint",null,null,null, Handle.Wrap(lhint.value) };
             var lcomm  = li as LICommon;
-            if (lcomm != null)
-                r = new object[] { "common",null,null,null, lcomm.Stash(), lcomm.VarName() };
+            if (lcomm != null) {
+                StashEnt se;
+                Kernel.currentGlobals.TryGetValue(lcomm.hkey, out se);
+                r = new object[] { "common",null,null,null, lcomm.Stash(), lcomm.VarName(), (se.constant ? Handle.Wrap(se.v) : null) };
+            }
 
             r[1] = li.file;
             r[2] = li.line;
