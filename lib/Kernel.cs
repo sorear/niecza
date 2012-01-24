@@ -4511,6 +4511,9 @@ saveme:
             disable_end = true;
             while (Top.prev != null) { Pop(); }
             Top.end.Run();
+            // XXX is this really the best place?
+            Builtins.stdout.Flush();
+            Builtins.stderr.Flush();
         }
 
         Compartment prev;
@@ -6253,18 +6256,6 @@ slow:
                 sb.Append(fmt(x));
             }
             return sb.ToString();
-        }
-
-        public static System.IO.TextReader OpenStdin() {
-            return new System.IO.StreamReader(Console.OpenStandardInput(), Console.InputEncoding);
-        }
-
-        public static System.IO.TextWriter OpenStdout() {
-            return new System.IO.StreamWriter(Console.OpenStandardOutput(), Console.OutputEncoding);
-        }
-
-        public static System.IO.TextWriter OpenStderr() {
-            return new System.IO.StreamWriter(Console.OpenStandardError(), Console.OutputEncoding);
         }
 
         public static Variable NewLabelVar(Frame fr, string name) {

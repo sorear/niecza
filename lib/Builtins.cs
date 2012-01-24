@@ -2773,4 +2773,18 @@ again:
     public static string param_name(P6any param) {
         return ((Parameter)param).name;
     }
+
+    public static System.IO.TextReader treader_stdin() {
+        return new System.IO.StreamReader(Console.OpenStandardInput(), Console.InputEncoding);
+    }
+
+    [TrueGlobal] internal static StreamWriter stdout =
+        new StreamWriter(Console.OpenStandardOutput(), Console.OutputEncoding);
+    [TrueGlobal] internal static StreamWriter stderr =
+        new StreamWriter(Console.OpenStandardError(), Console.OutputEncoding);
+    public static System.IO.TextWriter twriter_stdout() { return stdout; }
+
+    public static System.IO.TextWriter twriter_stderr() {
+        stderr.AutoFlush = true; return stderr;
+    }
 }

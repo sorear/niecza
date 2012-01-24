@@ -3167,7 +3167,6 @@ dynamic:
             thandlers["treader_getc"] = Methody(null, typeof(TextReader).GetMethod("Read", new Type[0]));
             thandlers["treader_slurp"] = Methody(null, typeof(TextReader).GetMethod("ReadToEnd"));
             thandlers["treader_getline"] = Methody(null, typeof(TextReader).GetMethod("ReadLine"));
-            thandlers["treader_stdin"] = Methody(null, typeof(Kernel).GetMethod("OpenStdin"));
             thandlers["treader_close"] = Methody(null, typeof(TextReader).GetMethod("Close"));
             ConstructorInfo treader_open = typeof(StreamReader).GetConstructor(new Type[1] { Tokens.String });
             thandlers["treader_open"] = delegate(CpsOp[] z) {

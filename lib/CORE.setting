@@ -3309,7 +3309,8 @@ sub reduce($expression, *@values) { @values.reduce($expression) }
 
 INIT {
     $PROCESS::IN ::= Q:CgOp { (box TextReader (treader_stdin)) };
-    $PROCESS::OUT ::= TextWriter.new;
+    $PROCESS::OUT ::= Q:CgOp { (box TextWriter (twriter_stdout)) };
+    $PROCESS::ERR ::= Q:CgOp { (box TextWriter (twriter_stderr)) };
     $PROCESS::ARGFILES ::= IO::ArgFiles.new;
     @PROCESS::ARGS = Q:CgOp { (sysquery (i 0)) };
     %PROCESS::ENV = Q:CgOp { (sysquery (i 4)) };
