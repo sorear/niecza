@@ -895,11 +895,14 @@ my class Str is Cool {
 
     method gist() { defined(self) ?? self !! nextsame }
     method Numeric () { Niecza::NumSyntax.str2num(~self) }
+    CHECK my $esc = {
+        '$' => '\$',  '@' => '\@',  '%' => '\%',  '&' => '\&',  '{' => '\{',
+        "\b" => '\b', "\n" => '\n', "\r" => '\r', "\t" => '\t', '"' => '\"',
+        '\\' => '\\\\' };
     method perl() {
         self // nextsame;
-        my $str = self;
-        $str ~~ s:g { <[ " \\ ]> } = '\\' ~ $/;
-        "\"$str\""
+        '"' ~ self.subst(/ <[$@%&{\b\n\r\t\"\\]> /, { $esc{$/} }, :g)\
+                  .subst(/ <-print> /, { ord($/).fmt('\x[%x]') }, :g) ~ '"'
     }
 }
 

@@ -6272,6 +6272,8 @@ slow:
                     SubInfo.DescribeControl(type, tgt, name);
             try {
                 Variable v1 = (Variable) payload;
+                if (v1.Fetch().mo.FindMethod("gist") == null)
+                    return "(no .gist on " + v1.Fetch().mo + " yet)";
                 Variable v2 = RunInferior(v1.Fetch().InvokeMethod(
                     GetInferiorRoot(), "gist", new Variable[] { v1 }, null));
                 return v2.Fetch().mo.mro_raw_Str.Get(v2);
