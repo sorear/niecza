@@ -901,7 +901,7 @@ my class Str is Cool {
         '\\' => '\\\\' };
     method perl() {
         self // nextsame;
-        '"' ~ self.subst(/ <[$@%&{\b\n\r\t\"\\]> /, { $esc{$/} }, :g)\
+        '"' ~ self.subst(/ <[$@%&{\b\cJ\cM\t\"\\]> /, { $esc{$/} }, :g)\
                   .subst(/ <-print> /, { ord($/).fmt('\x[%x]') }, :g) ~ '"'
     }
 }
