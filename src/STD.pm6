@@ -5167,11 +5167,11 @@ method getsig {
                     name => $pn, names => [ substr($pn,1) ]);
             }
             if $a_ {
-                push @parms, $SigParameter.new(slot => '@_', name => '*@_',
+                push @parms, $SigParameter.new(slot => '@_', name => '@_',
                     flags => $Sig::SLURPY_POS + $Sig::IS_LIST);
             }
             if $h_ {
-                push @parms, $SigParameter.new(slot => '%_', name => '*%_',
+                push @parms, $SigParameter.new(slot => '%_', name => '%_',
                     flags => $Sig::SLURPY_NAM + $Sig::IS_HASH);
             }
         }

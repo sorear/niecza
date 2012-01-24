@@ -2257,7 +2257,7 @@ method parameter($/) {
         # TODO: type constraint here
     }
 
-    make $SigParameter.new(name => ~$/, mdefault => $default,
+    make $SigParameter.new(mdefault => $default, name => ($p_ast<slot> // ""),
         |$p_ast, :$flags);
 
     for @<type_constraint> -> $tc {
@@ -2306,7 +2306,7 @@ method signature($/) {
     if $<param_var> {
         $<param_var>.ast<flags> +|= $Sig::SLURPY_PCL;
         my $sig = $Sig.new(params => [ $SigParameter.new(
-                name => ~$<param_var>, |$<param_var>.ast) ]);
+                name => ($<param_var>.ast<slot> // ""), |$<param_var>.ast) ]);
         $*CURLEX<!sub>.set_signature($sig) if $*SIGNUM;
         make $sig;
         return;
