@@ -44,6 +44,19 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
 our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
+method comp_unit($/) {
+    my $ast = $<statementlist>.ast;
+
+    if $*CURLEX<!sub>.has_lexical('&MAIN') {
+        $ast = $OpStatementList.new(children =>
+            [ $ast, mkcall($/, '&MAIN_HELPER') ]);
+    }
+
+    $*CURLEX{'!sub'}.finish($ast);
+
+    make $*unit;
+}
+method unitstopper($/) { $/.CURSOR.mark_used('&MAIN') }
 }
 
 my $usage = q:to/EOM/;

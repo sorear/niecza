@@ -13,5 +13,3 @@
 
 multi MAIN('foo', :$sam) { say "A" }
 multi MAIN('bar', $quux) { say "B", $quux };
-
-MAIN_HELPER;
