@@ -2627,8 +2627,18 @@ namespace Niecza {
                 }
                 if ((flags & Parameter.SLURPY_CAP) != 0) {
                     P6any nw = new P6opaque(Kernel.CaptureMO);
-                    nw.SetSlot(Kernel.CaptureMO, "$!positionals", pos);
-                    nw.SetSlot(Kernel.CaptureMO, "$!named", named);
+                    Variable[] spos = new Variable[pos.Length - posc];
+                    Array.Copy(pos, posc, spos, 0, spos.Length);
+                    VarHash snamed = null;
+                    if (named != null) {
+                        snamed = new VarHash();
+                        foreach (string k in named.Keys) {
+                            if (namedc.Contains(k))
+                                snamed[k] = named[k];
+                        }
+                    }
+                    nw.SetSlot(Kernel.CaptureMO, "$!positionals", spos);
+                    nw.SetSlot(Kernel.CaptureMO, "$!named", snamed);
                     src = Kernel.NewROScalar(nw);
                     named = null; namedc = null; posc = pos.Length;
                     goto gotit;
