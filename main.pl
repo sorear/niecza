@@ -13,142 +13,13 @@
 
 use MONKEY_TYPING;
 augment class Code {
-    method candidates() { Q:CgOp { (code_candidates (@ {self})) } }
-    method signature()  { Q:CgOp { (code_signature (@ {self})) } }
-    method candidates_matching(|$cap) { grep *.accepts_capture($cap), self.candidates }
-    method accepts_capture($cap) { Q:CgOp { (code_accepts_capture (@ {self}) (@ {$cap})) } }
-    method name() { Q:CgOp { (code_name (@ {self})) } }
-}
-augment class Routine {
-    method perl() {
-        self // nextsame;
-        my $perl = self.^name.lc();
-        if self.name() -> $n {
-            $perl ~= " $n";
-        }
-        $perl ~= self.signature().perl.substr(1);
-        $perl ~= ' { ... }';
-        $perl
-    }
-}
-augment class Signature {
-    method params() { Q:CgOp { (sig_params (@ {self})) } }
-    method arity() { Q:CgOp { (box Int (sig_arity (@ {self}))) } }
-    method count() { Q:CgOp { (box Int (sig_count (@ {self}))) } }
-    # XXX TODO: Parameter separators.
-    method perl() {
-        self // nextsame;
-        ':(' ~ join(', ', self.params».perl) ~ ')';
-    }
-}
-augment class Parameter {
-    # Value processing
-    our constant HASTYPE    = 1;
-    our constant MULTI_IGNORED = 16384;
-    our constant ANY_DEF    =  0x40000;
-    our constant UNDEF_ONLY =  0x80000;
-    our constant DEF_ONLY   =  0xC0000;
-    our constant TYPE_ONLY  = 0x100000;
-    our constant DEF_MASK   = 0x1C0000;
-
-    # Value binding
-    our constant READWRITE  = 2;
-    our constant RWTRANS    = 8;
-    our constant INVOCANT   = 8192;
-    our constant IS_COPY    = 32768;
-    our constant IS_LIST    = 65536;
-    our constant IS_HASH    = 131072;
-    our constant CALLABLE   = 0x20_0000;
-
-    # Value source
-    our constant HASDEFAULT = 32;
-    our constant OPTIONAL   = 64;
-    our constant DEFOUTER   = 4096;
-    our constant POSITIONAL = 128;
-    our constant SLURPY_POS = 256;
-    our constant SLURPY_NAM = 512;
-    our constant SLURPY_CAP = 1024;
-    our constant SLURPY_PCL = 2048;
-
-    method named() { !!! }
-    method named_names() { !!! }
-    method type() { !!! }
-    method optional() { !!! }
-    method positional() { !!! }
-    method value_constraint_list() { !!! }
-    method name() { !!! }
-    method slurpy() { !!! }
-
-    # no constraint_list!  niecza's SubInfo constraints don't reflect well :|
-    method parcel() { !!! }
-    method capture() { !!! }
-    method rw() { !!! }
-    method copy() { !!! }
-    method readonly() { !!! }
-    method invocant() { !!! }
-    method default() { !!! }
-
-    # XXX TODO: A few more bits :-)
-    multi method perl(Parameter:D:) {
-        my $perl = '';
-        my $flags = self.flags;
-        my $type = self.type.^name;
-        if $flags +& IS_LIST {
-            # XXX Need inner type
-        }
-        elsif $flags +& IS_HASH {
-            # XXX Need inner type
-        }
-        else {
-            $perl = $type;
-            if $flags +& DEF_ONLY {
-                $perl ~= ':D';
-            } elsif $flags +& UNDEF_ONLY {
-                $perl ~= ':U';
-            } elsif $flags +& TYPE_ONLY {
-                $perl ~= ':T';
-            }
-            $perl ~= ' ';
-        }
-        if self.name -> $name {
-            if $flags +& SLURPY_CAP {
-                $perl ~= '|' ~ $name;
-            } elsif $flags +& RWTRANS {
-                $perl ~= '\\' ~ $name;
-            } else {
-                my $default = self.default();
-                if self.named_names -> @names {
-                    my $short = $name.substr(1);
-                    $name = ':' ~ $name if $short eq any @names;
-                    for @names {
-                        next if $_ eq $short;
-                        $name = ':' ~ $_ ~ '(' ~ $name ~ ')';
-                    }
-                    $name ~= '!' unless self.optional;
-                } elsif self.optional && !$default {
-                    $name ~= '?';
-                } elsif self.slurpy {
-                    $name = '*' ~ $name;
-                }
-                $perl ~= $name;
-                if $!flags +& READWRITE {
-                    $perl ~= ' is rw';
-                } elsif $!flags +& IS_COPY {
-                    $perl ~= ' is copy';
-                }
-                $perl ~= ' = { ... }' if $default;
-                if self.sub_signature -> $sub {
-                    $perl ~= ' ' ~ $sub.perl;
-                }
-            }
-        }
-        $perl
-    }
-}
-augment class ClassHOW {
-    method name($) { Q:CgOp { (box Str (obj_typename (stab_what (unbox stable (@ {self}))))) } }
+##    method accepts_capture($cap) { Q:CgOp { (code_accepts_capture (@ {self}) (@ {$cap})) } }
 }
 
+for &die.candidates { say .signature.perl }
+for &splice.candidates { say .signature.perl }
+
+#`〈
 my sub MAIN_HELPER() {
     # Do we have a MAIN at all?
     my $m = CALLER::<&MAIN>;
@@ -244,3 +115,4 @@ my sub MAIN_HELPER() {
         exit 2;
     }
 }
+〉

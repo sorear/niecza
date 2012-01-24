@@ -1905,13 +1905,13 @@ flat_enough:;
     public static int get_count(P6any fcni) {
         if (!fcni.Isa(Kernel.CodeMO))
             return 1; // can't introspect fake subs (?)
-        return get_count(Kernel.GetInfo(fcni));
+        return sig_count(Kernel.GetInfo(fcni).sig);
     }
-    public static int get_count(SubInfo si) {
-        if (si.sig == null)
+    public static int sig_count(P6any si) {
+        if (si == null)
             return 1;
         int arity = 0;
-        foreach (Parameter p in si.sig.parms) {
+        foreach (Parameter p in ((Signature)si).parms) {
             int fl = p.flags;
             if ((fl & (Parameter.SLURPY_CAP | Parameter.SLURPY_POS |
                     Parameter.SLURPY_PCL)) != 0)
@@ -1922,11 +1922,9 @@ flat_enough:;
         return arity;
     }
 
-    public static int get_arity(SubInfo si) {
-        if (si.sig == null)
-            return 1;
+    public static int sig_arity(P6any obj) {
         int arity = 0;
-        foreach (Parameter p in si.sig.parms) {
+        foreach (Parameter p in ((Signature)obj).parms) {
             int fl = p.flags;
             if ((fl & (Parameter.SLURPY_CAP | Parameter.SLURPY_POS |
                     Parameter.SLURPY_PCL | Parameter.SLURPY_NAM |
@@ -1942,7 +1940,9 @@ flat_enough:;
         if (!fcni.Isa(Kernel.CodeMO))
             return MakeInt(1); // can't introspect fake subs (?)
         SubInfo si = (SubInfo) Kernel.GetInfo(fcni);
-        return MakeInt(get_arity(si));
+        if (si.sig == null)
+            return MakeInt(1);
+        return MakeInt(sig_arity(si.sig));
     }
 
     class ItemSource {
@@ -2716,5 +2716,61 @@ again:
 
     public static Variable blackhole(Variable o) {
         return new Blackhole(o.Fetch());
+    }
+
+    public static Variable sig_params(P6any sig) {
+        VarDeque items = new VarDeque();
+        foreach (Parameter p in ((Signature)sig).parms)
+            items.Push(Kernel.NewROScalar(p));
+        return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
+    }
+
+    public static string code_name(P6any obj) {
+        return Kernel.GetInfo(obj).name;
+    }
+
+    public static P6any code_signature(P6any obj) {
+        return Kernel.GetInfo(obj).sig ?? Kernel.AnyMO.typeObject;
+    }
+
+    public static Variable code_candidates(P6any sub) {
+        // Not foolproof
+        SubInfo si = Kernel.GetInfo(sub);
+        VarDeque items = new VarDeque();
+        if (si.param != null && si.param[0] is P6any[]) {
+            foreach (P6any cand in (P6any[])si.param[0])
+                if (cand != null)
+                    items.Push(Kernel.NewROScalar(cand));
+        } else {
+            items.Push(Kernel.NewROScalar(sub));
+        }
+        return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
+    }
+
+    public static int param_flags(P6any param) {
+        return ((Parameter)param).flags;
+    }
+
+    public static Variable param_names(P6any param) {
+        return BoxLoS(((Parameter)param).names ?? new string[0]);
+    }
+
+    public static Variable param_type(P6any param) {
+        return (((Parameter)param).type ?? Kernel.AnyMO).typeVar;
+    }
+
+    public static P6any param_subsig(P6any param) {
+        var p = param as Parameter;
+        if (p.post_constraints != null) {
+            foreach (object o in p.post_constraints) {
+                if (o is Signature)
+                    return (P6any)o;
+            }
+        }
+        return Kernel.AnyMO.typeObject;
+    }
+
+    public static string param_name(P6any param) {
+        return ((Parameter)param).name;
     }
 }

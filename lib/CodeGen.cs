@@ -2408,6 +2408,7 @@ namespace Niecza.CLRBackend {
             namtypes["num"] = Tokens.Double;
             namtypes["int"] = Tokens.Int32;
             namtypes["var"] = Tokens.Variable;
+            namtypes["stable"] = Tokens.STable;
             namtypes["obj"] = Tokens.P6any;
             namtypes["fvarlist"] = Tokens.FVarList;
             namtypes["vvarlist"] = Tokens.VVarList;
@@ -3766,7 +3767,7 @@ dynamic:
             return null;
         }
         public static object sub_arity(object[] args) {
-            return Builtins.get_arity((SubInfo)Handle.Unbox(args[1]));
+            return Builtins.sig_arity(((SubInfo)Handle.Unbox(args[1])).sig);
         }
         public static object sub_is_inlinable(object[] args) {
             return ((SubInfo)Handle.Unbox(args[1])).IsInlinable();
@@ -3775,7 +3776,7 @@ dynamic:
             return ((SubInfo)Handle.Unbox(args[1])).IsTopicalizer();
         }
         public static object sub_count(object[] args) {
-            return Builtins.get_count((SubInfo)Handle.Unbox(args[1]));
+            return Builtins.sig_count(((SubInfo)Handle.Unbox(args[1])).sig);
         }
         public static object sub_set_inlined(object[] args) {
             ((SubInfo)Handle.Unbox(args[1])).SetInlined();
