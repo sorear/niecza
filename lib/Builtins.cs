@@ -2770,8 +2770,27 @@ again:
         return Kernel.AnyMO.typeObject;
     }
 
+    public static Variable param_value_constraints(P6any param) {
+        var p = param as Parameter;
+        VarDeque items = new VarDeque();
+        if (p.post_constraints != null) {
+            foreach (object o in p.post_constraints) {
+                if (o is Variable)
+                    items.Push((Variable)o);
+            }
+        }
+        return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
+    }
+
     public static string param_name(P6any param) {
         return ((Parameter)param).name;
+    }
+
+    public static Frame code_accepts_capture(Frame th, P6any code, P6any cap) {
+        return Kernel.GetInfo(code).SetupCall(th, Kernel.GetOuter(code), code,
+            (Variable[])cap.GetSlot(Kernel.CaptureMO, "$!positionals"),
+            (VarHash)cap.GetSlot(Kernel.CaptureMO, "$!named"),
+            true, null);
     }
 
     public static System.IO.TextReader treader_stdin() {
