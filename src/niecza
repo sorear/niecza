@@ -47,7 +47,7 @@ our $Actions; $Actions = $Actions but role {
 method comp_unit($/) {
     my $ast = $<statementlist>.ast;
 
-    if $*CURLEX<!sub>.has_lexical('&MAIN') {
+    if $*CURLEX<!sub>.has_lexical('&MAIN') && $*UNITNAME eq 'MAIN' {
         $ast = $OpStatementList.new(children =>
             [ $ast, mkcall($/, '&MAIN_HELPER') ]);
     }
