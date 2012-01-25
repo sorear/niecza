@@ -204,6 +204,7 @@ S03-smartmatch/any-num.t
 S03-smartmatch/any-pair.t
 S03-smartmatch/any-str.t
 S03-smartmatch/any-sub.t
+S03-smartmatch/any-type.t
 S03-smartmatch/array-array.t
 S03-smartmatch/array-hash.t
 S03-smartmatch/disorganized.t
