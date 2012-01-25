@@ -1917,6 +1917,107 @@ my class EnumMap does Associative {
 BEGIN { $Bool::_enums ::= EnumMap.new("False" => 0, "True" => 1) }
 my enum Order (:Increase(-1), :Same(0), :Decrease(1));
 
+class Set does Associative {
+    has Bool %!elems;
+
+    method keys { %!elems.keys }
+    method values { %!elems.values }
+    method elems returns Int { %!elems.elems }
+    method exists($a) returns Bool { %!elems.exists($a) }
+    method Bool { %!elems.Bool }
+    method Numeric { %!elems.Numeric }
+    method hash { %!elems.hash }
+    method postcircumfix:<{ }> (*@k) { @k.map(-> $k { %!elems{$k} // False }) }
+
+    #constant Set term:<∅> = set();
+
+    # Constructor
+    method new(*@args --> Set) {
+        self.bless(*, :elems(%(@args X=> True)));
+    }
+
+    submethod BUILD (%!elems) { }
+
+    # Coercions to and from
+    method postcircumfix:<( )> ($s --> Set) { to-set($s) }
+    multi to-set (Set $set --> Set) { $set }
+    multi to-set (@elems --> Set) { Set.new: @elems }
+    multi to-set ([*@elems] --> Set) { Set.new: @elems }
+    multi to-set (%elems --> Set) { Set.new: %elems.keys }
+    multi to-set ($elem --> Set) { die "Cannot coerce $elem.perl() to a Set; use set($elem.perl()) to create a one-element set" }
+
+    submethod Str(Any:D $ : --> Str) { "set(< %!elems.keys() >)" }
+    submethod gist(Any:D $ : --> Str) { "set({ %!elems.keys».gist.join(', ') })" }
+    submethod perl(Any:D $ : --> Str) { 'set(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' }
+
+    method iterator() { %!elems.keys.iterator }
+    method list() { %!elems.keys }
+    method pick($arg) { %!elems.keys.pick: $arg }
+    method roll($arg) { %!elems.keys.roll: $arg }
+
+    # Set operators
+
+    # proto sub infix:<∈>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+    # multi sub infix:<∈>($a, Any $b --> Bool) { $a ∈ to-set($b) }
+    # multi sub infix:<∈>($a, Set $b --> Bool) { $b!elems{$a}:exists }
+    # multi sub infix:<(elem)>($a, $b --> Bool) { $a ∈ $b }
+    # multi sub infix:<∉>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !∈ $b }
+    #
+    # proto sub infix:<∋>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+    # multi sub infix:<∋>($a, Any $b --> Bool) { to-set($a) ∋ $b }
+    # multi sub infix:<∋>($a, Set $b --> Bool) { $a!elems{$b}:exists }
+    # multi sub infix:<(cont)>($a, $b --> Bool) { $a ∋ $b }
+    # multi sub infix:<∌>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !∋ $b }
+    #
+    # multi sub infix:<∪>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export { to-set($a) ∪ to-set($b) }
+    # multi sub infix:<∪>(Set $a, Set $b --> Set) is equiv(&infix:<X>) is export { Set.new: $a.keys, $b.keys }
+    # multi sub infix:<(|)>($a, $b --> Set) is equiv(&infix:<X>) is export { $a ∪ $b }
+    #
+    # multi sub infix:<∩>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export { to-set($a) ∩ to-set($b) }
+    # multi sub infix:<∩>(Set $a, Set $b --> Set) is equiv(&infix:<X>) is export { Set.new: $a.keys.grep: -> $k { ?$b{$k} } }
+    # multi sub infix:<(&)>($a, $b --> Set) is equiv(&infix:<X>) is export { $a ∩ $b }
+    #
+    # multi sub infix:<(-)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export { to-set($a) (-) to-set($b) }
+    # multi sub infix:<(-)>(Set $a, Set $b --> Set) is equiv(&infix:<X>) is export { Set.new: $a.keys.grep: * ∉ $b }
+    #
+    # multi sub infix:<(^)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export { to-set($a) (^) to-set($b) }
+    # multi sub infix:<(^)>(Set $a, Set $b --> Set) is equiv(&infix:<X>) is export { ($a (-) $b) ∪ ($b (-) $a) }
+    #
+    # multi sub infix:<===>(Any $a, Any $b --> Bool) is export { to-set($a) === to-set($b) }
+    # multi sub infix:<===>(Set $a, Set $b --> Bool) is export { $a == $b and so $a.keys.all ∈ $b }
+    #
+    # multi sub infix:<eqv>(Any $a, Any $b --> Bool) is export { to-set($a) eqv to-set($b) }
+    # multi sub infix:<eqv>(Set $a, Set $b --> Bool) is export { $a == $b and so $a.keys.all ∈ $b }
+    #
+    # proto sub infix:<⊆>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+    # multi sub infix:<⊆>(Any $a, Any $b --> Bool) { to-set($a) ⊆ to-set($b) }
+    # multi sub infix:<⊆>(Set $a, Set $b --> Bool) { $a <= $b and so $a.keys.all ∈ $b }
+    # multi sub infix:['(<=)']($a, $b --> Bool) is equiv(&infix:<==>) is export { $a ⊆ $b }
+    # multi sub infix:<⊈>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !⊆ $b }
+    #
+    # proto sub infix:<⊂>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+    # multi sub infix:<⊂>(Any $a, Any $b --> Bool) { to-set($a) ⊂ to-set($b) }
+    # multi sub infix:<⊂>(Set $a, Set $b --> Bool) { $a < $b and so $a.keys.all ∈ $b }
+    # multi sub infix:['(<)']($a, $b --> Bool) is equiv(&infix:<==>) is export { $a ⊂ $b }
+    # multi sub infix:<⊄>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !⊂ $b }
+    #
+    # proto sub infix:<⊇>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+    # multi sub infix:<⊇>(Any $a, Any $b --> Bool) { to-set($a) ⊇ to-set($b) }
+    # multi sub infix:<⊇>(Set $a, Set $b --> Bool) { $a >= $b and so $b.keys.all ∈ $a }
+    # multi sub infix:['(>=)']($a, $b --> Bool) is equiv(&infix:<==>) is export { $a ⊇ $b }
+    # multi sub infix:<⊉>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !⊇ $b }
+    #
+    # proto sub infix:<⊃>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
+    # multi sub infix:<⊃>(Any $a, Any $b --> Bool) { to-set($a) ⊃ to-set($b) }
+    # multi sub infix:<⊃>(Set $a, Set $b --> Bool) { $a > $b and so $b.keys.all ∈ $a }
+    # multi sub infix:['(>)']($a, $b --> Bool) is equiv(&infix:<==>) is export { $a ⊃ $b }
+    # multi sub infix:<⊅>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !⊃ $b }
+}
+
+sub set(*@args --> Set) is export {
+    Set.new(@args);
+}
+
 my class Junction is Mu {
     has $!kind_;
     has $!eigenstates_;
