@@ -7,7 +7,7 @@
 
 # note: rather heavily modified -sorear
 
-our ($Sig, $SigParameter);
+our ($Sig, $SigParameter, $Actions);
 grammar STD:ver<6.0.0.alpha>:auth<cpan:SOREAR>;
 
 sub mnode($M) {
@@ -1750,7 +1750,7 @@ grammar P6 is STD {
     token declarator {
         :my $*LEFTSIGIL = '';
         [
-        | '\\' <identifier> <.ws>
+        | '\\' <identifier> <.ws> { $Actions.install_parcel($/) }
             [ <initializer> || <.sorry("Term definition requires an initializer")> ]
         | <variable_declarator> <initializer>?
             [ <?before <.ws>','<.ws> { @*MEMOS[$¢.pos]<declend> = $*SCOPE; }> ]?
@@ -2748,6 +2748,7 @@ grammar P6 is STD {
 
         <trait>*
 
+        { $Actions.install_constant($/) }
         [
         || <initializer>
         || <.sorry: "Missing initializer on constant declaration">

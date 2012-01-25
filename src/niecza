@@ -31,7 +31,7 @@ our ($Op, $OpAttribute, $OpBareBlock, $OpBuiltin, $OpCallLike, $OpCallMethod,
      $OpParen, $OpRegexBody, $OpRequire, $OpShortCircuit, $OpSimplePair,
      $OpSimpleParcel, $OpStart, $OpStateDecl, $OpStatementList,
      $OpStringLiteral, $OpTemporize, $OpTry, $OpWhatever, $OpWhateverCode,
-     $OpWhen, $OpWhileLoop, $OpYada, $OpYouAreHere); #OK
+     $OpWhen, $OpWhileLoop, $OpYada, $OpYouAreHere, $OpLexicalBind); #OK
 our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
      $RxOpCutBrack, $RxOpCutRule, $RxOpConfineLang, $RxOpCapturing,
      $RxOpCClassElem, $RxOpCheckBlock, $RxOpEndpoint, $RxOpListPrim,
@@ -44,9 +44,15 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
 our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
+method install_parcel($/) {
+    $/.CURSOR.trymop({
+        $*CURLEX<!sub>.add_my_name(~$<identifier>, |mnode($/));
+    });
+}
 method declarator($/) {
     if $<identifier> {
-        $/.CURSOR.sorry('bare identifier forms NYI');
+        make ~$<identifier>;
+        self.do_initialize($/, True);
         return;
     }
     if $<signature> {
@@ -89,13 +95,15 @@ method declarator($/) {
     self.do_initialize($/);
 }
 method type_declarator:constant ($/) {
+    self.do_initialize($/);
+}
+method install_constant ($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
     my $name  = ~($<identifier> // $<variable> // self.gensym);
 
     make self.make_constant($/, $*SCOPE, $name);
-    self.do_initialize($/);
 }
 method named_param($/) {
     my %rt;
@@ -212,11 +220,19 @@ method parameter($/) {
 }
 
 method initializer($/) { }
-method do_initialize($/) {
+method do_initialize($/, $parcel?) {
     my $i = $<initializer> or return;
     my $fn = $i<infix>.ast;
     my $lhs = $/.ast;
     my $rhs = ($i<EXPR> // $i<dottyopish>).ast;
+
+    if $parcel {
+        if $i<infix> ne '=' {
+            $/.CURSOR.sorry('Parcel variables may only be set using = for now');
+        }
+        make $OpLexicalBind.new(name => $lhs, :$rhs);
+        return;
+    }
 
     make $fn.with_args($/, $lhs, $rhs);
 
