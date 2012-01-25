@@ -3292,6 +3292,7 @@ grammar P6 is STD {
         {} <infixish('HYPER')> [ '<<' | '>>' || <.panic("Missing << or >>")> ]
         <.can_meta($<infixish>, "hyper with")>
         $<O> = {$<infixish><O>}
+        $<sym> = {$<infixish><sym>}
     }
 
     token assign_meta_operator ($op) {
