@@ -44,6 +44,211 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
 our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
+method declarator($/) {
+    if $<identifier> {
+        $/.CURSOR.sorry('bare identifier forms NYI');
+        return;
+    }
+    if $<signature> {
+        temp $*SCOPE ||= 'my';
+        my $sub = $*CURLEX<!sub>;
+
+        my @p = @( $<signature>.ast.params );
+        # TODO: keep the original signature around somewhere := can find it
+        # TODO: fanciness checks
+        for @p -> \$param {
+            my $slot = $param.slot;
+            $sub.delete_lex($slot) if defined($slot);
+            $slot //= self.gensym;
+            $slot = self.gensym if $*SCOPE eq 'anon';
+            my $list = ?($param.flags +& $Sig::IS_LIST);
+            my $hash = ?($param.flags +& $Sig::IS_HASH);
+            my $type = $param.tclass;
+
+            if $*SCOPE eq 'state' {
+                $sub.add_state_name($slot, self.gensym, :$list, :$hash,
+                    typeconstraint => $type, |mnode($/));
+                $param = $OpLexical.new(name => $slot, pos=>$/);
+            } elsif $*SCOPE eq 'our' {
+                $param = self.package_var($/, $slot, $slot, ['OUR']);
+            } else {
+                $sub.add_my_name($slot, :$list, :$hash,
+                    typeconstraint => $type, |mnode($/));
+                $param = $OpLexical.new(name => $slot, pos=>$/);
+            }
+        }
+        make $OpSimpleParcel.new(pos=>$/, items => @p);
+        make $OpStateDecl.new(pos=>$/, inside => $/.ast)
+            if $*SCOPE eq 'state';
+    } else {
+        make $<variable_declarator> ?? $<variable_declarator>.ast !!
+             $<routine_declarator>  ?? $<routine_declarator>.ast !!
+             $<regex_declarator>    ?? $<regex_declarator>.ast !!
+             $<type_declarator>.ast;
+    }
+    self.do_initialize($/);
+}
+method type_declarator:constant ($/) {
+    if $*MULTINESS {
+        $/.CURSOR.sorry("Multi variables NYI");
+    }
+    my $name  = ~($<identifier> // $<variable> // self.gensym);
+
+    make self.make_constant($/, $*SCOPE, $name);
+    self.do_initialize($/);
+}
+method named_param($/) {
+    my %rt;
+    if $<varname> {
+        $/.CURSOR.sorry("bare identifier forms NYI");
+        return;
+    }
+    if $<name> {
+        if $<named_param> {
+            %rt = %( $<named_param>.ast );
+        } else {
+            %rt = %( $<param_var>.ast );
+            %rt<names> = []; # completely replace
+        }
+        %rt<names> = [ @( %rt<names> // [] ), ~$<name> ]
+            unless %rt<names> && %rt<names>.grep(~$<name>);
+    } else {
+        %rt = %( $<param_var>.ast );
+        if !%rt<names> {
+            $/.CURSOR.sorry("Abbreviated named parameter must have a name");
+        }
+    }
+    %rt<flags> +&= +^$Sig::POSITIONAL;
+    make %rt;
+}
+# now that initializer has been split out this can be a lot smaller...
+method INFIX($/) {
+    my $fn = $<infix>.ast;
+    my ($st,$lhs,$rhs) = self.whatever_precheck($fn, $<left>.ast, $<right>.ast);
+
+    make $fn.with_args($/, $lhs, $rhs);
+    make self.whatever_postcheck($/, $st, $/.ast);
+}
+method parameter($/) {
+    my $sorry;
+    my $p = $<param_var> // $<named_param>;
+    my $p_ast = $p ?? $p.ast !! { names => [], flags => $Sig::POSITIONAL };
+    my $flags = $p_ast<flags>;
+
+    $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
+
+    for @( $<trait> ) -> $trait {
+        if $trait.ast<rw> { $flags +|= $Sig::READWRITE }
+        elsif $trait.ast<copy> { $flags +|= $Sig::IS_COPY }
+        elsif $trait.ast<parcel> { $flags +|= $Sig::RWTRANS }
+        elsif $trait.ast<readonly> { $flags +&= +^$Sig::READWRITE }
+        else {
+            $trait.CURSOR.sorry('Unhandled trait ' ~ $trait.ast.keys.[0]);
+        }
+    }
+
+    my $default = $<default_value> ?? $<default_value>.ast !! Any;
+    $default.set_name("$/ init") if $default && $default.kind eq 'sub';
+
+    my $tag = $<quant> ~ ':' ~ $<kind>;
+    if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
+    elsif $tag eq '*:*'  { $flags +|= ($flags +& $Sig::IS_HASH) ?? $Sig::SLURPY_NAM !! $Sig::SLURPY_POS }
+    elsif $tag eq '|:!'  { $flags +|= $Sig::SLURPY_CAP }
+    elsif $tag eq '\\:!' { $flags +|= $Sig::RWTRANS }
+    elsif $tag eq '\\:?' { $flags +|= ($Sig::RWTRANS + $Sig::OPTIONAL) }
+    elsif $tag eq ':!'   { }
+    elsif $tag eq ':*'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '?:*'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq ':?'   { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '?:?'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '!:!'  { }
+    elsif $tag eq '!:?'  { $flags +|= $Sig::OPTIONAL }
+    elsif $tag eq '!:*'  { }
+    else                 { $sorry = "Confusing parameters ($tag)" }
+    if $sorry { $/.CURSOR.sorry($sorry); }
+
+    if defined $p_ast<slot> {
+        # TODO: type constraint here
+    }
+
+    make $SigParameter.new(mdefault => $default, name => ($p_ast<slot> // ""),
+        |$p_ast, :$flags);
+
+    for @<type_constraint> -> $tc {
+        if $tc.ast<where> {
+            # Should we detect $foo where 5 here?
+            push ($/.ast.where //= []), self.thunk_sub($tc.ast<where>.ast);
+        } elsif $tc.ast<value> {
+            $/.ast.tclass = $tc.ast<value>.get_type;
+            push ($/.ast.where //= []), $tc.ast<value>;
+        } else {
+            $/.CURSOR.sorry("Parameter coercion NYI") if $tc.ast<as>;
+            my $type = $tc.ast<type>;
+            if $type.kind eq 'subset' {
+                push ($/.ast.where //= []), self.thunk_sub(
+                    $OpGeneralConst.new(value => $type.get_type_var));
+                $type = $type.get_basetype while $type.kind eq 'subset';
+            }
+            $/.ast.tclass = $type;
+            $/.ast.flags +|= $tc.ast<tmode>;
+        }
+    }
+
+    for @<post_constraint> -> $pc {
+        # XXX this doesn't seem to be specced anywhere, but it's
+        # Rakudo-compatible and shouldn't hurt
+        if $pc<bracket> {
+            $/.ast.flags +&= +^$Sig::IS_HASH;
+            $/.ast.flags +|= $Sig::IS_LIST;
+        }
+
+        if $pc<signature> -> $ssig {
+            $ssig.CURSOR.sorry('Cannot have more than one sub-signature for a pparameter') if $/.ast.subsig;
+            $/.ast.subsig = $pc<signature>.ast;
+        } else {
+            push ($/.ast.where //= []), self.thunk_sub($pc<EXPR>.ast);
+        }
+    }
+}
+
+method initializer($/) { }
+method do_initialize($/) {
+    my $i = $<initializer> or return;
+    my $fn = $i<infix>.ast;
+    my $lhs = $/.ast;
+    my $rhs = ($i<EXPR> // $i<dottyopish>).ast;
+
+    make $fn.with_args($/, $lhs, $rhs);
+
+    # Assignments to has and state declarators are rewritten into
+    # an appropriate phaser
+    if $lhs.^isa($OpStateDecl) {
+        my $cv = self.gensym;
+        $*CURLEX<!sub>.add_state_name(Str, $cv);
+        make mklet($lhs, -> $ll {
+            $OpStatementList.new(pos=>$/, children => [
+                $OpStart.new(condvar => $cv, body =>
+                    $fn.with_args($/, $ll, $rhs)),
+                $ll]) });
+    }
+    elsif $lhs.^isa($OpAttribute) {
+        my $init = self.thunk_sub($rhs,
+            :name($lhs.initializer.name ~ " init"));
+        $init.set_outervar(my $ov = self.gensym);
+        $*CURLEX<!sub>.add_my_sub($ov, $init);
+        $lhs.initializer.add_initializer($lhs.name, $init);
+        make $OpStatementList.new;
+    }
+    elsif $lhs.^isa($OpConstantDecl) && !$lhs.init {
+        my $sig = substr($lhs.name, 0, 1);
+        if defined '$@&%'.index($sig) {
+            self.init_constant($lhs, self.docontext($/, $sig, $rhs));
+        } else {
+            self.init_constant($lhs, $rhs);
+        }
+        make $lhs;
+    }
+}
 method comp_unit($/) {
     my $ast = $<statementlist>.ast;
 
