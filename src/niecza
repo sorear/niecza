@@ -108,6 +108,12 @@ method install_constant ($/) {
 method named_param($/) {
     my %rt;
     if $<varname> {
+        # XXX funky syntax
+        my $id = ~$<varname>;
+        $/.CURSOR.trymop({
+            $*CURLEX<!sub>.add_my_name($id, |mnode($/));
+        });
+        make { slot => $id, names => [ $id ], flags => $Sig::RWTRANS };
         $/.CURSOR.sorry("bare identifier forms NYI");
         return;
     }
@@ -140,8 +146,15 @@ method INFIX($/) {
 method parameter($/) {
     my $sorry;
     my $p = $<param_var> // $<named_param>;
-    my $p_ast = $p ?? $p.ast !! { names => [], flags => $Sig::POSITIONAL };
+    my $p_ast = $p ?? $p.ast !! $<identifier> ??
+        { names => [], flags => $Sig::POSITIONAL + $Sig::RWTRANS, slot => ~$<identifier> } !!
+        { names => [], flags => $Sig::POSITIONAL };
     my $flags = $p_ast<flags>;
+    if $<identifier> {
+        $/.CURSOR.trymop({
+            $*CURLEX<!sub>.add_my_name($p_ast<slot>, |mnode($/));
+        });
+    }
 
     $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
 

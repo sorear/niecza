@@ -90,8 +90,8 @@ sub any  (*@p) is pure { any @p }
 sub infix:<< == >>($l,$r) is pure is Niecza::builtin('numeq',2,2)
     is Niecza::absprec<m= chain> is diffy is iffy { $l == $r }
 # Needs special handling of junctions
-sub infix:<< != >>(\$l,\$r) is pure is Niecza::builtin('numne',2,2)
-    is equiv<==> { $l != $r }
+sub infix:<< != >>(\l,\r) is pure is Niecza::builtin('numne',2,2)
+    is equiv<==> { l != r }
 sub infix:<< < >>($l,$r)  is pure is Niecza::builtin('numlt',2,2)
     is equiv<==> { $l <  $r }
 sub infix:<< > >>($l,$r)  is pure is Niecza::builtin('numgt',2,2)
@@ -112,25 +112,25 @@ sub infix:<lt>($s1, $s2) is Niecza::builtin('strlt',2,2)
 sub infix:<eq>($s1, $s2) is Niecza::builtin('streq',2,2)
     is equiv<==> is pure { $s1 eq $s2 }
 # Needs special handling of junctions
-sub infix:<ne>(\$s1, \$s2) is Niecza::builtin('strne',2,2)
-    is equiv<==> is pure { $s1 ne $s2 }
+sub infix:<ne>(\s1, \s2) is Niecza::builtin('strne',2,2)
+    is equiv<==> is pure { s1 ne s2 }
 
 sub infix:<,> is Niecza::builtin('comma',0) is pure is Niecza::absprec<g= list> (\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
-sub infix:<=>(\$a, \$b) is Niecza::absprec<i= right> is Niecza::builtin('assign',2,2) { $a = $b }
+sub infix:<=>(\a, \b) is Niecza::absprec<i= right> is Niecza::builtin('assign',2,2) { a = b }
 
 sub chars($str) is pure is Niecza::builtin('chars',1,1) { chars($str) }
 sub codes($str) is pure is Niecza::builtin('codes',1,1) { codes($str) }
 
-sub defined(\$x) is pure is Niecza::builtin('defined',1,1) { defined($x) }
+sub defined(\x) is pure is Niecza::builtin('defined',1,1) { defined(x) }
 
-sub prefix:<~>(\$v) is pure is Niecza::builtin('asstr', 1, 1) { ~$v }
-sub prefix:<?>(\$v) is pure is Niecza::builtin('asbool', 1, 1) { ?$v }
-sub prefix:<->(\$v) is pure is Niecza::builtin('negate', 1, 1) { -$v }
-sub prefix:<+>(\$v) is pure is Niecza::builtin('num', 1, 1) { +$v }
-sub prefix:<!>(\$v) is pure is Niecza::builtin('not', 1, 1) { !$v }
+sub prefix:<~>(\v) is pure is Niecza::builtin('asstr', 1, 1) { ~v }
+sub prefix:<?>(\v) is pure is Niecza::builtin('asbool', 1, 1) { ?v }
+sub prefix:<->(\v) is pure is Niecza::builtin('negate', 1, 1) { -v }
+sub prefix:<+>(\v) is pure is Niecza::builtin('num', 1, 1) { +v }
+sub prefix:<!>(\v) is pure is Niecza::builtin('not', 1, 1) { !v }
 
-sub not(\$v) is pure is Niecza::builtin('not', 1, 1)    { not($v) }
-sub so(\$v)  is pure is Niecza::builtin('asbool', 1, 1) { so $v }
+sub not(\v) is pure is Niecza::builtin('not', 1, 1)    { not(v) }
+sub so(\v)  is pure is Niecza::builtin('asbool', 1, 1) { so v }
 
 sub infix:<+&> is pure is Niecza::builtin('numand',2,2) is equiv<*> ($x, $y) { $x +& $y }
 sub infix:<+|>($x, $y) is pure is Niecza::builtin('numor',2,2) { $x +| $y }
@@ -144,12 +144,12 @@ sub prefix:<< +^ >>($x) is Niecza::builtin('numcompl',1,1) is pure { +^$x }
 sub infix:<< => >>($k, Mu $v) is equiv<=> is pure
     is Niecza::builtin('pair', 2, 2) { $k => $v }
 
-sub postcircumfix:<[ ]>(\$container, \$index, *%adverbs) {
-    $container.postcircumfix:<[ ]>($index, |%adverbs)
+sub postcircumfix:<[ ]>(\container, \index, *%adverbs) {
+    container.postcircumfix:<[ ]>(index, |%adverbs)
 }
 
-sub postcircumfix:<{ }>(\$container, \$index, *%adverbs) {
-    $container.postcircumfix:<{ }>($index, |%adverbs)
+sub postcircumfix:<{ }>(\container, \index, *%adverbs) {
+    container.postcircumfix:<{ }>(index, |%adverbs)
 }
 
 sub push(@array, *@stuff) is Niecza::builtin('push', 1) { @array.push(@stuff) }
@@ -164,8 +164,8 @@ multi sub splice(@array is rw, $offset, $size, *@values) { @array.splice($offset
 sub grep(Mu $filter, *@items) is Niecza::builtin('grep',1) { grep($filter, @items) }
 sub map($callback, *@items) is Niecza::builtin('map',1) { map($callback, @items) }
 
-sub _array_constructor(\$parcel) is Niecza::builtin('array_constructor', 1,
-    1) { _array_constructor($parcel) }
+sub _array_constructor(\parcel) is Niecza::builtin('array_constructor', 1,
+    1) { _array_constructor(parcel) }
 
 sub make($x) is Niecza::builtin('make', 1, 1) { make $x }
 
@@ -174,13 +174,13 @@ sub prefix:<-->  is Niecza::absprec<x= unary non> is Niecza::builtin('predec',1,
 sub prefix:<++>  is equiv<--> is Niecza::builtin('preinc',1,1) ($v is rw) { $v = $v.succ; $v }
 sub postfix:<--> is Niecza::absprec<x= unary non> is Niecza::builtin('postdec',1,1) ($v is rw) { my $old = $v; $v = $v.pred; $old }
 sub postfix:<++> is equiv<--> is Niecza::builtin('postinc',1,1) ($v is rw) { my $old = $v; $v = $v.succ; $old }
-sub substr(\$str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) is pure {
-    $start := $start(chars $str) if $start.^does(Code);
-    $len := $len.^does(Code) ?? ($len(chars $str) - $start) !!
-        $len // (chars($str) - $start);
+sub substr(\str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) is pure {
+    $start := $start(chars str) if $start.^does(Code);
+    $len := $len.^does(Code) ?? ($len(chars str) - $start) !!
+        $len // (chars(str) - $start);
     defined($repl) ??
-        substr($str, $start, $len) = $repl !!
-        substr($str, $start, $len)
+        substr(str, $start, $len) = $repl !!
+        substr(str, $start, $len)
 }
 
 # not actually inlined but needed for constant i
@@ -195,8 +195,8 @@ my constant True  = 1.Bool;
 my constant False = 0.Bool;
 my class Mu {
     method head() { @(self).head }
-    method flattens(\$self:) {
-        Q:CgOp { (box Bool (var_islist {$self})) }
+    method flattens(\this:) {
+        Q:CgOp { (box Bool (var_islist {this})) }
     }
     method typename() {  # should be ^name
         Q:CgOp { (box Str (obj_typename (@ {self}))) }
@@ -215,7 +215,7 @@ my class Mu {
     method succ() { defined(self) ?? die("cannot increment a value of type {self.typename()}") !! 1 }
     method pred() { defined(self) ?? die("cannot decrement a value of type {self.typename()}") !! -1 }
     method notdef() { !defined(self) }
-    method ACCEPTS(\$x) { defined(self) ?? self === $x !! $x.^does(self) }
+    method ACCEPTS(\x) { defined(self) ?? self === x !! x.^does(self) }
     method perl() { defined(self) ?? "{self.typename}.new(...)" !! self.typename }
     method so() { ?self }
     method not() { !self }
@@ -223,13 +223,13 @@ my class Mu {
     method CREATE() { Q:CgOp { (ns (obj_newblank (obj_llhow (@ {self})))) } }
     method new(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
     method clone(*%_) { Q:CgOp { (ns (repr_clone (@ {self}) (unbox varhash (@ {%_})))) } }
-    method dispatch:<::>(|$) { Q:CgOp { (dispatch_fromtype) } }
+    method dispatch:<::>(|) { Q:CgOp { (dispatch_fromtype) } }
     method immutable() { !defined(self) }
 }
 
 my class Any is Mu {
-    method isa(\$other) { self.^isa($other) }
-    method does(\$other) { self.^does($other) }
+    method isa(\other) { self.^isa(other) }
+    method does(\other) { self.^does(other) }
     method can($method) { self.^can($method) }
     method flat() { @(self) }
     method Numeric() {
@@ -254,10 +254,10 @@ my class Any is Mu {
 
     method kv() {
         my $i = 0;
-        gather for @(self) -> \$value {
+        gather for @(self) -> \value {
             my $key = $i++;
             take $key;
-            take $value;
+            take value;
         }
     }
 
@@ -270,13 +270,13 @@ my class Any is Mu {
     }
 
     method values() {
-        gather for @(self) -> \$value {
-            take $value;
+        gather for @(self) -> \value {
+            take value;
         }
     }
 
     method pairs() {
-        self.kv.map(-> $key, \$value { $key => $value; });
+        self.kv.map(-> $key, \value { $key => value; });
     }
 
     # NOTE: These functions are called by the default postcircumfixes, *after*
@@ -293,12 +293,12 @@ my class Any is Mu {
     method at_key($) {
         die "Cannot use hash access on an object of type {self.WHAT.perl}"
     }
-    method bind_key($, \$) {
+    method bind_key($, $) {
         die "Cannot use hash access on an object of type {self.WHAT.perl}"
     }
 
     method at_pos($key) { self.list.at_pos($key) }
-    method bind_pos($, \$) {
+    method bind_pos($, $) {
         die "Cannot use hash access on an object of type {self.WHAT.perl}"
     }
 
@@ -378,10 +378,10 @@ my class Any is Mu {
 }
 
 sub Niecza::autopun($pun, $name) {
-    -> |$ { Q:CgOp { (rnull (pun_helper {$pun} {$name} (callframe))) }; nextsame }
+    -> | { Q:CgOp { (rnull (pun_helper {$pun} {$name} (callframe))) }; nextsame }
 }
 
-sub IMMUTABLE(\$x) { Q:CgOp { (ternary (var_is_rw {$x}) {False} {$x.immutable}) } }
+sub IMMUTABLE(\x) { Q:CgOp { (ternary (var_is_rw {x}) {False} {x.immutable}) } }
 
 my class Cool {
     method FatRat () { Niecza::NumSyntax.str2num(~self, :fatrat) }
@@ -481,7 +481,7 @@ my class Cool {
         Q:CgOp { (rnull (set_status (s $/) {Match})) };
         Match;
     }
-    method subst(\$: $matcher_, $replacement, :g(:$global), :$x,
+    method subst(\$: $matcher_, $replacement, :g(:$global), :$x, #OK
             :c(:$continue), :th(:st(:nd(:rd(:$nth)))), :p(:$pos), :$inplace) {
         die ":pos may not be used with :continue" if
             defined($pos) && defined($continue);
@@ -616,13 +616,13 @@ my class Cool {
         $self = substr($str, 0, chars($str)-1);
         $end;
     }
-    method substr(\$str: $start, $len?, $repl?) {
-        $start := $start(chars $str) if $start.^does(Code);
-        $len := $len.^does(Code) ?? ($len(chars $str) - $start) !!
-            $len // (chars($str) - $start);
+    method substr(\str: $start, $len?, $repl?) {
+        $start := $start(chars str) if $start.^does(Code);
+        $len := $len.^does(Code) ?? ($len(chars str) - $start) !!
+            $len // (chars(str) - $start);
         defined($repl) ??
-            substr($str, $start, $len) = $repl !!
-            substr($str, $start, $len)
+            substr(str, $start, $len) = $repl !!
+            substr(str, $start, $len)
     }
     method lc()   { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
     method uc()   { Q:CgOp { (box Str (str_toupper (obj_getstr {self}))) }}
@@ -655,7 +655,7 @@ my class Nil is Cool {
     method Str() { '' }
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
-    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
+    method postcircumfix:<[ ]>(\key) { @(self).[key] }
     method at_pos($key) { @(self).[$key] }
     method Capture () { ().Capture }
     method elems  () { 0 }
@@ -704,9 +704,9 @@ my class Capture does Positional does Associative {
 # }}}
 # Scalar types {{{
 my role Numeric is Cool {
-    method ACCEPTS(\$t) {
-        defined(self) ?? (self == self ?? self == $t !! $t != $t)
-            !! $t.^does(self)
+    method ACCEPTS(\t) {
+        defined(self) ?? (self == self ?? self == t !! t != t)
+            !! t.^does(self)
     }
 }
 my role Real does Numeric {
@@ -811,7 +811,7 @@ my class FatRat does Real {
 my class Str is Cool {
     method new() { "" }
     method immutable() { True }
-    method ACCEPTS(\$t) { defined(self) ?? self eq $t !! $t.^does(self) }
+    method ACCEPTS(\t) { defined(self) ?? self eq t !! t.^does(self) }
     method chars() { chars(self) }
     method IO() { IO.new(path => self) }
     method say() { $PROCESS::OUTPUT_USED := 1; Q:CgOp {
@@ -921,18 +921,18 @@ my class Code does Callable {
     method accepts_capture($cap) { Q:CgOp { (code_accepts_capture (@ {self}) (@ {$cap})) } }
     method candidates(Code:D:) { Q:CgOp { (code_candidates (@ {self})) } }
     method signature(Code:D:)  { Q:CgOp { (ns (code_signature (@ {self}))) } }
-    method candidates_matching(|$cap) { grep *.accepts_capture($cap), self.candidates }
+    method candidates_matching(|cap) { grep *.accepts_capture(cap), self.candidates }
     method name(Code:D:) { Q:CgOp { (box Str (code_name (@ {self}))) } }
 }
 
 my class Block is Code {
-    method ACCEPTS(\$t) { defined(self) ?? (self)($t) !! $t.^does(self) }
+    method ACCEPTS(\t) { defined(self) ?? (self)(t) !! t.^does(self) }
     method count() { Q:CgOp { (count (@ {self})) } }
     method arity() { Q:CgOp { (arity (@ {self})) } }
 }
 
 my class Routine is Block {
-    method assuming(|$cap) { sub (|$_) { self.(|$cap, |$_) } }
+    method assuming(|cap) { sub (|new) { self.(|cap, |new) } }
     # wrap, unwrap, cando NYI
     method perl() {
         self // nextsame;
@@ -1072,12 +1072,12 @@ my class Signature {
 
 my class ClassHOW {
     method name($) { Q:CgOp { (box Str (obj_typename (stab_what (unbox stable (@ {self}))))) } }
-    method isa(\$obj, \$type) { Q:CgOp {
-        (box Bool (obj_isa (@ {$obj}) (obj_llhow (@ {$type}))))
+    method isa(\obj, \type) { Q:CgOp {
+        (box Bool (obj_isa (@ {obj}) (obj_llhow (@ {type}))))
     } }
-    method does(\$obj, \$role) { self.isa($obj, $role) }
-    method can(\$obj, $name) { Q:CgOp {
-        (box Bool (obj_can (@ {$obj}) (obj_getstr {$name})))
+    method does(\obj, \role) { self.isa(obj, role) }
+    method can(\obj, $name) { Q:CgOp {
+        (box Bool (obj_can (@ {obj}) (obj_getstr {$name})))
     } }
 }
 
@@ -1144,7 +1144,7 @@ my class Bool is Int does IntBasedEnum {
     method enums() { $_enums }
     our constant True = Q:CgOp { (box Bool (bool 1)) };
     our constant False = Q:CgOp { (box Bool (bool 0)) };
-    method ACCEPTS(\$t) { defined(self) ?? self !! $t.^does(self) }
+    method ACCEPTS(\t) { defined(self) ?? self !! t.^does(self) }
 }
 # }}}
 # Fundamental scalar operators {{{
@@ -1174,9 +1174,9 @@ our sub Niecza::gistcat(\|@items) {
     }
     @tok.join;
 }
-sub say(|$c) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (say     (obj_getstr {Niecza::gistcat(|$c)}))) }; True }
+sub say(|c) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (say     (obj_getstr {Niecza::gistcat(|c)}))) }; True }
 sub print(*@items) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (print (obj_getstr {@items.join("")}))) }; True }
-sub note(|$c) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (note   (obj_getstr {Niecza::gistcat(|$c)}))) }; True }
+sub note(|c) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (note   (obj_getstr {Niecza::gistcat(|c)}))) }; True }
 
 sub sprintf(\|$args) { Q:CgOp { (sprintf (unbox fvarlist (@ {$args}))) } }
 sub printf(Cool $format, *@args) { print sprintf $format, @args };
@@ -1193,7 +1193,7 @@ sub split($matcher,$str,$limit?,:$all) { (~$str).split($matcher,$limit,:$all) }
 sub item(Mu $x) { $x }
 sub list(*@x) { @x.list }
 
-sub prefix:<not> is pure is Niecza::absprec<h= unary left> (\$x) { not($x) }
+sub prefix:<not> is pure is Niecza::absprec<h= unary left> (\x) { not(x) }
 
 sub infix:<x> is pure is Niecza::absprec<s=> ($str, $ct) {
     my $i = +$ct;
@@ -1227,15 +1227,15 @@ sub trim($string) is pure { $string.trim };
 sub infix:<===>($l,$r) is equiv<==> { Q:CgOp {
     (box Bool (compare == (@ {$l}) (@ {$r})))
 } }
-sub infix:<=:=>(\$l,\$r) is equiv<==> { Q:CgOp {
-    (box Bool (compare == {$l} {$r}))
+sub infix:<=:=>(\l,\r) is equiv<==> { Q:CgOp {
+    (box Bool (compare == {l} {r}))
 } }
 
 sub _param_role_inst(\|$t) {
     Q:CgOp { (instrole (unbox fvarlist (@ {$t}))) }
 }
 
-sub infix:<does>($obj, \$roles, :$clone, :$value) is rw {
+sub infix:<does>($obj, \roles, :$clone, :$value) is rw {
     die "Cannot use 'does' operator with a type object"
         if !$clone && !$obj.defined;
     die "Cannot use 'does' operator with an immutable object"
@@ -1243,7 +1243,7 @@ sub infix:<does>($obj, \$roles, :$clone, :$value) is rw {
     $obj := $obj.clone if $clone && defined($obj);
 
     my Mu $newtype;
-    my @roles = $roles;
+    my @roles = roles;
     for @roles <-> $val {
         my $oval = $val;
         if defined($val) {
@@ -1259,8 +1259,8 @@ sub infix:<does>($obj, \$roles, :$clone, :$value) is rw {
     Q:CgOp { (mixin (@ {$obj}) {@roles} {$value} {$newtype}) }
 }
 
-sub infix:<but>($obj, \$roles, :$value) is rw {
-    infix:<does>($obj, $roles, :clone, :$value)
+sub infix:<but>($obj, \roles, :$value) is rw {
+    infix:<does>($obj, roles, :clone, :$value)
 }
 
 sub infix:<~~>($t,$m) is equiv<==> { $m.ACCEPTS($t) }
@@ -1314,7 +1314,7 @@ my class Label {
 }
 
 # XXX multi dispatch
-sub _lexotic ($id, $x, \$val) {
+sub _lexotic ($id, $x, \val) {
     Q:CgOp {
         (letn fr (null frame)
               nm (null str)
@@ -1325,7 +1325,7 @@ sub _lexotic ($id, $x, \$val) {
             (ternary (obj_isa (l id) (class_ref mo Str))
               (l nm (obj_getstr {$x}))
               (prog)))
-          (control (cast int (obj_getnum {$id})) (l fr) (int -1) (l nm) {$val}))
+          (control (cast int (obj_getnum {$id})) (l fr) (int -1) (l nm) {val}))
     }
 }
 sub goto ($x)  { _lexotic(8, $x, ()) }
@@ -1333,20 +1333,20 @@ sub goto ($x)  { _lexotic(8, $x, ()) }
 sub nextsame() {
     Q:CgOp { (control 9 (null frame) (int -1) (null str) (null obj)) }
 }
-sub nextwith(|$cap) {
-    Q:CgOp { (control 9 (null frame) (int -1) (null str) (@ {$cap})) }
+sub nextwith(|cap) {
+    Q:CgOp { (control 9 (null frame) (int -1) (null str) (@ {cap})) }
 }
 
 sub callsame () { Q:CgOp { (callnext (null obj)) } }
-sub callwith (|$cap) { Q:CgOp { (callnext (@ {$cap})) } }
+sub callwith (|cap) { Q:CgOp { (callnext (@ {cap})) } }
 
 sub assignop($fn) {
-    anon sub _assign(\$lhs, \$rhs) {
-        $lhs = $fn($lhs, $rhs)
+    anon sub _assign(\lhs, \rhs) {
+        lhs = $fn(lhs, rhs)
     }
 }
 
-sub notop(&fn) { -> \$x, \$y { !(fn($x,$y)) } }
+sub notop(&fn) { -> \x, \y { !(fn(x,y)) } }
 
 # }}}
 # Aggregate types {{{
@@ -1357,8 +1357,8 @@ sub notop(&fn) { -> \$x, \$y { !(fn($x,$y)) } }
 # coercion makes the elements of a List read-only and maybe fetches them too.
 # Array: mutable list of read-write scalar boxes
 
-sub unitem(\$a) { Q:CgOp { (newrwlistvar (@ {$a})) } }
-sub head(\$x) { for $x -> \$elt { return $elt }; Any }
+sub unitem(\a) { Q:CgOp { (newrwlistvar (@ {a})) } }
+sub head(\x) { for x -> \elt { return elt }; Any }
 
 my class Iterator {
     method list () {
@@ -1383,17 +1383,17 @@ my class IterCursor {
 }
 
 sub flat(*@x) { @x }
-sub hash(|$cap) {
-    (%$cap || $cap.Parcel.raw_elems != 1) ??
-        %( @$cap, %$cap ) !! %( $$cap )
+sub hash(|cap) {
+    (%(cap) || cap.Parcel.raw_elems != 1) ??
+        %( @(cap), %(cap) ) !! %( $(cap) )
 }
 
 my class EMPTY { }
 
 my class Parcel is Cool does Positional {
-    method ACCEPTS(\$what) { defined(self) ?? self.flat.ACCEPTS($what) !! nextsame }
+    method ACCEPTS(\what) { defined(self) ?? self.flat.ACCEPTS(what) !! nextsame }
     method flat() { self.iterator.flat }
-    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
+    method postcircumfix:<[ ]>(\key) { @(self).[key] }
     method at_pos($key) { @(self).[$key] }
 
     # LoLly usage
@@ -1429,14 +1429,14 @@ my class Parcel is Cool does Positional {
         }
     }
 
-    method perl(\$self:) {
-        $self // return $self.typename;
+    method perl(\$:) { #OK
+        self // return self.typename;
         my @tok;
-        push @tok, '$' if !$self.flattens;
+        push @tok, '$' if !self.flattens;
         push @tok, '(';
-        loop (my $i = 0; $i < $self.raw_elems; $i++) {
+        loop (my $i = 0; $i < self.raw_elems; $i++) {
             push @tok, self.raw_at($i).perl;
-            push @tok, ', ' unless $i == $self.raw_elems - 1 && $i;
+            push @tok, ', ' unless $i == self.raw_elems - 1 && $i;
         }
         push @tok, ')';
         @tok.join;
@@ -1500,14 +1500,14 @@ my class List is Cool does Positional {
         }
     }
 
-    method perl(\$self:) {
-        $self // return $self.typename;
+    method perl(\this:) {
+        this // return this.typename;
         my @tok;
         push @tok, '(';
-        push @tok, .perl, ', ' for @$self;
+        push @tok, .perl, ', ' for @(this);
         pop @tok if @tok >= 5;
         push @tok, ').list';
-        push @tok, '.item' if !$self.flattens;
+        push @tok, '.item' if !this.flattens;
         @tok.join
     }
 
@@ -1528,9 +1528,9 @@ my class List is Cool does Positional {
         $t // '';
     }
 
-    method ACCEPTS(\$topic) {
+    method ACCEPTS(\topic) {
         self // nextsame;
-        my @t = $topic.list;
+        my @t = topic.list;
         # TODO: Whatever-DWIMmery
         return False unless self.elems == @t.elems;
         for ^self.elems {
@@ -1544,7 +1544,7 @@ my class List is Cool does Positional {
     method sort($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
         if $cmp_.count == 1 {
-            $cmp = sub (\$x, \$y) { $cmp_($x) cmp $cmp_($y) }
+            $cmp = sub (\x, \y) { $cmp_(x) cmp $cmp_(y) }
         }
         my $l = @(self).eager;
         Q:CgOp {
@@ -1584,7 +1584,7 @@ my class List is Cool does Positional {
     method min($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
         if $cmp_.count == 1 {
-            $cmp = sub (\$x, \$y) { $cmp_($x) cmp $cmp_($y) }
+            $cmp = sub (\x, \y) { $cmp_(x) cmp $cmp_(y) }
         }
         my $min = self[0];
         for @(self) {
@@ -1596,7 +1596,7 @@ my class List is Cool does Positional {
     method max($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
         if $cmp_.count == 1 {
-            $cmp = sub (\$x, \$y) { $cmp_($x) cmp $cmp_($y) }
+            $cmp = sub (\x, \y) { $cmp_(x) cmp $cmp_(y) }
         }
         my $max = self[0];
         for @(self) {
@@ -1608,7 +1608,7 @@ my class List is Cool does Positional {
     method minmax($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
         if $cmp_.count == 1 {
-            $cmp = sub (\$x, \$y) { $cmp_($x) cmp $cmp_($y) }
+            $cmp = sub (\x, \y) { $cmp_(x) cmp $cmp_(y) }
         }
         my $min = self[0];
         my $max = self[0];
@@ -1676,7 +1676,7 @@ my class List is Cool does Positional {
 }
 
 my class Array is List {
-    method perl(\$self:) {
+    method perl(\$self:) { #OK
         $self // return $self.typename;
         "[" ~ $self.map(*.perl).join(', ') ~ "]" ~ ($self.flattens ?? ".list" !! "");
     }
@@ -1703,8 +1703,8 @@ my class Array is List {
 my class Stash does Associative {
     method at_key($key)        {
         Q:CgOp { (stash_at_key (@ {self}) (obj_getstr {$key})) } }
-    method bind_key($key, \$to) {
-        Q:CgOp { (stash_bind_key (@ {self}) (obj_getstr {$key}) {$to}) } }
+    method bind_key($key, \to) {
+        Q:CgOp { (stash_bind_key (@ {self}) (obj_getstr {$key}) {to}) } }
     method delete_key($key)    {
         Q:CgOp { (stash_delete_key (@ {self}) (obj_getstr {$key})) } }
     method exists_key($key)    {
@@ -1716,8 +1716,8 @@ my class PseudoStash does Associative {
 
     method at_key($key)        {
         Q:CgOp { (pstash_at_key (@ {self}) (obj_getstr {$key})) } }
-    method bind_key($key, \$to) {
-        Q:CgOp { (pstash_bind_key (@ {self}) (obj_getstr {$key}) {$to}) } }
+    method bind_key($key, \to) {
+        Q:CgOp { (pstash_bind_key (@ {self}) (obj_getstr {$key}) {to}) } }
 }
 
 my class Hash does Associative {
@@ -1788,7 +1788,7 @@ my class Hash does Associative {
     method exists_key($key) { self.{$key}:exists }
     method delete_key($key) { self.{$key}:exists }
 
-    method perl(\$self:) {
+    method perl(\$self:) { #OK
         $self // return $self.typename;
         '{' ~ (self{self.keys.sort}:p).map(*.perl).join(', ') ~ '}' ~
             ($self.flattens ?? ".hash" !! "")
@@ -1801,7 +1801,7 @@ my class Hash does Associative {
 
 my class Whatever {
     method immutable() { True }
-    method ACCEPTS(\$x) { defined(self) || $x.^isa(Whatever) }
+    method ACCEPTS(\x) { defined(self) || x.^isa(Whatever) }
 }
 # XXX use an unshadowable name
 BEGIN my $__Whatever := Q:CgOp { (blackhole {Whatever.new}) };
@@ -1839,10 +1839,10 @@ my class Enum is Cool {
 }
 
 my class Pair is Enum {
-    method ACCEPTS(\$other) {
+    method ACCEPTS(\other) {
         self // nextsame;
-        $other.^does(Hash) ?? ($.value.ACCEPTS($other{$.key})) !!
-            (?$.value) == (?$other.?"$.key"())
+        other.^does(Hash) ?? ($.value.ACCEPTS(other{$.key})) !!
+            (?$.value) == (?other.?"$.key"())
     }
     method Str() {
         $.key ~ "\t" ~ $.value
@@ -1910,7 +1910,7 @@ my class EnumMap does Associative {
     method invert() { @!values Z=> @!keys }
     method kv() { @!keys Z @!values }
     method pairs() { self.list }
-    method postcircumfix:<{ }>(\$k) { @!values[%!by-key.{$k}] }
+    method postcircumfix:<{ }>(\k) { @!values[%!by-key.{k}] }
     method at_key($k) { self{$k} }
     method exists_key($k) { self{$k}:exists }
 }
@@ -2040,20 +2040,20 @@ my class Junction is Mu {
 
     method Str() { defined(self) ?? self.perl !! "Junction()" }
 
-    method from-parcel(Int $kind, \$pcl) {
-        self!create($kind, $pcl)
+    method from-parcel(Int $kind, \pcl) {
+        self!create($kind, pcl)
     }
 
-    method ACCEPTS(Mu \$other) {
+    method ACCEPTS(Mu \other) {
         defined(self) ??
-            ?(self.FALLBACK("ACCEPTS", $other)) !!
-            $other.^isa(self)
+            ?(self.FALLBACK("ACCEPTS", other)) !!
+            other.^isa(self)
     }
 }
 # }}}
 # List utilities {{{
-sub _vivify_array_at_pos(\$self, $ix) {
-    Q:CgOp { (newvnewarrayvar (class_ref mo Any) {$self} (cast int (obj_getnum {$ix})) (@ {Any})) };
+sub _vivify_array_at_pos(\ary, $ix) {
+    Q:CgOp { (newvnewarrayvar (class_ref mo Any) {ary} (cast int (obj_getnum {$ix})) (@ {Any})) };
 }
 
 my class GatherIterator is IterCursor {
@@ -2110,8 +2110,8 @@ sub sort(*@values) {
 
 sub first(Mu $test, *@bits) { @bits.first($test) }
 
-sub _hash_constructor(\$parcel)  { my $r := (anon %hash = $parcel); $r }
-sub _make_capture(|$c) { $c }
+sub _hash_constructor(\parcel)  { my $r := (anon %hash = parcel); $r }
+sub _make_capture(|c) { c }
 
 sub _newtiedscalar($bind, $fetch, $store) {
     Q:CgOp { (var_new_tied (@ {$bind}) (@ {$fetch}) (@ {$store})) }
@@ -2544,8 +2544,8 @@ my class Grammar is Cursor {
 # }}}
 # Other operators {{{
 # TODO: these should be macros
-sub WHAT(\$x) { $x.WHAT }
-sub HOW(\$x) { $x.HOW }
+sub WHAT(\x) { x.WHAT }
+sub HOW(\x) { x.HOW }
 constant Inf = 1 / 0;
 my class RangeIter is IterCursor {
     has $.current;
@@ -2581,7 +2581,7 @@ my class Range is Cool does Positional {
 
     method list() { self.iterator.list }
     method flat() { self.iterator.flat }
-    method postcircumfix:<[ ]>(\$key) { @(self).[$key] }
+    method postcircumfix:<[ ]>(\key) { @(self).[key] }
 
     method bounds() { $.min, $.max }
     method from() { $.min }
@@ -2652,27 +2652,27 @@ sub _hyper_type($val) {
     }
 }
 
-sub hyperunary(&fun, \$obj) {
-    given _hyper_type($obj) {
+sub hyperunary(&fun, \obj) {
+    given _hyper_type(obj) {
         when 1 {
             my %out;
-            for $obj.kv -> $k, \$v {
-                %out{$k} = hyperunary(&fun, $v);
+            for obj.kv -> $k, \v {
+                %out{$k} = hyperunary(&fun, v);
             }
             return %out;
         }
         when 2 {
             my @out;
-            push @out, $( hyperunary(&fun, $_) ) for @$obj;
+            push @out, $( hyperunary(&fun, $_) ) for @(obj);
             return @out;
         }
         when 3 {
             my @out;
-            push @out, $( hyperunary(&fun, $_) ) for @$obj;
-            return $obj.new(@out);
+            push @out, $( hyperunary(&fun, $_) ) for @(obj);
+            return obj.new(@out);
         }
         when 0 {
-            return fun($obj);
+            return fun(obj);
         }
     }
 }
@@ -2721,33 +2721,33 @@ sub _hyper_posi($dwiml, $dwimr, $fun, $left, $right) {
     @out;
 }
 
-sub hyper($dwiml, $dwimr, $fun, \$left, \$right) {
+sub hyper($dwiml, $dwimr, $fun, \left, \right) {
     constant @htnames = 'scalar', 'Associative', 'Positional', #OK
         'non-Positional Iterable';
-    my $h1 = _hyper_type($left);
-    my $h2 = _hyper_type($right);
+    my $h1 = _hyper_type(left);
+    my $h2 = _hyper_type(right);
 
     if $h1 && $h2 && $h1 != $h2 {
         die "Cannot mix @htnames[$h1] and @htnames[$h2] in hyperop";
     }
 
     if $h2 == 0 || $h1 == 0 {
-        if $h1 == 0 && $h2 == 0 { return $fun($left, $right) }
+        if $h1 == 0 && $h2 == 0 { return $fun(left, right) }
         if $h2 {
             if $dwiml {
-                return hyperunary(sub (\$x) { $fun($left,$x) }, $right);
+                return hyperunary(sub (\x) { $fun(left,x) }, right);
             }
         } else {
             if $dwimr {
-                return hyperunary(sub (\$x) { $fun($x,$right) }, $left);
+                return hyperunary(sub (\x) { $fun(x,right) }, left);
             }
         }
         die "Non-dwimmy scalar used with complex item";
     }
 
     given $h1 {
-        when 1 { return _hyper_hash($dwiml, $dwimr, $fun, $left, $right) }
-        when 2 { return _hyper_posi($dwiml, $dwimr, $fun, @$left, @$right) }
+        when 1 { return _hyper_hash($dwiml, $dwimr, $fun, left, right) }
+        when 2 { return _hyper_posi($dwiml, $dwimr, $fun, @(left), @(right)) }
         when 3 { die "Cannot hyper two unordered collections" }
     }
 }
@@ -2857,16 +2857,16 @@ our sub Niecza::series-listop(Parcel $lists, $exclude-limit) {
     @l
 }
 
-sub undefine(Mu \$x) { $x = Any }
+sub undefine(Mu \x) { x = Any }
 sub infix:<%%> is equiv<*> is iffy is pure ($x,$y) { $x % $y == 0 }
 sub infix:<?&> is equiv<*> is iffy is pure ($a, $b) { ?($a && $b) }
 sub infix:<?|> ($a, $b) is pure is iffy { ?($a || $b) }
 sub infix:<?^> ($a, $b) is pure { ?( +$a +^ $b ) }
 sub prefix:<?^> ($a) is pure { !$a }
-sub prefix:<|> (\$item) { $item.Capture } # marking this pure breaks syntax
+sub prefix:<|> (\item) { item.Capture } # marking this pure breaks syntax
 sub prefix:<^> ($limit) is pure { 0 ..^ +$limit }
-sub prefix:<so> is equiv<not> is pure (\$item) { ?$item }
-sub infix:<xx> is equiv<x> (\$list, $ct) { map { $list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
+sub prefix:<so> is equiv<not> is pure (\item) { ?item }
+sub infix:<xx> is equiv<x> (\list, $ct) { map { list }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub _doreplicate($func, $ct) { map { $func() }, ($ct ~~ Whatever) ?? ^Inf !! ^$ct }
 sub prefix:<abs> ($x) is pure { Q:CgOp { (abs {$x}) } }
 sub abs($x) is pure { Q:CgOp { (abs {$x}) } }
@@ -2903,8 +2903,8 @@ sub infix:<cmp> is equiv<leg> ($a, $b) {
 sub infix:<eqv> is equiv<==> ($a, $b) { ($a cmp $b) == 0 }
 sub infix:<before> ($a, $b) is equiv<==> { ($a cmp $b) < 0 }
 sub infix:<after> ($a, $b) is equiv<==> { ($a cmp $b) > 0 }
-sub seqop($op, \$x, \$y) { $op($x,$y) } # TODO: Special case with hyper
-sub reverseop($op, \$x, \$y) { $op($y, $x) }
+sub seqop($op, \x, \y) { $op(x,y) } # TODO: Special case with hyper
+sub reverseop($op, \x, \y) { $op(y, x) }
 
 sub infix:<div> is equiv<*> ($x,$y) is pure { Q:CgOp { (divop (i 4) {$x} {$y}) } }
 sub infix:<mod> is equiv<*> ($x,$y) is pure { Q:CgOp { (divop (i 5) {$x} {$y}) } }
