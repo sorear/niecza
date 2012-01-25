@@ -2018,6 +2018,46 @@ sub set(*@args --> Set) is export {
     Set.new(@args);
 }
 
+class Bag does Associative {
+    has Bool %!elems;
+
+    method keys { %!elems.keys }
+    method values { %!elems.values }
+    method elems returns Int { [+] self.values }
+    method exists($a) returns Bool { %!elems.exists($a) }
+    method Bool { %!elems.Bool }
+    method Numeric { self.elems }
+    method hash { %!elems.hash }
+    method postcircumfix:<{ }> (*@k) { @k.map(-> $k { %!elems{$k} // 0 }) }
+
+    # Constructor
+    method new(*@args --> Bag) {
+        my %e;
+        for @args {
+            when Set { for .keys -> $key { %e{$key}++; } }
+            default { %e{$_}++; }
+        }
+        self.bless(*, :elems(%e));
+    }
+
+    submethod BUILD (%!elems) { }
+
+    submethod Str(Any:D $ : --> Str) { "bag(< { self.exploded-bag } >)" }
+    submethod gist(Any:D $ : --> Str) { "bag({ self.exploded-bag».gist.join(', ') })" }
+    submethod perl(Any:D $ : --> Str) { 'bag(' ~ join(', ', map { .perl }, self.exploded-bag) ~ ')' }
+
+    method iterator() { %!elems.keys.iterator }
+    method list() { %!elems.keys }
+    method exploded-bag() { %!elems.kv.map(-> $key, $value { $key xx $value }).flat }
+    # Next two are terribly inefficient
+    method pick($arg) { self.exploded-bag.pick: $arg }
+    method roll($arg) { self.exploded-bag.roll: $arg }
+}
+
+sub bag(*@a) {
+    Bag.new(|@a);
+}
+
 my class Junction is Mu {
     has $!kind_;
     has $!eigenstates_;
