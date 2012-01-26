@@ -1755,9 +1755,9 @@ grammar P6 is STD {
         [
         | '\\' <defterm> <.ws>
             [ <initializer> || <.sorry("Term definition requires an initializer")> ]
-        | <variable_declarator> <initializer>?
+        | <variable_declarator> <.ws><initializer>?
             [ <?before <.ws>','<.ws> { @*MEMOS[$¢.pos]<declend> = $*SCOPE; }> ]?
-        | '(' ~ ')' <signature> <trait>* <initializer>?
+        | '(' ~ ')' <signature> <trait>* <.ws><initializer>?
         | <routine_declarator>
         | <regex_declarator>
         | <type_declarator>
@@ -2757,6 +2757,7 @@ grammar P6 is STD {
         <trait>*
 
         { $Actions.install_constant($/) }
+        <.ws>
         [
         || <initializer>
         || <.sorry: "Missing initializer on constant declaration">
@@ -2764,17 +2765,17 @@ grammar P6 is STD {
     }
 
     token initializer:sym<=> {
-        <sym> <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
+        <sym>:s <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
                                         || <.panic: "Malformed initializer">
     }
     token initializer:sym<:=> {
-        <sym> <EXPR(item %list_prefix)> || <.panic: "Malformed binding">
+        <sym>:s <EXPR(item %list_prefix)> || <.panic: "Malformed binding">
     }
     token initializer:sym<::=> {
-        <sym> <EXPR(item %list_prefix)> || <.panic: "Malformed binding">
+        <sym>:s <EXPR(item %list_prefix)> || <.panic: "Malformed binding">
     }
     token initializer:sym<.=> {
-        <sym> <dottyopish>              || <.panic: "Malformed mutator method call">
+        <sym>:s <dottyopish>              || <.panic: "Malformed mutator method call">
     }
 
     token type_constraint {
