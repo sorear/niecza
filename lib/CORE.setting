@@ -195,8 +195,8 @@ my constant True  = 1.Bool;
 my constant False = 0.Bool;
 my class Mu {
     method head() { @(self).head }
-    method flattens(\this:) {
-        Q:CgOp { (box Bool (var_islist {this})) }
+    method flattens(\:) {
+        Q:CgOp { (box Bool (var_islist {self})) }
     }
     method typename() {  # should be ^name
         Q:CgOp { (box Str (obj_typename (@ {self}))) }
@@ -481,7 +481,7 @@ my class Cool {
         Q:CgOp { (rnull (set_status (s $/) {Match})) };
         Match;
     }
-    method subst(\$: $matcher_, $replacement, :g(:$global), :$x, #OK
+    method subst(\: $matcher_, $replacement, :g(:$global), :$x,
             :c(:$continue), :th(:st(:nd(:rd(:$nth)))), :p(:$pos), :$inplace) {
         die ":pos may not be used with :continue" if
             defined($pos) && defined($continue);
@@ -616,13 +616,13 @@ my class Cool {
         $self = substr($str, 0, chars($str)-1);
         $end;
     }
-    method substr(\str: $start, $len?, $repl?) {
-        $start := $start(chars str) if $start.^does(Code);
-        $len := $len.^does(Code) ?? ($len(chars str) - $start) !!
-            $len // (chars(str) - $start);
+    method substr(\: $start, $len?, $repl?) {
+        $start := $start(chars self) if $start.^does(Code);
+        $len := $len.^does(Code) ?? ($len(chars self) - $start) !!
+            $len // (chars(self) - $start);
         defined($repl) ??
-            substr(str, $start, $len) = $repl !!
-            substr(str, $start, $len)
+            substr(self, $start, $len) = $repl !!
+            substr(self, $start, $len)
     }
     method lc()   { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
     method uc()   { Q:CgOp { (box Str (str_toupper (obj_getstr {self}))) }}
@@ -1429,7 +1429,7 @@ my class Parcel is Cool does Positional {
         }
     }
 
-    method perl(\$:) { #OK
+    method perl(\:) {
         self // return self.typename;
         my @tok;
         push @tok, '$' if !self.flattens;
@@ -1500,14 +1500,14 @@ my class List is Cool does Positional {
         }
     }
 
-    method perl(\this:) {
-        this // return this.typename;
+    method perl(\:) {
+        self // return self.typename;
         my @tok;
         push @tok, '(';
-        push @tok, .perl, ', ' for @(this);
+        push @tok, .perl, ', ' for @(self);
         pop @tok if @tok >= 5;
         push @tok, ').list';
-        push @tok, '.item' if !this.flattens;
+        push @tok, '.item' if !self.flattens;
         @tok.join
     }
 
@@ -1676,9 +1676,9 @@ my class List is Cool does Positional {
 }
 
 my class Array is List {
-    method perl(\$self:) { #OK
-        $self // return $self.typename;
-        "[" ~ $self.map(*.perl).join(', ') ~ "]" ~ ($self.flattens ?? ".list" !! "");
+    method perl(\:) {
+        self // return self.typename;
+        "[" ~ self.map(*.perl).join(', ') ~ "]" ~ (self.flattens ?? ".list" !! "");
     }
 
     method delete(*@indices) {
@@ -1788,10 +1788,10 @@ my class Hash does Associative {
     method exists_key($key) { self.{$key}:exists }
     method delete_key($key) { self.{$key}:exists }
 
-    method perl(\$self:) { #OK
-        $self // return $self.typename;
+    method perl(\:) {
+        self // return self.typename;
         '{' ~ (self{self.keys.sort}:p).map(*.perl).join(', ') ~ '}' ~
-            ($self.flattens ?? ".hash" !! "")
+            (self.flattens ?? ".hash" !! "")
     }
 
     method fmt($format = "%s\t%s", $sep = "\n") {
