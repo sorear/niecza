@@ -260,7 +260,7 @@ method type_constraint($/) {
 }
 
 method typename($/) {
-    constant %masks = ':_' => $Sig::ANY_DEF, ':T' => $Sig::UNDEF_ONLY,
+    state %masks = ':_' => $Sig::ANY_DEF, ':T' => $Sig::UNDEF_ONLY,
         ':U' => $Sig::UNDEF_ONLY, ':D' => $Sig::DEF_ONLY;
 
     $/.CURSOR.sorry('WHENCE blocks not allowed on declarative type names')
