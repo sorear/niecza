@@ -220,6 +220,9 @@ proto token quote_mod {*}
 token category:trait_mod { <sym> }
 proto token trait_mod is endsym<keyspace> {*}
 
+token category:initializer { <sym> }
+proto token initializer is endsym<ws> {*}
+
 token category:type_declarator { <sym> }
 proto token type_declarator is endsym<keyspace> {*}
 
@@ -1750,7 +1753,7 @@ grammar P6 is STD {
     token declarator {
         :my $*LEFTSIGIL = '';
         [
-        | '\\' <identifier> <.ws> { $Actions.install_parcel($/) }
+        | '\\' <defterm> <.ws>
             [ <initializer> || <.sorry("Term definition requires an initializer")> ]
         | <variable_declarator> <initializer>?
             [ <?before <.ws>','<.ws> { @*MEMOS[$¢.pos]<declend> = $*SCOPE; }> ]?
@@ -2401,6 +2404,11 @@ grammar P6 is STD {
 
 
 
+    token defterm {     # XXX this is probably too general
+        :dba('new term to be defined')
+        <identifier> <colonpair>*
+    }
+
     token deflongname {
         :dba('new name to be defined')
         <name>
@@ -2739,7 +2747,7 @@ grammar P6 is STD {
         <sym> <.ws>
 
         [
-        | '\\'? <identifier>
+        | '\\'? <defterm>
         | <variable>
         | <?>
         ]
@@ -2755,19 +2763,18 @@ grammar P6 is STD {
         ]
     }
 
-    token initializer {
-        <?before '=' | '.=' | ':=' | '::=' >
-        <infix> <.ws>
-        [
-            :my $infix; { $infix = $<infix>.Str; }
-            [
-            || <?{ $infix eq '=' or $infix eq ':=' or $infix eq '::=' }>
-                [ <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
-                    || <.panic: "Malformed initializer"> ]
-            || <?{ $infix eq '.=' }>
-                [ <dottyopish> || <.panic: "Malformed method call"> ]
-            ]
-        ]
+    token initializer:sym<=> {
+        <sym> <EXPR(($*LEFTSIGIL eq '$' ?? (item %item_assignment) !! (item %list_prefix) ))>
+                                        || <.panic: "Malformed initializer">
+    }
+    token initializer:sym<:=> {
+        <sym> <EXPR(item %list_prefix)> || <.panic: "Malformed binding">
+    }
+    token initializer:sym<::=> {
+        <sym> <EXPR(item %list_prefix)> || <.panic: "Malformed binding">
+    }
+    token initializer:sym<.=> {
+        <sym> <dottyopish>              || <.panic: "Malformed mutator method call">
     }
 
     token type_constraint {
@@ -2792,14 +2799,22 @@ grammar P6 is STD {
 
     token named_param {
         :my $*GOAL ::= ')';
+        :dba('named parameter')
         ':'
         [
-        | <name=.identifier> '(' <.ws>
-            [ <named_param> | <param_var> <.ws> ]
-            [ ')' || <.panic: "Unable to parse named parameter; couldn't find right parenthesis"> ]
+        | <name=.identifier> '(' ~ ')' <named_param_term>
         | <param_var>
-        | '\\' <varname=.identifier>
+        | '\\' <defterm>
         ]
+    }
+
+    token named_param_term {
+        <.ws>
+        [
+        | <named_param>
+        | <param_var>
+        | '\\' <defterm>
+        ] <.ws>
     }
 
     token param_var {
@@ -2865,13 +2880,12 @@ grammar P6 is STD {
                 @t > 1 and $¢.sorry("Multiple prefix constraints not yet supported")
             }
             [
-            | '**' <param_var>   { $quant = '**'; $kind = '*'; }
+            | '**' <param_var>  { $quant = '**'; $kind = '*'; }
             | '*' <param_var>   { $quant = '*'; $kind = '*'; }
-            | '|' [ <identifier> ]?
-                                { $quant = '|'; $kind = '!'; }
-            | '\\' <identifier> { $quant = '\\'; $kind = '!'; }
+            | '|' <defterm>?    { $quant = '|'; $kind = '!'; }
+            | '\\' <defterm>?   { $quant = '\\'; $kind = '!'; }
             | '|' <param_var>   { $quant = '|'; $kind = '!'; } <.worryobs("| with sigil","| without sigil"," nowadays")>
-            | '\\' <param_var>   { $quant = '\\'; $kind = '!'; } <.worryobs("\\ with sigil","\\ without sigil"," nowadays")>
+            | '\\' <param_var>  { $quant = '\\'; $kind = '!'; } <.worryobs("\\ with sigil","\\ without sigil"," nowadays")>
             |   [
                 | <param_var>   { $quant = ''; $kind = '!'; }
                 | <named_param> { $quant = ''; $kind = '*'; }
@@ -2885,11 +2899,10 @@ grammar P6 is STD {
             ]
 
         | '**' <param_var>   { $quant = '**'; $kind = '*'; }
-        | '*' <param_var>   { $quant = '*'; $kind = '*'; }
-        | '|' [ <identifier> ]?
-                            { $quant = '|'; $kind = '!'; }
-        | '\\' <identifier> { $quant = '\\'; $kind = '!'; }
-        | '|' <param_var>   { $quant = '|'; $kind = '!'; } <.worryobs("| with sigil","| without sigil"," nowadays")>
+        | '*' <param_var>    { $quant = '*'; $kind = '*'; }
+        | '|' <defterm>?     { $quant = '|'; $kind = '!'; }
+        | '\\' <defterm>?    { $quant = '\\'; $kind = '!'; }
+        | '|' <param_var>    { $quant = '|'; $kind = '!'; } <.worryobs("| with sigil","| without sigil"," nowadays")>
         | '\\' <param_var>   { $quant = '\\'; $kind = '!'; } <.worryobs("\\ with sigil","\\ without sigil"," nowadays")>
         |   [
             | <param_var>   { $quant = ''; $kind = '!'; }
@@ -5520,8 +5533,8 @@ method lookup_compiler_var($name) {
 
 method check_categorical ($name) {
     self.deb("check_categorical $name") if $*DEBUG +& DEBUG::symtab;
-    self.add_categorical(substr($name,1))
-        if defined($name) && $name ~~ /^\&\w+\:/;
+    self.add_categorical($0)
+        if defined($name) && $name ~~ /^\&?(\w+\:.*)/;
 }
 
 method trymop($f) {

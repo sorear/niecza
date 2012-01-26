@@ -23,6 +23,11 @@ augment class Any {
     submethod new(|$) { die "Attempted to instantiate undefined class." }
 }
 
+our ($Operator, $Operator_Method, $Operator_Replicate, $Operator_FlipFlop,
+     $Operator_SmartMatch, $Operator_Comma, $Operator_Binding,
+     $Operator_ShortCircuit, $Operator_Ternary, $Operator_Temp,
+     $Operator_DotEq, $Operator_Mixin, $Operator_Let, $Operator_PostCall,
+     $Operator_Function, $Operator_CompoundAssign); #OK
 our ($Op, $OpAttribute, $OpBareBlock, $OpBuiltin, $OpCallLike, $OpCallMethod,
      $OpCallSub, $OpCatchyWrapper, $OpCgOp, $OpConditional, $OpConstantDecl,
      $OpContextVar, $OpDoOnceLoop, $OpForLoop, $OpGather, $OpGeneralConst,
@@ -44,14 +49,32 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
 our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
-method install_parcel($/) {
-    $/.CURSOR.trymop({
-        $*CURLEX<!sub>.add_my_name(~$<identifier>, |mnode($/));
-    });
+method FALLBACK($meth, $/) {
+    my $S = $<sym>;
+
+    if substr($meth,0,7) eq 'prefix:' {
+        make $Operator.funop($/, q:s'&prefix:<$S>', 1);
+    } elsif substr($meth,0,14) eq 'postcircumfix:' {
+        make $Operator.funop($/, q:s'&postcircumfix:<$S>', 1, @( $<semilist>.ast ));
+    } elsif substr($meth,0,10) eq 'circumfix:' {
+        make mkcall($/, q:s'&circumfix:<$S>', @( $<semilist>.ast ));
+    } elsif substr($meth,0,8) eq 'postfix:' {
+        make $Operator.funop($/, q:s'&postfix:<$S>', 1);
+    } elsif substr($meth,0,6) eq 'infix:' {
+        make $Operator.funop($/, q:s'&infix:<$S>', 2);
+    } elsif substr($meth,0,5) eq 'term:' {
+        if $*CURLEX<!sub>.lookup_lex(q:s"term:<$S>") {
+            make mklex($/, q:s"term:<$S>");
+        } else {
+            make mkcall($/, q:s'&term:<$S>');
+        }
+    } else {
+        $/.CURSOR.sorry("Action method $meth not yet implemented");
+    }
 }
 method declarator($/) {
-    if $<identifier> {
-        make ~$<identifier>;
+    if $<defterm> {
+        make $<defterm>.ast;
         self.do_initialize($/, True);
         return;
     }
@@ -101,29 +124,31 @@ method install_constant ($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
-    my $name  = ~($<identifier> // $<variable> // self.gensym);
+    my $name  = ~($<defterm> // $<variable> // self.gensym);
 
     make self.make_constant($/, $*SCOPE, $name);
 }
+method named_param_term($/) {
+    if $<named_param> {
+        make $<named_param>.ast;
+    } elsif $<param_var> {
+        make (anon % = %( $<param_var>.ast ));
+        $/.ast<names> = []; # completely replace
+    } else {
+        make { slot => $<defterm>.ast, names => [ ], flags => $Sig::RWTRANS };
+    }
+}
 method named_param($/) {
     my %rt;
-    if $<varname> {
+    if $<defterm> {
         # XXX funky syntax
-        my $id = ~$<varname>;
-        $/.CURSOR.trymop({
-            $*CURLEX<!sub>.add_my_name($id, |mnode($/));
-        });
+        my $id = ~$<defterm>;
         make { slot => $id, names => [ $id ], flags => $Sig::RWTRANS };
         $/.CURSOR.sorry("bare identifier forms NYI");
         return;
     }
     if $<name> {
-        if $<named_param> {
-            %rt = %( $<named_param>.ast );
-        } else {
-            %rt = %( $<param_var>.ast );
-            %rt<names> = []; # completely replace
-        }
+        %rt = %( $<named_param_term>.ast );
         %rt<names> = [ @( %rt<names> // [] ), ~$<name> ]
             unless %rt<names> && %rt<names>.grep(~$<name>);
     } else {
@@ -146,15 +171,10 @@ method INFIX($/) {
 method parameter($/) {
     my $sorry;
     my $p = $<param_var> // $<named_param>;
-    my $p_ast = $p ?? $p.ast !! $<identifier> ??
-        { names => [], flags => $Sig::POSITIONAL + $Sig::RWTRANS, slot => ~$<identifier> } !!
+    my $p_ast = $p ?? $p.ast !! $<defterm> ??
+        { names => [], flags => $Sig::POSITIONAL + $Sig::RWTRANS, slot => ~$<defterm> } !!
         { names => [], flags => $Sig::POSITIONAL };
     my $flags = $p_ast<flags>;
-    if $<identifier> {
-        $/.CURSOR.trymop({
-            $*CURLEX<!sub>.add_my_name($p_ast<slot>, |mnode($/));
-        });
-    }
 
     $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
 
@@ -232,15 +252,29 @@ method parameter($/) {
     }
 }
 
+method defterm($/) {
+    make ~$/;
+    return if ($*IN_DECL // '') eq 'constant';
+    $/.CURSOR.trymop({
+        $*CURLEX<!sub>.add_my_name($/.ast, |mnode($/));
+        $/.CURSOR.check_categorical($/.ast);
+    });
+}
+
 method initializer($/) { }
+method initializer:sym<=> ($/) { make $Operator.funop($/, '&infix:<=>', 2) }
+method initializer:sym<:=> ($/) { make $Operator_Binding.new(:!readonly) }
+method initializer:sym<::=> ($/) { make $Operator_Binding.new(:readonly) }
+method initializer:sym<.=> ($/) { make $Operator_DotEq.new }
+
 method do_initialize($/, $parcel?) {
     my $i = $<initializer> or return;
-    my $fn = $i<infix>.ast;
+    my $fn = $i.ast;
     my $lhs = $/.ast;
     my $rhs = ($i<EXPR> // $i<dottyopish>).ast;
 
     if $parcel {
-        if $i<infix> ne '=' {
+        if $i<sym> ne '=' {
             $/.CURSOR.sorry('Parcel variables may only be set using = for now');
         }
         make $OpLexicalBind.new(name => $lhs, :$rhs);
