@@ -25,7 +25,7 @@ grammar CgOp is STD {
 grammar Q is STD::Q { #} {
     method tweak(:$CgOp, *%_) {
         if $CgOp.defined { self.cursor_fresh(NieczaGrammar::CgOp) }
-        else { nextwith(self, |%_) }
+        else { nextsame }
     }
 }
 
