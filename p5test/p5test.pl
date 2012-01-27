@@ -37,7 +37,7 @@ print $test4_config <<END;
 END
 
 system($csc,"test4.cs");
-system("$cc -shared -o test4lib.so test4lib.c");
+system("$cc -shared -o test4lib.$Config{so} test4lib.c");
 my $ok4 = `mono test4.exe`;
 is $ok4,"OK 4\n","We call C code from mono";
 
@@ -50,7 +50,7 @@ print $test5_config <<END;
 END
 
 system($csc,"test5.cs");
-system("$cc -shared -o test5lib.so test5lib.c $ccopts $ldopts");
+system("$cc -shared -o test5lib.$Config{so} test5lib.c $ccopts $ldopts");
 my $ok5 = `mono test5.exe`;
 is $ok5,"OK 5\n","We call C code from mono";
 
