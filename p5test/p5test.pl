@@ -9,7 +9,7 @@ use File::Spec::Functions qw(rel2abs);
 my $cc = $Config{cc};
 my $csc = "gmcs";
 
-diag($Config{osname});
+diag('osname = '.$Config{osname});
 system($cc,"test1.c","-o","test1");
 my $ok1 = `./test1`;
 
@@ -36,13 +36,18 @@ print $test4_config <<END;
 </configuration>
 END
 
-for my $invocation ("$cc -shared ","$cc -m32 -shared","$cc -m32 -shared -fPIC","gcc -dynamiclib -current_version 1.0") {
+my $cc_with_opts;
+my $ok4;
+for my $invocation ("$cc -m32 -shared ","$cc -shared") {
     unlink("test4lib.$Config{so}");
     system($csc,"test4.cs");
     system("$invocation -o test4lib.$Config{so} test4lib.c");
-    my $ok4 = `mono test4.exe`;
-    diag('resulting library: '.`file test4lib.$Config{so}`);
-    is $ok4,"OK 4\n","We call C code from mono using $invocation";
+    $ok4 = `mono test4.exe`;
+    is $ok4,"OK 4\n","We can call C code from mono using $invocation";
+    if ($ok4 =~ 'OK 4') {
+        $cc_with_opts = $invocation;
+        last;
+    }
 }
 
 my $lib_path5 = rel2abs("test5lib.$Config{so}");
@@ -54,9 +59,9 @@ print $test5_config <<END;
 END
 
 system($csc,"test5.cs");
-system("$cc -shared -o test5lib.$Config{so} test5lib.c $ccopts $ldopts");
+system("$cc_with_opts -o test5lib.$Config{so} test5lib.c $ccopts $ldopts");
 my $ok5 = `mono test5.exe`;
-is $ok5,"OK 5\n","We call P5 code from mono";
+is $ok5,"OK 5\n","We can call P5 code from mono";
 
 
 done_testing;
