@@ -1,0 +1,19 @@
+#!perl
+use Config;
+use File::Spec::Functions qw(rel2abs);
+my $path = "obj/p5embed.$Config{so}";
+my $full_path = rel2abs($path);
+open(my $config,">obj/Perl5Interpreter.dll.config");
+print $config <<END;
+ <configuration>
+    <dllmap dll="p5embed" target="$full_path" />
+</configuration>
+END
+
+my $ccopts = `perl -MExtUtils::Embed -e ccopts`; 
+my $ldopts = `perl -MExtUtils::Embed -e ldopts`; 
+chomp($ccopts);
+chomp($ldopts);
+
+my $cc = "$Config{cc} -m32 -shared";
+system("$cc lib/p5embed.c -o $path $ccopts $ldopts");

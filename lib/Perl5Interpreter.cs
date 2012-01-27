@@ -4,49 +4,49 @@ using System;
 using Niecza.Serialization;
 
 public class Perl5Interpreter : IForeignInterpreter {
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_initialize")]
+    [DllImport("p5embed", EntryPoint="p5embed_initialize")]
     public static extern void Initialize();
   
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_dispose")]
+    [DllImport("p5embed", EntryPoint="p5embed_dispose")]
     public static extern void Dispose();
   
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_eval")]
+    [DllImport("p5embed", EntryPoint="p5embed_eval")]
     public static extern IntPtr EvalPerl5(string code);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvIV")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvIV")]
     public static extern int SvIV(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPV_nolen")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvPV_nolen")]
     public static extern string SvPV_nolen(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPVutf8_nolen")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvPVutf8_nolen")]
     public static extern IntPtr SvPVutf8_nolen(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPVutf8_length")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvPVutf8_length")]
     public static extern int SvPVutf8_length(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvNV")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvNV")]
     public static extern double SvNV(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvIOKp")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvIOKp")]
     public static extern int SvIOKp(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvNOKp")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvNOKp")]
     public static extern int SvNOKp(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvPOKp")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvPOKp")]
     public static extern int SvPOKp(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvOK")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvOK")]
     public static extern int SvOK(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_newSVpvn")]
+    [DllImport("p5embed", EntryPoint="p5embed_newSVpvn")]
     public static extern IntPtr newSVpvn(IntPtr s,int length);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_SvUTF8_on")]
+    [DllImport("p5embed", EntryPoint="p5embed_SvUTF8_on")]
     public static extern void SvUTF8_on(IntPtr sv);
 
-    [DllImport("obj/p5embed.so", EntryPoint="p5embed_subcall")]
+    [DllImport("p5embed", EntryPoint="p5embed_subcall")]
     public static extern IntPtr SubCall(
         int context,
         IntPtr[] arguments,
