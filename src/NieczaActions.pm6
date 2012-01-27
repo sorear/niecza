@@ -3555,10 +3555,10 @@ method trait_mod:is ($/) {
         $noparm = 'Export tags NYI';
     } elsif $trait eq 'endsym' {
         my $text;
-        if !$<circumfix> || !$<circumfix>.ast.^isa($OpStringLiteral) {
-            $/.CURSOR.sorry("Argument to endsym must be a literal string");
+        if !$<circumfix> {
+            $/.CURSOR.sorry("Argument to endsym must be provided");
         } else {
-            $text = $<circumfix>.ast.text;
+            $text = self.eval_ast_str($/, $<circumfix>.ast) // '';
         }
         make { endsym => $text };
     } elsif $trait eq 'rawcall' {
