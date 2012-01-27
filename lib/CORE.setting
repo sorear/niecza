@@ -43,6 +43,7 @@ my class Enum     { ... }
 my class Range    { ... }
 my class Whatever { ... }
 my class IO       { ... }
+my class ObjAt    { ... }
 grammar Niecza::NumSyntax { ... }
 # }}}
 # Important inlinable definitions {{{
@@ -225,6 +226,7 @@ my class Mu {
     method clone(*%_) { Q:CgOp { (ns (repr_clone (@ {self}) (unbox varhash (@ {%_})))) } }
     method dispatch:<::>(|) { Q:CgOp { (dispatch_fromtype) } }
     method immutable() { !defined(self) }
+    multi method WHICH() { ObjAt.new(str => '', ref => self) }
 }
 
 my class Any is Mu {
@@ -652,6 +654,8 @@ my class Nil is Cool {
     method new() { Nil }
     method iterator() { ().iterator }
     method gist() { 'Nil' }
+    # XXX the default won't work because of Nil's exotic binding behavior
+    multi method WHICH() { ObjAt.new(str => 'Nil', ref => Any) }
     method Str() { '' }
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
@@ -733,6 +737,7 @@ my role Integral does Real { Any }
 my class Num does Real {
     method new() { 0e0 }
     method immutable() { True }
+    multi method WHICH(Num:D:) { ObjAt.new(str => ~self, ref => self.WHAT) }
     our constant pi = 3.14159_26535_89793_238e0;
     our constant e  = 2.71828_18284_59045_235e0;
     our constant i  = Q:CgOp { (complex_new {0} {1}) };
@@ -755,6 +760,7 @@ our constant i  = Num::i;
 my class Int does Integral {
     method new() { 0 }
     method immutable() { True }
+    multi method WHICH(Int:D:) { ObjAt.new(str => ~self, ref => self.WHAT) }
     method niecza_quantifier_max() { self }
     method niecza_quantifier_min() { self }
     method Bridge() { self.Num }
@@ -779,6 +785,7 @@ my class Int does Integral {
 my class Rat does Real {
     method new($n,$d) { $n / $d }
     method immutable() { True }
+    multi method WHICH(Rat:D:) { ObjAt.new(str => self.perl, ref => self.WHAT) }
     method perl() { defined(self) ?? "<" ~ self.numerator ~ "/" ~ self.denominator ~ ">" !! self.typename }
     method gist() { self // nextsame; self.Str }
     method numerator() { Q:CgOp { (rat_nu {self}) } }
@@ -789,6 +796,7 @@ my class Rat does Real {
 my class Complex does Numeric {
     method new($re,$im) { Q:CgOp { (complex_new {$re} {$im}) } }
     method immutable() { True }
+    multi method WHICH(Complex:D:) { ObjAt.new(str => self.perl, ref => self.WHAT) }
     method perl() { defined(self) ?? "<" ~ self ~ ">" !! self.typename }
     method gist() { self // nextsame; self.Str }
     method Complex() { self }
@@ -800,6 +808,7 @@ my class Complex does Numeric {
 my class FatRat does Real {
     method new($n,$d) { FatRat.succ * $n / $d }
     method immutable() { True }
+    multi method WHICH(FatRat:D:) { ObjAt.new(str => self.perl, ref => self.WHAT) }
     method perl() { defined(self) ?? "FatRat.new({self.numerator}, {self.denominator})" !! self.typename }
     method FatRat() { self }
     method gist() { self // nextsame; self.Str }
@@ -819,6 +828,9 @@ my class Str is Cool {
               [box Bool (bool 1)]
         )
     } }
+    multi method WHICH(Str:D:) {
+        ObjAt.new(str => ("str|" ~ self), ref => self.WHAT)
+    }
 
     # TODO: Switch to a multi once where is working.
     method indent($steps) {
@@ -904,6 +916,36 @@ my class Str is Cool {
         '"' ~ self.subst(/ <[$@%&{\b\cJ\cM\t\"\\]> /, { $esc{$/} }, :g)\
                   .subst(/ <-print> /, { ord($/).fmt('\x[%x]') }, :g) ~ '"'
     }
+}
+
+# ObjAt in Niecza is the type of return values from WHICH.  It is a comparable
+# type that allows any two objects to be compared, and attempts to capture a
+# notion of 'essential equality'.  The most ready way to compare the identities
+# of mutable objects is to compare references, so ObjAt keeps a reference;
+# ObjAt also keeps a string description of contents, for non-mutable types.
+#
+# For mutable types, the string should be empty, and the reference should be
+# the specific object that WHICH was invoked upon.
+#
+# For defined values of immuable types, the string should hold a description
+# of this object, and the reference points to the WHAT of the invokee.
+#
+# Note that if this protocol is followed, $x === $y implies
+# $x.WHAT === $y.WHAT, and so the string data is completely under the control
+# of the type.
+#
+# Well, not quite - you need to avoid returning anything starting with objat|
+my class ObjAt {
+    has Str $.str;
+    has Mu  $.ref;
+
+    multi method WHICH(ObjAt:D:) {
+        ObjAt.new(str => 'objat|' ~ $!str, ref => $!ref)
+    }
+
+    sub REFHASH($v) { Q:CgOp { (box Int (ref_hash (@ {$v}))) }.fmt('[%X]') }
+    method Str()  { self // nextsame; $!str ~ REFHASH($!ref) }
+    method gist() { self // nextsame; $!str ~ REFHASH($!ref) }
 }
 
 my class Scalar {
@@ -1223,10 +1265,12 @@ sub trim-leading($string) is pure { $string.trim-leading };
 sub trim-trailing($string) is pure { $string.trim-trailing };
 sub trim($string) is pure { $string.trim };
 
-# this one is horribly wrong and only handles the ref eq case.
-sub infix:<===>($l,$r) is equiv<==> { Q:CgOp {
-    (box Bool (compare == (@ {$l}) (@ {$r})))
-} }
+sub infix:<===>($l,$r) is equiv<==> {
+    my $lw = $l.WHICH;
+    my $rw = $r.WHICH;
+    Q:CgOp { (box Bool (compare == (@ {$lw.ref}) (@ {$rw.ref}))) } &&
+        $lw.str eq $rw.str
+}
 sub infix:<=:=>(\l,\r) is equiv<==> { Q:CgOp {
     (box Bool (compare == {l} {r}))
 } }

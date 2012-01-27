@@ -2806,4 +2806,6 @@ again:
     public static System.IO.TextWriter twriter_stderr() {
         stderr.AutoFlush = true; return stderr;
     }
+
+    public static int ref_hash(P6any o) { return RuntimeHelpers.GetHashCode(o); }
 }
