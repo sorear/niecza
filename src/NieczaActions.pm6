@@ -1702,7 +1702,7 @@ method methodop($/) {
             self.do_variable_reference($/, $<variable>.ast));
     }
 
-    $/.ast.args = $<args>.ast[0] if $<args>;
+    $/.ast.args = $<args>.ast[0] // [] if $<args>;
     $/.ast.args = $<arglist>.ast if $<arglist>;
 }
 
