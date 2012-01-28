@@ -398,7 +398,7 @@ my class Cool {
     method truncate() { truncate self }
     method sqrt() { sqrt self }
     method sign() { sign self }
-    method conjugate() { self }
+    method conj() { self }
     multi method exp() { Q:CgOp { (exp {self}) } }
     multi method exp($base) { $base ** self }
     method ln() { Q:CgOp { (ln {self}) } }
@@ -802,7 +802,7 @@ my class Complex does Numeric {
     method Complex() { self }
     method re() { Q:CgOp { (complex_re {self}) } }
     method im() { Q:CgOp { (complex_im {self}) } }
-    method conjugate() { self.re - (self.im)i }
+    method conj() { self.re - (self.im)i }
     method polar() { self.abs, atan2(self.im, self.re); }
 }
 my class FatRat does Real {
@@ -2956,7 +2956,7 @@ sub prefix:<abs> ($x) is pure { Q:CgOp { (abs {$x}) } }
 sub abs($x) is pure { Q:CgOp { (abs {$x}) } }
 sub floor($x) is pure { Q:CgOp { (floor {$x}) } }
 sub ceiling($x) is pure { -floor(-$x) }
-sub conjugate($x) is pure { $x.conjugate }
+sub conj($x) is pure { $x.conj }
 sub round($x, $scale=1) is pure { floor($x / $scale + 0.5) * $scale }
 sub truncate($x) is pure { $x.Int }
 sub sign($x) is pure { $x < 0 ?? -1 !! $x > 0 ?? 1 !! 0 }
