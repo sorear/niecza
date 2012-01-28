@@ -11,7 +11,7 @@ method _register_ops(*@ops) {
         my $fnc = anon sub CgOperator (\|@parcel) {
             Q:CgOp {
                 (letn arr {[@parcel]}
-                      items (getslot items vvarlist (@ (l arr)))
+                      items (getslot List $!items vvarlist (@ (l arr)))
                   (sink (vvarlist_shift (l items)))
                   (vvarlist_unshift (l items) {$name})
                   (l arr))

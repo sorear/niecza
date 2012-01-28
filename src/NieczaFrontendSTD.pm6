@@ -72,27 +72,6 @@ method balanced ($start,$stop) { self.mixin( rolecache("B$start\0$stop", {STD::s
 method unbalanced ($stop) { self.mixin( rolecache("U$stop", {STD::stop[$stop]}) ); }
 method unitstop ($stop) { self.mixin( rolecache("N$stop", {STD::unitstop[$stop]}) ); }
 
-# MOP will be used to install $*rx into appropriate method field
-role sym_categorical[$name,$cat,$sym] {
-    $*name = $name;
-    $*rxm = anon token sym_categorical () {
-        $sym $<sym>={$sym} $<name>={$name}
-        $<O>={ self.cat_O($cat, $sym) }
-    }
-}
-
-role bracket_categorical[$name,$cat,$sym1,$sym2] {
-    $*name = $name;
-    $*rxm = anon token bracket_categorical () {
-        :my $*GOAL := $sym2;
-        $sym1 {}:s
-        $<name>={$name}
-        [ :lang($¢.unbalanced($sym2)) <semilist> ]
-        [ $sym2 || <.FAILGOAL($sym2, $name, self.pos)> ]
-        $<O>={ self.cat_O($cat, "$sym1 $sym2") } $<sym>={ [$sym1,$sym2] }
-    }
-}
-
 method add_categorical($name) {
     state %cat_cache;
 
@@ -109,27 +88,35 @@ method add_categorical($name) {
         return self.cursor_fresh(%*LANG<MAIN>);
     }
 
-    my $cat = ~$0;
-    my $sym = ~$1;
-    my ($role, $*rxm, $*name);
+    my $cat ::= ~$0;
+    my $sym ::= ~$1;
+    my $role;
+    # need these readonly for proper LTM
 
     if $sym ~~ /\s+/ {
-        my $sym1 = $sym.substr(0, $/.from);
-        my $sym2 = $sym.substr($/.to, $sym.chars - $/.to);
-        $role = OUR::bracket_categorical["{$cat}:sym<$sym1 $sym2>",
-            $cat, $sym1, $sym2];
+        my $sym1 ::= $sym.substr(0, $/.from);
+        my $sym2 ::= $sym.substr($/.to, $sym.chars - $/.to);
+        my $mname = "{$cat}:sym<$sym1 $sym2>";
+
+        my $meth = anon token bracket_categorical () {
+            :my $*GOAL := $sym2;
+            $sym1 {}:s
+            $<name>={$mname}
+            [ :lang($¢.unbalanced($sym2)) <semilist> ]
+            [ $sym2 || <.FAILGOAL($sym2, $mname, self.pos)> ]
+            $<O>={ self.cat_O($cat, "$sym1 $sym2") } $<sym>={ [$sym1,$sym2] }
+        }
+
+        $role = $Backend.make_role($mname, $meth);
     } else {
-        $role = OUR::sym_categorical["{$cat}:sym<$sym>", $cat, $sym];
+        my $mname = "{$cat}:sym<$sym>";
+        my $meth = anon token sym_categorical () {
+            $sym $<sym>={$sym} $<name>={$mname}
+            $<O>={ self.cat_O($cat, $sym) }
+        }
+        $role = $Backend.make_role($mname, $meth);
     }
     %cat_cache{$name} := $role;
-
-    # $*name will be set if the role blocks are run.  If $*name is not set,
-    # then a cached role was reused and there is no need to fix up method names.
-    if defined $*name {
-        Q:CgOp { (rnull (_addmethod (obj_llhow (@ {$role})) 8
-            (obj_getstr {$*name}) (@ {$*rxm}))) };
-        Q:CgOp { (rnull (_invalidate (obj_llhow (@ {$role})))) };
-    }
 
     %*LANG<MAIN> = $Backend.cached_but(self.WHAT, $role);
     self.cursor_fresh(%*LANG<MAIN>);

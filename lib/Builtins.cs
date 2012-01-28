@@ -2652,12 +2652,25 @@ again:
     }
 
     public static Variable enum_mixin_role(string name, P6any meth) {
-        STable r = new STable("ANON");
+        STable r = new STable('{' + name + '}');
         r.mo.FillRole(new STable[0], null);
         r.typeObject = r.initObject = new P6opaque(r);
         r.typeVar = r.initVar = Kernel.NewROScalar(r.typeObject);
         r.mo.AddMethod(0, name, meth);
         r.mo.Revalidate();
+        r.SetupVTables();
+        return r.typeVar;
+    }
+
+    // TODO: merge
+    public static Variable cat_mixin_role(string name, P6any meth) {
+        STable r = new STable('{' + name + '}');
+        r.mo.FillRole(new STable[0], null);
+        r.typeObject = r.initObject = new P6opaque(r);
+        r.typeVar = r.initVar = Kernel.NewROScalar(r.typeObject);
+        r.mo.AddMethod(P6how.M_MULTI, name, meth);
+        r.mo.Revalidate();
+        r.SetupVTables();
         return r.typeVar;
     }
 
