@@ -2561,14 +2561,14 @@ my class Match is Cool does Associative does Positional {
         my @chunks;
         for self.caps {
             if .value.from > $lpos {
-                push @chunks, '~' => Match.synthetic(:cursor(self),
+                push @chunks, '~' => Match.synthetic(:cursor(self), :captures[],
                     :from($lpos), :to(.value.from));
             }
             push @chunks, $_;
             $lpos = .value.to;
         }
         if self.to > $lpos {
-            push @chunks, '~' => Match.synthetic(:cursor(self),
+            push @chunks, '~' => Match.synthetic(:cursor(self), :captures[],
                 :from($lpos), :to(self.to));
         }
 
