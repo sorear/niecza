@@ -381,9 +381,9 @@ GetOptions(:!permute,
 );
 
 my @*INC;
-my $backend;
+our $Backend;
 if $bcnd eq 'dotnet' || $bcnd eq 'mono' {
-    $backend = NieczaBackendDotnet.new(obj_dir => $odir, safemode => $safe);
+    $Backend = NieczaBackendDotnet.new(obj_dir => $odir, safemode => $safe);
 }
 else {
     note "Backend '$bcnd' not supported";
@@ -398,7 +398,7 @@ my $c = NieczaCompiler.new(
         lang => $lang,
         safemode => $safe,
     ),
-    backend => $backend,
+    backend => $Backend,
     verbose => $verb,
 );
 

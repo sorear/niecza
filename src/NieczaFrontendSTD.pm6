@@ -1,4 +1,4 @@
-our $Actions;
+our ($Actions, $Backend);
 
 class NieczaFrontendSTD;
 
@@ -63,6 +63,15 @@ method default_O($cat, $sym) {
     }
 }
 
+sub rolecache($key, $thunk) {
+    state %cache;
+    (%cache{$key}:exists) ?? %cache{$key} !! (%cache{$key} := $thunk())
+}
+
+method balanced ($start,$stop) { self.mixin( rolecache("B$start\0$stop", {STD::startstop[$start,$stop]}) ); }
+method unbalanced ($stop) { self.mixin( rolecache("U$stop", {STD::stop[$stop]}) ); }
+method unitstop ($stop) { self.mixin( rolecache("N$stop", {STD::unitstop[$stop]}) ); }
+
 # MOP will be used to install $*rx into appropriate method field
 role sym_categorical[$name,$cat,$sym] {
     $*name = $name;
@@ -85,6 +94,8 @@ role bracket_categorical[$name,$cat,$sym1,$sym2] {
 }
 
 method add_categorical($name) {
+    state %cat_cache;
+
     # Signature extension, not categorical
     if $name ~~ /^\w+\:\(/ {
         return self;
@@ -92,6 +103,12 @@ method add_categorical($name) {
     # CORE names are hardcoded
     return self if $*UNITNAME eq 'CORE';
     return self unless ($name ~~ /^(\w+)\: \< (.*) \> /);
+
+    if %cat_cache{$name}:exists {
+        %*LANG<MAIN> = $Backend.cached_but(self.WHAT, %cat_cache{$name});
+        return self.cursor_fresh(%*LANG<MAIN>);
+    }
+
     my $cat = ~$0;
     my $sym = ~$1;
     my ($role, $*rxm, $*name);
@@ -104,6 +121,7 @@ method add_categorical($name) {
     } else {
         $role = OUR::sym_categorical["{$cat}:sym<$sym>", $cat, $sym];
     }
+    %cat_cache{$name} := $role;
 
     # $*name will be set if the role blocks are run.  If $*name is not set,
     # then a cached role was reused and there is no need to fix up method names.
@@ -113,7 +131,7 @@ method add_categorical($name) {
         Q:CgOp { (rnull (_invalidate (obj_llhow (@ {$role})))) };
     }
 
-    %*LANG<MAIN> = self.WHAT but $role;
+    %*LANG<MAIN> = $Backend.cached_but(self.WHAT, $role);
     self.cursor_fresh(%*LANG<MAIN>);
 }
 
@@ -162,7 +180,7 @@ method cursor_force($pos) {
     self.cursor($pos);
 }
 
-method mixin($role) { self.cursor_fresh(self.WHAT but $role) }
+method mixin($role) { self.cursor_fresh($Backend.cached_but(self.WHAT, $role)) }
 
 method mark_sinks(@sl) { #OK not used
     #NYI

@@ -75,6 +75,12 @@ sub downcall(*@args) {
     Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.DownCall {@args}) }
 }
 
+method cached_but($cls, $role) {
+    # TODO: Object hashes!
+    my $slot := Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.CacheSlot (@ {$cls}) (@ {$role})) };
+    defined($slot) ?? ($slot = ($cls but $role)) !! $slot
+}
+
 sub gethash($str) {
     Q:CgOp { (box Str (rawscall Niecza.Downcaller,CompilerBlob.DoHash (obj_getstr {$str}))) }
 }
