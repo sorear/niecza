@@ -30,8 +30,7 @@ LOL: feature requires slice context mappings.
 (1172) No auto-declared temporary variables $x = <.ident>
 (1178) No bindings to existing variables
 (1186) No || @array temporal-alternation syntax DISCUSS
-(1253) No handling of formal parameters in LTM
-(1276) Declarativeness of constants is insufficiently general
+(1276) Declarativeness of constants is excessively general
 (1461) DISCUSS: STD parses EXPR in assertion:variable, why?
 (1585) <[ z..a ]> not treated as compile error DISCUSS
 (1679) No <.>
