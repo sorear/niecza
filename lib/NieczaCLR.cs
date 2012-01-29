@@ -663,6 +663,13 @@ for $args (0..9) {
             Array.Copy(pm.mo.mro, 0, mro, 1, pm.mo.mro.Length);
             mro[0] = m;
             m.FillClass(new string[] { }, new STable[] { }, new STable[] { pm }, mro);
+            foreach (Type ity in t.GetInterfaces())
+                m.mo.role_typecheck_list.Add(GetWrapper(ity));
+            if (t.IsInterface) {
+                m.mo.type = P6how.ROLE;
+                m.mo.rtype = "role";
+                m.mo.role_typecheck_list.Add(m);
+            }
 
             HashSet<string> needNewWrapper = new HashSet<string>();
             needNewWrapper.Add("new"); // don't inherit constructors
