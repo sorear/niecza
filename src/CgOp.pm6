@@ -66,7 +66,7 @@ CgOp._register_ops: <
         vvarlist_new_empty vvarlist_new_singleton vvarlist_pop
         vvarlist_push vvarlist_shift vvarlist_sort vvarlist_to_fvarlist
         vvarlist_unshift vvarlist_unshiftn whileloop xspan times
-        divop obj_can sqrt push pop unshift shift
+        divop obj_can sqrt push pop unshift shift ind_method_call
         newarray newhash you_are_here frame_outer frame_sub makejunction
         who sc_root sc_indir temporize _addmethod _invalidate rxlprim >;
 

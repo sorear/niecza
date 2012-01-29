@@ -202,6 +202,11 @@ class CallMethod is CallLike {
                         $CgOp.fetch($r))), "can", $r, $CgOp.box('Str',$n))),
                     $CgOp.methodcall($r, $n, self.argblock($body)),
                     $CgOp.scopedlex('Nil'))})});
+        } elsif $meta eq '::(' {
+            $CgOp.ind_method_call($CgOp.sc_root(), $name,
+                $CgOp.fetch($CgOp.subcall($CgOp.fetch(
+                    $CgOp.corelex('&_make_capture')),
+                    $!receiver.cgop($body), self.argblock($body))));
         } elsif $!pclass {
             $CgOp.methodcall($.receiver.cgop($body), 'dispatch:<::>',
                 $CgOp.class_ref('typeVar', $!pclass), $CgOp.box("Str",$name),

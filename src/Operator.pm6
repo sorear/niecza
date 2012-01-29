@@ -97,8 +97,8 @@ class PostCall is Operator {
 class Method is Operator {
     has $.name; # Str | Op; .foo; use args, meta, private, path
     has $.args = [];
-    has $.meta; # Bool
-    has $.private; # Bool
+    has Str $.meta;
+    has Bool $.private; # Bool
     has $.package; # Xref
 
     method clone(*%_) {

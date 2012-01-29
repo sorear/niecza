@@ -49,6 +49,29 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
 our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
+method methodop($/) {
+    if $<longname> {
+        my ($c) = self.process_name($<longname>, :defer);
+        make $Operator_Method.new(name => 'die');
+        unless $c {
+            $/.CURSOR.sorry("Method call requires a name");
+            return;
+        }
+        if $c<iname> {
+            make $Operator_Method.new(name => $c<iname>, meta => '::(');
+            return;
+        }
+        make $Operator_Method.new(name => $c<name>, package => $c<pkg>);
+    } elsif $<quote> {
+        make $Operator_Method.new(name => $<quote>.ast);
+    } elsif $<variable> {
+        make $Operator_Function.new(function =>
+            self.do_variable_reference($/, $<variable>.ast));
+    }
+
+    $/.ast.args = $<args>.ast[0] // [] if $<args>;
+    $/.ast.args = $<arglist>.ast if $<arglist>;
+}
 method FALLBACK($meth, $/) {
     my $S = $<sym>;
 

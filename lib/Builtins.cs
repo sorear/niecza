@@ -2821,4 +2821,35 @@ again:
     }
 
     public static int ref_hash(P6any o) { return RuntimeHelpers.GetHashCode(o); }
+
+    public static Frame ind_method_call(Frame th, StashCursor root,
+            string nm, P6any cap) {
+        int cut = nm.LastIndexOf("::");
+        var pos = (Variable[]) cap.GetSlot(Kernel.CaptureMO, "$!positionals");
+        var nam = (VarHash)    cap.GetSlot(Kernel.CaptureMO, "$!named");
+
+        if (cut < 0) {
+            return pos[0].Fetch().InvokeMethod(th, nm, pos, nam);
+        } else {
+            var from = root.Indirect(nm.Substring(0, cut), false, null)
+                .Fetch().mo;
+            var name = nm.Substring(cut+2);
+
+            // some code copied from dispatch_fromtype
+            if (!pos[0].Fetch().Does(from)) {
+                return Kernel.Die(th, "Cannot dispatch to a method on " +
+                    from.name + " because it is not inherited or done by " +
+                    pos[0].Fetch().mo.name);
+            }
+
+            var de = from.FindMethod(name);
+            if (de != null) {
+                return de.info.SetupCall(th, de.outer, de.ip6,
+                            pos, nam, false, de);
+            } else {
+                return Kernel.Die(th, "Unable to resolve method " + name +
+                        " via " + from.name);
+            }
+        }
+    }
 }
