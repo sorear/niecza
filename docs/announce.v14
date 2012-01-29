@@ -1,0 +1,158 @@
+    Announce: Niecza Perl 6 v13
+
+This is the fourteenth release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month.  I'm on winter break now, which means lots
+of time for improvements.  Muahahaha.  This month hasn't seen much of a
+focus.
+
+With this release, Niecza now passes a similar number of spectests as
+Rakudo.  (Note that they are not the same tests, and as such the test counts
+are not completely comparable.)  Solomon Foster has begun efforts to port
+panda to niecza, with the goal of designing a multi-implementation ecosystem.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+[Breaking changes]
+
+Multiple dispatch has been changed to reject all cases of ambiguity using
+an explicit list of conflictors; some ambiguous cases were formerly accepted.
+
+List iteration has been modified to throw an exception when the list generator
+tries to access the unreified part of the list.  The previous code exhibited
+undefined behavior that some code actually relied on.
+
+Parameters like @foo and %foo now insist that their arguments to Positional and
+Associative respectively.
+
+Rat and Complex stringification has been substantially changed.
+
+Niecza now enforces "trusts".
+
+
+
+[Major features]
+
+END blocks are now suppported.
+
+The subroutine entry process has been significantly modified to allow
+signatures to reference variables and anonymous code blocks.
+
+Roles have been overhauled to much more closely match the Rakudo nom behavior.
+Importantly, roles now have a $?CLASS parameter, and role blocks are not run
+until that is available.  Role composition at compile time is now supported,
+as is role summation, attributes in roles, role conflict detection, type
+checking against roles, etc.  &infix:<does> and &infix:<but> now support
+much more of specced behaviors.
+
+Accompanying that, the old tag and mixin classes CommonEnum, IntBasedEnum,
+StrBasedEnum, Callable, Positional, Associative, Numeric, and Real have been
+converted into roles.
+
+Major signature improvements: Added support for sub-signatures, where blocks,
+proper MMD with subtypes, values used as types.  Parameter and Signature
+objects are now reified into Perl 6 space and support a subset of the Rakudo
+nom introspection API.
+
+Niecza now supports constant folding!  If you mark a sub 'is pure' and call
+it with sufficiently constant arguments, it will be replaced at compile time
+with the result of the call, provided said call does not throw an exception.
+What constitutes "sufficiently constant" is not documented, poorly defined,
+and subject to change.
+
+Niecza now keeps attributes from different classes in different namespaces,
+so you can have $!x in both a parent and a child class without issues.
+
+
+[Minor features]
+
+$obj.Foo::bar, $obj.::("Foo::bar"), and /<::("Foo::bar")>/ are now accepted.
+
+Type adverbs :_ :U :D :T are now accepted.
+
+Signatures like (Int, Int) are now allowed.
+
+Phaser handling has been improved, and support added for CHECK.
+
+Aliasing forms like <foo=$bar> are now allowed.
+
+Version information is now embedded into the build, allowing for --version
+and $?PERL support.
+
+Printing of unhandled exceptions uses .gist.
+
+Multiple dispatch now handles junctions.
+
+
+infix:<cmp> supports pairs, ±Inf (Solomon Foster)
+
+Hash.perl sorts the output to be slightly more useful.
+
+New setting subroutines and methods:
+
+Cool.polar, Cool.roots, &roots, Array.delete, &infix:<minmax>, &rotate,
+CommonEnum.pick, CommonEnum.roll, Any.min, Any.max, Any.minmax, Str.trans,
+&elems, Any.reduce, &reduce, &shell
+(Solomon Foster)
+
+Hash.push
+(Moritz Lenz)
+
+Int.base
+(Will Coleda)
+
+&prefix:<sleep>, Mu.clone
+
+split and comb now support limits of Whatever (Solomon Foster)
+
+Range coerces values to numbers according to spec (Solomon Foster)
+
+&sort accepts a Callable first argument (Solomon Foster)
+
+Added limit to &lines, :r and :rw to &open (Solomon Foster)
+
+min and max support arbitrarily many arguments (Solomon Foster)
+
+Changed sleep to return a value (Will Coleda)
+
+
+
+[Other]
+
+Daniel Ruoso is attempting an implementation of concurrent feeds (not yet done).
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+    Future directions
+
+My current priorities are:
+ 1. Make regexes much more feature-complete, including general Unicode
+    properties and grapheme mode
+ 2. Prototype the debugger
+ 3. 6model convergence work, including roles/native types
+ 4. Figure out how modules and S11 stuff should work in Niecza.  Do it.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-13.zip
+[2] https://github.com/sorear/niecza
+[3] http://www.unicode.org/reports/tr18/
+[4] https://github.com/flussence/specgraphs/raw/master/impls.png
