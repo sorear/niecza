@@ -517,8 +517,6 @@ namespace Niecza {
 
         public static STable GetNamedWrapper(string nm) {
             lock (wrapper_cache_lock) {
-                if (wrapper_cache == null)
-                    wrapper_cache = new Dictionary<Type, STable>();
                 if (named_wrapper_cache == null)
                     named_wrapper_cache = new Dictionary<string, STable>();
                 STable r;
@@ -528,8 +526,7 @@ namespace Niecza {
                 if (CLROpts.Debug)
                     Console.WriteLine("Loading type {0} ... {1}", nm.Substring(1), ty == null ? "failed" : "succeeded");
                 if (ty != null) {
-                    wrapper_cache[ty] = r = NewWrapper(ty);
-                    named_wrapper_cache[nm] = r;
+                    named_wrapper_cache[nm] = r = GetWrapper(ty);
                 } else {
                     named_wrapper_cache[nm] = r = StashCursor.MakePackage(
                         "CLR" + nm.Replace(".","::"),
@@ -757,6 +754,11 @@ for $args (0..9) {
             m.box_type = t;
             m.typeObject = m.initObject = new BoxObject<object>(null, m);
             m.typeVar = m.initVar = Kernel.NewROScalar(m.typeObject);
+            if (CLROpts.Debug) {
+                Console.WriteLine("--- Created box for {0} ---", m.name);
+                foreach (var o in m.mo.type_list)
+                    Console.WriteLine("type {0}", o.name);
+            }
             return m;
         }
 
