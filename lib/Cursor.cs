@@ -2033,13 +2033,16 @@ anew:
         return uniqfates;
     }
 
-    internal static P6any[] RunDispatch(Frame fromf, Cursor cursor) {
+    internal static P6any[] RunDispatch(Frame th, Cursor cursor) {
+        Frame fromf = th;
         if (fromf.info.param == null) {
             fromf = fromf.caller;
             while (fromf.info.param == null ||
                     !(fromf.info.param[0] is P6any[]))
                 fromf = fromf.outer;
         }
+        th.lex2 = fromf.pos;
+        th.lex3 = fromf.named;
 
         STable kl = cursor.mo;
 
@@ -2059,6 +2062,7 @@ anew:
     internal static SubInfo StandardProtoSI =
         new SubInfo("KERNEL protoregex", StandardProtoC);
     internal static Frame StandardProtoC(Frame th) {
+        Variable[] al;
         switch (th.ip) {
             default:
                 return Kernel.Die(th, "Invalid IP");
@@ -2076,8 +2080,10 @@ anew:
                     goto case 1;
                 th.rx.PushBacktrack(2);
                 th.ip = 3;
-                return (((P6any[])th.lex1)[th.lexi0++]).Invoke(th,
-                    new Variable[] { Kernel.NewROScalar(th.rx.MakeCursor()) }, null);
+                al = (Variable[])(((Variable[])th.lex2).Clone());
+                al[0] = Kernel.NewROScalar(th.rx.MakeCursor());
+                return (((P6any[])th.lex1)[th.lexi0++]).Invoke(th, al,
+                    (VarHash)th.lex3);
             case 3:
                 th.lex2 = Builtins.start_iter((Variable) th.resultSlot);
                 goto case 4;
