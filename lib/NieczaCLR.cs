@@ -666,8 +666,6 @@ for $args (0..9) {
             foreach (Type ity in t.GetInterfaces())
                 m.mo.role_typecheck_list.Add(GetWrapper(ity));
             if (t.IsInterface) {
-                m.mo.type = P6how.ROLE;
-                m.mo.rtype = "role";
                 m.mo.role_typecheck_list.Add(m);
             }
 
