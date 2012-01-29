@@ -117,9 +117,9 @@ method methodop($/) {
         }
         if $c<iname> {
             make $Operator_Method.new(name => $c<iname>, meta => '::(');
-            return;
+        } else {
+            make $Operator_Method.new(name => $c<name>, package => $c<pkg>);
         }
-        make $Operator_Method.new(name => $c<name>, package => $c<pkg>);
     } elsif $<quote> {
         make $Operator_Method.new(name => $<quote>.ast);
     } elsif $<variable> {
