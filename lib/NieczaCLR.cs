@@ -656,6 +656,7 @@ for $args (0..9) {
                 Console.WriteLine("Setting up wrapper for {0}", t.FullName);
             STable m = new STable("CLR::" + t.FullName.Replace(".","::"));
             m.who = StashCursor.MakeCLR_WHO("." + t.FullName);
+            m.how = Kernel.BoxRaw(m, Kernel.ClassHOWMO);
             STable pm = t.BaseType == null ? Kernel.AnyMO :
                 GetWrapper(t.BaseType);
             STable[] mro = new STable[pm.mo.mro.Length + 1];
