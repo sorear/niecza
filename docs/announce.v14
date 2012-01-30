@@ -36,7 +36,7 @@ List iteration has been modified to throw an exception when the list generator
 tries to access the unreified part of the list.  The previous code exhibited
 undefined behavior that some code actually relied on.
 
-Parameters like @foo and %foo now insist that their arguments to Positional and
+Parameters like @foo and %foo now insist that their arguments be Positional and
 Associative respectively.
 
 Rat and Complex stringification has been substantially changed.
