@@ -43,6 +43,13 @@ Rat and Complex stringification has been substantially changed.
 
 Niecza now enforces "trusts".
 
+&nextwith and CallFrame.args now conspire to hide the invocant parameter.  If
+you are calling nextwith directly, you no longer need to - and must no longer -
+pass a self argument.
+
+|$foo capture parameters now capture the logical "current" capture, rather
+than the "initial" capture.  In particular, 'method (|$foo)' no longer results
+in $foo containing self.
 
 
 [Major features]
@@ -76,11 +83,42 @@ and subject to change.
 
 Niecza now keeps attributes from different classes in different namespaces,
 so you can have $!x in both a parent and a child class without issues.
+Additionally, the sigil is part of the name, so you can now have both $!x
+and @!x.
+
+val() is now supported, and is used automatically on <> lists.
+
+MAIN is now supported.
+
+STD-imported syntax changes: \foo and |foo parameters no longer require a
+sigil.  my \foo = ... works to declare a "raw" variable.  Initializer
+assignment now binds tightly to the declarator, so that e.g. (5 + my $x = 3)
+does something more useful.
+
+.WHICH has been added, and === does the correct thing with value types now.
+
+Perl 5 interop improvements: can now be used from any directory and builds
+much more robustly.  Also supports more pass and return cases.  (Paweł Murias)
 
 
 [Minor features]
 
+No more pseudo-evaluators - all constructs which contain code that logically
+is run at BEGIN time to produce a value, is now actually run rather than
+attempting a static evaluation.
+
+Binding to attributes is now supported.
+
+Class attribute forms such as my $.foo, and the aliasing form has $foo, are
+now supported.
+
+Within a named 'anon sub', the name is visible, allowing for nicer recursion.
+
+* now properly ignores assignments.
+
 $obj.Foo::bar, $obj.::("Foo::bar"), and /<::("Foo::bar")>/ are now accepted.
+
+You can now set 'is iffy' and 'is diffy' for fully custom operators.
 
 Type adverbs :_ :U :D :T are now accepted.
 
@@ -97,25 +135,44 @@ Printing of unhandled exceptions uses .gist.
 
 Multiple dispatch now handles junctions.
 
+Exporting multisubs from modules now approximately works.
+
+Added ".Bridge" support. (Solomon Foster)
+
+Attribute-binding parameters (:$!foo) now implemented.
+
+:16() syntax is now supported.
+
+Defaults and type constraints that are constants are now saved as such,
+avoiding an unneeded block.
+
+Str.perl now escapes special characters.
+
+CLR interop now supports calls to shadowed and hidden methods, like
+$obj.CLR::System::IDisposable.Dispose().  Note that this can NOT be used to
+call overriden methods (callvirt semantics are used).
+
+LTM processing ignores arguments and dispatchers forward the arguments to
+multi regexes.
 
 infix:<cmp> supports pairs, ±Inf (Solomon Foster)
 
 Hash.perl sorts the output to be slightly more useful.
 
-New setting subroutines and methods:
-
+New setting things:
 Cool.polar, Cool.roots, &roots, Array.delete, &infix:<minmax>, &rotate,
 CommonEnum.pick, CommonEnum.roll, Any.min, Any.max, Any.minmax, Str.trans,
-&elems, Any.reduce, &reduce, &shell
+&elems, Any.reduce, &reduce, &shell, &categorize, &cwd, &chdir, $*CWD,
+&printf, IO.copy, IO.chmod
 (Solomon Foster)
 
-Hash.push
-(Moritz Lenz)
+Hash.push (Moritz Lenz)
 
-Int.base
-(Will Coleda)
+Int.base, Array.splice, &splice (Will Coleda)
 
-&prefix:<sleep>, Mu.clone
+Set, Bag (Larry Wall, Solomon Foster)
+
+&prefix:<sleep>, Mu.clone, &undefine, $*OS, Order, $*OUT, $*ERR
 
 split and comb now support limits of Whatever (Solomon Foster)
 
@@ -133,7 +190,7 @@ Changed sleep to return a value (Will Coleda)
 
 [Other]
 
-Daniel Ruoso is attempting an implementation of concurrent feeds (not yet done).
+Daniel Ruoso is attempting an implementation of concurrent feeds.
 
 
     Getting involved
@@ -144,15 +201,10 @@ on stuff on it, or have cool ideas to add to it, both are good.
 
     Future directions
 
-My current priorities are:
- 1. Make regexes much more feature-complete, including general Unicode
-    properties and grapheme mode
- 2. Prototype the debugger
- 3. 6model convergence work, including roles/native types
- 4. Figure out how modules and S11 stuff should work in Niecza.  Do it.
+Next month is likely to see fewer tuits in general.  The only concrete plan
+I have is to continue with 6model convergence, hopefully reaching a point
+where user-defined metaclasses are possible.
 
 
-[1] https://github.com/downloads/sorear/niecza/niecza-13.zip
+[1] https://github.com/downloads/sorear/niecza/niecza-14.zip
 [2] https://github.com/sorear/niecza
-[3] http://www.unicode.org/reports/tr18/
-[4] https://github.com/flussence/specgraphs/raw/master/impls.png
