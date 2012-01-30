@@ -2041,8 +2041,8 @@ anew:
                     !(fromf.info.param[0] is P6any[]))
                 fromf = fromf.outer;
         }
-        th.lex2 = fromf.pos;
-        th.lex3 = fromf.named;
+        th.lex3 = fromf.pos;
+        th.lex4 = fromf.named;
 
         STable kl = cursor.mo;
 
@@ -2080,10 +2080,10 @@ anew:
                     goto case 1;
                 th.rx.PushBacktrack(2);
                 th.ip = 3;
-                al = (Variable[])(((Variable[])th.lex2).Clone());
+                al = (Variable[])(((Variable[])th.lex3).Clone());
                 al[0] = Kernel.NewROScalar(th.rx.MakeCursor());
                 return (((P6any[])th.lex1)[th.lexi0++]).Invoke(th, al,
-                    (VarHash)th.lex3);
+                    (VarHash)th.lex4);
             case 3:
                 th.lex2 = Builtins.start_iter((Variable) th.resultSlot);
                 goto case 4;
