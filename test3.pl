@@ -85,15 +85,3 @@ use Test;
     sub foo(%x) { } #OK
     dies_ok { foo(3) }, '%x needs Associative';
 }
-
-{
-    my grammar Z5 {
-        token TOP { fo* | <k(5)> }
-        token k( $ ) { foo }
-        token p:x ($x) { {$*ret = $x} }
-    }
-    ok Z5.parse('foo')<k>.defined, 'arguments do not disturb LTM';
-    my $*ret;
-    "foo" ~~ / :lang(Z5) <p(9)> /;
-    is $*ret, 9, 'protoregex dispatchers pass arguments to callees';
-}

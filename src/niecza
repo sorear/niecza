@@ -89,7 +89,7 @@ method assertion:name ($/) {
             [ self.op_for_regex($/, $<nibbler>.ast) ] !!
             $<arglist> ?? $<arglist>.ast !! [];
 
-        my ($callop, $ltm);
+        my $callop;
         if $is_lexical {
             $callop = $OpCallSub.new(invocant => mklex($/, "&$name"),
                 positionals => [ mklex($/, '$¢'), @$args ]);
@@ -97,14 +97,13 @@ method assertion:name ($/) {
             $callop = $Operator_Method.new(name => $pname<iname>, :$args,
                 meta => '::(').with_args($/, mklex($/, '$¢'));
         } else {
-            $ltm = [ 'Method', $pname<name> ];
             $callop = $Operator_Method.new(name => $pname<name>, :$args,
                 package => $pname<pkg>).with_args($/, mklex($/, '$¢'));
         }
 
         my $regex = self.rxembed($/, $callop, True);
 
-        make $RxOpSubrule.new(:$regex, :$ltm);
+        make $RxOpSubrule.new(regex => $regex);
     }
     make self.rxcapturize($/, ~$<longname>, $/.ast);
 }
