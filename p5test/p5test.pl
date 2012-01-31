@@ -5,64 +5,65 @@ use Test::More;
 use Config;
 use ExtUtils::Embed;
 use File::Spec::Functions qw(rel2abs);
-
-my $cc = $Config{cc};
-my $csc = "gmcs";
+use File::Path qw(rmtree);
 
 diag('osname = '.$Config{osname});
-system($cc,"test1.c","-o","test1");
-my $ok1 = `./test1`;
 
-is $ok1,"OK 1\n","We have a working C compiler.";
-
+# get the right flags to embed p5
 my $ccopts = `perl -MExtUtils::Embed -e ccopts`; 
 my $ldopts = `perl -MExtUtils::Embed -e ldopts`; 
 chomp($ccopts);
 chomp($ldopts);
-system("$cc test2.c -o test2 $ccopts $ldopts");
-my $ok2 = `./test2`;
 
-is $ok2,"OK 2\n","We can embed p5.";
-
-system($csc,"test3.cs");
-my $ok3 = `mono test3.exe`;
-is $ok3,"OK 3\n","We can run programs under mono";
-
-my $lib_path4 = rel2abs("test4lib.$Config{so}");
-open(my $test4_config,">test4.exe.config");
-print $test4_config <<END;
- <configuration>
-    <dllmap dll="test4lib" target="$lib_path4" />
-</configuration>
-END
-
-my $cc_with_opts;
-my $ok4;
-for my $invocation ("$cc -m32 -shared ","$cc -shared") {
-    unlink("test4lib.$Config{so}");
-    system($csc,"test4.cs");
-    system("$invocation -o test4lib.$Config{so} test4lib.c");
-    $ok4 = `mono test4.exe`;
-    is $ok4,"OK 4\n","We can call C code from mono using $invocation";
-    if ($ok4 =~ 'OK 4') {
-        $cc_with_opts = $invocation;
-        last;
+my $number = 0;
+sub test { 
+    $number++;
+    my ($opts,$desc) = @_;
+    my $path = "tmp";
+    for my $cc ("$Config{cc}","$Config{cc} -m32") {
+        mkdir($path);
+        do_test($number,$path,{cc=>$cc,csc=>"gmcs"},$opts,$desc." using $cc");
+        rmtree($path);
     }
 }
+sub do_test {
+    my $ok;
+    my ($number,$path,$env,$opts,$desc) = @_;
+    my $cc = $env->{cc};
+    my $csc = $env->{csc};
 
-my $lib_path5 = rel2abs("test5lib.$Config{so}");
-open(my $test5_config,">test5.exe.config");
-print $test5_config <<END;
- <configuration>
-    <dllmap dll="test5lib" target="$lib_path5" />
+    my $p5flags = $opts->{embed_p5} ? " $ccopts $ldopts" : "";
+
+    if ($opts->{cc}) {
+        system("$cc test$number.c -o $path/test$number $p5flags");
+        $ok = `$path/test$number`;
+    }
+    # we write a .config file to portably specify where the dynamic library is
+    if ($opts->{config}) {
+        my $lib_path = rel2abs("$path/test${number}lib.$Config{so}");
+        open(my $test_config,">$path/test$number.exe.config");
+    print $test_config <<END;
+<configuration>
+    <dllmap dll="test${number}lib" target="$lib_path" />
 </configuration>
 END
+    }
+    if ($opts->{so}) {
+        system("$cc -shared -o $path/test${number}lib.$Config{so} test${number}lib.c $p5flags");
+    }
 
-system($csc,"test5.cs");
-system("$cc_with_opts -o test5lib.$Config{so} test5lib.c $ccopts $ldopts");
-my $ok5 = `mono test5.exe`;
-is $ok5,"OK 5\n","We can call P5 code from mono";
+    if ($opts->{mono}) {
+        system($csc,"/out:$path/test$number.exe","test$number.cs");
+        $ok = `mono $path/test$number.exe`;
+    }
 
+    is $ok,"OK $number\n",$desc;
 
+}
+
+test({cc=>1},"We have a working C compiler.");
+test({cc=>1,embed_p5=>1},"We can embed p5.");
+test({mono=>1},"We can run programs under mono");
+test({config=>1,so=>1,mono=>1},"We can call C code from mono");
+test({config=>1,so=>1,embed_p5=>1,mono=>1},"We can call P5 code from mono");
 done_testing;
- 
