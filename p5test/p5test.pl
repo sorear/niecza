@@ -65,5 +65,5 @@ test({cc=>1},"We have a working C compiler.");
 test({cc=>1,embed_p5=>1},"We can embed p5.");
 test({mono=>1},"We can run programs under mono");
 test({config=>1,so=>1,mono=>1},"We can call C code from mono");
-test({config=>1,so=>1,embed_p5=>1,mono=>1},"We can call P5 code from mono");
+test({config=>1,so=>1,embed_p5=>1,mono=>1},"We can call p5 code from mono");
 done_testing;
