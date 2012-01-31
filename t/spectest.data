@@ -4,6 +4,7 @@ integration/lexical-array-in-inner-block.t
 integration/method-calls-and-instantiation.t
 integration/no-indirect-new.t
 integration/passing-pair-class-to-sub.t
+integration/role-composition-vs-attribute.t
 integration/substr-after-match-in-gather-in-for.t
 integration/weird-errors.t
 integration/99problems-01-to-10.t
@@ -266,6 +267,7 @@ S05-capture/subrule.t
 S05-grammar/action-stubs.t
 S05-grammar/inheritance.t
 S05-grammar/methods.t
+S05-grammar/namespace.t
 S05-grammar/parse_and_parsefile.t
 S05-grammar/protoregex.t
 S05-grammar/signatures.t
@@ -382,6 +384,7 @@ S12-class/inheritance-class-methods.t
 S12-class/instantiate.t
 S12-class/lexical.t
 S12-class/mro.t
+S12-class/namespaced.t
 S12-class/open.t
 S12-class/self-inheritance.t
 S12-class/stubs.t
