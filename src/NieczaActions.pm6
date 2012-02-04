@@ -6,7 +6,7 @@ our ($Op, $OpAttribute, $OpBareBlock, $OpBuiltin, $OpCallLike, $OpCallMethod,
      $OpParen, $OpRegexBody, $OpRequire, $OpShortCircuit, $OpSimplePair,
      $OpSimpleParcel, $OpStart, $OpStateDecl, $OpStatementList,
      $OpStringLiteral, $OpTemporize, $OpTry, $OpWhatever, $OpWhateverCode,
-     $OpWhen, $OpWhileLoop, $OpYada, $OpYouAreHere);
+     $OpWhen, $OpWhileLoop, $OpYada, $OpYouAreHere, $OpLexicalBind);
 
 our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
      $RxOpCutBrack, $RxOpCutRule, $RxOpConfineLang, $RxOpCapturing,
@@ -49,7 +49,11 @@ method FALLBACK($meth, $/) {
     } elsif substr($meth,0,6) eq 'infix:' {
         make $Operator.funop($/, q:s'&infix:<$S>', 2);
     } elsif substr($meth,0,5) eq 'term:' {
-        make mkcall($/, q:s'&term:<$S>');
+        if $*CURLEX<!sub>.lookup_lex(q:s"term:<$S>") {
+            make mklex($/, q:s"term:<$S>");
+        } else {
+            make mkcall($/, q:s'&term:<$S>');
+        }
     } else {
         $/.CURSOR.sorry("Action method $meth not yet implemented");
     }
@@ -994,15 +998,13 @@ method assertion:name ($/) {
             [ self.op_for_regex($/, $<nibbler>.ast) ] !!
             $<arglist> ?? $<arglist>.ast !! [];
 
-        if $pname<iname> {
-            $/.CURSOR.sorry('Indirect method calls NYI');
-            $pname = {name => 'alpha'};
-        }
-
         my $callop;
         if $is_lexical {
             $callop = $OpCallSub.new(invocant => mklex($/, "&$name"),
                 positionals => [ mklex($/, '$¢'), @$args ]);
+        } elsif $pname<iname> {
+            $callop = $Operator_Method.new(name => $pname<iname>, :$args,
+                meta => '::(').with_args($/, mklex($/, '$¢'));
         } else {
             $callop = $Operator_Method.new(name => $pname<name>, :$args,
                 package => $pname<pkg>).with_args($/, mklex($/, '$¢'));
@@ -1207,7 +1209,7 @@ method escape:sym<%> ($/) { make $<EXPR>.ast }
 method escape:ch ($/) { make ~$<ch> }
 method escape:ws ($/) { make "" }
 my class RangeSymbol { };
-method escape:sym<..> ($/) { make RangeSymbol }
+method escape:sym<..> ($/) { make RangeSymbol.new }
 
 # XXX I probably shouldn't have used "Str" for this action method name
 method Str($match?) { "NieczaActions" } #OK not used
@@ -1279,11 +1281,12 @@ method process_tribble(@bits) {
     my @cstack;
     my @mstack;
     for @bits -> $b {
-        if $b.ast.^isa(Str) {
-            next if $b.ast eq "";
+        my $ast = $b.ast // ~$b;
+        if $ast.^isa(Str) {
+            next if $ast eq "";
         }
         push @mstack, $b.CURSOR;
-        push @cstack, $b.ast;
+        push @cstack, $ast;
         if @cstack >= 2 && @cstack[*-2] ~~ RangeSymbol {
             if @cstack == 2 {
                 @mstack[0].sorry(".. requires a left endpoint");
@@ -1524,42 +1527,12 @@ method statement_control:TEMP ($/) {
         var => self.inliney_call($/, $<block>.ast));
 }
 
+# now that initializer has been split out this can be a lot smaller...
 method INFIX($/) {
     my $fn = $<infix>.ast;
     my ($st,$lhs,$rhs) = self.whatever_precheck($fn, $<left>.ast, $<right>.ast);
 
     make $fn.with_args($/, $lhs, $rhs);
-
-    if $fn.assignish {
-        # Assignments to has and state declarators are rewritten into
-        # an appropriate phaser
-        if $lhs.^isa($OpStateDecl) {
-            my $cv = self.gensym;
-            $*CURLEX<!sub>.add_state_name(Str, $cv);
-            make mklet($lhs, -> $ll {
-                $OpStatementList.new(pos=>$/, children => [
-                    $OpStart.new(condvar => $cv, body =>
-                        $fn.with_args($/, $ll, $rhs)),
-                    $ll]) });
-        }
-        elsif $lhs.^isa($OpAttribute) {
-            my $init = self.thunk_sub($rhs,
-                :name($lhs.initializer.name ~ " init"));
-            $init.set_outervar(my $ov = self.gensym);
-            $*CURLEX<!sub>.add_my_sub($ov, $init);
-            $lhs.initializer.add_initializer($lhs.name, $init);
-            make $OpStatementList.new;
-        }
-        elsif $lhs.^isa($OpConstantDecl) && !$lhs.init {
-            my $sig = substr($lhs.name, 0, 1);
-            if defined '$@&%'.index($sig) {
-                self.init_constant($lhs, self.docontext($/, $sig, $rhs));
-            } else {
-                self.init_constant($lhs, $rhs);
-            }
-            make $lhs;
-        }
-    }
     make self.whatever_postcheck($/, $st, $/.ast);
 }
 
@@ -1691,10 +1664,10 @@ method methodop($/) {
             return;
         }
         if $c<iname> {
-            $/.CURSOR.sorry("Indirectly named method calls NYI");
-            return;
+            make $Operator_Method.new(name => $c<iname>, meta => '::(');
+        } else {
+            make $Operator_Method.new(name => $c<name>, package => $c<pkg>);
         }
-        make $Operator_Method.new(name => $c<name>, package => $c<pkg>);
     } elsif $<quote> {
         make $Operator_Method.new(name => $<quote>.ast);
     } elsif $<variable> {
@@ -2147,16 +2120,27 @@ method special_variable:sym<$¢> ($/) {}
 
 method param_sep ($/) {}
 
-# :: { list : Bool, hash : Bool  slot : Maybe[Str], names : [Str] }
+method named_param_term($/) {
+    if $<named_param> {
+        make $<named_param>.ast;
+    } elsif $<param_var> {
+        make (anon % = %( $<param_var>.ast ));
+        $/.ast<names> = []; # completely replace
+    } else {
+        make { slot => $<defterm>.ast, names => [ ], flags => $Sig::RWTRANS };
+    }
+}
 method named_param($/) {
     my %rt;
+    if $<defterm> {
+        # XXX funky syntax
+        my $id = ~$<defterm>;
+        make { slot => $id, names => [ $id ], flags => $Sig::RWTRANS };
+        $/.CURSOR.sorry("bare identifier forms NYI");
+        return;
+    }
     if $<name> {
-        if $<named_param> {
-            %rt = %( $<named_param>.ast );
-        } else {
-            %rt = %( $<param_var>.ast );
-            %rt<names> = []; # completely replace
-        }
+        %rt = %( $<named_param_term>.ast );
         %rt<names> = [ @( %rt<names> // [] ), ~$<name> ]
             unless %rt<names> && %rt<names>.grep(~$<name>);
     } else {
@@ -2218,7 +2202,9 @@ method param_var($/) {
 method parameter($/) {
     my $sorry;
     my $p = $<param_var> // $<named_param>;
-    my $p_ast = $p ?? $p.ast !! { names => [], flags => $Sig::POSITIONAL };
+    my $p_ast = $p ?? $p.ast !! $<defterm> ??
+        { names => [], flags => $Sig::POSITIONAL + $Sig::RWTRANS, slot => ~$<defterm> } !!
+        { names => [], flags => $Sig::POSITIONAL };
     my $flags = $p_ast<flags>;
 
     $flags +|= $Sig::READWRITE if $*SIGNUM && $*CURLEX<!rw_lambda>;
@@ -2239,7 +2225,7 @@ method parameter($/) {
     my $tag = $<quant> ~ ':' ~ $<kind>;
     if    $tag eq '**:*' { $sorry = "Slice parameters NYI" }
     elsif $tag eq '*:*'  { $flags +|= ($flags +& $Sig::IS_HASH) ?? $Sig::SLURPY_NAM !! $Sig::SLURPY_POS }
-    elsif $tag eq '|:*'  { $flags +|= $Sig::SLURPY_CAP }
+    elsif $tag eq '|:!'  { $flags +|= $Sig::SLURPY_CAP }
     elsif $tag eq '\\:!' { $flags +|= $Sig::RWTRANS }
     elsif $tag eq '\\:?' { $flags +|= ($Sig::RWTRANS + $Sig::OPTIONAL) }
     elsif $tag eq ':!'   { }
@@ -2572,7 +2558,7 @@ method terminator:sym« --> » ($/) {}
 method terminator:sym<!!> ($/) {}
 
 method stdstopper($/) {}
-method unitstopper($/) {}
+method unitstopper($/) { $/.CURSOR.mark_used('&MAIN') }
 method eat_terminator($/) {}
 
 method scoped($/) {
@@ -2582,6 +2568,11 @@ method scoped($/) {
 
 # :: Op
 method declarator($/) {
+    if $<defterm> {
+        make $<defterm>.ast;
+        self.do_initialize($/, True);
+        return;
+    }
     if $<signature> {
         temp $*SCOPE ||= 'my';
         my $sub = $*CURLEX<!sub>;
@@ -2613,12 +2604,74 @@ method declarator($/) {
         make $OpSimpleParcel.new(pos=>$/, items => @p);
         make $OpStateDecl.new(pos=>$/, inside => $/.ast)
             if $*SCOPE eq 'state';
+    } else {
+        make $<variable_declarator> ?? $<variable_declarator>.ast !!
+             $<routine_declarator>  ?? $<routine_declarator>.ast !!
+             $<regex_declarator>    ?? $<regex_declarator>.ast !!
+             $<type_declarator>.ast;
+    }
+    self.do_initialize($/);
+}
+
+method defterm($/) {
+    make ~$/;
+    return if ($*IN_DECL // '') eq 'constant';
+    $/.CURSOR.trymop({
+        $*CURLEX<!sub>.add_my_name($/.ast, |mnode($/));
+        $/.CURSOR.check_categorical($/.ast);
+    });
+}
+
+method initializer($/) { }
+method initializer:sym<=> ($/) { make $Operator.funop($/, '&infix:<=>', 2) }
+method initializer:sym<:=> ($/) { make $Operator_Binding.new(:!readonly) }
+method initializer:sym<::=> ($/) { make $Operator_Binding.new(:readonly) }
+method initializer:sym<.=> ($/) { make $Operator_DotEq.new }
+
+method do_initialize($/, $parcel?) {
+    my $i = $<initializer> or return;
+    my $fn = $i.ast;
+    my $lhs = $/.ast;
+    my $rhs = ($i<EXPR> // $i<dottyopish>).ast;
+
+    if $parcel {
+        if $i<sym> ne '=' {
+            $/.CURSOR.sorry('Parcel variables may only be set using = for now');
+        }
+        make $OpLexicalBind.new(name => $lhs, :$rhs);
         return;
     }
-    make $<variable_declarator> ?? $<variable_declarator>.ast !!
-         $<routine_declarator>  ?? $<routine_declarator>.ast !!
-         $<regex_declarator>    ?? $<regex_declarator>.ast !!
-         $<type_declarator>.ast;
+
+    make $fn.with_args($/, $lhs, $rhs);
+
+    # Assignments to has and state declarators are rewritten into
+    # an appropriate phaser
+    if $lhs.^isa($OpStateDecl) {
+        my $cv = self.gensym;
+        $*CURLEX<!sub>.add_state_name(Str, $cv);
+        make mklet($lhs, -> $ll {
+            $OpStatementList.new(pos=>$/, children => [
+                $OpStart.new(condvar => $cv, body =>
+                    $fn.with_args($/, $ll, $rhs)),
+                $ll]) });
+    }
+    elsif $lhs.^isa($OpAttribute) {
+        my $init = self.thunk_sub($rhs,
+            :name($lhs.initializer.name ~ " init"));
+        $init.set_outervar(my $ov = self.gensym);
+        $*CURLEX<!sub>.add_my_sub($ov, $init);
+        $lhs.initializer.add_initializer($lhs.name, $init);
+        make $OpStatementList.new;
+    }
+    elsif $lhs.^isa($OpConstantDecl) && !$lhs.init {
+        my $sig = substr($lhs.name, 0, 1);
+        if defined '$@&%'.index($sig) {
+            self.init_constant($lhs, self.docontext($/, $sig, $rhs));
+        } else {
+            self.init_constant($lhs, $rhs);
+        }
+        make $lhs;
+    }
 }
 
 method scope_declarator:my ($/) { make $<scoped>.ast }
@@ -2856,10 +2909,13 @@ method init_constant($con, $rhs) {
 }
 
 method type_declarator:constant ($/) {
+    self.do_initialize($/);
+}
+method install_constant ($/) {
     if $*MULTINESS {
         $/.CURSOR.sorry("Multi variables NYI");
     }
-    my $name  = ~($<identifier> // $<variable> // self.gensym);
+    my $name  = ~($<defterm> // $<variable> // self.gensym);
 
     make self.make_constant($/, $*SCOPE, $name);
 }
@@ -3970,7 +4026,14 @@ method statement_prefix:BEGIN ($/) {
 }
 
 method comp_unit($/) {
-    $*CURLEX{'!sub'}.finish($<statementlist>.ast);
+    my $ast = $<statementlist>.ast;
+
+    if $*CURLEX<!sub>.has_lexical('&MAIN') && $*UNITNAME eq 'MAIN' {
+        $ast = $OpStatementList.new(children =>
+            [ $ast, mkcall($/, '&MAIN_HELPER') ]);
+    }
+
+    $*CURLEX{'!sub'}.finish($ast);
 
     make $*unit;
 }
