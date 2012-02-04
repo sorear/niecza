@@ -49,6 +49,45 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
 our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
+my class RangeSymbol { };
+method escape:sym<..> ($/) { make RangeSymbol }
+method process_tribble(@bits) {
+    my @cstack;
+    my @mstack;
+    for @bits -> $b {
+        my $ast = $b.ast // ~$b;
+        if $ast.^isa(Str) {
+            next if $ast eq "";
+        }
+        push @mstack, $b.CURSOR;
+        push @cstack, $ast;
+        if @cstack >= 2 && @cstack[*-2] ~~ RangeSymbol {
+            if @cstack == 2 {
+                @mstack[0].sorry(".. requires a left endpoint");
+                return self.void_cc;
+            }
+            for 1, 3 -> $i {
+                if (@cstack[*-$i] !~~ Str) || (@cstack[*-$i].codes != 1) {
+                    @mstack[*-$i].sorry(".. endpoint must be a single character");
+                    return self.void_cc;
+                }
+            }
+            my $new = [False, $RxOpCClassElem.new(cc =>
+                $CClass.range(@cstack[*-3], @cstack[*-1]))];
+            pop(@cstack); pop(@cstack); pop(@cstack); push(@cstack, $new);
+            pop(@mstack); pop(@mstack);
+        }
+    }
+    if @cstack && @cstack[*-1] ~~ RangeSymbol {
+        @mstack[*-1].sorry(".. requires a right endpoint");
+        return self.void_cc;
+    }
+    my $retcc = self.void_cc;
+    for @cstack {
+        $retcc = self.or_cc($retcc, ($_ ~~ Str) ?? self.string_cc($_) !! $_);
+    }
+    $retcc;
+}
 method assertion:name ($/) {
     my ($pname) = self.process_name($<longname>, :defer);
     my $name = ~$<longname>;
