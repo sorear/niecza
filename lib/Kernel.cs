@@ -2582,13 +2582,13 @@ namespace Niecza {
                 var sm = Kernel.RunInferior(thn);
                 bool res = Kernel.ACCEPTS(arg, sm);
                 if (!res && !quiet)
-                    throw new NieczaException("Constraint type check failed for parameter " + param.name + " in " + signame);
+                    throw new NieczaException("Constraint type check failed for parameter '" + param.name + "' in '" + signame + "'");
                 return res;
             }
             if (c is Variable) {
                 bool res = Kernel.ACCEPTS(arg, (Variable)c);
                 if (!res && !quiet)
-                    throw new NieczaException("Constraint type check failed for parameter " + param.name + " in " + signame);
+                    throw new NieczaException("Constraint type check failed for parameter '" + param.name + "' in '" + signame + "'");
                 return res;
             }
             throw new NieczaException("funny object in post-constraint list");
@@ -2689,7 +2689,7 @@ get_default:
                             .MakeChild(th, (SubInfo)param.def, Kernel.AnyP);
                         src = Kernel.RunInferior(thn);
                         if (src == null)
-                            throw new Exception("Improper null return from sub default for " + param.name + " in " + signame);
+                            throw new Exception("Improper null return from sub default for '" + param.name + "' in '" + signame + "'");
                     }
                     goto gotit;
                 }
@@ -2714,7 +2714,7 @@ get_default:
                     goto gotit;
                 }
                 if (quiet) return false;
-                throw new NieczaException("No value for parameter " + param.name + " in " + signame);
+                throw new NieczaException("No value for parameter '" + param.name + "' in '" + signame + "'");
 gotit:
                 switch ((flags & Parameter.DEF_MASK) >> Parameter.DEF_SHIFT) {
                     // TODO: Failure will make these cases different
@@ -2723,12 +2723,12 @@ gotit:
                         if (!src.Fetch().IsDefined())
                             break;
                         if (quiet) return false;
-                        throw new NieczaException("Parameter " + param.name + " in " + signame + " requires an undefined argument");
+                        throw new NieczaException("Parameter '" + param.name + "' in '" + signame + "' requires an undefined argument");
                     case Parameter.DEF_ONLY >> Parameter.DEF_SHIFT:
                         if (src.Fetch().IsDefined())
                             break;
                         if (quiet) return false;
-                        throw new NieczaException("Parameter " + param.name + " in " + signame + " requires a defined argument");
+                        throw new NieczaException("Parameter '" + param.name + "' in '" + signame + "' requires a defined argument");
                     default:
                         break;
                 }
@@ -2771,7 +2771,7 @@ gotit:
                             }
                             continue;
                         }
-                        throw new NieczaException("Nominal type check failed in binding " + param.name + " in " + signame + "; got " + srco.mo.name + ", needed " + type.name);
+                        throw new NieczaException("Nominal type check failed in binding '" + param.name + "' in '" + signame + "'; got " + srco.mo.name + ", needed " + type.name);
                     }
 
                     if (rw) {
@@ -2782,7 +2782,7 @@ gotit:
                             goto bound;
                         } else {
                             if (quiet) return false;
-                            throw new NieczaException("Binding " + param.name + " in " + signame + ", cannot bind read-only value to is rw parameter");
+                            throw new NieczaException("Binding '" + param.name + "' in '" + signame + "', cannot bind read-only value to is rw parameter");
                         }
                     }
                     else {
