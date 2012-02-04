@@ -50,7 +50,7 @@ our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
 my class RangeSymbol { };
-method escape:sym<..> ($/) { make RangeSymbol }
+method escape:sym<..> ($/) { make RangeSymbol.new }
 method process_tribble(@bits) {
     my @cstack;
     my @mstack;
