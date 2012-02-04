@@ -1827,7 +1827,9 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
 {
     my $log = '';
     my $ret = '';
-    my $var := _newtiedscalar(Any, { $log ~= "F"; $ret }, { $log ~= $_ });
+    my $nada = sub (|) { Any };
+    my $var := Proxy.new(FETCH => -> $ { $log ~= "F"; $ret },
+        STORE => -> $, $x { $log ~= $x });
 
     $ret = 5; $log = "";
     my $a = $var;
@@ -1839,19 +1841,19 @@ ok "x:" ~~ /. >> ./, "Punctuation ends words";
     is $log, "9", "stores work";
 
     $log = "";
-    $a = _newtiedscalar({ $log ~= "B" }, { Any }, { Any });
+    $a = Proxy.new(BIND => { $log ~= "B" }, FETCH => $nada, STORE => $nada);
     is $log, "", "bind not called spuriously (1)";
 
     $log = "";
-    $a ::= _newtiedscalar({ $log ~= "B" }, { Any }, { Any });
+    $a ::= Proxy.new(BIND => { $log ~= "B" }, FETCH => $nada, STORE => $nada);
     is $log, "", "bind not called spuriously (2)";
 
     $log = "";
-    my $b := _newtiedscalar({ $log ~= "B" }, { Any }, { Any }); #OK
+    my $b := Proxy.new(BIND => { $log ~= "B" }, FETCH => $nada, STORE => $nada); #OK
     is $log, "B", "bind called when needed (bind)";
 
     $log = "";
-    _newtiedscalar({ $log ~= "B" }, { Any }, { Any }) = 5;
+    Proxy.new(BIND => { $log ~= "B" }, FETCH => $nada, STORE => $nada) = 5;
     is $log, "B", "bind called when needed (write)";
 }
 

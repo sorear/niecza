@@ -89,7 +89,7 @@ namespace Niecza {
         public SubViviHook(P6any sub) { this.sub = sub; }
         public override void Do(Variable toviv) {
             Kernel.RunInferior(sub.Invoke(Kernel.GetInferiorRoot(),
-                        new Variable[] { toviv }, null));
+                new Variable[] { toviv }, null));
         }
         public override void Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.SubViviHook);
@@ -289,7 +289,7 @@ namespace Niecza {
 
         public override P6any Fetch() {
             Variable vr = Kernel.RunInferior(fetch.Invoke(
-                Kernel.GetInferiorRoot(), None, null));
+                Kernel.GetInferiorRoot(), new [] {Kernel.AnyMO.typeVar}, null));
             return vr.Fetch();
         }
 
@@ -300,7 +300,7 @@ namespace Niecza {
                 vh.Do(this);
             }
             Kernel.RunInferior(store.Invoke(Kernel.GetInferiorRoot(),
-                        new Variable[] { Kernel.NewROScalar(v) }, null));
+                new [] { Kernel.AnyMO.typeVar, Kernel.NewROScalar(v) }, null));
         }
 
         public override Variable GetVar() {

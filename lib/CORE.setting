@@ -2194,8 +2194,11 @@ sub first(Mu $test, *@bits) { @bits.first($test) }
 sub _hash_constructor(\parcel)  { my $r := (anon %hash = parcel); $r }
 sub _make_capture(|c) { c }
 
-sub _newtiedscalar($bind, $fetch, $store) {
-    Q:CgOp { (var_new_tied (@ {$bind}) (@ {$fetch}) (@ {$store})) }
+# strange API for this, no?
+my class Proxy {
+    method new(:$FETCH, :$STORE, :$BIND) {
+        Q:CgOp { (var_new_tied (@ {$BIND}) (@ {$FETCH}) (@ {$STORE})) }
+    }
 }
 
 sub infix:<X>(\|$pcl) is Niecza::absprec<f= list> {
