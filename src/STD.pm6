@@ -5235,7 +5235,7 @@ method getsig {
     }
 
     my $new = Cursor.^can('cursor_start');
-    if ($*CURLEX<!multi>//'') ne 'proto' {
+    if ($*CURLEX<!multi>//'') ne 'proto' && !$*in_repl {
         for $*CURLEX<!sub>.unused_lexicals -> $k, $pos {
             next unless interesting($new ?? Cursor.cursor_start($k) !! Cursor.new($k));
             # next if $[_/!] declared automatically "dynamic" TODO
