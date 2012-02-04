@@ -3834,7 +3834,9 @@ dynamic:
             try {
                 r = Handle.Wrap(Kernel.RunInferior(callee.protosub.Invoke(
                     Kernel.GetInferiorRoot(), pos.ToArray(), nam)));
-            } catch (Exception) { }
+            } catch (Exception ex) {
+                r = ex.ToString();
+            }
             return r;
         }
         public static object unit_string_constant(object[] args) {

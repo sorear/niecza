@@ -6,8 +6,8 @@ class OptBeta;
 # (-> $x { block })($y), due to control structures and regexes.  Try to clean
 # that up here.
 
-method make_call($var, *@params) {
-    my $nonopt = $OpCallSub.new(
+method make_call($/, $var, *@params) {
+    my $nonopt = $OpCallSub.new(pos=>$/,
         positionals => [ @params ],
         invocant => $OpLexical.new(name => $var));
     my @lex = $*CURLEX<!sub>.lookup_lex($var) or return $nonopt;

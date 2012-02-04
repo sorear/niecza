@@ -46,7 +46,7 @@ method cgop_labelled($body, $label) {
 
 method code_labelled($body, $label) { self.code($body) } #OK not used
 
-method statement_level() { self }
+method statement_level($/) { self }
 method onlystub() { False }
 method const_value($) { }
 
@@ -146,7 +146,7 @@ class CallSub is CallLike {
     method zyg() { $.invocant, @( $.args // $.positionals ) } # XXX callsame
 
     method adverb($adv) {
-        $OpCallSub.new(invocant => $.invocant, args => [ self.getargs, $adv ])
+        $OpCallSub.new(pos => $.pos, invocant => $.invocant, args => [ self.getargs, $adv ])
     }
 
     method code($body) {
@@ -495,12 +495,12 @@ class ForLoop is Op {
                 $.source.cgop($body)), 'map', $CgOp.scopedlex($!sin));
     }
 
-    method statement_level() {
+    method statement_level($/) {
         my $body = $*CURLEX<!sub>.lookup_lex($!sink)[4];
         my $var = [ map { $Actions.gensym },
             0 ..^ $body.count ];
         $OpImmedForLoop.new(source => $!source, var => $var,
-            sink => $OptBeta.make_call($!sink,
+            sink => $OptBeta.make_call($/, $!sink,
                 map { $OpLetVar.new(name => $_) }, @$var));
     }
 }
@@ -549,8 +549,8 @@ class Labelled is Op {
         $CgOp.prog($CgOp.label("goto_$.name"),$.stmt.cgop_labelled($body,$.name));
     }
 
-    method statement_level() {
-        self.new(name => $.name, stmt => $.stmt.statement_level);
+    method statement_level($/) {
+        self.new(name => $.name, stmt => $.stmt.statement_level($/));
     }
 }
 
@@ -666,9 +666,9 @@ class BareBlock is Op {
 
     method code($) { $CgOp.scopedlex($!var) }
 
-    method statement_level() {
+    method statement_level($/) {
         $*CURLEX<!sub>.lookup_lex($!var).[4].set_run_once;
-        $OptBeta.make_call($!var);
+        $OptBeta.make_call($/, $!var);
     }
 }
 

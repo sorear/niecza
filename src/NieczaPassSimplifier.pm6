@@ -15,7 +15,13 @@ method invoke($*unit) {
 }
 
 method invoke_incr($sub, $ops) {
+    my $*where = False;
     run_optree($sub, $ops, 1);
+}
+
+sub sorry($msg) {
+    die "No position info to report ($msg)" unless $*where;
+    $*where.CURSOR.sorry($msg);
 }
 
 sub no_named_params($op) {
@@ -138,12 +144,17 @@ sub check_folding($body, $sub, $op) {
     }
 
     my $ret = $*unit.constant_fold($sub, @evargs) // return;
+    if $ret.^isa(Str) {
+        sorry "Constant folding threw exception: $ret";
+        return;
+    }
     $OpGeneralConst.new(value => $ret);
 }
 
 sub run_optree($body, $op, $nv) {
     die "WTF in $body.name()" if !defined $op;
     my @kids := flat($op.ctxzyg($nv));
+    temp $*where; $*where = $op.pos // $*where;
     my $i = 0;
     while $i < @kids {
         @kids[$i] = run_optree($body, @kids[$i], @kids[$i+1]);

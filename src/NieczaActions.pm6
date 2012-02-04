@@ -1000,7 +1000,7 @@ method assertion:name ($/) {
 
         my $callop;
         if $is_lexical {
-            $callop = $OpCallSub.new(invocant => mklex($/, "&$name"),
+            $callop = $OpCallSub.new(pos=>$/, invocant => mklex($/, "&$name"),
                 positionals => [ mklex($/, '$¢'), @$args ]);
         } elsif $pname<iname> {
             $callop = $Operator_Method.new(name => $pname<iname>, :$args,
@@ -1413,7 +1413,7 @@ method circumfix:sym<{ }> ($/) {
 
     if self.check_hash($/) {
         make mkcall($/, '&_hash_constructor',
-            $OptBeta.make_call($var));
+            $OptBeta.make_call($/, $var));
     }
 }
 
@@ -1530,7 +1530,7 @@ method statement_control:TEMP ($/) {
 # now that initializer has been split out this can be a lot smaller...
 method INFIX($/) {
     my $fn = $<infix>.ast;
-    my ($st,$lhs,$rhs) = self.whatever_precheck($fn, $<left>.ast, $<right>.ast);
+    my ($st,$lhs,$rhs) = self.whatever_precheck($/, $fn, $<left>.ast, $<right>.ast);
 
     make $fn.with_args($/, $lhs, $rhs);
     make self.whatever_postcheck($/, $st, $/.ast);
@@ -1546,7 +1546,7 @@ method CHAIN($/) {
         push @ops,  $<chain>[$i++]<infix>.ast;
     }
 
-    my ($st, @vargs) = self.whatever_precheck(@ops[0], @args);
+    my ($st, @vargs) = self.whatever_precheck($/, @ops[0], @args);
 
     sub reduce($/) {
         my $fa = shift @vargs;
@@ -1572,7 +1572,7 @@ method LIST($/) {
     # STD guarantees that all elements of delims have the same sym
     # the last item may have an ast of undef due to nulltermish
     my $fn = $<delims>[0].ast;
-    my ($st, @pos) = self.whatever_precheck($fn,
+    my ($st, @pos) = self.whatever_precheck($/, $fn,
         grep *.&defined, map *.ast, @( $<list> ));
 
     make self.whatever_postcheck($/, $st, $fn.with_args($/, @pos));
@@ -1580,7 +1580,7 @@ method LIST($/) {
 
 method POSTFIX($/) {
     # adverbs have undef ast
-    my ($st, $arg) = self.whatever_precheck($<op>.ast // '', $<arg>.ast);
+    my ($st, $arg) = self.whatever_precheck($/, $<op>.ast // '', $<arg>.ast);
     if $<op><colonpair> {
         if $arg.^isa($OpCallLike) {
             make $arg.adverb($<op><colonpair>.ast<term>);
@@ -1596,7 +1596,7 @@ method POSTFIX($/) {
 }
 
 method PREFIX($/) {
-    my ($st, $arg) = self.whatever_precheck($<op>.ast, $<arg>.ast);
+    my ($st, $arg) = self.whatever_precheck($/, $<op>.ast, $<arg>.ast);
     make self.whatever_postcheck($/, $st, $<op>.ast.with_args($/, $arg));
 }
 
@@ -1773,7 +1773,7 @@ method fatarrow($/) {
 
 my %_nowhatever = (map { ($_ => True) }, ('&infix:<,>', '&infix:<..>',
     '&infix:<...>', '&infix:<=>', '&infix:<xx>'));
-method whatever_precheck($op, *@args) {
+method whatever_precheck($/, $op, *@args) {
     return ([], @args) if ($op.^isa($Operator) ?? !$op.whatever_curry !! %_nowhatever{$op});
     my @vars;
     my @args_ = @args;
@@ -1784,7 +1784,7 @@ method whatever_precheck($op, *@args) {
             $a = $OpLexical.new(name => $a.slot);
         } elsif $a.^isa($OpWhateverCode) {
             push @vars, @( $a.vars );
-            $a = $OpCallSub.new(
+            $a = $OpCallSub.new(pos=>$/,
                 invocant => $OpLexical.new(name => $a.slot),
                 args => [ map { $OpLexical.new(name => $_) }, @($a.vars) ]);
         }
@@ -2974,11 +2974,11 @@ method type_declarator:enum ($/) {
 
             for $map.enum_keys {
                 self.make_constant_into($/, $obj, $_, rhs =>
-                    $OpCallSub.new(invocant => mklex($/, $lexvar),
+                    $OpCallSub.new(pos=>$/, invocant => mklex($/, $lexvar),
                         args => [ $OpStringLiteral.new(text => $_) ]));
 
                 self.init_constant(self.make_constant($/, $scope, $_),
-                    $OpCallSub.new(invocant => mklex($/, $lexvar),
+                    $OpCallSub.new(pos=>$/, invocant => mklex($/, $lexvar),
                         args => [ $OpStringLiteral.new(text => $_) ]));
             }
         });
@@ -3277,7 +3277,7 @@ method statement_mod_loop:given ($/)  { self.statement_mod_loop($/) }
 
 method statementlist($/) {
     make $OpStatementList.new(pos=>$/, children =>
-        [ map *.statement_level, map *.ast, @( $<statement> ) ]);
+        [ map *.statement_level($/), map *.ast, @( $<statement> ) ]);
 }
 
 method semilist($/) { make [ map *.ast, @( $<statement> ) ] }
@@ -3585,7 +3585,7 @@ method package_def ($/) {
                 make mklex($/, $*CURLEX<!sub>.outervar);
             } else {
                 make $OpStatementList.new(pos=>$/, children => [
-                    $OpCallSub.new(invocant => mklex($/, $bodyvar)),
+                    $OpCallSub.new(pos=>$/, invocant => mklex($/, $bodyvar)),
                     $OpLexical.new(name => $*CURLEX<!sub>.outervar) ]);
             }
         }
@@ -3675,7 +3675,7 @@ method block_expr($/, $pb) {
 method inliney_call($/, $block, *@parms) {
     my $sym = self.gensym;
     $*CURLEX<!sub>.add_my_sub($sym, $block);
-    $OptBeta.make_call($sym, @parms);
+    $OptBeta.make_call($/, $sym, @parms);
 }
 
 # this is intended to be called after parsing the longname for a sub,
@@ -3938,7 +3938,7 @@ method blast($/) {
     if $<block> {
         make $<block>.ast;
     } else {
-        make self.thunk_sub($<statement>.ast.statement_level);
+        make self.thunk_sub($<statement>.ast.statement_level($/));
     }
 }
 
