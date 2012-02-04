@@ -6092,6 +6092,12 @@ slow:
             LabelMO.FillProtoClass(AnyMO, new string[] { "$!target", "$!name" },
                     new STable[] { LabelMO, LabelMO });
 
+            EnumMO = new STable("Enum");
+            EnumMO.FillProtoClass(AnyMO, new string[] { "$!key", "$!value" },
+                    new STable[] { EnumMO, EnumMO });
+            PairMO = new STable("Pair");
+            PairMO.FillProtoClass(EnumMO);
+
             // forward reference
             StrMO = new STable("Str");
             BoolMO = new STable("Bool");
