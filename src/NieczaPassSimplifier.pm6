@@ -19,9 +19,14 @@ method invoke_incr($sub, $ops) {
     run_optree($sub, $ops, 1);
 }
 
-sub sorry($msg) {
+# sub sorry($msg) {
+#     die "No position info to report ($msg)" unless $*where;
+#     $*where.CURSOR.sorry($msg);
+# }
+
+sub worry($msg) {
     die "No position info to report ($msg)" unless $*where;
-    $*where.CURSOR.sorry($msg);
+    $*where.CURSOR.worry($msg);
 }
 
 sub no_named_params($op) {
@@ -145,7 +150,8 @@ sub check_folding($body, $sub, $op) {
 
     my $ret = $*unit.constant_fold($sub, @evargs) // return;
     if $ret.^isa(Str) {
-        sorry "Constant folding threw exception: $ret";
+        $ret ~~ / $$ /;
+        worry "Operation cannot succeed (constant folding threw exception: $/.prematch())";
         return;
     }
     $OpGeneralConst.new(value => $ret);
