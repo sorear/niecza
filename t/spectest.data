@@ -104,6 +104,7 @@ S02-types/flattening.t
 S02-types/hash.t
 S02-types/hash_ref.t
 S02-types/infinity.t
+S02-types/keyset.t
 S02-types/lists.t
 S02-types/mixed_multi_dimensional.t
 S02-types/nan.t
