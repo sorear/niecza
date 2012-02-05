@@ -2072,7 +2072,7 @@ class KeySet does Associative {
     method hash { %!elems.hash }
     method postcircumfix:<{ }> ($k) {
         Proxy.new(FETCH => { %!elems{$k}:exists ?? True !! False },
-                  STORE => -> $dummy, $value { if $value { %!elems{$k} = True } else { %!elems{$k}:delete }});
+                  STORE => -> $, $value { if $value { %!elems{$k} = True } else { %!elems{$k}:delete }});
     }
 
     # Constructor
