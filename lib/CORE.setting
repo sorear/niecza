@@ -45,6 +45,8 @@ my class Whatever { ... }
 my class IO       { ... }
 my class ObjAt    { ... }
 my class Proxy    { ... }
+my class KeySet   { ... }
+my class KeyBag   { ... }
 grammar Niecza::NumSyntax { ... }
 # }}}
 # Important inlinable definitions {{{
@@ -1975,7 +1977,15 @@ class Set does Associative {
 
     # Constructor
     method new(*@args --> Set) {
-        self.bless(*, :elems(%(@args X=> True)));
+        my %e;
+        for @args {
+            when Set | KeySet { for .keys -> $key { %e{$key} = True; } }
+            # when Bag | KeyBag { for .keys -> $key {
+            #     if %e{$key}:exists { %e{$key} += $_{$key} } else { %e{$key} = $_{$key} }
+            # } }
+            default { %e{$_} = True; }
+        }
+        self.bless(*, :elems(%e));
     }
 
     submethod BUILD (%!elems) { }
@@ -2077,7 +2087,15 @@ class KeySet does Associative {
 
     # Constructor
     method new(*@args --> KeySet) {
-        self.bless(*, :elems(%(@args X=> True)));
+        my %e;
+        for @args {
+            when Set | KeySet { for .keys -> $key { %e{$key} = True; } }
+            # when Bag | KeyBag { for .keys -> $key {
+            #     if %e{$key}:exists { %e{$key} += $_{$key} } else { %e{$key} = $_{$key} }
+            # } }
+            default { %e{$_} = True; }
+        }
+        self.bless(*, :elems(%e));
     }
 
     submethod BUILD (%!elems) { }
@@ -2108,7 +2126,10 @@ class Bag does Associative {
     method new(*@args --> Bag) {
         my %e;
         for @args {
-            when Set { for .keys -> $key { %e{$key}++; } }
+            when Set | KeySet { for .keys -> $key { %e{$key}++; } }
+            when Bag | KeyBag { for .keys -> $key {
+                if %e{$key}:exists { %e{$key} += $_{$key} } else { %e{$key} = $_{$key} }
+            } }
             default { %e{$_}++; }
         }
         self.bless(*, :elems(%e));
@@ -2151,7 +2172,10 @@ class KeyBag does Associative {
     method new(*@args --> KeyBag) {
         my %e;
         for @args {
-            when Set { for .keys -> $key { %e{$key}++; } }
+            when Set | KeySet { for .keys -> $key { %e{$key}++; } }
+            when Bag | KeyBag { for .keys -> $key {
+                if %e{$key}:exists { %e{$key} += $_{$key} } else { %e{$key} = $_{$key} }
+            } }
             default { %e{$_}++; }
         }
         self.bless(*, :elems(%e));
