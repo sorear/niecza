@@ -2172,8 +2172,9 @@ class KeyBag does Associative {
     method new(*@args --> KeyBag) {
         my %e;
         for @args {
+            when Pair { if %e{.key}:exists { %e{.key} += .value } else { %e{.key} = .value } }
             when Set | KeySet { for .keys -> $key { %e{$key}++; } }
-            when Bag | KeyBag { for .keys -> $key {
+            when Bag | KeyBag | Hash { for .keys -> $key {
                 if %e{$key}:exists { %e{$key} += $_{$key} } else { %e{$key} = $_{$key} }
             } }
             default { %e{$_}++; }
@@ -2183,16 +2184,48 @@ class KeyBag does Associative {
 
     submethod BUILD (%!elems) { }
 
-    submethod Str(Any:D $ : --> Str) { "keybag(< { self.exploded-bag } >)" }
-    submethod gist(Any:D $ : --> Str) { "keybag({ self.exploded-bag».gist.join(', ') })" }
-    submethod perl(Any:D $ : --> Str) { 'KeyBag.new(' ~ join(', ', map { .perl }, self.exploded-bag) ~ ')' }
+    submethod Str(Any:D $ : --> Str) { "keybag({ self.pairs>>.perl.join(', ') })" }
+    submethod gist(Any:D $ : --> Str) { "keybag({ self.pairs>>.gist.join(', ') })" }
+    submethod perl(Any:D $ : --> Str) { 'KeyBag.new(' ~ %!elems.perl ~ ')' }
 
-    method iterator() { %!elems.keys.iterator }
-    method list() { %!elems.keys }
-    method exploded-bag() { %!elems.kv.map(-> $key, $value { $key xx $value }).flat }
-    # Next two are terribly inefficient
-    method pick($arg) { self.exploded-bag.pick: $arg }
-    method roll($arg) { self.exploded-bag.roll: $arg }
+    method iterator() { %!elems.pairs.iterator }
+    method list() { %!elems.pairs }
+    method pairs() { %!elems.pairs }
+
+    method pick($count = 1) {
+        return self.roll if $count ~~ Num && $count == 1;
+
+        my $temp-bag = KeyBag.new(self);
+        my $lc = $count ~~ Whatever ?? Inf !! $count;
+        gather while $temp-bag && $lc-- {
+            my $choice = $temp-bag.roll;
+            take $choice;
+            $temp-bag{$choice}--;
+        }
+    }
+    method roll($count = 1) {
+        my @inverse-mapping;
+        my $a = 0;
+        for %!elems.pairs -> $pair {
+            $a += $pair.value;
+            @inverse-mapping.push((+$a) => $pair.key);
+        }
+
+        sub choose {
+            my $choice = $a.rand;
+            my $i = 0;
+            for @inverse-mapping -> $im {
+                if $choice ~~ $i ..^ +$im.key {
+                    return $im.value;
+                }
+                $i = $im.key;
+            }
+        }
+
+        return choose() xx * if $count ~~ Whatever;
+        return choose() if $count == 1;
+        return choose() xx $count;
+    }
 }
 
 my class Junction is Mu {
