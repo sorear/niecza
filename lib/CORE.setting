@@ -2189,7 +2189,7 @@ class KeyBag does Associative {
     submethod perl(Any:D $ : --> Str) { 'KeyBag.new(' ~ %!elems.perl ~ ')' }
 
     method iterator() { %!elems.pairs.iterator }
-    method list() { %!elems.pairs }
+    method list() { %!elems.keys }
     method pairs() { %!elems.pairs }
 
     method pick($count = 1) {
