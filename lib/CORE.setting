@@ -2143,6 +2143,7 @@ class Bag does Associative {
 
     method iterator() { %!elems.keys.iterator }
     method list() { %!elems.keys }
+    method pairs() { %!elems.pairs }
     method exploded-bag() { %!elems.kv.map(-> $key, $value { $key xx $value }).flat }
     # Next two are terribly inefficient
     method pick($arg) { self.exploded-bag.pick: $arg }
@@ -2171,13 +2172,18 @@ class KeyBag does Associative {
     # Constructor
     method new(*@args --> KeyBag) {
         my %e;
+        sub register-arg($arg) {
+            given $arg {
+                when Pair { if %e{.key}:exists { %e{.key} += .value } else { %e{.key} = .value } }
+                when Set | KeySet { for .keys -> $key { %e{$key}++; } }
+                when Associative { for .pairs -> $p { register-arg($p) } }
+                when Positional { for .list -> $p { register-arg($p) } }
+                default { %e{$_}++; }
+            }
+        }
+
         for @args {
-            when Pair { if %e{.key}:exists { %e{.key} += .value } else { %e{.key} = .value } }
-            when Set | KeySet { for .keys -> $key { %e{$key}++; } }
-            when Bag | KeyBag | Hash { for .keys -> $key {
-                if %e{$key}:exists { %e{$key} += $_{$key} } else { %e{$key} = $_{$key} }
-            } }
-            default { %e{$_}++; }
+            register-arg($_);
         }
         self.bless(*, :elems(%e));
     }
