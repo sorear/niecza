@@ -83,19 +83,19 @@ INIT {
     $GLOBAL::TEST-BUILDER.reset;
 }
 
-sub cmp_ok(\$a, $fn, \$b, $tag?) is export { ok($fn($a, $b), $tag); }
-sub ok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(?$bool, $tag) }
-sub nok(\$bool, $tag?) is export { $*TEST-BUILDER.ok(!$bool, $tag) }
+sub cmp_ok(\a, $fn, \b, $tag?) is export { ok($fn(a, b), $tag); }
+sub ok(\bool, $tag?) is export { $*TEST-BUILDER.ok(?bool, $tag) }
+sub nok(\bool, $tag?) is export { $*TEST-BUILDER.ok(!bool, $tag) }
 sub skip_rest($tag?) is export { } #OK
 sub pass($tag?) is export { $*TEST-BUILDER.ok(1, $tag); True }
 sub flunk($tag?) is export { $*TEST-BUILDER.ok(0, $tag) }
 sub isa_ok(Mu $obj, Mu $type, $tag?) is export { $*TEST-BUILDER.ok($obj.^isa($type), $tag) }
 sub is_deeply($a,$b,$c) is export { is $a.perl, $b.perl, $c }
-sub is(\$got, \$expected, $tag?) is export {
+sub is(\got, \expected, $tag?) is export {
 
     # avoid comparing twice
-    my $sgot  = ~($got // '');
-    my $sexpexted = ~($expected // '');
+    my $sgot  = ~(got // '');
+    my $sexpexted = ~(expected // '');
     my $equal = $sgot eq $sexpexted;
 
     $*TEST-BUILDER.ok($equal, $tag);
