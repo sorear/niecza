@@ -2125,7 +2125,7 @@ class KeySet does Associative {
 }
 
 class Bag does Associative {
-    has Bool %!elems;
+    has Int %!elems; # should be UInt
 
     method keys { %!elems.keys }
     method values { %!elems.values }
@@ -2174,7 +2174,7 @@ sub bag(*@a) {
 }
 
 class KeyBag does Associative {
-    has Bool %!elems;
+    has Int %!elems; # should be UInt
 
     method keys { %!elems.keys }
     method values { %!elems.values }
