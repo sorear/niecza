@@ -72,24 +72,15 @@ method balanced ($start,$stop) { self.mixin( rolecache("B$start\0$stop", {STD::s
 method unbalanced ($stop) { self.mixin( rolecache("U$stop", {STD::stop[$stop]}) ); }
 method unitstop ($stop) { self.mixin( rolecache("N$stop", {STD::unitstop[$stop]}) ); }
 
-method add_categorical($name) {
+method cat_role($cat,$sym) {
     state %cat_cache;
 
-    # Signature extension, not categorical
-    if $name ~~ /^\w+\:\(/ {
-        return self;
-    }
-    # CORE names are hardcoded
-    return self if $*UNITNAME eq 'CORE';
-    return self unless ($name ~~ /^(\w+)\: \< (.*) \> /);
+    my $name = "{$cat}:<{$sym}>";
 
     if %cat_cache{$name}:exists {
-        %*LANG<MAIN> = $Backend.cached_but(self.WHAT, %cat_cache{$name});
-        return self.cursor_fresh(%*LANG<MAIN>);
+        return %cat_cache{$name};
     }
 
-    my $cat ::= ~$0;
-    my $sym ::= ~$1;
     my $role;
     # need these readonly for proper LTM
 
@@ -116,9 +107,43 @@ method add_categorical($name) {
         }
         $role = $Backend.make_role($mname, $meth);
     }
-    %cat_cache{$name} := $role;
+    return (%cat_cache{$name} := $role);
+}
 
-    %*LANG<MAIN> = $Backend.cached_but(self.WHAT, $role);
+method exists_syntax($cat, $sym) {
+    return True if self.can("{$cat}:sym<{$sym}>");
+    return True if self.can("{$cat}:{$sym}");
+    return True if $sym eq any < ...^ >;
+    return False;
+}
+
+method add_categorical($name) {
+    # Signature extension, not categorical
+    if $name ~~ /^\w+\:\(/ {
+        return self;
+    }
+
+    # CORE names are hardcoded
+    return self unless ($name ~~ /^(\w+)\: \< (.*) \> /);
+    return self if $*UNITNAME eq 'CORE' && self.exists_syntax($0, $1);
+
+    %*LANG<MAIN> = $Backend.cached_but(self.WHAT, self.cat_role($0, $1));
+    self.cursor_fresh(%*LANG<MAIN>);
+}
+
+method batch_categoricals(@names) {
+    my @roles;
+    for @names -> $name {
+        next if $name ~~ /^\w+\:\(/;
+        next unless ($name ~~ /^(\w+)\: \< (.*) \> /);
+        # XXX: This is maybe not 100% right as it doesn't allow user modules
+        # to overwrite parsed setting macros with subs
+        next if self.exists_syntax($0, $1);
+
+        push @roles, self.cat_role($0, $1);
+    }
+
+    %*LANG<MAIN> = self.WHAT but @roles;
     self.cursor_fresh(%*LANG<MAIN>);
 }
 

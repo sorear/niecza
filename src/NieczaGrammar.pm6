@@ -47,14 +47,14 @@ grammar P6 is STD::P6 {
         %*LANG<Q>    = NieczaGrammar::Q  ;
         %*LANG<MAIN> = NieczaGrammar::P6 ;
 
-        my $h = self;
-        loop (my $C = $*CURLEX<!sub>; $C && $C.unit.name ne 'CORE'; $C.=outer) {
-            for $C.lex_names -> $lex {
-                $h.check_categorical($lex);
-                $h = $h.cursor_fresh(%*LANG<MAIN>);
+        my @names;
+        loop (my $C = $*CURLEX<!sub>; $C; $C.=outer) {
+            for $C.lex_names -> $name {
+                $name := $name.substr(1) if $name && substr($name,0,1) eq '&';
+                push @names, $name;
             }
         }
-
+        self.batch_categoricals(@names);
         self;
     }
 }
