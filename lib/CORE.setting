@@ -193,6 +193,19 @@ sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
 sub callframe() { Q:CgOp { (ns (frame_caller (callframe))) } }
 
 sub Niecza::toggle_mono_trace() { Q:CgOp { (prog (raise (s "SIGUSR2")) {0}) } }
+
+sub infix:<X>(\|$pcl) is Niecza::absprec<f= list> {
+    Q:CgOp { (cross (b 0) (unbox fvarlist (@ {$pcl}))) }
+}
+sub infix:<Z>(\|$pcl) is equiv<X> {
+    Q:CgOp { (zip (b 0) (unbox fvarlist (@ {$pcl}))) }
+}
+sub zipop(\|$pcl) {
+    Q:CgOp { (zip (b 1) (unbox fvarlist (@ {$pcl}))) }
+}
+sub crossop(\|$pcl) {
+    Q:CgOp { (cross (b 1) (unbox fvarlist (@ {$pcl}))) }
+}
 # }}}
 # Fundamental types {{{
 my constant True  = 1.Bool;
@@ -2007,66 +2020,65 @@ class Set does Associative {
     method pick($arg) { %!elems.keys.pick: $arg }
     method roll($arg) { %!elems.keys.roll: $arg }
 
-    # Set operators
-
-    # proto sub infix:<∈>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
-    # multi sub infix:<∈>($a, Any $b --> Bool) { $a ∈ to-set($b) }
-    # multi sub infix:<∈>($a, Set $b --> Bool) { $b!elems{$a}:exists }
-    # multi sub infix:<(elem)>($a, $b --> Bool) { $a ∈ $b }
-    # multi sub infix:<∉>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !∈ $b }
-    #
-    # proto sub infix:<∋>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
-    # multi sub infix:<∋>($a, Any $b --> Bool) { to-set($a) ∋ $b }
-    # multi sub infix:<∋>($a, Set $b --> Bool) { $a!elems{$b}:exists }
-    # multi sub infix:<(cont)>($a, $b --> Bool) { $a ∋ $b }
-    # multi sub infix:<∌>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !∋ $b }
-    #
-    # multi sub infix:<∪>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export { to-set($a) ∪ to-set($b) }
-    # multi sub infix:<∪>(Set $a, Set $b --> Set) is equiv(&infix:<X>) is export { Set.new: $a.keys, $b.keys }
-    # multi sub infix:<(|)>($a, $b --> Set) is equiv(&infix:<X>) is export { $a ∪ $b }
-    #
-    # multi sub infix:<∩>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export { to-set($a) ∩ to-set($b) }
-    # multi sub infix:<∩>(Set $a, Set $b --> Set) is equiv(&infix:<X>) is export { Set.new: $a.keys.grep: -> $k { ?$b{$k} } }
-    # multi sub infix:<(&)>($a, $b --> Set) is equiv(&infix:<X>) is export { $a ∩ $b }
-    #
-    # multi sub infix:<(-)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export { to-set($a) (-) to-set($b) }
-    # multi sub infix:<(-)>(Set $a, Set $b --> Set) is equiv(&infix:<X>) is export { Set.new: $a.keys.grep: * ∉ $b }
-    #
-    # multi sub infix:<(^)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) is export { to-set($a) (^) to-set($b) }
-    # multi sub infix:<(^)>(Set $a, Set $b --> Set) is equiv(&infix:<X>) is export { ($a (-) $b) ∪ ($b (-) $a) }
-    #
-    # multi sub infix:<===>(Any $a, Any $b --> Bool) is export { to-set($a) === to-set($b) }
-    # multi sub infix:<===>(Set $a, Set $b --> Bool) is export { $a == $b and so $a.keys.all ∈ $b }
-    #
-    # multi sub infix:<eqv>(Any $a, Any $b --> Bool) is export { to-set($a) eqv to-set($b) }
-    # multi sub infix:<eqv>(Set $a, Set $b --> Bool) is export { $a == $b and so $a.keys.all ∈ $b }
-    #
-    # proto sub infix:<⊆>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
-    # multi sub infix:<⊆>(Any $a, Any $b --> Bool) { to-set($a) ⊆ to-set($b) }
-    # multi sub infix:<⊆>(Set $a, Set $b --> Bool) { $a <= $b and so $a.keys.all ∈ $b }
-    # multi sub infix:['(<=)']($a, $b --> Bool) is equiv(&infix:<==>) is export { $a ⊆ $b }
-    # multi sub infix:<⊈>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !⊆ $b }
-    #
-    # proto sub infix:<⊂>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
-    # multi sub infix:<⊂>(Any $a, Any $b --> Bool) { to-set($a) ⊂ to-set($b) }
-    # multi sub infix:<⊂>(Set $a, Set $b --> Bool) { $a < $b and so $a.keys.all ∈ $b }
-    # multi sub infix:['(<)']($a, $b --> Bool) is equiv(&infix:<==>) is export { $a ⊂ $b }
-    # multi sub infix:<⊄>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !⊂ $b }
-    #
-    # proto sub infix:<⊇>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
-    # multi sub infix:<⊇>(Any $a, Any $b --> Bool) { to-set($a) ⊇ to-set($b) }
-    # multi sub infix:<⊇>(Set $a, Set $b --> Bool) { $a >= $b and so $b.keys.all ∈ $a }
-    # multi sub infix:['(>=)']($a, $b --> Bool) is equiv(&infix:<==>) is export { $a ⊇ $b }
-    # multi sub infix:<⊉>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !⊇ $b }
-    #
-    # proto sub infix:<⊃>($, $ --> Bool) is equiv(&infix:<==>) is export {*}
-    # multi sub infix:<⊃>(Any $a, Any $b --> Bool) { to-set($a) ⊃ to-set($b) }
-    # multi sub infix:<⊃>(Set $a, Set $b --> Bool) { $a > $b and so $b.keys.all ∈ $a }
-    # multi sub infix:['(>)']($a, $b --> Bool) is equiv(&infix:<==>) is export { $a ⊃ $b }
-    # multi sub infix:<⊅>($a, $b --> Bool) is equiv(&infix:<==>) is export { $a !⊃ $b }
+    # TODO: WHICH will require the capability for >1 pointer in ObjAt
 }
 
-sub set(*@args --> Set) is export {
+# Set operators
+
+proto sub infix:<∈>($, $ --> Bool) is equiv(&infix:<==>) {*}
+multi sub infix:<∈>($a, Any $b --> Bool) { $a ∈ Set($b) }
+multi sub infix:<∈>($a, Set $b --> Bool) { $b!elems{$a}:exists }
+multi sub infix:<(elem)>($a, $b --> Bool) { $a ∈ $b }
+multi sub infix:<∉>($a, $b --> Bool) is equiv(&infix:<==>) { $a !∈ $b }
+
+proto sub infix:<∋>($, $ --> Bool) is equiv(&infix:<==>) {*}
+multi sub infix:<∋>($a, Any $b --> Bool) { Set($a) ∋ $b }
+multi sub infix:<∋>($a, Set $b --> Bool) { $a!elems{$b}:exists }
+multi sub infix:<(cont)>($a, $b --> Bool) { $a ∋ $b }
+multi sub infix:<∌>($a, $b --> Bool) is equiv(&infix:<==>) { $a !∋ $b }
+
+multi sub infix:<∪>(Any $a, Any $b --> Set) is equiv(&infix:<X>) { Set($a) ∪ Set($b) }
+multi sub infix:<∪>(Set $a, Set $b --> Set) is equiv(&infix:<X>) { Set.new: $a.keys, $b.keys }
+multi sub infix:<(|)>($a, $b --> Set) is equiv(&infix:<X>) { $a ∪ $b }
+
+multi sub infix:<∩>(Any $a, Any $b --> Set) is equiv(&infix:<X>) { Set($a) ∩ Set($b) }
+multi sub infix:<∩>(Set $a, Set $b --> Set) is equiv(&infix:<X>) { Set.new: $a.keys.grep: -> $k { ?$b{$k} } }
+multi sub infix:<(&)>($a, $b --> Set) is equiv(&infix:<X>) { $a ∩ $b }
+
+multi sub infix:<(-)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) { Set($a) (-) Set($b) }
+multi sub infix:<(-)>(Set $a, Set $b --> Set) is equiv(&infix:<X>) { Set.new: $a.keys.grep: * ∉ $b }
+
+multi sub infix:<(^)>(Any $a, Any $b --> Set) is equiv(&infix:<X>) { Set($a) (^) Set($b) }
+multi sub infix:<(^)>(Set $a, Set $b --> Set) is equiv(&infix:<X>) { ($a (-) $b) ∪ ($b (-) $a) }
+
+# TODO: polymorphic eqv
+# multi sub infix:<eqv>(Any $a, Any $b --> Bool) { Set($a) eqv Set($b) }
+# multi sub infix:<eqv>(Set $a, Set $b --> Bool) { $a == $b and so $a.keys.all ∈ $b }
+
+proto sub infix:<⊆>($, $ --> Bool) is equiv(&infix:<==>) {*}
+multi sub infix:<⊆>(Any $a, Any $b --> Bool) { Set($a) ⊆ Set($b) }
+multi sub infix:<⊆>(Set $a, Set $b --> Bool) { $a <= $b and so $a.keys.all ∈ $b }
+multi sub infix:['(<=)']($a, $b --> Bool) is equiv(&infix:<==>) { $a ⊆ $b }
+multi sub infix:<⊈>($a, $b --> Bool) is equiv(&infix:<==>) { $a !⊆ $b }
+
+proto sub infix:<⊂>($, $ --> Bool) is equiv(&infix:<==>) {*}
+multi sub infix:<⊂>(Any $a, Any $b --> Bool) { Set($a) ⊂ Set($b) }
+multi sub infix:<⊂>(Set $a, Set $b --> Bool) { $a < $b and so $a.keys.all ∈ $b }
+multi sub infix:['(<)']($a, $b --> Bool) is equiv(&infix:<==>) { $a ⊂ $b }
+multi sub infix:<⊄>($a, $b --> Bool) is equiv(&infix:<==>) { $a !⊂ $b }
+
+proto sub infix:<⊇>($, $ --> Bool) is equiv(&infix:<==>) {*}
+multi sub infix:<⊇>(Any $a, Any $b --> Bool) { Set($a) ⊇ Set($b) }
+multi sub infix:<⊇>(Set $a, Set $b --> Bool) { $a >= $b and so $b.keys.all ∈ $a }
+multi sub infix:['(>=)']($a, $b --> Bool) is equiv(&infix:<==>) { $a ⊇ $b }
+multi sub infix:<⊉>($a, $b --> Bool) is equiv(&infix:<==>) { $a !⊇ $b }
+
+proto sub infix:<⊃>($, $ --> Bool) is equiv(&infix:<==>) {*}
+multi sub infix:<⊃>(Any $a, Any $b --> Bool) { Set($a) ⊃ Set($b) }
+multi sub infix:<⊃>(Set $a, Set $b --> Bool) { $a > $b and so $b.keys.all ∈ $a }
+multi sub infix:['(>)']($a, $b --> Bool) is equiv(&infix:<==>) { $a ⊃ $b }
+multi sub infix:<⊅>($a, $b --> Bool) is equiv(&infix:<==>) { $a !⊃ $b }
+sub set(*@args --> Set) {
     Set.new(@args);
 }
 
@@ -2336,18 +2348,6 @@ my class Proxy {
     }
 }
 
-sub infix:<X>(\|$pcl) is Niecza::absprec<f= list> {
-    Q:CgOp { (cross (b 0) (unbox fvarlist (@ {$pcl}))) }
-}
-sub infix:<Z>(\|$pcl) is equiv<X> {
-    Q:CgOp { (zip (b 0) (unbox fvarlist (@ {$pcl}))) }
-}
-sub zipop(\|$pcl) {
-    Q:CgOp { (zip (b 1) (unbox fvarlist (@ {$pcl}))) }
-}
-sub crossop(\|$pcl) {
-    Q:CgOp { (cross (b 1) (unbox fvarlist (@ {$pcl}))) }
-}
 sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
     if $triangle {
         if $chain {
