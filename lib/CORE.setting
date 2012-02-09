@@ -1981,7 +1981,7 @@ class Set does Associative {
     method Bool { %!elems.Bool }
     method Numeric { %!elems.Numeric }
     method hash { %!elems.hash }
-    method at_key($k) { %!elems{$k} // False }
+    method at_key($k) { ?(%!elems{$k} // False) }
 
     # Constructor
     method new(*@args --> Set) {
@@ -2134,7 +2134,7 @@ class Bag does Associative {
     method Bool { %!elems.Bool }
     method Numeric { self.elems }
     method hash { %!elems.hash }
-    method at_key($k) { %!elems{$k} // 0 }
+    method at_key($k) { +(%!elems{$k} // 0) }
 
     # Constructor
     method new(*@args --> Bag) {
