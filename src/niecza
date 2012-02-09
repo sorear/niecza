@@ -20,7 +20,7 @@ use STD;
 $GLOBAL::DEBUG_STD = (%*ENV<NIECZA_STD_DEBUG> ?? -1 !! 0);
 
 augment class Any {
-    submethod new(|$) { die "Attempted to instantiate undefined class." }
+    submethod new(|) { die "Attempted to instantiate undefined class." }
 }
 
 our ($Operator, $Operator_Method, $Operator_Replicate, $Operator_FlipFlop,
