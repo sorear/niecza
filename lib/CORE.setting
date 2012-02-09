@@ -2139,29 +2139,34 @@ class Bag does Associative {
     # Constructor
     method new(*@args --> Bag) {
         my %e;
+        sub register-arg($arg) {
+            given $arg {
+                when Pair { if %e{.key}:exists { %e{.key} += .value } else { %e{.key} = .value } }
+                when Set | KeySet { for .keys -> $key { %e{$key}++; } }
+                when Associative { for .pairs -> $p { register-arg($p) } }
+                when Positional { for .list -> $p { register-arg($p) } }
+                default { %e{$_}++; }
+            }
+        }
+
         for @args {
-            when Set | KeySet { for .keys -> $key { %e{$key}++; } }
-            when Bag | KeyBag { for .keys -> $key {
-                if %e{$key}:exists { %e{$key} += $_{$key} } else { %e{$key} = $_{$key} }
-            } }
-            default { %e{$_}++; }
+            register-arg($_);
         }
         self.bless(*, :elems(%e));
     }
 
     submethod BUILD (%!elems) { }
 
-    submethod Str(Any:D $ : --> Str) { "bag(< { self.exploded-bag } >)" }
-    submethod gist(Any:D $ : --> Str) { "bag({ self.exploded-bag».gist.join(', ') })" }
-    submethod perl(Any:D $ : --> Str) { 'bag(' ~ join(', ', map { .perl }, self.exploded-bag) ~ ')' }
+    submethod Str(Any:D $ : --> Str) { "bag({ self.pairs>>.perl.join(', ') })" }
+    submethod gist(Any:D $ : --> Str) { "bag({ self.pairs>>.gist.join(', ') })" }
+    submethod perl(Any:D $ : --> Str) { 'Bag.new(' ~ %!elems.perl ~ ')' }
 
-    method iterator() { %!elems.keys.iterator }
+    method iterator() { %!elems.pairs.iterator }
     method list() { %!elems.keys }
     method pairs() { %!elems.pairs }
-    method exploded-bag() { %!elems.kv.map(-> $key, $value { $key xx $value }).flat }
-    # Next two are terribly inefficient
-    method pick($arg) { self.exploded-bag.pick: $arg }
-    method roll($arg) { self.exploded-bag.roll: $arg }
+
+    method pick($count = 1) { my $kb = KeyBag.new(self); $kb.pick($count); }
+    method roll($count = 1) { my $kb = KeyBag.new(self); $kb.roll($count); }
 }
 
 sub bag(*@a) {
