@@ -675,7 +675,6 @@ my class Nil is Cool {
     method Str() { '' }
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
-    method postcircumfix:<[ ]>(\key) { @(self).[key] }
     method at_pos($key) { @(self).[$key] }
     method Capture () { ().Capture }
     method elems  () { 0 }
@@ -1450,7 +1449,6 @@ my class EMPTY { }
 my class Parcel is Cool does Positional {
     method ACCEPTS(\what) { defined(self) ?? self.flat.ACCEPTS(what) !! nextsame }
     method flat() { self.iterator.flat }
-    method postcircumfix:<[ ]>(\key) { @(self).[key] }
     method at_pos($key) { @(self).[$key] }
 
     # LoLly usage
@@ -1967,8 +1965,7 @@ my class EnumMap does Associative {
     method invert() { @!values Z=> @!keys }
     method kv() { @!keys Z @!values }
     method pairs() { self.list }
-    method postcircumfix:<{ }>(\k) { @!values[%!by-key.{k}] }
-    method at_key($k) { self{$k} }
+    method at_key(\k) { (my $ ::= @!values[%!by-key.{k}]) }
     method exists_key($k) { self{$k}:exists }
 }
 BEGIN { $Bool::_enums ::= EnumMap.new("False" => 0, "True" => 1) }
@@ -1984,7 +1981,7 @@ class Set does Associative {
     method Bool { %!elems.Bool }
     method Numeric { %!elems.Numeric }
     method hash { %!elems.hash }
-    method postcircumfix:<{ }> (*@k) { @k.map(-> $k { %!elems{$k} // False }) }
+    method at_key($k) { %!elems{$k} // False }
 
     #constant Set term:<∅> = set();
 
@@ -2092,7 +2089,7 @@ class KeySet does Associative {
     method Bool { %!elems.Bool }
     method Numeric { %!elems.Numeric }
     method hash { %!elems.hash }
-    method postcircumfix:<{ }> ($k) {
+    method at_key($k) {
         Proxy.new(FETCH => { %!elems{$k}:exists ?? True !! False },
                   STORE => -> $, $value { if $value { %!elems{$k} = True } else { %!elems{$k}:delete }});
     }
@@ -2132,7 +2129,7 @@ class Bag does Associative {
     method Bool { %!elems.Bool }
     method Numeric { self.elems }
     method hash { %!elems.hash }
-    method postcircumfix:<{ }> (*@k) { @k.map(-> $k { %!elems{$k} // 0 }) }
+    method at_key($k) { %!elems{$k} // 0 }
 
     # Constructor
     method new(*@args --> Bag) {
@@ -2176,7 +2173,7 @@ class KeyBag does Associative {
     method Bool { %!elems.Bool }
     method Numeric { self.elems }
     method hash { %!elems.hash }
-    method postcircumfix:<{ }> ($k) {
+    method at_key($k) {
         Proxy.new(FETCH => { %!elems{$k}:exists ?? %!elems{$k} !! 0 },
                   STORE => -> $, $value { if $value > 0 { %!elems{$k} = $value } else { %!elems{$k}:delete }});
     }
@@ -2800,7 +2797,7 @@ my class Range is Cool does Positional {
 
     method list() { self.iterator.list }
     method flat() { self.iterator.flat }
-    method postcircumfix:<[ ]>(\key) { @(self).[key] }
+    method at_pos(\key) { @(self).at_pos(key) }
 
     method bounds() { $.min, $.max }
     method from() { $.min }
