@@ -126,7 +126,7 @@ method add_categorical($name) {
     # CORE names are hardcoded; also, avoid redundant composition
     return self if substr($name, chars($name)-1, 1) eq ')'; # multi candidates
     return self unless ($name ~~ /^(\w+)\: \< (.*) \> /);
-    return self if self.exists_syntax($0, $1);
+    return self if $*UNITNAME eq 'CORE' && self.exists_syntax($0, $1);
 
     %*LANG<MAIN> = $Backend.cached_but(self.WHAT, self.cat_role(~$0, ~$1));
     return self.cursor_fresh(%*LANG<MAIN>);
