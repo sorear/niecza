@@ -75,7 +75,7 @@ method unitstop ($stop) { self.mixin( rolecache("N$stop", {STD::unitstop[$stop]}
 method cat_role($cat,$sym) {
     state %cat_cache;
 
-    my $name = "{$cat}:<{$sym}>";
+    my $name ::= "{$cat}:<{$sym}>";
 
     if %cat_cache{$name}:exists {
         return %cat_cache{$name};
@@ -123,24 +123,26 @@ method add_categorical($name) {
         return self;
     }
 
-    # CORE names are hardcoded
+    # CORE names are hardcoded; also, avoid redundant composition
+    return self if substr($name, chars($name)-1, 1) eq ')'; # multi candidates
     return self unless ($name ~~ /^(\w+)\: \< (.*) \> /);
-    return self if $*UNITNAME eq 'CORE' && self.exists_syntax($0, $1);
+    return self if self.exists_syntax($0, $1);
 
-    %*LANG<MAIN> = $Backend.cached_but(self.WHAT, self.cat_role($0, $1));
-    self.cursor_fresh(%*LANG<MAIN>);
+    %*LANG<MAIN> = $Backend.cached_but(self.WHAT, self.cat_role(~$0, ~$1));
+    return self.cursor_fresh(%*LANG<MAIN>);
 }
 
 method batch_categoricals(@names) {
     my @roles;
     for @names -> $name {
         next if $name ~~ /^\w+\:\(/;
+        next if substr($name, chars($name)-1, 1) eq ')'; # multi candidates
         next unless ($name ~~ /^(\w+)\: \< (.*) \> /);
         # XXX: This is maybe not 100% right as it doesn't allow user modules
         # to overwrite parsed setting macros with subs
         next if self.exists_syntax($0, $1);
 
-        push @roles, self.cat_role($0, $1);
+        push @roles, self.cat_role(~$0, ~$1);
     }
 
     %*LANG<MAIN> = self.WHAT but @roles;
