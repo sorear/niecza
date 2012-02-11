@@ -1842,7 +1842,7 @@ my class Hash does Associative {
 
     method at_key($key) { self.{$key} }
     method exists_key($key) { self.{$key}:exists }
-    method delete_key($key) { self.{$key}:exists }
+    method delete_key($key) { self.{$key}:delete }
 
     method perl(\:) {
         self // return self.typename;
@@ -1983,6 +1983,7 @@ class Set does Associative {
     method Numeric { %!elems.Numeric }
     method hash { %!elems.hash }
     method at_key($k) { ?(%!elems{$k} // False) }
+    method exists_key($k) { self.exists($k) }
 
     # Constructor
     method new(*@args --> Set) {
@@ -2108,6 +2109,8 @@ class KeySet does Associative {
         Proxy.new(FETCH => { %!elems{$k}:exists ?? True !! False },
                   STORE => -> $, $value { if $value { %!elems{$k} = True } else { %!elems{$k}:delete }});
     }
+    method exists_key($k) { self.exists($k) }
+    method delete_key($k) { %!elems{$k}:delete }
 
     # Constructor
     method new(*@args --> KeySet) {
@@ -2151,6 +2154,7 @@ class Bag does Associative {
     method Numeric { self.elems }
     method hash { %!elems.hash }
     method at_key($k) { +(%!elems{$k} // 0) }
+    method exists_key($k) { self.exists($k) }
 
     # Constructor
     method new(*@args --> Bag) {
@@ -2203,6 +2207,8 @@ class KeyBag does Associative {
         Proxy.new(FETCH => { %!elems{$k}:exists ?? %!elems{$k} !! 0 },
                   STORE => -> $, $value { if $value > 0 { %!elems{$k} = $value } else { %!elems{$k}:delete }});
     }
+    method exists_key($k) { self.exists($k) }
+    method delete_key($k) { %!elems{$k}:delete }
 
     # Constructor
     method new(*@args --> KeyBag) {
