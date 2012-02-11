@@ -1986,12 +1986,18 @@ class Set does Associative {
     # Constructor
     method new(*@args --> Set) {
         my %e;
+        sub register-arg($arg) {
+            given $arg {
+                when Pair { %e{.key} = True; }
+                when Set | KeySet { for .keys -> $key { %e{$key} = True; } }
+                when Associative { for .pairs -> $p { register-arg($p); } }
+                when Positional { for .list -> $p { register-arg($p); } }
+                default { %e{$_} = True; }
+            }
+        }
+
         for @args {
-            when Set | KeySet { for .keys -> $key { %e{$key} = True; } }
-            # when Bag | KeyBag { for .keys -> $key {
-            #     if %e{$key}:exists { %e{$key} += $_{$key} } else { %e{$key} = $_{$key} }
-            # } }
-            default { %e{$_} = True; }
+            register-arg($_);
         }
         self.bless(*, :elems(%e));
     }
@@ -2012,8 +2018,8 @@ class Set does Associative {
 
     method iterator() { %!elems.keys.iterator }
     method list() { %!elems.keys }
-    method pick($arg) { %!elems.keys.pick: $arg }
-    method roll($arg) { %!elems.keys.roll: $arg }
+    method pick($count = 1) { %!elems.keys.pick($count) }
+    method roll($count = 1) { %!elems.keys.roll($count) }
 
     # TODO: WHICH will require the capability for >1 pointer in ObjAt
 }
@@ -2120,8 +2126,8 @@ class KeySet does Associative {
 
     method iterator() { %!elems.keys.iterator }
     method list() { %!elems.keys }
-    method pick($arg) { %!elems.keys.pick: $arg }
-    method roll($arg) { %!elems.keys.roll: $arg }
+    method pick($count = 1) { %!elems.keys.pick($count) }
+    method roll($count = 1) { %!elems.keys.roll($count) }
 }
 
 class Bag does Associative {
