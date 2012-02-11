@@ -46,6 +46,7 @@ my class IO       { ... }
 my class ObjAt    { ... }
 my class Proxy    { ... }
 my class KeySet   { ... }
+my class Bag      { ... }
 my class KeyBag   { ... }
 grammar Niecza::NumSyntax { ... }
 # }}}
@@ -2007,6 +2008,9 @@ class Set does Associative {
     # Coercions to and from
     method postcircumfix:<( )> ($s --> Set) { to-set($s) }
     multi to-set (Set $set --> Set) { $set }
+    multi to-set (KeySet $set --> Set) { Set.new: $set }
+    multi to-set (Bag $bag --> Set) { Set.new: $bag }
+    multi to-set (KeyBag $bag --> Set) { Set.new: $bag }
     multi to-set (@elems --> Set) { Set.new: @elems }
     multi to-set ([*@elems] --> Set) { Set.new: @elems }
     multi to-set (%elems --> Set) { Set.new: %elems.keys }
