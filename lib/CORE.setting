@@ -2108,21 +2108,27 @@ class KeySet does Associative {
     # Constructor
     method new(*@args --> KeySet) {
         my %e;
+        sub register-arg($arg) {
+            given $arg {
+                when Pair { %e{.key} = True; }
+                when Set | KeySet { for .keys -> $key { %e{$key} = True; } }
+                when Associative { for .pairs -> $p { register-arg($p); } }
+                when Positional { for .list -> $p { register-arg($p); } }
+                default { %e{$_} = True; }
+            }
+        }
+
         for @args {
-            when Set | KeySet { for .keys -> $key { %e{$key} = True; } }
-            # when Bag | KeyBag { for .keys -> $key {
-            #     if %e{$key}:exists { %e{$key} += $_{$key} } else { %e{$key} = $_{$key} }
-            # } }
-            default { %e{$_} = True; }
+            register-arg($_);
         }
         self.bless(*, :elems(%e));
     }
 
     submethod BUILD (%!elems) { }
 
-    submethod Str(Any:D $ : --> Str) { "set(< %!elems.keys() >)" }
-    submethod gist(Any:D $ : --> Str) { "set({ %!elems.keys».gist.join(', ') })" }
-    submethod perl(Any:D $ : --> Str) { 'set(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' }
+    submethod Str(Any:D $ : --> Str) { "keyset(< %!elems.keys() >)" }
+    submethod gist(Any:D $ : --> Str) { "keyset({ %!elems.keys».gist.join(', ') })" }
+    submethod perl(Any:D $ : --> Str) { 'KeySet.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' }
 
     method iterator() { %!elems.keys.iterator }
     method list() { %!elems.keys }
