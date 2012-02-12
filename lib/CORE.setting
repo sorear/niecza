@@ -2044,8 +2044,8 @@ only  sub infix:<(elem)>($a, $b --> Bool) { $a ∈ $b }
 only  sub infix:<∉>($a, $b --> Bool) is equiv(&infix:<==>) { $a !∈ $b }
 
 proto sub infix:<∋>($, $ --> Bool) is equiv(&infix:<==>) {*}
-multi sub infix:<∋>($a, Any $b --> Bool) { Set($a) ∋ $b }
-multi sub infix:<∋>($a, Set $b --> Bool) { $a.exists($b) }
+multi sub infix:<∋>(Any $a, $b --> Bool) { Set($a) ∋ $b }
+multi sub infix:<∋>(Set $a, $b --> Bool) { $a.exists($b) }
 multi sub infix:<(cont)>($a, $b --> Bool) { $a ∋ $b }
 only  sub infix:<∌>($a, $b --> Bool) is equiv(&infix:<==>) { $a !∋ $b }
 
