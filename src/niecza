@@ -49,6 +49,80 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
 our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
 
 our $Actions; $Actions = $Actions but role {
+method variable($/) {
+    my $sigil =  $<sigil>  ?? ~$<sigil> !! substr(~$/, 0, 1);
+    my $twigil = $<twigil> ?? $<twigil><sym> !! '';
+
+    my ($name, $pkg);
+    my ($dsosl) = $<desigilname> ?? $<desigilname>.ast !!
+        $<sublongname> ?? $<sublongname>.ast !!
+        $<longname> ?? self.process_name($<longname>, :defer) !!
+        Any;
+    if defined($dsosl<ind>) {
+        make { term => self.docontext($/, $sigil, $dsosl<ind>) };
+        return;
+    } elsif defined($dsosl<iname>) {
+        make { term => $OpIndirectVar.new(pos=>$/,
+            name => mkstringycat($/, $sigil ~ $twigil, $dsosl<iname>)) };
+        return;
+    } elsif $twigil eq '.' && $<postcircumfix>[0] {
+        if defined $dsosl<pkg> {
+            $/.CURSOR.sorry('$.Foo::bar syntax NYI');
+        }
+
+        make { term => self.docontext($/, $sigil, $OpCallMethod.new(pos=>$/,
+            name => $dsosl<name>, receiver => mklex($/, 'self'),
+            args => [ @($<postcircumfix>[0].ast.args) ])) };
+        return;
+    } elsif defined $dsosl {
+        ($name, $pkg) = $dsosl<name pkg>;
+    } elsif $<infixish> {
+        make { term => $<infixish>.ast.as_function($/) };
+        return;
+    } elsif $<special_variable> {
+        $name = substr(~$<special_variable>, 1);
+    } elsif $<index> {
+        make { capid => $<index>.ast, term =>
+            self.docontextif($/, $sigil,
+                mkcall($/, '&postcircumfix:<[ ]>',
+                    $OpLexical.new(name => '$/'),
+                    $OpNum.new(value => $<index>.ast)))
+        };
+        return Nil;
+    } elsif $<postcircumfix>[0] && $twigil ne '.' {
+        if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
+            make { capid => self.eval_ast_str($/, $<postcircumfix>[0].ast.args[0]) // '', term =>
+                self.docontextif($/, $sigil,
+                    mkcall($/, '&postcircumfix:<{ }>',
+                        $OpLexical.new(name => '$/'),
+                        @( $<postcircumfix>[0].ast.args)))
+            };
+            return;
+        } else {
+            if $<postcircumfix>[0].ast.args[0] -> $arg {
+                make { term => self.docontext($/, $sigil, $arg) };
+            } elsif $sigil eq '$' {
+                make { term => $OpShortCircuit.new(pos=>$/, kind => '//',
+                    args => [ $OpCallMethod.new(name => 'ast',
+                                receiver => mklex($/, '$/')),
+                              $OpCallMethod.new(name => 'Str',
+                                receiver => mklex($/, '$/')) ] ) };
+            } elsif $sigil eq any < @ % > {
+                make { term => self.docontext($/, $sigil, mklex($/, '$/')) };
+            } else {
+                make { term => mklex($/, 'Mu') };
+                $/.CURSOR.sorry("Missing argument for contextualizer");
+            }
+            return;
+        }
+    } else {
+        $name = '';
+    }
+
+    make {
+        sigil => $sigil, twigil => $twigil, name => $name, pkg => $pkg
+    };
+}
 }
 
 my $usage = q:to/EOM/;
