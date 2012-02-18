@@ -3692,6 +3692,12 @@ dynamic:
                 return new string[0];
             return Builtins.UnboxLoS(bv.v);
         }
+        public static object unit_use_from_perl5(object[] args) {
+		string name = (string)args[2];
+		Variable code = Kernel.BoxAnyMO<string>("Niecza::Interoperability::use_module('"+name+"')", Kernel.StrMO);
+		string sub = Kernel.UnboxAny<string>(Builtins.eval_perl5(code).Fetch());
+		return sub;
+	}
         public static object unit_need_unit(object[] args) {
             // LinkUnit state is owned by the root
             RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);

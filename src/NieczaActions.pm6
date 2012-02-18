@@ -3383,6 +3383,27 @@ method statement_control:use ($/) {
     my $name = $<module_name>.ast<name>;
     my $args = $<arglist> ?? $<arglist>.ast !! [];
 
+    my $sub = $*CURLEX<!sub>;
+    my $placeholder = $*unit.create_sub(
+        outer      => $sub,
+        cur_pkg    => $sub.cur_pkg,
+        name       => "placeholder",
+        class      => 'Code');
+    $placeholder.finish($OpStatementList.new);
+
+    # support loading modules from perl5
+    if $<module_name><longname><colonpair> -> $pairs {
+	if $pairs[0].<identifier> eq 'from' && $pairs[0].<coloncircumfix><circumfix><nibble> eq 'perl5' {
+	    my $func = $*unit.use_from_perl5($name);
+	    say "importing $func from p5 land";
+            $*CURLEX<!sub>.add_my_sub($func,$placeholder);
+	    return;
+	} else {
+		$/.CURSOR.sorry("NYI");
+	}
+    } else {
+    }
+
     if defined $<module_name>.ast.<args> {
         $/.CURSOR.sorry("'use' of an instantiated role not yet understood");
         return;
