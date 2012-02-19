@@ -225,5 +225,29 @@ namespace Niecza {
                 subcache[a2] = var = Kernel.NewMuScalar(Kernel.TrueV.Fetch());
             return var;
         }
+
+        public static Variable PruneMatch(Variable vr) {
+            Cursor c = (Cursor)vr.Fetch();
+            // remove as much as possible - don't call this if you still need
+            // the match!
+            if (c.feedback != null) {
+                c.feedback.CommitRule();
+                c.feedback.bt = null;
+                c.feedback.st = new State();
+                c.feedback.ast = null;
+            }
+
+            for (CapInfo it = c.captures; it != null; it = it.prev) {
+                if (it.cap != null && it.cap.Fetch() is Cursor)
+                    PruneMatch(it.cap);
+            }
+
+            c.captures = null;
+            c.feedback = null;
+            c.ast = null;
+            c.xact = null;
+            c.nstate = null;
+            return vr;
+        }
     }
 }

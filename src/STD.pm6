@@ -1206,7 +1206,7 @@ grammar P6 is STD {
         <pblock>
     }
 
-    token block () {
+    token block ($*catchy = False) {
         :temp $*CURLEX;
         :dba('scoped block')
         [ <?before '{' > || <.panic: "Missing block"> ]
@@ -1522,8 +1522,8 @@ grammar P6 is STD {
     token statement_prefix:PRE     { <sym> <blast> }
     token statement_prefix:POST    { <sym> <blast> }
 
-    rule statement_control:CATCH   {<sym> <block> }
-    rule statement_control:CONTROL {<sym> <block> }
+    rule statement_control:CATCH   {<sym> <block(1)> }
+    rule statement_control:CONTROL {<sym> <block(1)> }
     rule statement_control:TEMP    {<sym> <block> }
 
     #######################

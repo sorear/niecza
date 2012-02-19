@@ -77,6 +77,9 @@ sub downcall(*@args) {
 method make_role($name, $meth) {
     Q:CgOp { (cat_mixin_role (obj_getstr {$name}) (@ {$meth})) }
 }
+method prune_match($match) {
+    Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.PruneMatch {$match}) }
+}
 
 method cached_but($cls, $role) {
     # TODO: Object hashes!

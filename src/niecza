@@ -46,7 +46,8 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
      $RxOpTilde, $RxOpVoidBlock, $RxOpVarString, $RxOpZeroWidth,
      $RxOpZeroWidthCCs); #OK
 
-our ($Sig, $SigParameter, $PassSimplifier, $CClass, $OptBeta); #OK
+our ($Sig, $SigParameter, $PassSimplifier, $CClass, $OptBeta, $Backend,
+     $CgOp, $OptRxSimple); #OK
 
 our $Actions; $Actions = $Actions but role {
 method variable($/) {
@@ -169,8 +170,155 @@ method pblock($/) {
     }
 
     $*CURLEX<!sub>.finish($<blockoid>.ast);
+    $Backend.prune_match($<blockoid>);
     make $*CURLEX<!sub>;
 }
+method regex_def($/) {
+    my $ast = $<regex_block>.ast;
+
+    if $<regex_block><onlystar> {
+        $ast = $RxOpProtoRedis.new(name => $*CURLEX<!name>);
+    }
+
+    my @lift = $ast.oplift;
+    my $ltm = $OptRxSimple.run_lad($ast.lad);
+    $*CURLEX<!sub>.set_ltm($ltm);
+    ($ast, my $mb) = $OptRxSimple.run($ast);
+    if $<regex_block><onlystar> {
+        $*CURLEX<!sub>.finish_dispatcher('regex');
+    } else {
+        $*CURLEX<!sub>.finish($OpRegexBody.new(pos=>$/, pre => @lift,
+            name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb));
+    }
+    $Backend.prune_match($<regex_block>);
+    make $OpLexical.new(pos=>$/, name => $*CURLEX<!sub>.outervar);
+}
+method embeddedblock($/) {
+    $*CURLEX<!sub>.finish($<statementlist>.ast);
+    $*CURLEX<!sub>.set_signature($Sig.simple());
+    $Backend.prune_match($<statementlist>);
+    make $*CURLEX<!sub>;
+}
+method package_def ($/) {
+    my $sub = $*CURLEX<!sub>;
+    my $obj = $sub.body_of;
+
+    my $bodyvar = self.gensym;
+    $sub.outer.add_my_sub($bodyvar, $sub);
+    my $ast = ($<blockoid> // $<statementlist>).ast;
+
+    if defined $*AUGMENT_BUFFER {
+        # generate an INIT block to do the augment
+        my $ph = $*unit.create_sub(
+            outer      => $sub,
+            cur_pkg    => $sub.cur_pkg,
+            name       => "phaser-$sub.name()",
+            class      => 'Code',
+            run_once   => $sub.run_once);
+
+        my @ops;
+        for @( $*AUGMENT_BUFFER ) -> $mode, $name, $sym {
+            push @ops, $CgOp._addmethod($CgOp.letvar('!mo'), $mode,
+                $CgOp.str($name), $CgOp.fetch($CgOp.scopedlex($sym)));
+        }
+        my $fin = $CgOp.letn('!mo', $CgOp.class_ref('mo', $obj),
+            @ops, $CgOp._invalidate($CgOp.letvar('!mo')), $CgOp.corelex('Nil'));
+
+        $ph.finish($OpCgOp.new(op => $fin));
+        $sub.create_static_pad;
+        $ph.set_phaser($*backend.phaser('INIT'));
+
+        make $OpCallSub.new(pos=>$/, invocant => mklex($/, $bodyvar));
+    }
+    else {
+        if $<stub> {
+            $*unit.stub_stash($/.from, $obj);
+
+            make mklex($/, $*CURLEX<!sub>.outervar);
+        }
+        else {
+            $/.CURSOR.trymop({ $obj.close; });
+
+            if $obj.kind eq 'prole' {
+                # return the frame object so that role instantiation can
+                # find the cloned methods
+                $ast = $OpStatementList.new(pos=>$/, children => [
+                    $ast, mkcall($/, '&callframe') ]);
+                $sub.create_static_pad;
+                $obj.set_instantiation_block($sub);
+
+                make mklex($/, $*CURLEX<!sub>.outervar);
+            } else {
+                make $OpStatementList.new(pos=>$/, children => [
+                    $OpCallSub.new(pos=>$/, invocant => mklex($/, $bodyvar)),
+                    $OpLexical.new(name => $*CURLEX<!sub>.outervar) ]);
+            }
+        }
+    }
+
+    $Backend.prune_match($<blockoid> // $<statementlist>);
+    $sub.finish($ast);
+}
+method finish_method_routine ($/) {
+    if self.is_dispatcher($<blockoid>) {
+        $*CURLEX<!sub>.finish_dispatcher('multi');
+    } else {
+        $*CURLEX<!sub>.finish($<blockoid>.ast);
+    }
+    $Backend.prune_match($<blockoid>);
+    make $OpLexical.new(pos=>$/, name => $*CURLEX<!sub>.outervar);
+}
+method block($/) {
+    my $code = $<blockoid>.ast;
+    $code = $OpCatchyWrapper.new(inner => $code) if $*catchy;
+    $*CURLEX<!sub>.finish($code);
+    $Backend.prune_match($<blockoid>);
+    make $*CURLEX<!sub>
+}
+sub phaser($/, $ph, :$unique, :$topic, :$csp) {
+    my $sub = ($<blast> // $<block>).ast;
+
+    if $unique {
+        $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
+            if $sub.outer.contains_phaser($*backend.phaser($ph));
+    }
+
+    $sub.outer.noninlinable;
+
+    if $topic {
+        $sub.has_lexical('$_') || $sub.add_my_name('$_');
+        $sub.parameterize_topic;
+        $sub.set_signature($Sig.simple('$_'));
+    }
+    $*CURLEX<!sub>.create_static_pad if $csp;
+    $sub.set_phaser($*backend.phaser($ph));
+    make $OpStatementList.new;
+}
+method comp_unit($/) {
+    my $ast = $<statementlist>.ast;
+
+    if $*CURLEX<!sub>.has_lexical('&MAIN') && $*UNITNAME eq 'MAIN' {
+        $ast = $OpStatementList.new(children =>
+            [ $ast, mkcall($/, '&MAIN_HELPER') ]);
+    }
+
+    $*CURLEX{'!sub'}.finish($ast);
+    $Backend.prune_match($<statementlist>);
+
+    make $*unit;
+}
+method statement_control:CATCH ($/) { phaser($/, 'CATCH', :unique, :topic) }
+method statement_control:CONTROL ($/) { phaser($/, 'CONTROL', :unique, :topic) }
+method statement_prefix:PRE ($/) { phaser($/, 'PRE') }
+method statement_prefix:POST ($/) { phaser($/, 'POST', :topic) }
+method statement_prefix:KEEP ($/) { phaser($/, 'KEEP', :topic) }
+method statement_prefix:UNDO ($/) { phaser($/, 'UNDO', :topic) }
+method statement_prefix:ENTER ($/) { phaser($/, 'ENTER') }
+method statement_prefix:LEAVE ($/) { phaser($/, 'LEAVE', :topic) }
+
+method statement_prefix:CHECK ($/) { phaser($/, 'CHECK', :csp) }
+method statement_prefix:END ($/) { phaser($/, 'END', :csp) }
+method statement_prefix:INIT ($/) { phaser($/, 'INIT', :csp) }
 }
 
 my $usage = q:to/EOM/;
