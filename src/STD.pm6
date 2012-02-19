@@ -431,7 +431,7 @@ token escape:none { <!> }
 # and this is what makes nibbler polymorphic...
 method nibble ($lang) {
     temp %*RX; # prevent up-vars from leaking
-    %*RX<dba> = 'anonymous regex';
+    %*RX<dba> //= 'anonymous regex';
     # leave endsym, sym undefined
     self.cursor_fresh($lang).nibbler;
 }
