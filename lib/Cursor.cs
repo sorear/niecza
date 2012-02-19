@@ -1943,6 +1943,9 @@ anew:
         if (LtmTrace) {
             Dump();
         }
+        if (LtmProf) {
+            Console.WriteLine("Lexer ({0}) has {1} nodes", tag, pad.nodes_l.Count);
+        }
         start = new LexerState(pad);
         start.Add(0);
         pad.Close(start);
