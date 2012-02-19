@@ -2161,7 +2161,7 @@ class Bag does Associative {
         my %e;
         sub register-arg($arg) {
             given $arg {
-                when Pair { if %e{.key}:exists { %e{.key} += .value } else { %e{.key} = .value } }
+                when Pair { if .value { if %e{.key}:exists { %e{.key} += .value } else { %e{.key} = .value } } }
                 when Set | KeySet { for .keys -> $key { %e{$key}++; } }
                 when Associative { for .pairs -> $p { register-arg($p) } }
                 when Positional { for .list -> $p { register-arg($p) } }
@@ -2215,7 +2215,7 @@ class KeyBag does Associative {
         my %e;
         sub register-arg($arg) {
             given $arg {
-                when Pair { if %e{.key}:exists { %e{.key} += .value } else { %e{.key} = .value } }
+                when Pair { if .value { if %e{.key}:exists { %e{.key} += .value } else { %e{.key} = .value } } }
                 when Set | KeySet { for .keys -> $key { %e{$key}++; } }
                 when Associative { for .pairs -> $p { register-arg($p) } }
                 when Positional { for .list -> $p { register-arg($p) } }
