@@ -46,7 +46,7 @@ our ($RxOp, $RxOpAlt, $RxOpAny, $RxOpBefore, $RxOpCut, $RxOpConj, $RxOpCutLTM,
      $RxOpTilde, $RxOpVoidBlock, $RxOpVarString, $RxOpZeroWidth,
      $RxOpZeroWidthCCs); #OK
 
-our ($Sig, $SigParameter, $PassSimplifier, $CClass); #OK
+our ($Sig, $SigParameter, $PassSimplifier, $CClass, $OptBeta); #OK
 
 our $Actions; $Actions = $Actions but role {
 method variable($/) {
@@ -122,6 +122,54 @@ method variable($/) {
     make {
         sigil => $sigil, twigil => $twigil, name => $name, pkg => $pkg
     };
+}
+method circumfix:sym<{ }> ($/) {
+    my $var = self.gensym;
+    $*CURLEX<!sub>.add_my_sub($var, $<pblock>.ast);
+    make $OpBareBlock.new(pos=>$/, :$var);
+
+    if $<pblock>.ast.get_extend('hashy') {
+        make mkcall($/, '&_hash_constructor',
+            $OptBeta.make_call($/, $var));
+    }
+}
+method check_hash($sub, $do is copy) {
+    return False if $sub.arity;
+
+    return False unless $do.^isa($OpStatementList);
+    return True if $do.children == 0;
+    return False if $do.children > 1;
+
+    $do = $do.children[0];
+    my @bits = $do.^isa($OpSimpleParcel) ?? @( $do.items ) !! $do;
+
+    return True if @bits[0].^isa($OpSimplePair);
+
+    if @bits[0].^isa($OpCallSub) &&
+            @bits[0].invocant.^isa($OpLexical) &&
+            @bits[0].invocant.name eq '&infix:<=>>' {
+        return True;
+    }
+
+    if @bits[0].^isa($OpGeneralConst) && @bits[0].value.starts_with_pair {
+        return True;
+    }
+
+    if @bits[0].^isa($OpLexical) && substr(@bits[0].name,0,1) eq '%' {
+        return True;
+    }
+
+    return False;
+}
+method pblock($/) {
+    #my $rw = $<lambda> && $<lambda> eq '<->'; TODO
+    # snatch away some information here
+    if self.check_hash($*CURLEX<!sub>, $<blockoid>.ast) {
+        $*CURLEX<!sub>.set_extend('hashy', True);
+    }
+
+    $*CURLEX<!sub>.finish($<blockoid>.ast);
+    make $*CURLEX<!sub>;
 }
 }
 
