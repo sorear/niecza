@@ -319,6 +319,13 @@ method statement_prefix:LEAVE ($/) { phaser($/, 'LEAVE', :topic) }
 method statement_prefix:CHECK ($/) { phaser($/, 'CHECK', :csp) }
 method statement_prefix:END ($/) { phaser($/, 'END', :csp) }
 method statement_prefix:INIT ($/) { phaser($/, 'INIT', :csp) }
+method statement_prefix:BEGIN ($/) {
+    $*CURLEX<!sub>.create_static_pad;
+    my $con = self.make_constant($/, 'anon', 'BEGIN');
+    $<blast>.ast.run_BEGIN($con.name);
+    $con.init = True;
+    make $con;
+}
 }
 
 my $usage = q:to/EOM/;

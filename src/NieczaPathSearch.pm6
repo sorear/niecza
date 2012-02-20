@@ -6,7 +6,7 @@ has @.path;
 method load_module($name) {
     my $sub = "".IO.combine($name.split('::'));
 
-    my @path = @*INC, @!path;
+    my @path = ($*unit ?? $*unit.get_incs !! ()), @!path;
 
     for @path -> $pe {
         for <pm6 pm setting> -> $ext {

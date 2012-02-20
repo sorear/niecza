@@ -3686,6 +3686,12 @@ dynamic:
             }
             return new Handle(ru);
         }
+        public static object unit_get_incs(object[] args) {
+            StashEnt bv;
+            if (!Kernel.currentGlobals.TryGetValue("\u0008::GLOBAL@INC", out bv))
+                return new string[0];
+            return Builtins.UnboxLoS(bv.v);
+        }
         public static object unit_need_unit(object[] args) {
             // LinkUnit state is owned by the root
             RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
