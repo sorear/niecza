@@ -2195,7 +2195,7 @@ sub bag(*@a) {
 
 proto sub infix:<⊍>($, $ --> Bag) is equiv(&infix:<X>) {*}
 multi sub infix:<⊍>(Any $a, Any $b --> Bag) { bag($a) ⊍ bag($b) }
-multi sub infix:<⊍>(Bag $a, Bag $b --> Bag) { bag(($a ∪ $b).map({ ; $_ => $a{$_} min $b{$_} })) }
+multi sub infix:<⊍>(Bag $a, Bag $b --> Bag) { bag(($a ∪ $b).map({ ; $_ => $a{$_} * $b{$_} })) }
 only  sub infix:<(.)>($a, $b --> Bag) is equiv(&infix:<X>) { $a ⊍ $b }
 
 proto sub infix:<⊎>($, $ --> Bag) is equiv(&infix:<X>) {*}
