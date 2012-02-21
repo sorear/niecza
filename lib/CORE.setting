@@ -2919,7 +2919,7 @@ my class Range is Cool does Positional {
     }
 
     method pick($count = 1) {
-        return self.list.roll($count) unless $!min.^isa(Int) && $!max.^isa(Int);
+        return self.list.pick($count) unless $!min.^isa(Int) && $!max.^isa(Int);
         return self.list.pick(*) if $count ~~ Whatever;
         return self.roll if $count == 1;
         return self.list.pick($count) unless $!max - $!min > 3 * $count;
