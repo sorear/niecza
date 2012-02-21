@@ -2902,6 +2902,39 @@ my class Range is Cool does Positional {
     method fmt($format = '%s', $separator = ' ') {
         self.list.fmt($format, $separator);
     }
+
+    method roll($count = 1) {
+        return self.list.roll($count) unless $!min.^isa(Int) && $!max.^isa(Int);
+
+        my $least = $!excludes_min ?? $!min + 1 !! $!min;
+        my $elems = 1 + ($!excludes_max ?? $!max - 1 !! $!max) - $least;
+
+        sub choose {
+            $elems ?? ($least + $elems.rand.floor) !! Any;
+        }
+
+        return choose() xx * if $count ~~ Whatever;
+        return choose() if $count == 1;
+        return choose() xx $count;
+    }
+
+    method pick($count = 1) {
+        return self.list.roll($count) unless $!min.^isa(Int) && $!max.^isa(Int);
+        return self.list.pick(*) if $count ~~ Whatever;
+        return self.roll if $count == 1;
+        return self.list.pick($count) unless $!max - $!min > 3 * $count;
+
+        my %seen;
+        my $i = 0;
+        gather while $i < $count {
+            my $x = self.roll;
+            unless %seen{$x} {
+                %seen{$x} = 1;
+                $i++;
+                take $x;
+            }
+        }
+    }
 }
 
 sub infix:<..> is equiv<leg> ($a, $b)   is pure { Range.new($a, $b) }
