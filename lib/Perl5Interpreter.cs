@@ -187,7 +187,7 @@ public class SVany : P6any {
 
                 if (name == "postcircumfix:<( )>") {
                     int context = 1;
-                    if (named != null && named["context"] != null) {
+                    if (named != null && named.ContainsKey("context") && named["context"] != null) {
                         context = Context(named["context"]);
                     }
                     IntPtr[] args = MarshalPositionals(pos);

@@ -3376,6 +3376,28 @@ method statement_control:when ($/) {
         body => self.inliney_call($/, $<xblock>.ast[1]));
 }
 
+method use_from_perl5($/,$name) {
+    my $sub = $*CURLEX<!sub>;
+    my $func = $*unit.use_perl5_module($name);
+
+    my $placeholder = $*unit.create_sub(
+        outer      => $sub,
+        cur_pkg    => $sub.cur_pkg,
+        name       => "placeholder",
+        class      => 'Code');
+
+    my $p5code = '\\&'~$func;
+    my $p5sub = $OpCallSub.new(pos=>$/,invocant=>mklex($/,'&eval'),args=>[$OpStringLiteral.new(text=>$p5code),$OpSimplePair.new(key=>'lang',value=>$OpStringLiteral.new(text=>'perl5'))]);
+    $placeholder.add_my_name('|capture');
+    my $sig = $Sig.new(params => [$SigParameter.new(flags=>$Sig::SLURPY_CAP,name=>'|capture',slot=>'|capture')]);
+    $placeholder.set_signature($sig);
+    my $args = mkcall($/,'&prefix:<|>',mklex($/,'|capture'));
+    my $body = $OpCallSub.new(pos=>$/, invocant => $p5sub,args=>[$args]);
+
+    $placeholder.finish($body);
+
+    $*CURLEX<!sub>.add_my_sub($func,$placeholder);
+}
 method statement_control:use ($/) {
     make $OpStatementList.new;
     return if $<version>; # just ignore these
@@ -3383,20 +3405,11 @@ method statement_control:use ($/) {
     my $name = $<module_name>.ast<name>;
     my $args = $<arglist> ?? $<arglist>.ast !! [];
 
-    my $sub = $*CURLEX<!sub>;
-    my $placeholder = $*unit.create_sub(
-        outer      => $sub,
-        cur_pkg    => $sub.cur_pkg,
-        name       => "placeholder",
-        class      => 'Code');
-    $placeholder.finish($OpStatementList.new);
 
     # support loading modules from perl5
     if $<module_name><longname><colonpair> -> $pairs {
 	if $pairs[0].<identifier> eq 'from' && $pairs[0].<coloncircumfix><circumfix><nibble> eq 'perl5' {
-	    my $func = $*unit.use_from_perl5($name);
-	    say "importing $func from p5 land";
-            $*CURLEX<!sub>.add_my_sub($func,$placeholder);
+            self.use_from_perl5($/,$name);
 	    return;
 	} else {
 		$/.CURSOR.sorry("NYI");
