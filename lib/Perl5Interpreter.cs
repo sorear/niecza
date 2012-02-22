@@ -1,11 +1,12 @@
 using Niecza;
 using System.Runtime.InteropServices;
 using System;
+using System.IO;
 using Niecza.Serialization;
 
 public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("p5embed", EntryPoint="p5embed_initialize")]
-    public static extern void Initialize();
+    public static extern void Initialize(string p5lib);
   
     [DllImport("p5embed", EntryPoint="p5embed_dispose")]
     public static extern void Dispose();
@@ -84,7 +85,9 @@ public class Perl5Interpreter : IForeignInterpreter {
     }
   
     public Perl5Interpreter() {
-        Initialize();
+        string location = System.Reflection.Assembly.GetExecutingAssembly().Location;
+        string p5lib = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(location)),"perl5");
+        Initialize(p5lib);
     }
     ~Perl5Interpreter() {
         Dispose();

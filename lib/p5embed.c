@@ -17,7 +17,7 @@ xs_init(pTHX)
 }
 
 static PerlInterpreter *my_perl;
-void p5embed_initialize()
+void p5embed_initialize(char* p5lib)
 {
   int argc = 1;
   char *argv0[] = { "perl", NULL, 0 };
@@ -28,7 +28,10 @@ void p5embed_initialize()
   char *embedding[] = { "", "-e", "0" };
   perl_parse(my_perl, xs_init, 3, embedding, NULL);
   PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
-  eval_pv("use lib 'perl5';use Niecza::Interoperability",TRUE);
+  AV* INC = get_av("INC",0);
+  SV* p5lib_sv = newSVpv(p5lib,0);
+  av_push(INC,p5lib_sv);
+  eval_pv("use Niecza::Interoperability",TRUE);
 }
 
 SV* p5embed_eval(char* code) { 
