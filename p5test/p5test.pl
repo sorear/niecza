@@ -23,7 +23,7 @@ sub test {
     for my $cc ("$Config{cc}","$Config{cc} -m32") {
         mkdir($path);
         do_test($number,$path,{cc=>$cc,csc=>"gmcs"},$opts,$desc." using $cc");
-        rmtree($path);
+#        rmtree($path);
     }
 }
 sub do_test {
@@ -34,8 +34,13 @@ sub do_test {
 
     my $p5flags = $opts->{embed_p5} ? " $ccopts $ldopts" : "";
 
+    if ($opts->{so}) {
+        system("$cc -shared -o $path/test${number}lib.$Config{so} test${number}lib.c $p5flags");
+    }
+
     if ($opts->{cc}) {
-        system("$cc test$number.c -o $path/test$number $p5flags");
+        my $flags = defined $opts->{cc_flags} ? $opts->{cc_flags} : $p5flags;
+        system("$cc test$number.c -o $path/test$number $flags");
         $ok = `$path/test$number`;
     }
     # we write a .config file to portably specify where the dynamic library is
@@ -47,9 +52,6 @@ sub do_test {
     <dllmap dll="test${number}lib" target="$lib_path" />
 </configuration>
 END
-    }
-    if ($opts->{so}) {
-        system("$cc -shared -o $path/test${number}lib.$Config{so} test${number}lib.c $p5flags");
     }
 
     if ($opts->{mono}) {
@@ -66,4 +68,5 @@ test({cc=>1,embed_p5=>1},"We can embed p5.");
 test({mono=>1},"We can run programs under mono");
 test({config=>1,so=>1,mono=>1},"We can call C code from mono");
 test({config=>1,so=>1,embed_p5=>1,mono=>1},"We can call p5 code from mono");
+test({cc=>1,cc_flags=>"tmp/test6lib.$Config{so}",so=>1,embed_p5=>1},"We can call p5 code from a shared library");
 done_testing;
