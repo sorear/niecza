@@ -219,7 +219,8 @@ my class Mu {
     method typename() {  # should be ^name
         Q:CgOp { (box Str (obj_typename (@ {self}))) }
     }
-    method gist() { defined(self) ?? self.perl !! self.typename ~ '()' }
+    method gist() { defined(self) ?? self.perl   !! self.typename ~ '()' }
+    method say()  { defined(self) ?? (~self).say !! (self.typename ~ '()').say }
     method Stringy() { self.Str }
     method Str() {
         if defined(self) {
@@ -604,7 +605,6 @@ my class Cool {
         self.comb(/ \S+ /, $limit);
     }
     method words-val() { map &val, self.words }
-    method say() { (~self).say }
     method chars() { chars(self) }
     method codes() { codes(self) }
     method bytes() { chars(self) * 2 }
