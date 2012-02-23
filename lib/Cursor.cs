@@ -1154,8 +1154,8 @@ public sealed class NFA {
         }
     }
 
-    public List<Node> nodes_l = new List<Node>();
-    public Node[] nodes;
+    List<Node> nodes_l = new List<Node>();
+    Node[] nodes;
     public int curfate;
 
     public STable cursor_class;
@@ -1168,11 +1168,22 @@ public sealed class NFA {
         nodes_l.Add(new Node(curfate));
         return nodes_l.Count - 1;
     }
+    public void SetFinal(int node) {
+        nodes_l[node].final = true;
+    }
     public void AddEdge(int from, int to, CC when) {
         Edge e;
         e.to = to;
         e.when = when;
         nodes_l[from].edges_l.Add(e);
+    }
+    public int NodeCount { get { return nodes_l.Count; } }
+    public Edge[] EdgesOf(int i) {
+        return nodes[i].edges;
+    }
+    public int FateOf(int i) {
+        var n = nodes[i];
+        return n.final ? n.fate : -1;
     }
 
     public void Dump() {
@@ -1335,7 +1346,7 @@ public class LADImp : LAD {
     public override LAD Reify(NFA pad) { return this; }
     public override void ToNFA(NFA pad, int from, int to) {
         int knot = pad.AddNode();
-        pad.nodes_l[knot].final = true;
+        pad.SetFinal(knot);
         pad.AddEdge(from, knot, null);
     }
 
@@ -1709,7 +1720,7 @@ public sealed class LexerState {
     Dictionary<int,LexerState> dfc = new Dictionary<int,LexerState>();
 
     public LexerState(NFA nf) {
-        this.nstates = new int[(nf.nodes.Length + 31) >> 5];
+        this.nstates = new int[(nf.NodeCount + 31) >> 5];
     }
 
     public void Add(int n) {
@@ -1726,7 +1737,7 @@ public sealed class LexerState {
             for (int j = 0; j < 32; j++) {
                 if ((bm & (1 << j)) == 0)
                     continue;
-                foreach (NFA.Edge e in nf.nodes[32*i + j].edges) {
+                foreach (NFA.Edge e in nf.EdgesOf(32*i + j)) {
                     if (e.when != null && e.when.Accepts(ch))
                         l.Add(e.to);
                 }
@@ -1767,13 +1778,13 @@ public sealed class LexerState {
     }
 
     public void CollectFates(NFA nf, Lexer l) {
-        for (int i = nf.nodes.Length - 1; i >= 0; i--) {
+        for (int i = nf.NodeCount - 1; i >= 0; i--) {
             if ((nstates[i >> 5] & (1 << (i & 31))) != 0) {
-                NFA.Node n = nf.nodes[i];
-                if (n.final) {
+                int fate = nf.FateOf(i);
+                if (fate >= 0) {
                     if (Lexer.LtmTrace)
-                        Console.WriteLine("+ Adding fate {0}", n.fate);
-                    l.NoteFate(n.fate);
+                        Console.WriteLine("+ Adding fate {0}", fate);
+                    l.NoteFate(fate);
                 }
             }
         }
@@ -1930,7 +1941,7 @@ anew:
         for (int ix = 0; ix < alts.Length; ix++) {
             pad.curfate = alt_shuffle[ix];
             int target = pad.AddNode();
-            pad.nodes_l[target].final = true;
+            pad.SetFinal(target);
             alts[alt_shuffle[ix]].ToNFA(pad, root, target);
         }
         nfates = alts.Length;
@@ -1944,7 +1955,7 @@ anew:
             Dump();
         }
         if (LtmProf) {
-            Console.WriteLine("Lexer ({0}) has {1} nodes", tag, pad.nodes_l.Count);
+            Console.WriteLine("Lexer ({0}) has {1} nodes", tag, pad.NodeCount);
         }
         start = new LexerState(pad);
         start.Add(0);
