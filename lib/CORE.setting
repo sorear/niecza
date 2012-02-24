@@ -3636,6 +3636,10 @@ sub mkdir($filename) is unsafe {
     True; # is there a way to actually detect problems with path_mkdir?
 }
 
+sub rmdir($filename) is unsafe {
+    Q:CgOp { (box Int (path_rmdir (obj_getstr {$filename}))) } == 0;
+}
+
 sub shell($command) is unsafe {
     Q:CgOp { (box Int (command_system (obj_getstr {$command}))) };
 }
