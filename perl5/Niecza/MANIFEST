@@ -1,0 +1,14 @@
+Build.PL
+Changes
+lib/Niecza.pm
+lib/Niecza.xs
+lib/typemap
+MANIFEST			This list of files
+ppport.h
+README
+t/00-load.t
+t/01-object.t
+t/02-feature.t
+t/manifest.t
+t/pod-coverage.t
+t/pod.t

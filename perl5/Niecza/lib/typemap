@@ -1,0 +1,37 @@
+
+###############################################################################
+##
+##    Typemap for Niecza objects
+##
+##    Copyright (c) 2012 Paweł Murias
+##    All rights reserved.
+##
+##    This typemap is designed specifically to make it easier to handle
+##    Perl-style blessed objects in XS.  In particular, it takes care of
+##    blessing the object into the correct class (even for derived classes).
+##   
+##
+###############################################################################
+## vi:et:sw=4 ts=4
+
+TYPEMAP
+
+Niecza T_PTROBJ_SPECIAL
+
+INPUT
+T_PTROBJ_SPECIAL
+    if (sv_derived_from($arg, \"${(my $ntt=$ntype)=~s/_/::/g;\$ntt}\")) {
+	$var = SvRV($arg);
+    }
+    else
+	croak(\"$var is not of type ${(my $ntt=$ntype)=~s/_/::/g;\$ntt}\")
+
+OUTPUT
+T_PTROBJ_SPECIAL
+    /* inherited new() */
+    if ( strcmp(classname,\"${(my $ntt=$ntype)=~s/_/::/g;\$ntt}\") != 0 )
+	$arg = sv_bless(newRV_noinc($var),
+	    gv_stashpv(classname,TRUE));
+    else
+	$arg = sv_bless(newRV_noinc($var),
+	    gv_stashpv(\"${(my $ntt=$ntype)=~s/_/::/g;\$ntt}\",TRUE));
