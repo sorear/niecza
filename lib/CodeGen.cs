@@ -3694,7 +3694,7 @@ dynamic:
         }
         public static object unit_use_perl5_module(object[] args) {
 		string name = (string)args[2];
-		Variable code = Kernel.BoxAnyMO<string>("Niecza::Interoperability::use_module('"+name+"')", Kernel.StrMO);
+		Variable code = Kernel.BoxAnyMO<string>("Niecza::Helpers::use_module('"+name+"')", Kernel.StrMO);
 		string sub = Kernel.UnboxAny<string>(Builtins.eval_perl5(code).Fetch());
 		return sub;
 	}

@@ -17,3 +17,4 @@ chomp($ldopts);
 
 my $cc = "$Config{cc} -m32 -shared";
 system("$cc lib/p5embed.c -o $path $ccopts $ldopts");
+system("cd perl5/Niecza;perl Build.PL;perl Build");

@@ -6,7 +6,7 @@ using Niecza.Serialization;
 
 public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("p5embed", EntryPoint="p5embed_initialize")]
-    public static extern void Initialize(string p5lib);
+    public static extern void Initialize(string path1,string path2);
   
     [DllImport("p5embed", EntryPoint="p5embed_dispose")]
     public static extern void Dispose();
@@ -86,8 +86,18 @@ public class Perl5Interpreter : IForeignInterpreter {
   
     public Perl5Interpreter() {
         string location = System.Reflection.Assembly.GetExecutingAssembly().Location;
-        string p5lib = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(location)),"perl5");
-        Initialize(p5lib);
+
+        string[] paths = new string[] {"perl5/Niecza/blib/lib","perl5/Niecza/blib/arch"};
+        
+        for (int i=0;i<2;i++) {
+            // Try to construct the path in a platform portable manner
+            string p5lib = Path.GetDirectoryName(Path.GetDirectoryName(location));
+            foreach (string part in paths[i].Split('/')) {
+                p5lib = Path.Combine(p5lib,part);
+            }
+            paths[i] = p5lib;
+        }
+        Initialize(paths[0],paths[1]);
     }
     ~Perl5Interpreter() {
         Dispose();
