@@ -1,0 +1,9 @@
+lib/Niecza.c
+lib/Niecza.o
+blib
+_build
+MYMETA.yml
+MYMETA.json
+MANIFEST.bak
+MANIFEST.SKIP.bak
+Build
