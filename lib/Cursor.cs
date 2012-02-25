@@ -1155,10 +1155,11 @@ public sealed class NFA {
     public struct Edge {
         public int from;
         public int to;
-        public CC when; // null if epsilon
+        public int when; // -2=epsilon -1=use CC
+        public CC when_cc;
 
         public override string ToString() {
-            return ((when != null) ? when.ToString() : "ε") + " => " + to;
+            return ((when >= 0) ? "'" + Utils.Chr(when) + "'" : (when == -1) ? when.ToString() : "ε") + " => " + to;
         }
     }
 
@@ -1187,11 +1188,18 @@ public sealed class NFA {
     public void SetFinal(int node) {
         nodes_l[node].final = true;
     }
+    public void AddEdge(int from, int to, int when) {
+        AddEdge(from, to, when, null);
+    }
     public void AddEdge(int from, int to, CC when) {
+        AddEdge(from, to, when == null ? -2 : -1, when);
+    }
+    void AddEdge(int from, int to, int when, CC when_cc) {
         Edge e;
         e.from = from;
         e.to = to;
         e.when = when;
+        e.when_cc = when_cc;
         if (nedges == edges.Length) {
             Array.Resize(ref edges, nedges * 2);
         }
@@ -1233,7 +1241,7 @@ public sealed class NFA {
             int lix = nodes[val].nedges + eix;
             while (eix != lix) {
                 Edge e = edges[eix++];
-                if (e.when == null) {
+                if (e.when == -2) {
                     int ix = e.to >> 5;
                     int m = 1 << (e.to & 31);
                     if ((ls.nstates[ix] & m) == 0) {
@@ -1297,7 +1305,7 @@ public class LADStr : LAD {
             int len = text.Length;
             for (int c = 0; c < len; c++) {
                 int fromp = (c == len - 1) ? to : pad.AddNode();
-                pad.AddEdge(from, fromp, new CC(text[c]));
+                pad.AddEdge(from, fromp, (int)text[c]); // XXX supplementaries
                 from = fromp;
             }
         }
@@ -1792,7 +1800,7 @@ public sealed class LexerState {
                 var es = nf.EdgesOf(32*i + j, ref ei, ref eimax);
                 while (ei != eimax) {
                     var e = es[ei++];
-                    if (e.when != null && e.when.Accepts(ch))
+                    if (e.when == ch || e.when == -1 && e.when_cc.Accepts(ch))
                         l.Add(e.to);
                 }
             }
