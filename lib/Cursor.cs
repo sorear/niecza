@@ -1131,6 +1131,9 @@ public sealed class CC : IFreeze {
     }
 }
 
+// When building a NFA you may encounter negative pseudo-indexes which
+// are used to refer to NFAs that haven't been assigned to numbers yet;
+// the form is -{1,2}-2*N
 public sealed class NFA {
     public sealed class Node {
         public int fate;
@@ -1163,6 +1166,12 @@ public sealed class NFA {
     public HashSet<string> used_methods = new HashSet<string>();
     public List<Frame>   outer_stack = new List<Frame>();
     public List<SubInfo> info_stack  = new List<SubInfo>();
+
+    //List<NFA> subnfa_l = new List<NFA>();
+    //NFA[] subnfa;
+    //int[] subnfa_start;
+    //int[] subnfa_continue;
+    //int end_node;
 
     public int AddNode() {
         nodes_l.Add(new Node(curfate));
@@ -1232,7 +1241,8 @@ public sealed class NFA {
 
 // ltm automaton descriptors
 public abstract class LAD : IFreeze {
-    public abstract void ToNFA(NFA pad, int from, int to);
+    // return true if to is accessible
+    public abstract bool ToNFA(NFA pad, int from, int to);
     public abstract void Dump(int indent);
     public abstract void Freeze(FreezeBuffer fb);
     public virtual void QueryLiteral(NFA pad, out int len, out bool cont) {
@@ -1251,7 +1261,7 @@ public class LADStr : LAD {
         len = text.Length; cont = true;
     }
 
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         if (text.Length == 0) {
             pad.AddEdge(from, to, null);
         } else {
@@ -1262,6 +1272,7 @@ public class LADStr : LAD {
                 from = fromp;
             }
         }
+        return true;
     }
 
     public override void Dump(int indent) {
@@ -1289,7 +1300,7 @@ public class LADStrNoCase : LAD {
         len = text.Length; cont = true;
     }
 
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         if (text.Length == 0) {
             pad.AddEdge(from, to, null);
         } else {
@@ -1300,6 +1311,7 @@ public class LADStrNoCase : LAD {
                 from = fromp;
             }
         }
+        return true;
     }
 
     public override void Dump(int indent) {
@@ -1323,8 +1335,9 @@ public class LADCC : LAD {
     public LADCC(CC cc) { this.cc = cc; }
 
     public override LAD Reify(NFA pad) { return this; }
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         pad.AddEdge(from, to, cc);
+        return true;
     }
 
     public override void Dump(int indent) {
@@ -1344,10 +1357,11 @@ public class LADCC : LAD {
 
 public class LADImp : LAD {
     public override LAD Reify(NFA pad) { return this; }
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         int knot = pad.AddNode();
         pad.SetFinal(knot);
         pad.AddEdge(from, knot, null);
+        return false;
     }
 
     public override void Dump(int indent) {
@@ -1360,8 +1374,9 @@ public class LADImp : LAD {
 
 public class LADNull : LAD {
     public override LAD Reify(NFA pad) { return this; }
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         pad.AddEdge(from, to, null);
+        return true;
     }
 
     public override void Dump(int indent) {
@@ -1378,7 +1393,8 @@ public class LADNull : LAD {
 
 public class LADNone : LAD {
     public override LAD Reify(NFA pad) { return this; }
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
+        return false;
     }
 
     public override void Dump(int indent) {
@@ -1391,8 +1407,9 @@ public class LADNone : LAD {
 
 public class LADDot : LAD {
     public override LAD Reify(NFA pad) { return this; }
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         pad.AddEdge(from, to, CC.All);
+        return true;
     }
 
     public override void Dump(int indent) {
@@ -1423,7 +1440,7 @@ public class LADQuant : LAD {
     public override LAD Reify(NFA pad) {
         return new LADQuant(type, z0.Reify(pad), z1 != null ? z1.Reify(pad) : null);
     }
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         int knot1 = pad.AddNode();
         int knot2 = pad.AddNode();
         int knot3 = pad.AddNode();
@@ -1443,6 +1460,7 @@ public class LADQuant : LAD {
             pad.AddEdge(knot3, to, null);
         if ((type & 2) != 0)
             pad.AddEdge(knot3, knot1, null);
+        return true; // conservative
     }
 
     public override void Dump(int indent) {
@@ -1489,13 +1507,15 @@ public class LADSequence : LAD {
         }
     }
 
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         for (int i = 0; i < args.Length; i++) {
             int knot = (i == args.Length - 1) ? to : pad.AddNode();
-            args[i].ToNFA(pad, from, knot);
+            if (!args[i].ToNFA(pad, from, knot))
+                return false;
             from = knot;
         }
         if (from != to) pad.AddEdge(from, to, null);
+        return true;
     }
 
     public override void Dump(int indent) {
@@ -1526,9 +1546,11 @@ public class LADAny : LAD {
         return new LADAny(nc);
     }
 
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
+        bool ok = false;
         foreach (LAD k in zyg)
-            k.ToNFA(pad, from, to);
+            if (k.ToNFA(pad, from, to)) ok = true;
+        return ok;
     }
 
     public override void Dump(int indent) {
@@ -1584,7 +1606,7 @@ public class LADParam : LAD {
         }
     }
 
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         throw new InvalidOperationException();
     }
 
@@ -1613,7 +1635,7 @@ public class LADMethod : LAD {
     public LADMethod(string name) { this.name = name; }
     private LADMethod() {}
 
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         throw new InvalidOperationException();
     }
 
@@ -1671,7 +1693,7 @@ public class LADMethod : LAD {
 
 // Only really makes sense if used in the static scope of a proto
 public class LADDispatcher : LAD {
-    public override void ToNFA(NFA pad, int from, int to) {
+    public override bool ToNFA(NFA pad, int from, int to) {
         throw new InvalidOperationException();
     }
 
