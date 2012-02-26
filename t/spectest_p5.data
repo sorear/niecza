@@ -1,3 +1,4 @@
 S01-perl-5-integration/subs.t
 S01-perl-5-integration/strings.t
 S01-perl-5-integration/context.t
+S01-perl-5-integration/import.t
