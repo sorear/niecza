@@ -42,6 +42,13 @@ struct root_hash_link {
 	MonoObject* root;
 };
 
+/* holds per-image information for the types that are duplicated between Kernel
+   and Run.Kernel */
+struct per_image {
+	MonoImage* image;
+	MonoClass* p6any;
+};
+
 struct _MonoProfiler {
 	MonoObject **ptrs;
 	size_t ptrs_allocated;
@@ -56,6 +63,8 @@ struct _MonoProfiler {
 	size_t root_hash_size;
 
 	size_t total_prob;
+
+	struct per_image *run_img, *comp_img;
 };
 
 static void buffer_add(void **bufp, size_t *allocp, size_t *usedp, void *src,
@@ -86,9 +95,6 @@ static int do_heap_shot = 0;
  * sudo ldconfig
  */
 
-static MonoImage *img_run, *img_comp;
-static MonoClass *p6any_run, *p6any_comp;
-
 typedef struct _NieczaP6any NieczaP6any;
 typedef struct _NieczaSTable NieczaSTable;
 typedef struct _NieczaVariable NieczaVariable;
@@ -108,11 +114,10 @@ struct _NieczaSTable {
 	// and a million more that I don't care about now
 };
 
-static void
-explain_object (MonoObject *obj)
+static int
+explain_object_image (struct per_image *pi, MonoObject *obj)
 {
-	if ((p6any_run && mono_object_isinst(obj, p6any_run)) ||
-			(p6any_comp && mono_object_isinst(obj, p6any_comp))) {
+	if (pi->p6any && mono_object_isinst(obj, pi->p6any)) {
 		NieczaP6any *p6 = (NieczaP6any *)obj;
 		if (p6->mo && p6->mo->name) {
 			char *mname = mono_string_to_utf8(p6->mo->name);
@@ -121,9 +126,20 @@ explain_object (MonoObject *obj)
 		} else {
 			printf("(p6, no name available)\n");
 		}
-	} else {
-		printf("(clr) %s\n", mono_class_get_name(mono_object_get_class(obj)));
+		return 1;
 	}
+	return 0;
+}
+
+static void
+explain_object (MonoProfiler *prof, MonoObject *obj)
+{
+	if (prof->run_img && explain_object_image(prof->run_img, obj))
+		return;
+	if (prof->comp_img && explain_object_image(prof->comp_img, obj))
+		return;
+
+	printf("(clr) %s\n", mono_class_get_name(mono_object_get_class(obj)));
 }
 
 static int
@@ -282,9 +298,27 @@ sample (MonoProfiler *prof)
 			return;
 		}
 		printf("%p  ", obj->addr);
-		explain_object(obj->addr);
+		explain_object(prof, obj->addr);
 		obj = obj->prev;
 	}
+}
+
+static struct per_image*
+get_image (const char *name)
+{
+	MonoImage* img = mono_image_loaded(name);
+	if (!img) {
+		printf("%s: No such image\n", name);
+		return NULL;
+	}
+
+	struct per_image *pi = (struct per_image *)malloc(sizeof(struct per_image));
+
+	pi->image = img;
+	pi->p6any = mono_class_from_name(pi->image, "Niecza", "P6any");
+
+	printf("%s: img=%p p6any=%p\n", name, pi->image, pi->p6any);
+	return pi;
 }
 
 static void
@@ -305,14 +339,8 @@ heap_walk (MonoProfiler *prof)
 		return;
 
 	printf("Heap shot started... %zd roots\n", prof->num_roots);
-	img_run = mono_image_loaded("Run.Kernel");
-	img_comp = mono_image_loaded("Kernel");
-
-	p6any_run = img_run == NULL ? NULL :
-		mono_class_from_name(img_run, "Niecza", "P6any");
-	p6any_comp = img_comp == NULL ? NULL :
-		mono_class_from_name(img_comp, "Niecza", "P6any");
-	printf("%p %p\n", p6any_run, p6any_comp);
+	prof->comp_img = get_image("Kernel");
+	prof->run_img = get_image("Run.Kernel");
 
 	mono_gc_walk_heap (0, gc_reference, prof);
 	last_hs_time = now;
@@ -328,6 +356,8 @@ heap_walk (MonoProfiler *prof)
 
 	free(prof->ptrs);
 	free(prof->objs);
+	free(prof->comp_img);
+	free(prof->run_img);
 	prof->ptrs_allocated = prof->ptrs_used = prof->objs_allocated =
 		prof->objs_used = 0;
 	prof->ptrs = NULL;
