@@ -1278,7 +1278,7 @@ sub trim-leading($string) is pure { $string.trim-leading };
 sub trim-trailing($string) is pure { $string.trim-trailing };
 sub trim($string) is pure { $string.trim };
 
-sub infix:<===>($l,$r) is equiv<==> {
+sub infix:<===>($l, $r) is equiv<==> {
     my $lw = $l.WHICH;
     my $rw = $r.WHICH;
     Q:CgOp { (box Bool (compare == (@ {$lw.ref}) (@ {$rw.ref}))) } &&
@@ -3184,7 +3184,7 @@ sub infix:« <=> » is equiv<leg> ($a, $b) is pure {
     $a < $b ?? Order::Increase !! $a > $b ?? Order::Decrease !! Order::Same
 }
 # XXX polymorphic equality
-sub infix:<cmp> is equiv<leg> ($a, $b) {
+sub infix:<cmp> is equiv<leg> (Mu $a, Mu $b) {
     return $a <=> $b if $a ~~ Real && $b ~~ Real;
     if $a ~~ Real {
         return Order::Increase if $a == -Inf;
@@ -3196,12 +3196,13 @@ sub infix:<cmp> is equiv<leg> ($a, $b) {
     }
     return ($a ~~ Real ?? "Real" !! $a.WHAT.gist) leg
            ($b ~~ Real ?? "Real" !! $b.WHAT.gist)
-                unless $a.WHAT === $b.WHAT;
+                unless $a.WHAT.gist eq $b.WHAT.gist;
+    return 0 if !$a.defined && !$b.defined;
     return $a leg $b if $a ~~ Str;
     return $a.key cmp $b.key || $a.value cmp $b.value if $a ~~ Pair;
     return $a <=> $b;
 }
-sub infix:<eqv> is equiv<==> ($a, $b) { ($a cmp $b) == 0 }
+sub infix:<eqv> is equiv<==> (Mu $a, Mu $b) { ($a cmp $b) == 0 }
 sub infix:<before> ($a, $b) is equiv<==> { ($a cmp $b) < 0 }
 sub infix:<after> ($a, $b) is equiv<==> { ($a cmp $b) > 0 }
 sub seqop($op, \x, \y) { $op(x,y) } # TODO: Special case with hyper
