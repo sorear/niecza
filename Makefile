@@ -55,7 +55,12 @@ obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel)) lib/unidata
 	$(CSC) /target:exe /out:obj/Kernel.dll /lib:obj /unsafe+ \
 	    /res:lib/unidata $(patsubst %,lib/%,$(cskernel))
 
-perl5: obj/Perl5Interpreter.dll obj/p5embed.so
+
+.PHONY: Niecza_pm
+perl5: obj/Perl5Interpreter.dll obj/p5embed.so Niecza_pm
+Niecza_pm:
+	cd perl5/Niecza;perl Build.PL;perl Build
+
 obj/Perl5Interpreter.dll: obj/Run.Kernel.dll lib/Perl5Interpreter.cs
 	$(CSC) /target:library /lib:obj /out:obj/Perl5Interpreter.dll /r:Run.Kernel.dll lib/Perl5Interpreter.cs
 

@@ -2,6 +2,7 @@ using Niecza;
 using System.Runtime.InteropServices;
 using System;
 using System.IO;
+using System.Collections.Generic;
 using Niecza.Serialization;
 
 public class Perl5Interpreter : IForeignInterpreter {
@@ -41,6 +42,12 @@ public class Perl5Interpreter : IForeignInterpreter {
     [DllImport("p5embed", EntryPoint="p5embed_SvOK")]
     public static extern int SvOK(IntPtr sv);
 
+    [DllImport("p5embed", EntryPoint="p5embed_SvRV")]
+    public static extern IntPtr SvRV(IntPtr sv);
+
+    [DllImport("p5embed", EntryPoint="p5embed_sv_isa")]
+    public static extern int sv_isa(IntPtr sv,string name);
+
     [DllImport("p5embed", EntryPoint="p5embed_newSVpvn")]
     public static extern IntPtr newSVpvn(IntPtr s,int length);
 
@@ -54,6 +61,13 @@ public class Perl5Interpreter : IForeignInterpreter {
         int argument_n
     );
 
+
+    public delegate int create_LoS_delegate(int len,IntPtr data);
+
+    [DllImport("p5embed", EntryPoint="p5embed_set_create_LoS")]
+    public static extern void Set_p5embed_create_LoS(create_LoS_delegate f);
+
+
     // We can't use the standard char* conversion because some strings can contain nulls
     public static string UnmarshalString(IntPtr sv) {
         int len = SvPVutf8_length(sv);
@@ -62,6 +76,9 @@ public class Perl5Interpreter : IForeignInterpreter {
         Marshal.Copy(data, target, 0, len);
         return System.Text.Encoding.UTF8.GetString(target);
     }
+
+    static Dictionary<int,Variable> ExportedObjects;
+    static int ExportedID;
 
     public static Variable SVToVariable(IntPtr sv) {
         if (sv == IntPtr.Zero) {
@@ -79,12 +96,16 @@ public class Perl5Interpreter : IForeignInterpreter {
         } else if (SvPOKp(sv) != 0) {
             string s = UnmarshalString(sv); //SvPV_nolen(sv);
             return Kernel.BoxAnyMO(s, Kernel.StrMO);
+        } else if (sv_isa(sv,"Niecza::Object") != 0) {
+            return ExportedObjects[SvIV(SvRV(sv))];
         } else {
             return new SVVariable(sv);
         }
     }
   
     public Perl5Interpreter() {
+        ExportedObjects = new Dictionary<int,Variable>();
+        ExportedID = 8;
         string location = System.Reflection.Assembly.GetExecutingAssembly().Location;
 
         string[] paths = new string[] {"perl5/Niecza/blib/lib","perl5/Niecza/blib/arch"};
@@ -97,6 +118,18 @@ public class Perl5Interpreter : IForeignInterpreter {
             }
             paths[i] = p5lib;
         }
+        Set_p5embed_create_LoS(delegate(int len,IntPtr data) {
+            int id = ExportedID++;
+            IntPtr[] target = new IntPtr[len];
+            Marshal.Copy(data, target, 0, len);
+
+            string[] args = new string[len];
+            for (int i=0;i<len;i++) {
+                args[i] = UnmarshalString(target[i]);
+            }
+            ExportedObjects[id] = Builtins.BoxLoS(args);
+            return id;
+        });
         Initialize(paths[0],paths[1]);
     }
     ~Perl5Interpreter() {

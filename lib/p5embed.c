@@ -16,6 +16,12 @@ xs_init(pTHX)
 	newXS("DynaLoader::boot_DynaLoader", boot_DynaLoader, file);
 }
 
+/* Haven't found a better way to call managed code*/
+int (*p5embed_create_LoS)(int,SV**);
+void p5embed_set_create_LoS(int (*f)(int,SV**)) {
+    p5embed_create_LoS = f;
+}
+
 static PerlInterpreter *my_perl;
 void p5embed_initialize(char* path1,char* path2)
 {
@@ -135,6 +141,14 @@ double p5embed_SvNV(SV* sv) {
 }
 char* p5embed_SvPV_nolen(SV* sv) {
     return SvPV_nolen(sv);
+}
+
+
+SV* p5embed_SvRV(SV* sv) {
+    return SvRV(sv);
+}
+int p5embed_sv_isa(SV* sv,char* name) {
+    return sv_isa(sv,name);
 }
 
 char* p5embed_SvPVutf8_nolen(SV* sv) {

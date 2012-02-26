@@ -19,6 +19,7 @@ require XSLoader;
 XSLoader::load('Niecza', $VERSION);
 
 use Niecza::Helpers;
+use Niecza::Object;
 
 =head1 SYNOPSIS
 
