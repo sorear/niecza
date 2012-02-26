@@ -1729,10 +1729,10 @@ flat_enough:;
         object[] arguments = new object[]{ null, UnboxLoS(argv), UnboxLoS(env), Enum.ToObject(SpawnFlags, 0), null,
                                            null, null, null };
         bool result = (bool) spawn_sync.Invoke(null, arguments);
-        string stdout = (string) arguments[5];
+/*        string stdout = (string) arguments[5];
         string stderr = (string) arguments[6];
         int exit_status = (int) arguments[7];
-        return result ? 1 : 0;
+*/        return result ? 1 : 0;
     }
 
     public static int path_chmod(string path, double mode) {
