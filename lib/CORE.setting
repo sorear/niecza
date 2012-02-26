@@ -1278,12 +1278,14 @@ sub trim-leading($string) is pure { $string.trim-leading };
 sub trim-trailing($string) is pure { $string.trim-trailing };
 sub trim($string) is pure { $string.trim };
 
-sub infix:<===>($l, $r) is equiv<==> {
+sub Niecza::ValueIdentity(Mu $l, Mu $r)  {
     my $lw = $l.WHICH;
     my $rw = $r.WHICH;
     Q:CgOp { (box Bool (compare == (@ {$lw.ref}) (@ {$rw.ref}))) } &&
         $lw.str eq $rw.str
 }
+sub infix:<===>($l, $r) is equiv<==> { Niecza::ValueIdentity($l, $r) }
+
 sub infix:<=:=>(\l,\r) is equiv<==> { Q:CgOp {
     (box Bool (compare == {l} {r}))
 } }
@@ -3196,7 +3198,7 @@ sub infix:<cmp> is equiv<leg> (Mu $a, Mu $b) {
     }
     return ($a ~~ Real ?? "Real" !! $a.WHAT.gist) leg
            ($b ~~ Real ?? "Real" !! $b.WHAT.gist)
-                unless $a.WHAT.gist eq $b.WHAT.gist;
+                unless Niecza::ValueIdentity($a.WHAT, $b.WHAT);
     return 0 if !$a.defined && !$b.defined;
     return $a leg $b if $a ~~ Str;
     return $a.key cmp $b.key || $a.value cmp $b.value if $a ~~ Pair;
