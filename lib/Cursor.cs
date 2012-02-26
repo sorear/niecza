@@ -1255,6 +1255,8 @@ public sealed class NFA {
 
     public void Complete() {
         nodes = nodes_l.ToArray();
+        info_stack = null;
+        outer_stack = null;
         greybuf = new int[nodes.Length];
 
         var oedges = edges;
