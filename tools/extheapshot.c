@@ -24,12 +24,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/*#include <string.h>
-#include <assert.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>*/
-
 /* For each heap shot, we do BFS to find the shortest route from the root set
  * to (all objects), then explain a sample of objects to see retention. */
 
@@ -39,7 +33,7 @@ struct obj_info {
 	size_t first_ptr; /* rference to NULL-terminated list of referees */
 	size_t size;      /* byte count */
 	size_t total_size;/* for fast picking */
-	MonoObject* prev; /* filled by BFS; points to previous */
+	struct obj_info* prev; /* filled by BFS; points to previous */
 };
 
 /* we keep the roots in a hash set */
@@ -60,6 +54,8 @@ struct _MonoProfiler {
 	struct root_hash_link** root_hash;
 	size_t num_roots;
 	size_t root_hash_size;
+
+	size_t total_prob;
 };
 
 static void buffer_add(void **bufp, size_t *allocp, size_t *usedp, void *src,
@@ -112,7 +108,6 @@ struct _NieczaSTable {
 	// and a million more that I don't care about now
 };
 
-/*
 static void
 explain_object (MonoObject *obj)
 {
@@ -123,10 +118,13 @@ explain_object (MonoObject *obj)
 			char *mname = mono_string_to_utf8(p6->mo->name);
 			printf(":: %s\n", mname);
 			mono_free(mname);
+		} else {
+			printf("(p6, no name available)\n");
 		}
+	} else {
+		printf("(clr) %s\n", mono_class_get_name(mono_object_get_class(obj)));
 	}
 }
-*/
 
 static int
 gc_reference (MonoObject *obj, MonoClass *klass, uintptr_t size, uintptr_t num, MonoObject **refs, uintptr_t *offsets, void *data)
@@ -148,6 +146,7 @@ gc_reference (MonoObject *obj, MonoClass *klass, uintptr_t size, uintptr_t num, 
 		oi.prev = NULL;
 		buffer_add((void**)(&prof->objs), &prof->objs_allocated,
 			&prof->objs_used, (void*)(&oi), 1, sizeof(oi));
+		//printf("Add info for object %p\n", (void*)obj);
 	}
 	MonoObject* null = NULL;
 	buffer_add((void**)(&prof->ptrs), &prof->ptrs_allocated,
@@ -162,6 +161,131 @@ static unsigned int hs_mode_gc = 0;
 static unsigned int gc_count = 0;
 static unsigned int last_gc_gen_started = -1;
 static time_t last_hs_time = 0;
+
+static int
+obj_compare_addr(const void *a, const void *b)
+{
+	MonoObject *p1 = ((const struct obj_info*)a)->addr;
+	MonoObject *p2 = ((const struct obj_info*)b)->addr;
+
+	return (p1 < p2) ? -1 : (p1 == p2) ? 0 : 1;
+}
+
+static struct obj_info*
+get_info(MonoProfiler* prof, MonoObject* obj)
+{
+	size_t left = 0;
+	size_t right = prof->objs_used;
+
+	while (right != left) {
+		size_t mid = left + (right - left) / 2; /* may coincide with left */
+		struct obj_info *minf = &(prof->objs[mid]);
+		if (minf->addr == obj)
+			return minf;
+		if (minf->addr > obj) {
+			right = mid;
+		} else {
+			left = mid + 1;
+		}
+	}
+	//printf("Oops!  No information for object %p\n", obj);
+	return NULL;
+}
+
+static void
+bfs_mark(struct obj_info ***qtail, struct obj_info *item, struct obj_info *from)
+{
+	if (!item)
+		return;
+	if (!item->total_size) {
+		item->total_size = 1;
+		item->prev = from;
+		*((*qtail)++) = item;
+	}
+}
+
+// for the root set
+static struct obj_info dummy;
+
+static void
+bfs(MonoProfiler *prof)
+{
+	/* queue holds things that have been marked, but not their children */
+	struct obj_info **qbuf = (struct obj_info**)malloc(sizeof(struct obj_info*) * prof->objs_used);
+	struct obj_info **qhead = qbuf, **qtail = qbuf;
+	size_t ix;
+	struct root_hash_link *lk;
+	for (ix = 0; ix < prof->root_hash_size; ix++) {
+		for (lk = prof->root_hash[ix]; lk; lk = lk->next) {
+			bfs_mark(&qtail, get_info(prof, lk->root), &dummy);
+		}
+	}
+
+	while (qhead != qtail) {
+		struct obj_info *inf = *(qhead++);
+		MonoObject** pptr = prof->ptrs + inf->first_ptr;
+
+		while (*pptr) {
+			bfs_mark(&qtail, get_info(prof, *(pptr++)), inf);
+		}
+	}
+
+	printf("BFS done, visited %td objects\n", qtail - qbuf);
+	free(qbuf);
+}
+
+static void
+gen_probs (MonoProfiler *prof)
+{
+	size_t ix, totbytes = 0;
+
+	for (ix = 0; ix < prof->objs_used; ix++) {
+		prof->objs[ix].total_size = totbytes;
+		totbytes += prof->objs[ix].size;
+	}
+
+	prof->total_prob = totbytes;
+	printf("Probability generation done, total %zd bytes\n", totbytes);
+}
+
+static void
+sample (MonoProfiler *prof)
+{
+	size_t byteix;
+	size_t max = prof->total_prob;
+	do {
+		byteix = rand() / (RAND_MAX / max);
+	} while (byteix >= max);
+
+	size_t ixl = 0;
+	size_t ixr = prof->objs_used;
+	while (ixr - ixl > 1) {
+		size_t ixm = ixl + (ixr - ixl) / 2;
+		if (byteix >= prof->objs[ixm].total_size) {
+			ixl = ixm;
+		} else {
+			ixr = ixm;
+		}
+	}
+
+	struct obj_info *obj = &(prof->objs[ixl]);
+
+	printf("Byte %zd of %zd, object %zd of %zd, size %zd\n",
+		byteix, max, ixl, prof->objs_used, obj->size);
+	while(1) {
+		if (obj == &dummy) {
+			printf("[Root object]\n\n");
+			return;
+		}
+		if (!obj) {
+			printf("[Reference set unknown]\n\n");
+			return;
+		}
+		printf("%p  ", obj->addr);
+		explain_object(obj->addr);
+		obj = obj->prev;
+	}
+}
 
 static void
 heap_walk (MonoProfiler *prof)
@@ -193,6 +317,14 @@ heap_walk (MonoProfiler *prof)
 	mono_gc_walk_heap (0, gc_reference, prof);
 	last_hs_time = now;
 	printf("Heap walk complete: %zd objects %zd pointers.\n", prof->objs_used, prof->ptrs_used);
+	/* to allow effective access, sort the object set */
+	qsort(prof->objs, prof->objs_used, sizeof(struct obj_info),
+		obj_compare_addr);
+	bfs(prof);
+	gen_probs(prof);
+	int ix;
+	for (ix = 0; ix < prof->objs_used / 1000; ix++)
+		sample(prof);
 
 	free(prof->ptrs);
 	free(prof->objs);
@@ -270,6 +402,7 @@ add_root(MonoProfiler* prof, MonoObject* root)
 	l->next = prof->root_hash[ix];
 	prof->root_hash[ix] = l;
 	prof->num_roots++;
+	//printf("Added root %p\n", root);
 }
 
 static void
@@ -286,11 +419,13 @@ move_root(MonoProfiler* prof, MonoObject* from, MonoObject* to)
 		chainp = &((*chainp)->next);
 	}
 
-	int nix = HASH_ROOT(prof, from);
+	int nix = HASH_ROOT(prof, to);
 	struct root_hash_link *link = *chainp;
 	*chainp = (*chainp)->next;
 	link->next = prof->root_hash[nix];
+	link->root = to;
 	prof->root_hash[nix] = link;
+	//printf("Moved root %p to %p\n", from, to);
 }
 
 static void
@@ -321,6 +456,7 @@ mono_profiler_startup (const char *desc);
 static void
 log_shutdown (MonoProfiler *prof)
 {
+	fflush(stdout);
 	free(prof);
 }
 
