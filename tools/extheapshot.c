@@ -142,7 +142,10 @@ explain_object (MonoProfiler *prof, MonoObject *obj)
 	if (prof->comp_img && explain_object_image(prof->comp_img, obj))
 		return;
 
-	printf("(clr) %s\n", mono_class_get_name(mono_object_get_class(obj)));
+	MonoType *ty = mono_class_get_type(mono_object_get_class(obj));
+	const char *tn = mono_type_get_name(ty);
+	printf("(clr) %s\n", tn);
+	mono_free((void*)tn);
 }
 
 static int
