@@ -1,4 +1,4 @@
-/*
+/* vim: noet sw=8
  * This is a butchered version of the Mono log profiler; most features have
  * been removed, except for some features needed for heap analysis of niecza
  * which have been added.  Changes by sorear.
@@ -48,10 +48,42 @@ static int do_heap_shot = 0;
  * sudo ldconfig
  */
 
+static MonoImage *img_run, *img_comp;
+static MonoClass *p6any_run, *p6any_comp;
+
+typedef struct _NieczaP6any NieczaP6any;
+typedef struct _NieczaSTable NieczaSTable;
+typedef struct _NieczaVariable NieczaVariable;
+
+struct _NieczaP6any {
+	MonoObject object;
+	NieczaSTable *mo;
+};
+
+struct _NieczaSTable {
+	MonoObject object;
+	void *mo;
+	NieczaP6any *how, *who;
+	NieczaP6any *typeObject, *initObject;
+	NieczaVariable *typeVar, *initVar;
+	MonoString *name;
+	// and a million more that I don't care about now
+};
+
 static int
 gc_reference (MonoObject *obj, MonoClass *klass, uintptr_t size, uintptr_t num, MonoObject **refs, uintptr_t *offsets, void *data)
 {
-	printf ("obj: %p, klass: %s, refs: %d, size: %d\n", obj, mono_class_get_name(klass), (int)num, (int)size);
+	if (size == 0)
+		return 0;
+	if ((p6any_run && mono_object_isinst(obj, p6any_run)) ||
+			(p6any_comp && mono_object_isinst(obj, p6any_comp))) {
+		NieczaP6any *p6 = (NieczaP6any *)obj;
+		if (p6->mo && p6->mo->name) {
+			char *mname = mono_string_to_utf8(p6->mo->name);
+			printf(":: %s\n", mname);
+			mono_free(mname);
+		}
+	}
 	return 0;
 }
 
@@ -79,6 +111,15 @@ heap_walk (MonoProfiler *profiler)
 		return;
 
 	printf("Heap shot started...\n");
+	img_run = mono_image_loaded("Run.Kernel");
+	img_comp = mono_image_loaded("Kernel");
+
+	p6any_run = img_run == NULL ? NULL :
+		mono_class_from_name(img_run, "Niecza", "P6any");
+	p6any_comp = img_comp == NULL ? NULL :
+		mono_class_from_name(img_comp, "Niecza", "P6any");
+	printf("%p %p\n", p6any_run, p6any_comp);
+
 	mono_gc_walk_heap (0, gc_reference, NULL);
 	last_hs_time = now;
 	printf("Heap shot ends.\n");
@@ -106,7 +147,7 @@ gc_roots (MonoProfiler *prof, int num, void **objects, int *root_types, uintptr_
 {
 	int i;
 	for (i = 0; i < num; ++i) {
-		printf("root: %p t=%d ei=%d\n", objects[i], root_types[i], (int)extra_info[i]);
+		//printf("root: %p t=%d ei=%d\n", objects[i], root_types[i], (int)extra_info[i]);
 	}
 }
 
