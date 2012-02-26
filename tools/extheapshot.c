@@ -31,15 +31,18 @@
 struct obj_info {
 	MonoObject* addr; /* where is the object?  primary key. */
 	size_t first_ptr; /* rference to NULL-terminated list of referees */
-	size_t size;      /* byte count */
+	ssize_t size;     /* byte count */
 	size_t total_size;/* for fast picking */
 	struct obj_info* prev; /* filled by BFS; points to previous */
 };
+/* size == -1 indicates a root pseudo-info where total_size is actually
+   the root type word */
 
 /* we keep the roots in a hash set */
 struct root_hash_link {
 	struct root_hash_link* next;
 	MonoObject* root;
+	struct obj_info pseudo_info;
 };
 
 /* holds per-image information for the types that are duplicated between Kernel
@@ -220,9 +223,6 @@ bfs_mark(struct obj_info ***qtail, struct obj_info *item, struct obj_info *from)
 	}
 }
 
-// for the root set
-static struct obj_info dummy;
-
 static void
 bfs(MonoProfiler *prof)
 {
@@ -233,7 +233,7 @@ bfs(MonoProfiler *prof)
 	struct root_hash_link *lk;
 	for (ix = 0; ix < prof->root_hash_size; ix++) {
 		for (lk = prof->root_hash[ix]; lk; lk = lk->next) {
-			bfs_mark(&qtail, get_info(prof, lk->root), &dummy);
+			bfs_mark(&qtail, get_info(prof, lk->root), &(lk->pseudo_info));
 		}
 	}
 
@@ -289,12 +289,24 @@ sample (MonoProfiler *prof)
 	printf("Byte %zd of %zd, object %zd of %zd, size %zd\n",
 		byteix, max, ixl, prof->objs_used, obj->size);
 	while(1) {
-		if (obj == &dummy) {
-			printf("[Root object]\n\n");
-			return;
-		}
 		if (!obj) {
 			printf("[Reference set unknown]\n\n");
+			return;
+		}
+		if (obj->size == -1) {
+			int flags = (int)obj->total_size;
+			const char *pin = (flags & MONO_PROFILE_GC_ROOT_PINNING) ? ", pinned" : "";
+			const char *weak = (flags & MONO_PROFILE_GC_ROOT_WEAKREF) ? ", weak" : "";
+			const char *interior = (flags & MONO_PROFILE_GC_ROOT_INTERIOR) ? ", interior" : "";
+			const char *type = "(unknown)";
+			switch (flags & MONO_PROFILE_GC_ROOT_TYPEMASK) {
+				case MONO_PROFILE_GC_ROOT_STACK: type = "stack"; break;
+				case MONO_PROFILE_GC_ROOT_FINALIZER: type = "finalizer"; break;
+				case MONO_PROFILE_GC_ROOT_HANDLE: type = "handle"; break;
+				case MONO_PROFILE_GC_ROOT_OTHER: type = "other"; break;
+				case MONO_PROFILE_GC_ROOT_MISC: type = "misc"; break;
+			}
+			printf("[Root object: %s%s%s%s]\n\n", type, pin, weak, interior);
 			return;
 		}
 		printf("%p  ", obj->addr);
@@ -400,7 +412,7 @@ gc_handle (MonoProfiler *prof, int op, int type, uintptr_t handle, MonoObject *o
 #define HASH_ROOT(prof, ptr) (((size_t)(((uintptr_t) ptr) * 0x9E3779B9UL)) & (prof->root_hash_size - 1))
 
 static void
-add_root(MonoProfiler* prof, MonoObject* root)
+add_root(MonoProfiler* prof, MonoObject* root, size_t info)
 {
 	if (prof->num_roots == prof->root_hash_size) {
 		size_t ohsz = prof->root_hash_size;
@@ -418,7 +430,7 @@ add_root(MonoProfiler* prof, MonoObject* root)
 			lp = ohash[ix];
 			while (lp) {
 				nlp = lp->next;
-				add_root(prof, lp->root);
+				add_root(prof, lp->root, lp->pseudo_info.total_size);
 				free(lp);
 				lp = nlp;
 			}
@@ -430,6 +442,8 @@ add_root(MonoProfiler* prof, MonoObject* root)
 	struct root_hash_link *l = (struct root_hash_link *)malloc(sizeof(struct root_hash_link));
 	l->root = root;
 	l->next = prof->root_hash[ix];
+	l->pseudo_info.total_size = info;
+	l->pseudo_info.size = -1;
 	prof->root_hash[ix] = l;
 	prof->num_roots++;
 	//printf("Added root %p\n", root);
@@ -463,7 +477,7 @@ gc_roots (MonoProfiler *prof, int num, void **objects, int *root_types, uintptr_
 {
 	int i;
 	for (i = 0; i < num; ++i) {
-		add_root(prof, (MonoObject*)objects[i]);
+		add_root(prof, (MonoObject*)objects[i], (size_t)root_types[i]);
 	}
 }
 
