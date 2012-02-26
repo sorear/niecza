@@ -3644,6 +3644,11 @@ sub shell($command) is unsafe {
     Q:CgOp { (box Int (command_system (obj_getstr {$command}))) };
 }
 
+sub run(*@argv, :%env = %*ENV) is unsafe {
+    my @env = %env.map({ .key ~ "=" ~ .value });
+    Q:CgOp { (box Int (command_run {@argv} {@env})) };
+}
+
 multi sub open($filename, :$w?, :$a?, :$r?, :$rw?) is unsafe {
     die "Not yet able to open both :r and :w" if ($r && $w) || $rw;
     if $a {

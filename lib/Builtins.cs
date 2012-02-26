@@ -1721,6 +1721,20 @@ flat_enough:;
         return PosixWrapper.system(command);
     }
 
+    public static int command_run(Variable argv, Variable env) {
+        Type Process = Type.GetType("GLib.Process,glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f");
+        Type SpawnFlags = Type.GetType("GLib.SpawnFlags,glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f");
+        MethodInfo spawn_sync = Process.GetMethod("SpawnSync");
+
+        object[] arguments = new object[]{ null, UnboxLoS(argv), UnboxLoS(env), Enum.ToObject(SpawnFlags, 0), null,
+                                           null, null, null };
+        bool result = (bool) spawn_sync.Invoke(null, arguments);
+        string stdout = (string) arguments[5];
+        string stderr = (string) arguments[6];
+        int exit_status = (int) arguments[7];
+        return result ? 1 : 0;
+    }
+
     public static int path_chmod(string path, double mode) {
         return PosixWrapper.chmod(path, (int) mode);
     }
