@@ -2021,6 +2021,7 @@ anew:
         if (LtmProf) {
             Console.WriteLine("Lexer ({0}) has {1} nodes", tag, pad.NodeCount);
         }
+        this.alts = null;
         start = new LexerState(pad);
         start.Add(0);
         pad.Close(start);
