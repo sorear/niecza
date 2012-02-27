@@ -1135,25 +1135,24 @@ public sealed class CC : IFreeze {
 // are used to refer to NFAs that haven't been assigned to numbers yet;
 // the form is -{1,2}-2*N
 public sealed class NFA {
-    public sealed class Node {
-        NFA owner;
+    struct Node {
         public int fate;
-        public bool final;
-        public int nedges;
         public int first_edge;
-        public Node(NFA owner, int curfate) { this.owner = owner; fate = curfate; }
 
-        public override string ToString() {
+        public string Describe(NFA owner, int ownix) {
             List<Edge> le = new List<Edge>();
-            for (int i = 0; i < nedges; i++)
-                le.Add(owner.edges[first_edge + i]);
-            return "(" + fate + ")" + (final ? "+ " : " ") +
+            for (int i = first_edge; i < owner.edges.Length; i++) {
+                if (ownix + 1 < owner.nodes.Length &&
+                        i >= owner.nodes[ownix+1].first_edge)
+                    break;
+                le.Add(owner.edges[i]);
+            }
+            return (fate > 0 ? "(" + fate + ") " : "   ") +
                 Kernel.JoinS(", ", le);
         }
     }
 
     public struct Edge {
-        public int from;
         public int to;
         public int when; // -2=epsilon -1=use CC
         public CC when_cc;
@@ -1164,6 +1163,8 @@ public sealed class NFA {
     }
 
     List<Node> nodes_l = new List<Node>();
+    List<int> outgoing = new List<int>();
+    List<int> fromv    = new List<int>();
     Edge[] edges = new Edge[8];
     int nedges;
     Node[] nodes;
@@ -1182,11 +1183,14 @@ public sealed class NFA {
     //int end_node;
 
     public int AddNode() {
-        nodes_l.Add(new Node(this, curfate));
+        nodes_l.Add(new Node());
+        outgoing.Add(0);
         return nodes_l.Count - 1;
     }
     public void SetFinal(int node) {
-        nodes_l[node].final = true;
+        Node n = nodes_l[node];
+        n.fate = curfate + 1;
+        nodes_l[node] = n;
     }
     public void AddEdge(int from, int to, int when) {
         AddEdge(from, to, when, null);
@@ -1196,30 +1200,30 @@ public sealed class NFA {
     }
     void AddEdge(int from, int to, int when, CC when_cc) {
         Edge e;
-        e.from = from;
+        fromv.Add(from);
         e.to = to;
         e.when = when;
         e.when_cc = when_cc;
         if (nedges == edges.Length) {
             Array.Resize(ref edges, nedges * 2);
         }
-        nodes_l[from].nedges++;
+        ++outgoing[from];
         edges[nedges++] = e;
     }
-    public int NodeCount { get { return nodes_l.Count; } }
+    public int NodeCount { get { return nodes.Length; } }
     public Edge[] EdgesOf(int i, ref int index, ref int imax) {
         index = nodes[i].first_edge;
-        imax  = nodes[i].nedges + index;
+        imax  = (i == nodes.Length - 1) ? edges.Length : nodes[i+1].first_edge;
         return edges;
     }
     public int FateOf(int i) {
         var n = nodes[i];
-        return n.final ? n.fate : -1;
+        return n.fate - 1;
     }
 
     public void Dump() {
-        for (int ix = 0; ix < nodes_l.Count; ix++) {
-            Console.WriteLine(ix + ": " + nodes_l[ix].ToString());
+        for (int ix = 0; ix < nodes.Length; ix++) {
+            Console.WriteLine(ix + ": " + nodes[ix].Describe(this, ix));
         }
     }
 
@@ -1237,8 +1241,8 @@ public sealed class NFA {
 
         while (ngrey != 0) {
             int val = greybuf[--ngrey];
-            int eix = nodes[val].first_edge;
-            int lix = nodes[val].nedges + eix;
+            int eix = 0, lix = 0;
+            EdgesOf(val, ref eix, ref lix);
             while (eix != lix) {
                 Edge e = edges[eix++];
                 if (e.when == -2) {
@@ -1255,6 +1259,7 @@ public sealed class NFA {
 
     public void Complete() {
         nodes = nodes_l.ToArray();
+        nodes_l = null;
         info_stack = null;
         outer_stack = null;
         greybuf = new int[nodes.Length];
@@ -1265,13 +1270,15 @@ public sealed class NFA {
         int i = 0;
         // put the edges in correct order
         for (int j = 0; j < nodes.Length; j++) {
-            i += nodes[j].nedges;
+            i += outgoing[j];
             nodes[j].first_edge = i;
         }
         for (i = 0; i < nedges; i++) {
             Edge e = oedges[i];
-            edges[--nodes[e.from].first_edge] = e;
+            edges[--nodes[fromv[i]].first_edge] = e;
         }
+        outgoing = null;
+        fromv = null;
     }
 
     public Dictionary<LexerState,LexerState> dfashare
