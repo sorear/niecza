@@ -50,6 +50,14 @@ struct root_hash_link {
 struct per_image {
 	MonoImage* image;
 	MonoClass* p6any;
+	MonoClass* stable;
+	MonoClass* cursor;
+	MonoClass* frame;
+	MonoClass* subinfo;
+	MonoClass* rxframe;
+
+	int p6any_mo, cursor_from, cursor_pos, cursor_reduced, frame_info,
+	    subinfo_name, stable_name, rxframe_from, rxframe_pos, rxframe_name;
 };
 
 struct _MonoProfiler {
@@ -98,37 +106,66 @@ static int do_heap_shot = 0;
  * sudo ldconfig
  */
 
-typedef struct _NieczaP6any NieczaP6any;
-typedef struct _NieczaSTable NieczaSTable;
-typedef struct _NieczaVariable NieczaVariable;
+#define FIELD(type,offs,obj) (*( (type *) (offs + (char*)(obj)) ))
 
-struct _NieczaP6any {
-	MonoObject object;
-	NieczaSTable *mo;
-};
+#define P6ANY_MO(o) FIELD(MonoObject*, pi->p6any_mo, o)
+#define STABLE_NAME(o) FIELD(MonoString*, pi->stable_name, o)
+#define SUBINFO_NAME(o) FIELD(MonoString*, pi->subinfo_name, o)
+#define FRAME_INFO(o) FIELD(MonoObject*, pi->frame_info, o)
 
-struct _NieczaSTable {
-	MonoObject object;
-	void *mo;
-	NieczaP6any *how, *who;
-	NieczaP6any *typeObject, *initObject;
-	NieczaVariable *typeVar, *initVar;
-	MonoString *name;
-	// and a million more that I don't care about now
-};
+#define RXFRAME_POS(o) FIELD(int32_t, pi->rxframe_pos, o)
+#define RXFRAME_FROM(o) FIELD(int32_t, pi->rxframe_from, o)
+#define RXFRAME_NAME(o) FIELD(MonoString*, pi->rxframe_name, o)
+
+#define CURSOR_POS(o) FIELD(int32_t, pi->cursor_pos, o)
+#define CURSOR_FROM(o) FIELD(int32_t, pi->cursor_from, o)
+#define CURSOR_REDUCED(o) FIELD(MonoString*, pi->cursor_reduced, o)
+
+static void
+print_mono_string (MonoString *ms)
+{
+	if (ms) {
+		char *tmp = mono_string_to_utf8(ms);
+		fputs(tmp, stdout);
+		mono_free(tmp);
+	} else {
+		fputs("(null)", stdout);
+	}
+}
 
 static int
 explain_object_image (struct per_image *pi, MonoObject *obj)
 {
+	MonoClass *cls = mono_object_get_class(obj);
+
 	if (pi->p6any && mono_object_isinst(obj, pi->p6any)) {
-		NieczaP6any *p6 = (NieczaP6any *)obj;
-		if (p6->mo && p6->mo->name) {
-			char *mname = mono_string_to_utf8(p6->mo->name);
-			printf(":: %s\n", mname);
-			mono_free(mname);
-		} else {
-			printf("(p6, no name available)\n");
+		fputs("[p6] :: ", stdout);
+		print_mono_string(P6ANY_MO(obj) ? STABLE_NAME(P6ANY_MO(obj)) : NULL);
+
+		if (cls == pi->frame) {
+			fputs(" -- ", stdout);
+			print_mono_string(FRAME_INFO(obj) ? SUBINFO_NAME(FRAME_INFO(obj)) : NULL);
 		}
+		else if (cls == pi->cursor) {
+			printf(" -- %d-%d, reduced: ", (int)CURSOR_FROM(obj),
+				(int)CURSOR_POS(obj));
+			print_mono_string(CURSOR_REDUCED(obj));
+		}
+
+		putchar('\n');
+		return 1;
+	}
+	else if (cls == pi->rxframe) {
+		printf("rx-frame %d-%d, name=", (int)RXFRAME_FROM(obj),
+			(int)RXFRAME_POS(obj));
+		print_mono_string(RXFRAME_NAME(obj));
+		putchar('\n');
+		return 1;
+	}
+	else if (cls == pi->subinfo) {
+		fputs("SubInfo: ", stdout);
+		print_mono_string(SUBINFO_NAME(obj));
+		putchar('\n');
 		return 1;
 	}
 	return 0;
@@ -331,8 +368,33 @@ get_image (const char *name)
 
 	pi->image = img;
 	pi->p6any = mono_class_from_name(pi->image, "Niecza", "P6any");
+	pi->frame = mono_class_from_name(pi->image, "Niecza", "Frame");
+	pi->stable = mono_class_from_name(pi->image, "Niecza", "STable");
+	pi->subinfo = mono_class_from_name(pi->image, "Niecza", "SubInfo");
+	pi->cursor = mono_class_from_name(pi->image, "", "Cursor");
+	pi->rxframe = mono_class_from_name(pi->image, "", "RxFrame");
 
-	printf("%s: img=%p p6any=%p\n", name, pi->image, pi->p6any);
+	printf("%s: img=%p p6any=%p frame=%p subinfo=%p cursor=%p rxframe=%p\n",
+		name, pi->image, pi->p6any, pi->frame, pi->subinfo, pi->cursor,
+		pi->rxframe);
+
+	pi->subinfo_name = mono_field_get_offset(mono_class_get_field_from_name(pi->subinfo, "name"));
+	pi->stable_name = mono_field_get_offset(mono_class_get_field_from_name(pi->stable, "name"));
+	pi->cursor_pos = mono_field_get_offset(mono_class_get_field_from_name(pi->cursor, "pos"));
+	pi->cursor_from = mono_field_get_offset(mono_class_get_field_from_name(pi->cursor, "from"));
+	pi->cursor_reduced = mono_field_get_offset(mono_class_get_field_from_name(pi->cursor, "reduced"));
+	pi->frame_info = mono_field_get_offset(mono_class_get_field_from_name(pi->frame, "info"));
+	pi->p6any_mo = mono_field_get_offset(mono_class_get_field_from_name(pi->p6any, "mo"));
+	pi->rxframe_name = mono_field_get_offset(mono_class_get_field_from_name(pi->rxframe, "name"));
+	pi->rxframe_from = mono_field_get_offset(mono_class_get_field_from_name(pi->rxframe, "from"));
+
+	MonoClassField *st = mono_class_get_field_from_name(pi->rxframe, "st");
+	MonoClass *state = mono_type_get_class(mono_field_get_type(st));
+	int st_pos = mono_field_get_offset(mono_class_get_field_from_name(state, "pos")) - sizeof(MonoObject);
+	printf("st.type.pos-offset = %d\n", st_pos);
+
+	pi->rxframe_pos = mono_field_get_offset(mono_class_get_field_from_name(pi->rxframe, "st")) + st_pos;
+
 	return pi;
 }
 
