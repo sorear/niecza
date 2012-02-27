@@ -1736,12 +1736,34 @@ flat_enough:;
     }
 
     public static string command_qx(string command_line) {
-        Type Process = Type.GetType("GLib.Process,glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f");
-        MethodInfo spawn_sync = Process.GetMethod("SpawnCommandLineSync");
+        Type Process;
+        try {
+            Process = Type.GetType("GLib.Process,glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f");
+        } catch (Exception) {
+            Process = null;
+        }
+        if (Process != null) {
+            MethodInfo spawn_sync = Process.GetMethod("SpawnCommandLineSync");
 
-        object[] arguments = new object[]{ command_line, null, null, null };
-        bool result = (bool) spawn_sync.Invoke(null, arguments);
-        return result ? (string) arguments[1] : "";
+            object[] arguments = new object[]{ command_line, null, null, null };
+            bool result = (bool) spawn_sync.Invoke(null, arguments);
+            return result ? (string) arguments[1] : "";
+        } else {
+            /* Next line should be more robust... */
+            string [] args = command_line.Split(new Char[] {' '}, 2);
+            Process process = new Process();
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.FileName = args[0];
+            if (args[1] != "") {
+                process.StartInfo.Arguments = args[1];
+            }
+            process.Start();
+            /* Next two lines have to be in this order, not sure why */
+            string output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            return output;
+        }
     }
 
     public static int path_chmod(string path, double mode) {
