@@ -215,7 +215,7 @@ gc_reference (MonoObject *obj, MonoClass *klass, uintptr_t size, uintptr_t num, 
 	return 0;
 }
 
-static unsigned int hs_mode_s = 0;
+static double hs_mode_s = 0;
 static unsigned int hs_mode_gc = 0;
 static unsigned int gc_count = 0;
 static unsigned int last_gc_gen_started = -1;
@@ -402,10 +402,9 @@ static void
 heap_walk (MonoProfiler *prof)
 {
 	int do_walk = 0;
-	time_t now = time(0);
 	if (!do_heap_shot)
 		return;
-	if (hs_mode_s && (now - last_hs_time) >= hs_mode_s)
+	if (hs_mode_s && (clock() - last_hs_time) >= (clock_t)(hs_mode_s * CLOCKS_PER_SEC))
 		do_walk = 1;
 	else if (hs_mode_gc && (gc_count % hs_mode_gc) == 0)
 		do_walk = 1;
@@ -420,7 +419,6 @@ heap_walk (MonoProfiler *prof)
 	prof->run_img = get_image("Run.Kernel");
 
 	mono_gc_walk_heap (0, gc_reference, prof);
-	last_hs_time = now;
 	printf("Heap walk complete: %zd objects %zd pointers.\n", prof->objs_used, prof->ptrs_used);
 	/* to allow effective access, sort the object set */
 	qsort(prof->objs, prof->objs_used, sizeof(struct obj_info),
@@ -439,6 +437,7 @@ heap_walk (MonoProfiler *prof)
 		prof->objs_used = 0;
 	prof->ptrs = NULL;
 	prof->objs = NULL;
+	last_hs_time = clock();
 }
 
 static void
@@ -580,7 +579,7 @@ mono_profiler_startup (const char *desc)
 	    MONO_PROFILE_GC_ROOTS;
 
 	do_heap_shot = 1;
-	hs_mode_s = 10;
+	hs_mode_s = 3.0;
 
 	MonoProfiler* prof = (MonoProfiler*)calloc(1, sizeof(MonoProfiler));
 	mono_profiler_install (prof, log_shutdown);
