@@ -280,6 +280,19 @@ method parse(:$unitname, :$filename, :$source, :$outer, :$run, :$main, :$evalmod
 
     NieczaGrammar.parse($source, actions => $Actions);
 
+    if %*ENV<NIECZA_MEMO_INFO> {
+        say "Memos used for $*UNITNAME ($source.chars() positions):";
+        my %memo_count;
+        for @*MEMOS -> $memo {
+            for $memo.keys -> $key {
+                ++%memo_count{$key}
+            }
+        }
+        for %memo_count.kv -> $key, $ct {
+            say "{$ct.fmt('%05d')} $key";
+        }
+    }
+
     @STD::herestub_queue = @save_herestub;
 
     $*backend.accept($*unit, :$filename, :$run, :$evalmode, :$repl);
