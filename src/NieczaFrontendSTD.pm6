@@ -284,6 +284,7 @@ method parse(:$unitname, :$filename, :$source, :$outer, :$run, :$main, :$evalmod
         say "Memos used for $*UNITNAME ($source.chars() positions):";
         my %memo_count;
         for @*MEMOS -> $memo {
+            $memo // next;
             for $memo.keys -> $key {
                 ++%memo_count{$key}
             }
