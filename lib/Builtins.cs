@@ -1735,6 +1735,15 @@ flat_enough:;
 */        return result ? 1 : 0;
     }
 
+    public static string command_qx(string command_line) {
+        Type Process = Type.GetType("GLib.Process,glib-sharp, Version=2.12.0.0, Culture=neutral, PublicKeyToken=35e10195dab3c99f");
+        MethodInfo spawn_sync = Process.GetMethod("SpawnCommandLineSync");
+
+        object[] arguments = new object[]{ command_line, null, null, null };
+        bool result = (bool) spawn_sync.Invoke(null, arguments);
+        return result ? (string) arguments[1] : "";
+    }
+
     public static int path_chmod(string path, double mode) {
         return PosixWrapper.chmod(path, (int) mode);
     }

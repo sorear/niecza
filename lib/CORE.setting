@@ -3236,7 +3236,7 @@ sub eval($str,:$lang="perl6") is return-pass {
     }
 }
 
-sub rungather($ ) { die "Run NYI" }
+sub rungather($command_line) { Q:CgOp { (box Str (command_qx (obj_getstr {$command_line}))) } }
 
 # a rather strange grammar.  All of its rules are tokens, and some of them
 # will die().
