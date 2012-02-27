@@ -216,14 +216,23 @@ namespace Niecza {
 
         static Dictionary<P6any,Dictionary<P6any,Variable>> role_cache =
             new Dictionary<P6any,Dictionary<P6any,Variable>>();
-        public static Variable CacheSlot(P6any a1, P6any a2) {
+        public static Variable CachedBut(P6any but, Variable v1, Variable v2) {
+            P6any a1 = v1.Fetch();
+            P6any a2 = v2.Fetch();
             Dictionary<P6any,Variable> subcache;
             if (!role_cache.TryGetValue(a1, out subcache))
                 role_cache[a1] = subcache = new Dictionary<P6any,Variable>();
             Variable var;
-            if (!subcache.TryGetValue(a2, out var))
-                subcache[a2] = var = Kernel.NewMuScalar(Kernel.TrueV.Fetch());
-            return var;
+            if (subcache.TryGetValue(a2, out var))
+                return var;
+
+            // Mega-Hack - stop lots of internal data from being retained by
+            // CALLER pointers
+            Kernel.SetTopFrame(null);
+
+            var = Kernel.RunInferior(but.Invoke(Kernel.GetInferiorRoot(),
+                new [] { v1, v2 }, null));
+            return subcache[a2] = var;
         }
 
         public static Variable PruneMatch(Variable vr) {

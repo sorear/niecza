@@ -83,8 +83,8 @@ method prune_match($match) {
 
 method cached_but($cls, $role) {
     # TODO: Object hashes!
-    my $slot := Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.CacheSlot (@ {$cls}) (@ {$role})) };
-    defined($slot) ?? ($slot = ($cls but $role)) !! $slot
+    Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.CachedBut
+        (@ {&infix:<but>}) {$cls} {$role}) };
 }
 
 sub gethash($str) {
