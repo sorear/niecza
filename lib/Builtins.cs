@@ -1755,7 +1755,7 @@ flat_enough:;
             process.StartInfo.UseShellExecute = false;
             process.StartInfo.RedirectStandardOutput = true;
             process.StartInfo.FileName = args[0];
-            if (args[1] != "") {
+            if (args.Length > 1 && args[1] != "") {
                 process.StartInfo.Arguments = args[1];
             }
             process.Start();
