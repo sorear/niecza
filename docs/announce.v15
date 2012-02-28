@@ -3,7 +3,9 @@
 This is the fifteenth release of Niecza Perl 6, as usual scheduled on
 the last Monday of the month.  No, it's not dead.
 
-[insert most significant thing about v15 here]
+Niecza now passes more spectests than Rakudo, but that is not an entirely
+fair comparison, and we have the feature matrix now which is much more
+useful for such comparisons. [3]
 
 You can obtain a build of Niecza from [1].  This build contains a
 working compiler as a set of .exe and .dll files suitable for use with
@@ -22,6 +24,42 @@ README for details.
     List of changes
 
 
+[Major changes]
+
+The Unicode character database bundled with Niecza has been updated to
+version 6.1.0.
+
+
+[Minor changes]
+
+Constant folding which fails at compile time, since it cannot succeed, now
+generates a compile-time warning. (idea from Darren Duncan)
+
+Perl 5 interoperability has made progress. (Paweł Murias)
+
+Proxy has been added.  (No real new functionality, just putting a specced
+API on an existing feature)
+
+Unused-variable warnings are now suppressed in the REPL.
+
+Added KeySet, KeyBag; substantially improved Set and Bag. (Solomon Foster)
+
+Set operators (both Texas and Unicode) are now available; it is now possible
+to define operators in the setting beyond those defined in the grammar.
+
+Added ability to define custom iffy and diffy operators.
+
+Added $.foo(42) syntax meaning $(self.foo(42)).
+
+@*INC internals have changed again.
+
+Added Range.pick, Range.roll, &rmdir, &rungather. (Solomon Foster)
+
+Added &run (uses GLib if available for more robust argument passing).
+(Solomon Foster)
+
+Compiler memory usage has been substantially optimized, approximately 40%
+less used for CORE, with a small accompanying size improvement.
 
 
     Getting involved
@@ -31,5 +69,6 @@ this mailing.  Also check out the TODO file; whether you want to work
 on stuff on it, or have cool ideas to add to it, both are good.
 
 
-[1] https://github.com/downloads/sorear/niecza/niecza-14.zip
+[1] https://github.com/downloads/sorear/niecza/niecza-15.zip
 [2] https://github.com/sorear/niecza
+[3] http://perl6.org/compilers/features
