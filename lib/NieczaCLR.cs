@@ -149,8 +149,8 @@ namespace Niecza {
                 if (nth != null)
                     return nth;
 
-                return Kernel.Die(th, "No candidates for dispatch to " + name +
-                    "; candidates are:" + Console.Out.NewLine + "    " +
+                return Kernel.Die(th, "Cannot call " + name +
+                    "; none of these signatures match:" + Console.Out.NewLine + "    " +
                     Kernel.JoinS(Console.Out.NewLine + "    ", orig));
             }
 
@@ -162,8 +162,8 @@ namespace Niecza {
                         if (mc.Admissable(th, pos, named))
                             matched.Add(mc);
 
-                    return Kernel.Die(th, "Ambiguous dispatch for " + name +
-                        "; matched candidates are:" + Console.Out.NewLine + "    " +
+                    return Kernel.Die(th, "Ambiguous call to " + name +
+                        "; these signatures all match:" + Console.Out.NewLine + "    " +
                         Kernel.JoinS(Console.Out.NewLine + "    ", matched));
                 }
             }
