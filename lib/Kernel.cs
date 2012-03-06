@@ -2621,11 +2621,17 @@ namespace Niecza {
 
                 Variable src = null;
                 if ((flags & Parameter.SLURPY_PCL) != 0) {
-                    src = Kernel.BoxAnyMO(pos, Kernel.ParcelMO);
+                    src = (slot >= 0) ? Kernel.BoxAnyMO(pos, Kernel.ParcelMO) :
+                        Kernel.AnyMO.typeVar;
                     posc  = pos.Length;
                     goto gotit;
                 }
                 if ((flags & Parameter.SLURPY_CAP) != 0) {
+                    if (slot < 0) {
+                        src = Kernel.AnyMO.typeVar;
+                        named = null; namedc = null; posc = pos.Length;
+                        goto gotit;
+                    }
                     P6any nw = new P6opaque(Kernel.CaptureMO);
                     Variable[] spos = new Variable[pos.Length - posc];
                     Array.Copy(pos, posc, spos, 0, spos.Length);
@@ -5600,11 +5606,25 @@ slow:
             object[] p     = th.info.param;
             VarHash  n     = th.named;
             Variable self  = (Variable)th.lex0;
-            Variable index = (Variable)th.lex1;
+            Variable[] pos = th.pos;
 
             Variable res = null;
+            Variable index = pos.Length >= 2 ? pos[1] : null;
 
-            if (n == null) {
+            // Until shaped arrays exist, 'deep' array accesses are turned
+            // into nested accesses
+
+            if (pos.Length > 2) {
+                Variable inter = ((IndexHandler)p[0]).Get(self, index);
+                Variable[] npos = new Variable[pos.Length - 1];
+                Array.Copy(pos, 2, npos, 1, pos.Length - 2);
+                npos[0] = inter;
+                return inter.Fetch().InvokeMethod(th.Return(), (string)p[4],
+                        npos, n);
+            } else if (index == null) {
+                // TODO: handle adverbs on Zen slices (XXX does this make sense?)
+                res = self.islist ? self : Kernel.NewRWListVar(self.Fetch());
+            } else if (n == null) {
                 res = ((IndexHandler)p[0]).Get(self, index);
             } else if (p[1] != null && n.ContainsKey("exists")) {
                 res = ((IndexHandler)p[1]).Get(self, index);
@@ -5633,7 +5653,8 @@ slow:
                     DispIndexy);
             List<Parameter> lp = new List<Parameter>();
             lp.Add(Parameter.TPos("self", 0));
-            lp.Add(Parameter.TPos("$index", 1));
+            lp.Add(new Parameter(Parameter.RWTRANS | Parameter.SLURPY_PCL, -1,
+                        "args", null, null, null, null, null));
             if (del != null) {
                 lp.Add(Parameter.TNamedOpt("exists", -1));
                 lp.Add(Parameter.TNamedOpt("delete", -1));
@@ -5643,7 +5664,7 @@ slow:
             lp.Add(Parameter.TNamedOpt("p", -1));
             lp.Add(Parameter.TNamedOpt("BIND_VALUE", -1));
             si.sig = new Signature(lp.ToArray());
-            si.param = new object[] { at, exist, del, bind };
+            si.param = new object[] { at, exist, del, bind, name };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
 

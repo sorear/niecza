@@ -149,12 +149,12 @@ sub prefix:<< +^ >>($x) is Niecza::builtin('numcompl',1,1) is pure { +^$x }
 sub infix:<< => >>($k, Mu $v) is equiv<=> is pure
     is Niecza::builtin('pair', 2, 2) { $k => $v }
 
-sub postcircumfix:<[ ]>(\container, \index, *%adverbs) {
-    container.postcircumfix:<[ ]>(index, |%adverbs)
+sub postcircumfix:<[ ]>(\container, |stuff) {
+    container.postcircumfix:<[ ]>(|stuff)
 }
 
-sub postcircumfix:<{ }>(\container, \index, *%adverbs) {
-    container.postcircumfix:<{ }>(index, |%adverbs)
+sub postcircumfix:<{ }>(\container, |stuff) {
+    container.postcircumfix:<{ }>(|stuff)
 }
 
 sub push(@array, *@stuff) is Niecza::builtin('push', 1) { @array.push(@stuff) }
