@@ -3980,7 +3980,7 @@ tryagain:
             string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
 
-            return h[kss] = Kernel.NewBoundVar(Kernel.NBV_RW, Kernel.MuMO, to);
+            return h[kss] = to;
         }
     }
     class IxHashAtKey : IndexHandler {
@@ -4105,7 +4105,7 @@ tryagain:
             while (items.Count() <= ix) {
                 items.Push(Kernel.NewTypedScalar(null));
             }
-            return items[ix] = Kernel.NewBoundVar(Kernel.NBV_RW, Kernel.MuMO, to);
+            return items[ix] = to;
         }
     }
 
