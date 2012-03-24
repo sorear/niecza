@@ -72,6 +72,9 @@ sub redo ($x?) { _lexotic(3, $x, ()) }
 sub return(\|@pcl) is return-pass { Q:CgOp {
     (control 4 (null frame) (int -1) (null str) {@pcl.unwrap-single})
 } }
+sub return-rw(\|@pcl) is return-pass { Q:CgOp {
+    (control 4 (null frame) (int -1) (null str) {@pcl.unwrap-single})
+} }
 sub succeed(\|@pcl) {
     Q:CgOp { (control 6 (null frame) (int -1) (null str) {@pcl.unwrap-single}) }
 }
@@ -81,6 +84,7 @@ sub term:<proceed>() {
 }
 
 sub take(\|@pcl) { Q:CgOp { (take {@pcl.unwrap-single}) } }
+sub take-rw(\|@pcl) { Q:CgOp { (take {@pcl.unwrap-single}) } }
 
 sub infix:<&> is pure is Niecza::absprec<q= list> is iffy
     (\|$p) { Junction.from-parcel(0, $p) }
