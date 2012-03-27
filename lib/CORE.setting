@@ -2185,7 +2185,7 @@ class Bag does Associative does Baggy {
 
     submethod BUILD (%!elems) { }
 
-    submethod Str(Any:D $ : --> Str) { "bag({ self.pairs>>.perl.join(', ') })" }
+    submethod Str(Any:D $ : --> Str) { %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") }
     submethod gist(Any:D $ : --> Str) { "bag({ self.pairs>>.gist.join(', ') })" }
     submethod perl(Any:D $ : --> Str) { 'Bag.new(' ~ %!elems.perl ~ ')' }
 
@@ -2257,7 +2257,7 @@ class KeyBag does Associative does Baggy {
 
     submethod BUILD (%!elems) { }
 
-    submethod Str(Any:D $ : --> Str) { "keybag({ self.pairs>>.perl.join(', ') })" }
+    submethod Str(Any:D $ : --> Str) { %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") }
     submethod gist(Any:D $ : --> Str) { "keybag({ self.pairs>>.gist.join(', ') })" }
     submethod perl(Any:D $ : --> Str) { 'KeyBag.new(' ~ %!elems.perl ~ ')' }
 
