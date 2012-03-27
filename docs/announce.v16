@@ -1,0 +1,46 @@
+    Announce: Niecza Perl 6 v16
+
+This is the sixteenth release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you will still need a
+binary for bootstrapping, so you gain nothing from a "source is
+better" perspective.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+[Minor changes]
+
+Improved multi-dispatch failure error messages (Larry Wall).
+
+Added @foo[1;2;3] multi-indexing syntax (but no real multidimensional
+arrays yet), and Zen slices @foo[].
+
+Added take-rw and return-rw functions for returning a read-write value.
+(This will allow you to futureproof your code against take and return
+becoming readonly by default.)
+
+Containers bound into aggregates like %foo<k> := 1..3 now retain list
+nature for iteration.
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-16.zip
+[2] https://github.com/sorear/niecza
