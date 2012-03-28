@@ -129,6 +129,7 @@ method category:mod_internal ($ ) { }
 
 method sign($ ) { }
 
+# This code should probably somehow be merged with the from_base in CORE.setting
 sub from_base($str, $base) {
     my $acc = 0;
     my $punto = -1;
@@ -136,7 +137,10 @@ sub from_base($str, $base) {
         next if $ch eq '_';
         if $ch eq '.' { $punto = 0; next; }
         $punto++ if $punto >= 0;
-        $acc = $acc * $base + ($ch ge 'a' ?? ord($ch) - 87 !! ord($ch) - 48);
+        my $digit = $ch ge 'a' ?? ord($ch) - 87 !! ord($ch) - 48;
+        die "Digit <$ch> too large for radix $base"
+            if $digit >= $base;
+        $acc = $acc * $base + $digit;
     }
     $punto >= 0 ?? $acc / ($base ** $punto) !! $acc
 }
