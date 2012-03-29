@@ -224,7 +224,7 @@ my class Mu {
         Q:CgOp { (box Str (obj_typename (@ {self}))) }
     }
     method gist() { defined(self) ?? self.perl   !! self.typename ~ '()' }
-    method say()  { defined(self) ?? (~self).say !! (self.typename ~ '()').say }
+    method say()  { self.gist.say }
     method Stringy() { self.Str }
     method Str() {
         if defined(self) {
@@ -843,11 +843,7 @@ my class Str is Cool {
     method ACCEPTS(\t) { defined(self) ?? self eq t !! t.^does(self) }
     method chars() { chars(self) }
     method IO() { IO.new(path => self) }
-    method say() { $PROCESS::OUTPUT_USED := 1; Q:CgOp {
-        (prog [say (unbox str (@ {self}))]
-              [box Bool (bool 1)]
-        )
-    } }
+    method say() { $*OUT.say(self) }
     multi method WHICH(Str:D:) {
         ObjAt.new(str => ("str|" ~ self), ref => self.WHAT)
     }
