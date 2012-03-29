@@ -3284,7 +3284,7 @@ method statementlist($/) {
         [ map *.statement_level($/), map *.ast, @( $<statement> ) ]);
 }
 
-method semilist($/) { make [ map *.ast, @( $<statement> ) ] }
+method semilist($/) { make [ map *.ast.semilist_level($/), @( $<statement> ) ] }
 
 method module_name:normal ($/) {
     # name-extension stuff is just ignored on module names for now

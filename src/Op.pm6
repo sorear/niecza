@@ -47,6 +47,7 @@ method cgop_labelled($body, $label) {
 method code_labelled($body, $label) { self.code($body) } #OK not used
 
 method statement_level($/) { self }
+method semilist_level($/) { self }
 method onlystub() { False }
 method const_value($) { }
 
@@ -516,6 +517,19 @@ class ImmedForLoop is Op {
 
     method zyg() { $.source, $.sink }
     method ctxzyg($) { $.source, 1, $.sink, 0 }
+
+    # used only with 'foo ($_ for 1,2,3)'
+    # var will be a single gensym
+    method semilist_level($/) {
+        my $pname = $!var.[0];
+        my $aname = $Actions.gensym;
+        my $sub = $Actions.thunk_sub($OpLet.new(var => $pname,
+                to => $OpLexical.new(name => $aname), in => $!sink),
+            params => [ $aname ]);
+        my $sname = $Actions.block_expr($/, $sub).name;
+
+        $OpForLoop.new(sink => $sname, source => $!source);
+    }
 
     method code($body) { self.code_labelled($body, '') }
     method code_labelled($body, $l) {
