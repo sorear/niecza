@@ -1994,10 +1994,12 @@ flat_enough:;
         protected ItemSource() {}
         [Immutable]
         public static ItemSource Empty = new ItemSource();
+        // main access point - return true to block (only if block is true)
         public virtual bool TryGet(out Variable[] r, bool block) {
             r = null;
             return true;
         }
+        // utility to get data from a list
         protected static int TryOne(VarDeque items, bool block) {
             if (block) {
                 return Kernel.IterHasFlat(items, true) ? +1 : -1;
@@ -2062,6 +2064,8 @@ nomore:
                     case -1: return true;
                     case  0: return false;
                 }
+            if (sources.Length == 0)
+                return true; // empty zip should return immediately
             r = new Variable[sources.Length];
             for (int i = 0; i < sources.Length; i++)
                 r[i] = sources[i].Shift();
