@@ -488,11 +488,11 @@ class GeneralLoop is Op {
 class ForLoop is Op {
     has Op $.source = die "ForLoop.source required";
     has Str $.sink = die "ForLoop.sink required";
-    method zyg() { $.source, $.sink }
+    method zyg() { $!source }
 
     method code($body) {
         $CgOp.methodcall($CgOp.subcall($CgOp.fetch($CgOp.corelex('&flat')),
-                $.source.cgop($body)), 'map', $CgOp.scopedlex($!sin));
+                $.source.cgop($body)), 'map', $CgOp.scopedlex($!sink));
     }
 
     method statement_level($/) {
