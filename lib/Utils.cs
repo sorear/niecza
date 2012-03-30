@@ -204,16 +204,35 @@ namespace Niecza {
         VarHashLink[] heap;
         int[] htab;
 
-        const int INITIAL = 5;
-        const int THRESHOLD = 11;
+        const int INITIAL = 4;
+        const int THRESHOLD = 8;
 
-        [Immutable]
-        static int[] grow = new int[] {
-            5, 11, 17, 37, 67, 131, 257, 521, 1031, 2053, 4099, 8209, 16411,
-            32771, 65537, 131101, 262147, 524309, 1048583, 2097169, 4194319,
-            8388617, 16777259, 33554467, 67108879, 134217757, 268435459,
-            536870923, 1073741827
-        };
+        // sacrifices a bit of universality to save a reduction step
+        public const int HASH_ARG_MAX = 1073709057;
+        [TrueGlobal]
+        public static uint string_hash_argument;
+        public static uint hash_automorphism;
+
+        public static unsafe int UniversalHash(int buckets, string str) {
+            fixed(char *c = str) {
+                char *cc = c;
+                char *end = cc + str.Length;
+                uint accum = 0;
+                while (cc < end) {
+                    // accum <= 2^32-1-65535
+                    accum += *(cc++);
+                    // accum <= 2^32-1
+                    ulong temp = (ulong)accum * string_hash_argument;
+                    // temp <= (2^32-1) * HASH_ARG_MAX
+                    // temp <= 4611545284160290815
+                    accum = (uint)((temp & 0x7FFFFFFF) + (temp >> 31));
+                    // accum <= floor(temp / 2^31) + (2^31-1)
+                    // accum <= 4294901760 = 2^32-1-65535
+                }
+                ulong temp2 = (ulong)accum * (uint)buckets;
+                return (int) (temp2 >> 32);
+            }
+        }
 
         public VarHash() { Clear(); }
 
@@ -255,8 +274,7 @@ namespace Niecza {
                     return;
                 }
 
-                int bkt = (int)(((uint) key.GetHashCode()) %
-                        ((uint) htab.Length));
+                int bkt = UniversalHash(htab.Length, key);
                 int ptr = htab[bkt];
 
                 if (ptr < 0) {
@@ -307,11 +325,11 @@ namespace Niecza {
 
         void rehash(int ordel) {
             int rank = 0;
-            while (heap.Length != grow[rank]) rank++;
+            while (heap.Length != (1 << (rank + 2))) rank++;
             rank += ordel;
 
             VarHashLink[] oheap = heap;
-            init(grow[rank]);
+            init(1 << (rank + 2));
 
             foreach (VarHashLink vhl in oheap)
                 if (vhl.key != null)
@@ -338,7 +356,7 @@ namespace Niecza {
                 return false;
             }
 
-            int bkt = (int)(((uint) key.GetHashCode()) % ((uint) htab.Length));
+            int bkt = UniversalHash(htab.Length, key);
             int ptr = htab[bkt];
 
             if (ptr < 0)
@@ -419,7 +437,7 @@ namespace Niecza {
                 return false;
             }
 
-            int ptr = htab[((uint) key.GetHashCode()) % ((uint) htab.Length)];
+            int ptr = htab[UniversalHash(htab.Length, key)];
 
             while (ptr >= 0) {
                 if (heap[ptr].key == key) {

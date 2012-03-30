@@ -4740,6 +4740,15 @@ saveme:
         [CompartmentGlobal] internal static SubInfo CommonGrep_I;
         [CompartmentGlobal] internal static SubInfo TEMP_SI;
 
+        internal static void InitGlobal() {
+            Random r = new Random();
+            VarHash.string_hash_argument =
+                (uint)r.Next(VarHash.HASH_ARG_MAX + 1);
+            VarHash.hash_automorphism =
+                ((uint)r.Next(int.MaxValue)) * 2 + 1;
+            SetTrace();
+        }
+
         internal static void InitCompartment() {
             RuntimeUnit.reg = new ObjectRegistry();
 
@@ -6518,7 +6527,7 @@ slow:
 
         public static void MainHandler(string uname, string[] args) {
             InitCompartment();
-            SetTrace();
+            InitGlobal();
             commandArgs = args;
 
             RuntimeUnit ru = (RuntimeUnit)
@@ -6555,7 +6564,7 @@ slow:
             string cmd = args.Length > 0 ? args[0] : "-help";
 
             InitCompartment();
-            SetTrace();
+            InitGlobal();
 
             if (cmd == "-field-inventory") {
                 foreach (Type ty in typeof(Kernel).Assembly.GetTypes()) {

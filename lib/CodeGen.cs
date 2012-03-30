@@ -3652,7 +3652,7 @@ dynamic:
                 Kernel.TraceFlags = Kernel.TRACE_CUR;
                 Kernel.TraceCount = Kernel.TraceFreq = 1;
             }
-            Kernel.SetTrace();
+            Kernel.InitGlobal();
             Backend.obj_dir = (string)args[1];
             Builtins.upcall_receiver = (System.Collections.IDictionary)args[2];
             return null;
