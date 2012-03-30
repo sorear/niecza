@@ -1998,7 +1998,7 @@ grammar P6 is STD {
             <POST>*
         ]
         {
-            self.check_variable($*VAR) if $*VAR;
+            $Actions.check_variable($*VAR) if $*VAR;
         }
     }
 
@@ -2049,16 +2049,18 @@ grammar P6 is STD {
         | :dba('signature') '(' ~ ')' <fakesignature>
         | <coloncircumfix('')>
             { $key = ""; $value = $<coloncircumfix>; }
-        | $<var> = (
-                <sigil> {}
-                [
-                | <twigil>? <desigilname>
-                | '<' <desigilname> '>'
-                ]
-            )
-            { $key = $<var><desigilname>.Str; $value = $<var>; $¢.check_variable($value); }
+        | $<var> = <.colonpair_var>
+            { $key = $<var><desigilname>.Str; $value = $<var>; $Actions.check_variable($value); }
         ]
         $<k> = {$key} $<v> = {$value}
+    }
+
+    token colonpair_var {
+        <sigil> {}
+        [
+        | <twigil>? <desigilname>
+        | '<' <desigilname> '>'
+        ]
     }
 
     # Most of these special variable rules are there simply to catch old p5 brainos
@@ -2354,7 +2356,7 @@ grammar P6 is STD {
             [ <?{ $*IN_DECL }> <.panic: "Cannot declare an indirect variable name"> ]?
             <variable> {
                 $*VAR = $<variable>;
-                self.check_variable($*VAR) if substr($*VAR,1,1) ne '$';
+                $Actions.check_variable($*VAR) if substr($*VAR,1,1) ne '$';
             }
         | <?before <[\@\%\&]> <sigil>* \w > <.panic: "Invalid hard reference syntax">
         | <longname>
@@ -3369,7 +3371,7 @@ grammar P6 is STD {
     token methodop {
         [
         | <longname>
-        | <?before '$' | '@' | '&' > <variable> { $¢.check_variable($<variable>) }
+        | <?before '$' | '@' | '&' > <variable> { $Actions.check_variable($<variable>) }
         | <?before <[ ' " ]> >
             [ <!{$*QSIGIL}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
             <quote>
@@ -4933,8 +4935,8 @@ grammar Regex is STD {
         $<sym> = {$<variable>.Str}
         [
         || $<binding> = ( \s* '=' \s* <quantified_atom> )
-           { $¢.check_variable($<variable>) unless substr($<sym>,1,1) eq '<' }
-        || { $¢.check_variable($<variable>) }
+           { $Actions.check_variable($<variable>) unless substr($<sym>,1,1) eq '<' }
+        || { $Actions.check_variable($<variable>) }
            [ <?before '.'? <[ \[ \{ \< ]>> <.worry: "Apparent subscript will be treated as regex"> ]?
         ]
     }
@@ -5429,97 +5431,6 @@ method is_known ($n, $curlex = $*CURLEX) {
 
 method add_routine ($name) {
     @*MEMOS[self.pos]<wasname> = $name if self.is_name($name);
-    self;
-}
-
-# check_variable($M)
-#   $M is <variable> (desigilname, method for @$foo, .$var indir), metachar:var,
-#         ...
-#   $M is anon(sigil,twigil,desigilname) or anon(sigil<desigilname>) (colonpair)
-#   $M is synthetic(<longname>::<postcircumfix>) (term:name)
-# check_variable should handle ALL of the possible sorries resulting from
-# a referential variable use.  Even term:variable is too early, since we may
-# backtrack if $*QSIGIL ne '$' and no posfix.
-
-# I don't like the way this is factored, since do_variable_reference has to
-# redo a lot of the same scanning.
-method check_variable ($variable) {
-    return () unless defined $variable;
-    my $name = $variable.Str;
-    my $here = self.cursor($variable.from);
-    self.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
-    my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
-    ($first,$twigil) = ($twigil, '') if $first eq '';
-    given $twigil {
-        when '' {
-            my $ok = 0;
-            $ok ||= $*IN_DECL;
-            $ok ||= $first lt 'A';
-            $ok ||= $first eq '¢';
-            $ok ||= self.is_known($name);
-            $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
-            if not $ok {
-                my $id = $name;
-                $id ~~ s/^\W\W?//;
-                if $sigil eq '&' {
-                    $here.add_mystery(Match.synthetic(:cursor(self), :method('Str'), :captures(), :from($variable.from+1), :to($variable.to)), self.pos, 'var')
-                }
-                elsif $name eq '@_' or $name eq '%_' {
-                    $here.add_placeholder($name);
-                }
-                else {  # guaranteed fail now
-                    if my $scope = @*MEMOS[$variable.from]<declend> {
-                        return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
-                    }
-                    elsif $id !~~ /\:\:/ {
-                        if self.is_known('@' ~ $id) {
-                            return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
-                        }
-                        elsif self.is_known('%' ~ $id) {
-                            return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
-                        }
-                    }
-                    return $here.sorry("Variable $name is not predeclared");
-                }
-            }
-            else {
-                self.mark_used($name);
-            }
-        }
-        when '!' {
-            if not $*HAS_SELF { # XXX to be replaced by MOP queries
-                $here.sorry("Variable $name used where no 'self' is available");
-            }
-        }
-        when '.' {
-            given $*HAS_SELF { # XXX to be replaced by MOP queries
-                when 'complete' {}
-                when 'partial' { $here.sorry("Virtual call $name may not be used on partially constructed object"); }
-                default { $here.sorry("Variable $name used where no 'self' is available"); }
-            }
-        }
-        when '^' {
-            my $*MULTINESS = 'multi';
-            $here.add_placeholder($name);
-        }
-        when ':' {
-            my $*MULTINESS = 'multi';
-            $here.add_placeholder($name);
-        }
-        when '~' {
-            return %*LANG.{substr($name,2)};
-        }
-        when '?' {
-            if $name ~~ /\:\:/ {
-                # TODO: $?CALLER::x makes sense!  also CONTEXT,OUTER,MY,SETTING,CORE
-                $here.worry("Unrecognized variable: $name");
-            }
-            else {
-                # search upward through languages to STD
-                $here.lookup_compiler_var($name);
-            }
-        }
-    }
     self;
 }
 

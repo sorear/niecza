@@ -32,6 +32,11 @@ use OpHelpers;
 
 our $CCTrace = %*ENV<NIECZA_CC_TRACE> // False;
 
+my package DEBUG {
+    our constant symtab = 1;
+    our constant EXPR   = 2;
+}
+
 # XXX Niecza  Needs improvement
 method sym_categorical($/) { self.FALLBACK($<name>, $/) }
 method bracket_categorical($/) { self.FALLBACK($<name>, $/) }
@@ -1751,21 +1756,23 @@ method get_cp_ext($/) {
         return ":" ~ $<k> ~ "<" ~ $suf ~ ">";
     }
 }
+method colonpair_var($/) {
+    if substr($/,1,1) eq '<' {
+        make { term => mkcall($/, '&postcircumfix:<{ }>',
+            $OpLexical.new(name => '$/'),
+            $OpStringLiteral.new(text => ~$<desigilname>)) };
+    } else {
+        make { sigil => ~$<sigil>,
+                twigil => ($<twigil> ?? ~$<twigil> !! ''),
+                name => ~$<desigilname> };
+    }
+}
 method colonpair($/) {
     my $tv = $<v>.^isa(Match) ?? ($<v>.ast // ~$<v>) !!
         $OpLexical.new(name => $<v> ?? 'True' !! 'False');
 
-    if $tv ~~ Str {
-        if substr($<v>,1,1) eq '<' {
-            $tv = mkcall($/, '&postcircumfix:<{ }>',
-                $OpLexical.new(name => '$/'),
-                $OpStringLiteral.new(text => ~$<k>));
-        } else {
-            $tv = self.do_variable_reference($/,
-                { sigil => ~$<v><sigil>,
-                    twigil => ($<v><twigil> ?? ~$<v><twigil> !! ''),
-                    name => $<k> });
-        }
+    if $tv ~~ Hash {
+        $tv = self.do_variable_reference($/, $tv);
     }
 
     make { term => $OpSimplePair.new(key => $<k>, value => $tv) };
@@ -1960,6 +1967,96 @@ method term:reduce ($/) {
             mkbool($assoc eq 'right'), mkbool($assoc eq 'chain'),
             $<op>.ast.as_function($/), @( $<args>.ast.[0] // [] )
         ]);
+}
+
+# check_variable($M)
+#   $M is <variable> (desigilname, method for @$foo, .$var indir), metachar:var,
+#         ...
+#   $M is anon(sigil,twigil,desigilname) or anon(sigil<desigilname>) (colonpair)
+#   $M is synthetic(<longname>::<postcircumfix>) (term:name)
+# check_variable should handle ALL of the possible sorries resulting from
+# a referential variable use.  Even term:variable is too early, since we may
+# backtrack if $*QSIGIL ne '$' and no posfix.
+
+# I don't like the way this is factored, since do_variable_reference has to
+# redo a lot of the same scanning.
+method check_variable ($variable) {
+    return () unless defined $variable;
+    my $name = $variable.Str;
+    my $here = $variable.CURSOR.cursor($variable.from);
+    $here.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
+    my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
+    ($first,$twigil) = ($twigil, '') if $first eq '';
+    given $twigil {
+        when '' {
+            my $ok = 0;
+            $ok ||= $*IN_DECL;
+            $ok ||= $first lt 'A';
+            $ok ||= $first eq '¢';
+            $ok ||= $here.is_known($name);
+            $ok ||= $name ~~ /.\:\:/ && $name !~~ /MY|UNIT|OUTER|SETTING|CORE/;
+            if not $ok {
+                my $id = $name;
+                $id ~~ s/^\W\W?//;
+                if $sigil eq '&' {
+                    $here.add_mystery(Match.synthetic(:cursor($here), :method('Str'), :captures(), :from($variable.from+1), :to($variable.to)), $here.pos, 'var')
+                }
+                elsif $name eq '@_' or $name eq '%_' {
+                    $here.add_placeholder($name);
+                }
+                else {  # guaranteed fail now
+                    if my $scope = @*MEMOS[$variable.from]<declend> {
+                        return $here.sorry("Variable $name is not predeclared (declarators are tighter than comma, so maybe your '$scope' signature needs parens?)");
+                    }
+                    elsif $id !~~ /\:\:/ {
+                        if $here.is_known('@' ~ $id) {
+                            return $here.sorry("Variable $name is not predeclared (did you mean \@$id?)");
+                        }
+                        elsif $here.is_known('%' ~ $id) {
+                            return $here.sorry("Variable $name is not predeclared (did you mean \%$id?)");
+                        }
+                    }
+                    return $here.sorry("Variable $name is not predeclared");
+                }
+            }
+            else {
+                $here.mark_used($name);
+            }
+        }
+        when '!' {
+            if not $*HAS_SELF { # XXX to be replaced by MOP queries
+                $here.sorry("Variable $name used where no 'self' is available");
+            }
+        }
+        when '.' {
+            given $*HAS_SELF { # XXX to be replaced by MOP queries
+                when 'complete' {}
+                when 'partial' { $here.sorry("Virtual call $name may not be used on partially constructed object"); }
+                default { $here.sorry("Variable $name used where no 'self' is available"); }
+            }
+        }
+        when '^' {
+            my $*MULTINESS = 'multi';
+            $here.add_placeholder($name);
+        }
+        when ':' {
+            my $*MULTINESS = 'multi';
+            $here.add_placeholder($name);
+        }
+        when '~' {
+            return %*LANG.{substr($name,2)};
+        }
+        when '?' {
+            if $name ~~ /\:\:/ {
+                # TODO: $?CALLER::x makes sense!  also CONTEXT,OUTER,MY,SETTING,CORE
+                $here.worry("Unrecognized variable: $name");
+            }
+            else {
+                # search upward through languages to STD
+                $here.lookup_compiler_var($name);
+            }
+        }
+    }
 }
 
 method do_variable_reference($M, $v) {
