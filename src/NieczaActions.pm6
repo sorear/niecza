@@ -428,6 +428,7 @@ method sublongname($/) {
 method desigilname($/) {
     if $<variable> {
         make { ind => self.do_variable_reference($/, $<variable>.ast) };
+        self.check_variable($<variable>);
     } else {
         make self.process_name($<longname>, :defer);
     }
@@ -786,6 +787,7 @@ method metachar:var ($/) {
 
         if !defined $cid {
             $/.CURSOR.sorry("Non-Match bindings NYI");
+            # self.check_variable($<variable>);
             make $RxOpSequence.new;
             return Nil;
         }
@@ -814,6 +816,7 @@ method metachar:var ($/) {
     make $RxOpListPrim.new(name => ~$<variable>, type => $kind,
         ops => self.rxembed($/,
             self.do_variable_reference($/, $<variable>.ast), True));
+    self.check_variable($<variable>);
 }
 
 method rxcapturize($M, $name, $rxop is copy) { #OK not used
@@ -1682,6 +1685,7 @@ method methodop($/) {
     } elsif $<variable> {
         make $Operator_Function.new(function =>
             self.do_variable_reference($/, $<variable>.ast));
+        self.check_variable($<variable>);
     }
 
     $/.ast.args = $<args>.ast[0] // [] if $<args>;
@@ -1773,6 +1777,7 @@ method colonpair($/) {
 
     if $tv ~~ Hash {
         $tv = self.do_variable_reference($/, $tv);
+        self.check_variable($<v>);
     }
 
     make { term => $OpSimplePair.new(key => $<k>, value => $tv) };
@@ -1986,6 +1991,7 @@ method check_variable ($variable) {
     my $here = $variable.CURSOR.cursor($variable.from);
     $here.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
     my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
+    $variable.ast<checked> || $here.sorry("do_variable_reference must always precede check_variable");
     ($first,$twigil) = ($twigil, '') if $first eq '';
     given $twigil {
         when '' {
@@ -2060,6 +2066,7 @@ method check_variable ($variable) {
 }
 
 method do_variable_reference($M, $v) {
+    $v<checked> = True;
     if $v<term> {
         return $v<term>;
     }

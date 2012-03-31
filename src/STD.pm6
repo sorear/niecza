@@ -2050,7 +2050,7 @@ grammar P6 is STD {
         | <coloncircumfix('')>
             { $key = ""; $value = $<coloncircumfix>; }
         | $<var> = <.colonpair_var>
-            { $key = $<var><desigilname>.Str; $value = $<var>; $Actions.check_variable($value); }
+            { $key = $<var><desigilname>.Str; $value = $<var>; }
         ]
         $<k> = {$key} $<v> = {$value}
     }
@@ -2354,10 +2354,7 @@ grammar P6 is STD {
         [
         | <?before '$' >
             [ <?{ $*IN_DECL }> <.panic: "Cannot declare an indirect variable name"> ]?
-            <variable> {
-                $*VAR = $<variable>;
-                $Actions.check_variable($*VAR) if substr($*VAR,1,1) ne '$';
-            }
+            <variable>
         | <?before <[\@\%\&]> <sigil>* \w > <.panic: "Invalid hard reference syntax">
         | <longname>
         ]
@@ -3371,7 +3368,7 @@ grammar P6 is STD {
     token methodop {
         [
         | <longname>
-        | <?before '$' | '@' | '&' > <variable> { $Actions.check_variable($<variable>) }
+        | <?before '$' | '@' | '&' > <variable>
         | <?before <[ ' " ]> >
             [ <!{$*QSIGIL}> || <!before '"' <-["]>*? \s > ] # dwim on "$foo."
             <quote>
@@ -4935,9 +4932,7 @@ grammar Regex is STD {
         $<sym> = {$<variable>.Str}
         [
         || $<binding> = ( \s* '=' \s* <quantified_atom> )
-           { $Actions.check_variable($<variable>) unless substr($<sym>,1,1) eq '<' }
-        || { $Actions.check_variable($<variable>) }
-           [ <?before '.'? <[ \[ \{ \< ]>> <.worry: "Apparent subscript will be treated as regex"> ]?
+        || [ <?before '.'? <[ \[ \{ \< ]>> <.worry: "Apparent subscript will be treated as regex"> ]?
         ]
     }
 
