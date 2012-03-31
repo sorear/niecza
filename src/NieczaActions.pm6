@@ -24,7 +24,7 @@ our ($Operator, $Operator_Method, $Operator_Replicate, $Operator_FlipFlop,
      $Operator_Function, $Operator_CompoundAssign);
 
 our ($CgOp, $CClass, $Sig, $SigParameter, $OptRxSimple, $OptBeta, $Actions,
-     $PassSimplifier);
+     $PassSimplifier, $Backend);
 
 class NieczaActions;
 
@@ -559,6 +559,7 @@ method regex_def($/) {
         $*CURLEX<!sub>.finish($OpRegexBody.new(pos=>$/, pre => @lift,
             name => ($*CURLEX<!name> // ''), rxop => $ast, canback => $mb));
     }
+    $Backend.prune_match($<regex_block>);
     make $OpLexical.new(pos=>$/, name => $*CURLEX<!sub>.outervar);
 }
 
@@ -1389,10 +1390,8 @@ method circumfix:sym<[ ]> ($/) {
 
 # XXX This fails to catch {; ... } because it runs after empty statement
 # elimination.
-method check_hash($/) {
-    my $do = $<pblock><blockoid>.ast;
-
-    return False if $<pblock>.ast.arity;
+method check_hash($sub, $do is copy) {
+    return False if $sub.arity;
 
     return False unless $do.^isa($OpStatementList);
     return True if $do.children == 0;
@@ -1403,7 +1402,9 @@ method check_hash($/) {
 
     return True if @bits[0].^isa($OpSimplePair);
 
-    if @bits[0].^isa($OpBuiltin) && @bits[0].name eq 'pair' {
+    if @bits[0].^isa($OpCallSub) &&
+            @bits[0].invocant.^isa($OpLexical) &&
+            @bits[0].invocant.name eq '&infix:<=>>' {
         return True;
     }
 
@@ -1423,7 +1424,7 @@ method circumfix:sym<{ }> ($/) {
     $*CURLEX<!sub>.add_my_sub($var, $<pblock>.ast);
     make $OpBareBlock.new(pos=>$/, :$var);
 
-    if self.check_hash($/) {
+    if $<pblock>.ast.get_extend('hashy') {
         make mkcall($/, '&_hash_constructor',
             $OptBeta.make_call($/, $var));
     }
@@ -2172,6 +2173,15 @@ method variable($/) {
         make { term => $OpIndirectVar.new(pos=>$/,
             name => mkstringycat($/, $sigil ~ $twigil, $dsosl<iname>)) };
         return;
+    } elsif $twigil eq '.' && $<postcircumfix>[0] {
+        if defined $dsosl<pkg> {
+            $/.CURSOR.sorry('$.Foo::bar syntax NYI');
+        }
+
+        make { term => self.docontext($/, $sigil, $OpCallMethod.new(pos=>$/,
+            name => $dsosl<name>, receiver => mklex($/, 'self'),
+            args => [ @($<postcircumfix>[0].ast.args) ])) };
+        return;
     } elsif defined $dsosl {
         ($name, $pkg) = $dsosl<name pkg>;
     } elsif $<infixish> {
@@ -2187,7 +2197,7 @@ method variable($/) {
                     $OpNum.new(value => $<index>.ast)))
         };
         return Nil;
-    } elsif $<postcircumfix>[0] {
+    } elsif $<postcircumfix>[0] && $twigil ne '.' {
         if $<postcircumfix>[0].reduced eq 'postcircumfix:sym<< >>' { #XXX fiddly
             make { capid => self.eval_ast_str($/, $<postcircumfix>[0].ast.args[0]) // '', term =>
                 self.docontextif($/, $sigil,
@@ -2630,6 +2640,7 @@ method lambda($/) {}
 method embeddedblock($/) {
     $*CURLEX<!sub>.finish($<statementlist>.ast);
     $*CURLEX<!sub>.set_signature($Sig.simple());
+    $Backend.prune_match($<statementlist>);
     make $*CURLEX<!sub>;
 }
 
@@ -2688,25 +2699,25 @@ method declarator($/) {
         my @p = @( $<signature>.ast.params );
         # TODO: keep the original signature around somewhere := can find it
         # TODO: fanciness checks
-        for @p -> \$param {
-            my $slot = $param.slot;
+        for @p -> \param {
+            my $slot = param.slot;
             $sub.delete_lex($slot) if defined($slot);
             $slot //= self.gensym;
             $slot = self.gensym if $*SCOPE eq 'anon';
-            my $list = ?($param.flags +& $Sig::IS_LIST);
-            my $hash = ?($param.flags +& $Sig::IS_HASH);
-            my $type = $param.tclass;
+            my $list = ?(param.flags +& $Sig::IS_LIST);
+            my $hash = ?(param.flags +& $Sig::IS_HASH);
+            my $type = param.tclass;
 
             if $*SCOPE eq 'state' {
                 $sub.add_state_name($slot, self.gensym, :$list, :$hash,
                     typeconstraint => $type, |mnode($/));
-                $param = $OpLexical.new(name => $slot, pos=>$/);
+                param = $OpLexical.new(name => $slot, pos=>$/);
             } elsif $*SCOPE eq 'our' {
-                $param = self.package_var($/, $slot, $slot, ['OUR']);
+                param = self.package_var($/, $slot, $slot, ['OUR']);
             } else {
                 $sub.add_my_name($slot, :$list, :$hash,
                     typeconstraint => $type, |mnode($/));
-                $param = $OpLexical.new(name => $slot, pos=>$/);
+                param = $OpLexical.new(name => $slot, pos=>$/);
             }
         }
         make $OpSimpleParcel.new(pos=>$/, items => @p);
@@ -3766,6 +3777,7 @@ method package_def ($/) {
         }
     }
 
+    $Backend.prune_match($<blockoid> // $<statementlist>);
     $sub.finish($ast);
 }
 
@@ -4089,20 +4101,30 @@ method finish_method_routine ($/) {
     } else {
         $*CURLEX<!sub>.finish($<blockoid>.ast);
     }
+    $Backend.prune_match($<blockoid>);
     make $OpLexical.new(pos=>$/, name => $*CURLEX<!sub>.outervar);
 }
 method routine_def ($/) { self.finish_method_routine($/) }
 method method_def ($/)  { self.finish_method_routine($/) }
 
 method block($/) {
-    $*CURLEX<!sub>.finish($<blockoid>.ast);
+    my $code = $<blockoid>.ast;
+    $code = $OpCatchyWrapper.new(inner => $code) if $*catchy;
+    $*CURLEX<!sub>.finish($code);
+    $Backend.prune_match($<blockoid>);
     make $*CURLEX<!sub>
 }
 
 # :: Body
 method pblock($/) {
     #my $rw = $<lambda> && $<lambda> eq '<->'; TODO
+    # snatch away some information here
+    if self.check_hash($*CURLEX<!sub>, $<blockoid>.ast) {
+        $*CURLEX<!sub>.set_extend('hashy', True);
+    }
+
     $*CURLEX<!sub>.finish($<blockoid>.ast);
+    $Backend.prune_match($<blockoid>);
     make $*CURLEX<!sub>;
 }
 
@@ -4142,9 +4164,6 @@ sub phaser($/, $ph, :$unique, :$topic, :$csp) {
     if $unique {
         $/.CURSOR.sorry("Limit one $ph phaser per block, please.")
             if $sub.outer.contains_phaser($*backend.phaser($ph));
-        my $code = ($<blast><statement> // $<blast><block><blockoid> // $<block><blockoid>).ast;
-        # TODO avoid double finishing
-        $sub.finish($OpCatchyWrapper.new(inner => $code));
     }
 
     $sub.outer.noninlinable;
@@ -4173,26 +4192,6 @@ method statement_prefix:END ($/) { phaser($/, 'END', :csp) }
 method statement_prefix:INIT ($/) { phaser($/, 'INIT', :csp) }
 
 method statement_prefix:BEGIN ($/) {
-    # MAJOR HACK - allows test code like BEGIN { @*INC.push: ... } to work
-    # Should go away later once the spec is less slushy
-    repeat while False {
-        my $c = ($<blast><statement> || $<blast><block><blockoid>).ast;
-
-        last unless $c ~~ $OpStatementList;
-        last unless $c.children == 1;
-        my $d = $c.children.[0];
-        last unless $d ~~ $OpCallMethod;
-        last unless $d.receiver ~~ $OpContextVar;
-        last unless $d.receiver.name eq '@*INC';
-        last if $d.private || $d.ismeta;
-        last unless $d.name eq any <push unshift>;
-        last unless +$d.getargs == 1;
-        last unless defined my $str = self.eval_ast_str($/, $d.getargs.[0]);
-        @*INC."$d.name()"($str);
-        make $OpStatementList.new;
-        return;
-    }
-
     $*CURLEX<!sub>.create_static_pad;
     my $con = self.make_constant($/, 'anon', 'BEGIN');
     $<blast>.ast.run_BEGIN($con.name);
@@ -4209,6 +4208,7 @@ method comp_unit($/) {
     }
 
     $*CURLEX{'!sub'}.finish($ast);
+    $Backend.prune_match($<statementlist>);
 
     make $*unit;
 }
