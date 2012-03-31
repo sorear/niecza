@@ -2210,6 +2210,18 @@ namespace Niecza.CLRBackend {
 
             LexInfo lex = ResolveLex(name, outer>0, out uplevel, core);
 
+            if (lex == null) {
+                CpsOp sc = CpsOp.ConstructorCall(Tokens.SC_ctor,
+                        CpsOp.CallFrame(), CpsOp.IntLiteral(
+                            scope_stack.Count));
+                if (core) name = "CORE::" + name;
+                if (outer != 0) name = "OUTER::" + name;
+                return CpsOp.MethodCall(Tokens.StashCursor.
+                    GetMethod("Indirect"), sc, CpsOp.StringLiteral(name),
+                    CpsOp.BoolLiteral(false), set_to != null ? set_to :
+                    CpsOp.Null(Tokens.Variable));
+            }
+
             return CpsOp.LexAccess(lex, uplevel,
                 set_to == null ? new CpsOp[0] : new CpsOp[] { set_to });
         }
@@ -2235,7 +2247,7 @@ namespace Niecza.CLRBackend {
                     }
                 }
                 if (csr.outer == null)
-                    throw new Exception("Unable to find lexical " + name + " in " + sub.name);
+                    return null;
                 csr = csr.outer;
                 uplevel++;
             }
@@ -2244,6 +2256,8 @@ namespace Niecza.CLRBackend {
         STable ResolvePkg(string name) {
             int dummy;
             LexInfo li = ResolveLex(name, false, out dummy, true);
+            if (li == null)
+                throw new Exception("Unable to find lexical " + name + " in " + sub.name);
             return ((LIPackage)li).pkg;
         }
 
@@ -2645,6 +2659,8 @@ dynamic:
                     } else {
                         int dummy;
                         LexInfo li = th.ResolveLex(name,false,out dummy,true);
+                        if (li == null)
+                            throw new NieczaException("Cannot resolve package " + name);
                         mo = th.cpb.eu.TypeConstant((li as LIPackage).pkg);
                     }
                 } else {
