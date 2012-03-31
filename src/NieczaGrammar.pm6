@@ -42,6 +42,12 @@ grammar P6 is STD::P6 {
         $*CURLEX<!sub>.set_return_pass;
         $*CURLEX{'!sub'}.add_my_name('$_') if !$*settingref;
         $*CURLEX{'!sub'}.set_signature($Sig.simple());
+
+        # XXX a bit of a hack
+        if $*FILE<name> eq ('(eval)' | '-e') && !$*niecza_outer_ref {
+            $*CURLEX<!sub>.set_extend('strict', False);
+        }
+
         $*unit.set_mainline($*CURLEX<!sub>);
 
         %*LANG<Q>    = NieczaGrammar::Q  ;
