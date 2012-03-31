@@ -3484,6 +3484,34 @@ method statement_control:when ($/) {
         body => self.inliney_call($/, $<xblock>.ast[1]));
 }
 
+method statement_control:no ($/) {
+    make $OpStatementList.new;
+    my $name = $<module_name>.ast<name>;
+    my $args = $<arglist> ?? $<arglist>.ast !! [];
+
+    if defined $<module_name>.ast.<args> {
+        $/.CURSOR.sorry("'no' of an instantiated role not yet understood");
+        return;
+    }
+
+    if $args {
+        $/.CURSOR.sorry("'no' with arguments NYI");
+        return;
+    }
+
+    if ($name eq 'strict') {
+        $*CURLEX<!sub>.set_extend('strict', False);
+        return;
+    }
+
+    if ($name eq 'MONKEY_TYPING') {
+        $*MONKEY_TYPING = False;
+        return;
+    }
+
+    $/.CURSOR.sorry("No 'no' handling for $name");
+}
+
 method use_from_perl5($/,$name) {
     my $sub = $*CURLEX<!sub>;
     my $func = $*unit.use_perl5_module($name);
@@ -3516,12 +3544,12 @@ method statement_control:use ($/) {
 
     # support loading modules from perl5
     if $<module_name><longname><colonpair> -> $pairs {
-	if $pairs[0].<identifier> eq 'from' && $pairs[0].<coloncircumfix><circumfix><nibble> eq 'perl5' {
+        if $pairs[0].<identifier> eq 'from' && $pairs[0].<coloncircumfix><circumfix><nibble> eq 'perl5' {
             self.use_from_perl5($/,$name);
-	    return;
-	} else {
-		$/.CURSOR.sorry("NYI");
-	}
+            return;
+        } else {
+                $/.CURSOR.sorry("NYI");
+        }
     } else {
     }
 
@@ -3532,6 +3560,11 @@ method statement_control:use ($/) {
 
     if $args {
         $/.CURSOR.sorry("'use' with arguments NYI");
+        return;
+    }
+
+    if ($name eq 'strict') {
+        $*CURLEX<!sub>.set_extend('strict', True);
         return;
     }
 
