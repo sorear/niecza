@@ -1975,6 +1975,13 @@ method term:reduce ($/) {
         ]);
 }
 
+method check_strict() {
+    loop (my $s = $*CURLEX<!sub>; $s; $s .= outer) {
+        return ($s.get_extend('strict')[0] // next);
+    }
+    True
+}
+
 # check_variable($M)
 #   $M is <variable> (desigilname, method for @$foo, .$var indir), metachar:var,
 #         ...
@@ -2010,6 +2017,8 @@ method check_variable ($variable) {
                 }
                 elsif $name eq '@_' or $name eq '%_' {
                     $here.add_placeholder($name);
+                }
+                elsif !self.check_strict {
                 }
                 else {  # guaranteed fail now
                     if my $scope = @*MEMOS[$variable.from]<declend> {
