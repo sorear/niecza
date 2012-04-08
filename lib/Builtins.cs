@@ -1961,6 +1961,7 @@ flat_enough:;
             if ((fl & (Parameter.SLURPY_CAP | Parameter.SLURPY_POS |
                     Parameter.SLURPY_PCL)) != 0)
                 return int.MaxValue;
+            if ((fl & Parameter.SLURPY_NAM) != 0) continue;
             if ((fl & Parameter.POSITIONAL) == 0) continue;
             arity++;
         }
