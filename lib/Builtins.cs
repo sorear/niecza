@@ -2864,7 +2864,9 @@ again:
         new StreamWriter(Console.OpenStandardOutput(), Console.OutputEncoding);
     [TrueGlobal] internal static StreamWriter stderr =
         new StreamWriter(Console.OpenStandardError(), Console.OutputEncoding);
-    public static System.IO.TextWriter twriter_stdout() { return stdout; }
+    public static System.IO.TextWriter twriter_stdout() {
+        stdout.AutoFlush = true; return stdout;
+    }
 
     public static System.IO.TextWriter twriter_stderr() {
         stderr.AutoFlush = true; return stderr;
