@@ -40,11 +40,21 @@ linefeed only.
 
 =head1 DEPENDENCIES (BUILD FROM SOURCE)
 
+All of these need to be available in PATH.
+
 =over 4
 
 =item *
 
+Standard Unix utilities (touch, mkdir, rm, cp, echo)
+
+=item *
+
 wget (to fetch a bootstrapping binary).
+
+=item *
+
+perl (only needed for testing and the Perl 5 interop layer)
 
 =item *
 
@@ -53,6 +63,10 @@ GNU make
 =item *
 
 unzip
+
+=item *
+
+git
 
 =back
 
