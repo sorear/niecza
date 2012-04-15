@@ -1,0 +1,62 @@
+=head1 NAME
+
+Making standalone .exe files for Mono or Windows from Perl 6 code using Niecza
+
+=head1 LIMITATIONS
+
+=over 4
+
+=item *
+
+You will be getting a .NET exe, not a native Win32 exe.  This
+probably isn't an issue; recent versions of Windows come with .NET runtimes,
+and in any case it is unavoidable.
+
+=item *
+
+Niecza cannot currently produce truly standalone exes; you will
+have at least one dll.
+
+=item *
+
+It is not possible to use C<eval> or similar functionality with a precompiled
+program.
+
+=head1 METHOD
+
+    $ cat > foo.pl
+    say "Hello, world"
+    $ mono run/Niecza.exe -c foo.pl
+    $ cp obj/Run.MAIN.exe Foo.exe
+    $ cp obj/Run.Kernel.dll obj/Run.CORE.dll obj/Run.MAIN.ser obj/Run.CORE.ser .
+    $ mono Foo.exe
+    Hello, world
+
+The C<-c> option tells niecza to create an exe.  The produced exe depends on
+runtime availability in the same directory of Kernel, all depended modules
+(here just CORE), and the matching ser files for MAIN and all used modules.
+
+=head1 BUNDLING
+
+    $ cat > foo.pl
+    say "Hello, world"
+    $ make obj/Kernel.dll
+    make: `obj/Kernel.dll' is up to date.
+    $ NIECZA_KEEP_IL=1 mono run/Niecza.exe -C CORE
+    $ NIECZA_KEEP_IL=1 mono run/Niecza.exe -c foo.pl
+    $ cp obj/Kernel.dll .
+    $ mono Kernel.dll -gen-app Foo obj
+    $ mono Foo.exe
+    Hello, world
+    $ ls Foo*
+    Foo.exe  Foo.ser
+
+This method is slightly more involved, but allows shipping only three files
+(including Kernel.dll) regardless of used libraries.  It is necessary to
+build all used libraries with C<NIECZA_KEEP_IL=1>.
+
+=head1 TODO
+
+A single-file bundle mode using AssemblyResolve hooks.
+
+Automatic bundling invoked from the compiler.
