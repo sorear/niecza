@@ -271,7 +271,7 @@ method parse(:$unitname, :$filename, :$source, :$outer, :$run, :$main, :$evalmod
 
     $*backend.push_compartment unless $evalmode;
     LEAVE { $*backend.pop_compartment unless $evalmode };
-    my $*unit = $*backend.create_unit($unitname, $filename, $source, $main, $run);
+    my $*unit = $*backend.create_unit($unitname, $filename, $*no_incl_source ?? $Backend.gethash($source) !! $source, $main, $run);
     my $*settingref = $*niecza_outer_ref ||
         ($lang ne 'NULL' ?? $*unit.need_unit($lang).bottom !! Any);
 

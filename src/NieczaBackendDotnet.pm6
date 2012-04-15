@@ -41,7 +41,8 @@ sub upcalled(*@args) {
                     $*compiler.module_finder.load_module($module);
                 my $trueh = gethash($src);
                 say "check-dated $module: was $hash now $trueh" if $v;
-                return "no" unless $hash eq $trueh;
+                # allow for source concealment
+                return "no" unless $hash eq $trueh || $hash eq gethash($trueh);
             }
             return "ok";
         }
@@ -90,6 +91,7 @@ method cached_but($cls, $role) {
 sub gethash($str) {
     Q:CgOp { (box Str (rawscall Niecza.Downcaller,CompilerBlob.DoHash (obj_getstr {$str}))) }
 }
+method gethash($str) { gethash($str) }
 sub execname() {
     Q:CgOp { (box Str (rawscall Niecza.Downcaller,CompilerBlob.ExecName)) }
 }

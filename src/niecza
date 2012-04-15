@@ -71,8 +71,9 @@ general options:
       --safe                 # disable system interaction
       --help                 # display this message
 
-backend options:
+output options:
       --obj-dir=DIR          # select output location (all)
+      --no-include-source    # disable source-based introspection, etc
 EOM
 
 my $runobj = Q:CgOp { (box Str (rawcall get_BaseDirectory (rawscall System.AppDomain.get_CurrentDomain))) };
@@ -88,6 +89,7 @@ my @eval;
 my $cmod = False;
 my $comp = False;
 my $version = False;
+my $*no_incl_source = False;
 
 GetOptions(:!permute,
     "evaluate|e=s" => sub { push @eval, $_ },
@@ -103,6 +105,7 @@ GetOptions(:!permute,
     "include|I=s" => sub { unshift @lib, $_.IO.realpath },
     "obj-dir=s" => sub { $odir = $_ },
     "help|h" => sub { say $usage; exit 0 },
+    "no-include-source" => sub { $*no_incl_source = True },
 );
 
 my @*INC;
