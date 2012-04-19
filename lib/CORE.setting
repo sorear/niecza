@@ -659,6 +659,7 @@ my class Cool {
     method trim-leading () { self.subst(/^ \s+/, "") }
     method trim-trailing() { self.subst(/\s+ $/, "") }
     method trim         () { self.trim-leading.trim-trailing }
+    method eval() { eval(~self) }
 
     method fmt(Str $format = '%s') {
         sprintf($format, self);
