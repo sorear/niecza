@@ -107,10 +107,13 @@ sub is(\got, \expected, $tag?) is export {
 }
 sub isnt(Mu $got, Mu $expected, $tag?) is export { $*TEST-BUILDER.ok($got ne $expected, $tag) }
 # Runs $code, trapping various failure modes and returning applicable.
-sub no-control($code) {
+sub no-control($code, :$diag) {
     my ($died, $warned);
     {
-        CATCH   { default { $died = True } }
+        CATCH   {
+            $*TEST-BUILDER.note("Exception: $_") if $diag;
+            default { $died = True }
+        }
         CONTROL {
             if .[0] == 11 {
                 $warned = True;
@@ -123,19 +126,19 @@ sub no-control($code) {
     $died ?? "die" !! $warned ?? "warn" !! "";
 }
 sub lives_ok($code,$why?) is export {
-    $*TEST-BUILDER.ok(no-control($code) ne "die", $why);
+    $*TEST-BUILDER.ok(no-control($code, :diag) ne "die", $why);
 }
 sub dies_ok($code,$why?) is export {
     $*TEST-BUILDER.ok(no-control($code) eq "die", $why);
 }
 sub succeeds_ok($code,$why?,:$ignore = ()) is export {
-    $*TEST-BUILDER.ok(?(no-control($code) eq any("", @$ignore)), $why);
+    $*TEST-BUILDER.ok(?(no-control($code, :diag) eq any("", @$ignore)), $why);
 }
 sub fails_ok($code,$why?,:$expect = <die warn fail>) is export {
     $*TEST-BUILDER.ok(?(no-control($code) eq any(@$expect)), $why);
 }
 sub eval_lives_ok($code,$why?) is export {
-    $*TEST-BUILDER.ok(no-control({ eval $code }) ne "die", $why);
+    $*TEST-BUILDER.ok(no-control({ eval $code }, :diag) ne "die", $why);
 }
 sub eval_dies_ok($code,$why?) is export {
     $*TEST-BUILDER.ok(no-control({ eval $code }) eq "die", $why);
