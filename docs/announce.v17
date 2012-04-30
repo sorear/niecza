@@ -1,0 +1,49 @@
+    Announce: Niecza Perl 6 v17
+
+This is the seventeenth release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you still need a
+binary for bootstrapping.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+[Minor changes]
+
+The .Str methods of Set, KeySet, Bag, and KeyBag now just list the elements
+(Solomon Foster).
+
+Out-of-range digits in a radix conversion now warn appropriately (Solomon
+Foster).
+
+The [Z] operator now doesn't hang on empty inputs (Stefan O'Rear).
+
+Cool.eval added (Solomon Foster).
+
+[Major changes]
+
+List comprehension syntax like ($_*$_ for 0..9) works now (Stefan O'Rear).
+
+'no strict' (Stefan O'Rear).
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-16.zip
+[2] https://github.com/sorear/niecza
