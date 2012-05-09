@@ -2582,7 +2582,7 @@ grammar P6 is STD {
         <!old_rx_mods>
     }
 
-    token quote:mm {
+    token quote:ms {
         <sym> » <!before '('>
         <quibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s))>
         <!old_rx_mods>

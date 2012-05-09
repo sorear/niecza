@@ -486,6 +486,14 @@ method quote:m  ($/) {
                 self.extract_rx_adverbs(True, False, $<quibble>) ]);
 }
 
+method quote:ms  ($/) {
+    make $OpCallMethod.new(pos=>$/, name => 'match',
+            receiver => mklex($/, '$_'),
+            args => [
+                self.op_for_regex($/, $<quibble>.ast),
+                self.extract_rx_adverbs(True, False, $<quibble>) ]);
+}
+
 method encapsulate_regex($/, $rxop, :$passcut = False) {
     my @lift = $rxop.oplift;
     my $lad = $rxop.lad;
