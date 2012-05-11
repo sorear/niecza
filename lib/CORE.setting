@@ -812,8 +812,10 @@ my class Rat does Real {
     method gist() { self // nextsame; self.Str }
     method numerator() { Q:CgOp { (rat_nu {self}) } }
     method denominator() { Q:CgOp { (rat_de {self}) } }
+    method Rat($eps = 1e-6) { self }
     method FatRat() { FatRat.new(self.numerator, self.denominator) }
     method nude() { [ self.numerator, self.denominator ] }
+    method norm() { self }
 }
 my class Complex does Numeric {
     method new($re,$im) { Q:CgOp { (complex_new {$re} {$im}) } }
