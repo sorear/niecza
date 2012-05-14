@@ -21,14 +21,14 @@
 
   - make mkpackage # from inside next/
   - cd package
-  - zip -9r ../../niecza-vN+1.zip *
+  - zip -9r ../../niecza-N+1.zip *
   - make sure there are no extraneous files in it
 
 * Tag and upload stuff
 
   - git tag -s vN+1
   - git push --tags
-  - upload niecza-vN+1.zip to github Downloads pane
+  - upload niecza-N+1.zip to github Downloads pane
 
 * Announce it
 
