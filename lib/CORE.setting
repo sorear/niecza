@@ -192,6 +192,19 @@ sub substr(\str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) is p
         substr(str, $start, $len)
 }
 
+sub substr-rw($s is rw, $from = 0, $chars = $s.chars - $from) {
+    my $substr = substr($s, $from, $chars);
+    Proxy.new(
+        FETCH   => sub ($) { $substr },
+        STORE   => sub ($, $new) {
+            $substr = $new;
+            $s = $s.substr(0, $from)
+               ~ $new
+               ~ $s.substr($from + $chars);
+        }
+    );
+}
+
 # not actually inlined but needed for constant i
 sub sqrt($x) is pure { Q:CgOp { (sqrt {$x}) } }
 sub caller() { Q:CgOp { (ns (frame_caller (frame_caller (callframe)))) } }
