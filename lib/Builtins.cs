@@ -716,6 +716,38 @@ public partial class Builtins {
         return new SubstrLValue(v1, r2, r3);
     }
 
+    static readonly Func<Variable,Variable,Variable,Variable> substr_ro3_d = substr_ro3;
+    public static Variable substr_ro3(Variable v1, Variable v2, Variable v3) {
+        P6any o1 = v1.Fetch(), o2 = v2.Fetch(), o3 = v3.Fetch();
+        if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
+            return HandleSpecial3(v1,v2,v3, o1,o2,o3, substr3_d);
+
+        int r2, r3;
+
+        if (o2.Does(Kernel.CodeMO)) {
+            string s1 = o1.mo.mro_raw_Str.Get(v1);
+            Variable no2 = Kernel.RunInferior(o2.Invoke(
+                Kernel.GetInferiorRoot(), new Variable[] {
+                    MakeInt(s1.Length) }, null));
+            r2 = (int)no2.Fetch().mo.mro_raw_Numeric.Get(no2);
+        } else {
+            r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
+        }
+        if (o3.Does(Kernel.CodeMO)) {
+            string s1 = o1.mo.mro_raw_Str.Get(v1);
+            Variable no3 = Kernel.RunInferior(o3.Invoke(
+                Kernel.GetInferiorRoot(), new Variable[] {
+                    MakeInt(s1.Length) }, null));
+            r3 = (int)no3.Fetch().mo.mro_raw_Numeric.Get(no3) - r2;
+        } else {
+            r3 = (int)o3.mo.mro_raw_Numeric.Get(v3);
+        }
+
+        string str = v1.Fetch().mo.mro_raw_Str.Get(v1);
+        string sub = Builtins.LaxSubstring2(str, r2, r3);
+        return sub == null ? Kernel.StrMO.typeVar : MakeStr(sub);
+    }
+
     static readonly Func<Variable,Variable,Variable> plus_d = plus;
     public static Variable plus(Variable a1, Variable a2) {
         int r1, r2;

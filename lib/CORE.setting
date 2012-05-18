@@ -183,12 +183,12 @@ sub prefix:<-->  is Niecza::absprec<x= unary non> is Niecza::builtin('predec',1,
 sub prefix:<++>  is equiv<--> is Niecza::builtin('preinc',1,1) ($v is rw) { $v = $v.succ; $v }
 sub postfix:<--> is Niecza::absprec<x= unary non> is Niecza::builtin('postdec',1,1) ($v is rw) { my $old = $v; $v = $v.pred; $old }
 sub postfix:<++> is equiv<--> is Niecza::builtin('postinc',1,1) ($v is rw) { my $old = $v; $v = $v.succ; $old }
-sub substr(\str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) is pure {
+sub substr(\str, $start, $len?, $repl?) is Niecza::builtin('substr_ro3', 3, 3) is pure {
     $start := $start(chars str) if $start.^does(Code);
     $len := $len.^does(Code) ?? ($len(chars str) - $start) !!
         $len // (chars(str) - $start);
     defined($repl) ??
-        substr(str, $start, $len) = $repl !!
+        substr-rw(str, $start, $len) = $repl !!
         substr(str, $start, $len)
 }
 
@@ -199,8 +199,8 @@ sub substr-rw(\str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) i
     $len := $len.^does(Code) ?? ($len(chars str) - $start) !!
         $len // (chars(str) - $start);
     defined($repl) ??
-        substr(str, $start, $len) = $repl !!
-        substr(str, $start, $len)
+        substr-rw(str, $start, $len) = $repl !!
+        substr-rw(str, $start, $len)
 }
 
 # not actually inlined but needed for constant i
@@ -823,7 +823,7 @@ my class Rat does Real {
     method gist() { self // nextsame; self.Str }
     method numerator() { Q:CgOp { (rat_nu {self}) } }
     method denominator() { Q:CgOp { (rat_de {self}) } }
-    method Rat($eps = 1e-6) { self }
+    method Rat($eps = 1e-6) { self } #OK
     method FatRat() { FatRat.new(self.numerator, self.denominator) }
     method nude() { [ self.numerator, self.denominator ] }
     method norm() { self }
