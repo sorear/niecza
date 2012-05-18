@@ -512,6 +512,7 @@ my class Cool {
                 Q:CgOp { (rnull (set_status (s $/) {$mat})) };
                 return unitem($mat);
             }
+            $ix = $ix max $mat.to if defined $mat;
             $ix = $max + 1 if defined($pos);
         }
         Q:CgOp { (rnull (set_status (s $/) {Match})) };
@@ -544,6 +545,7 @@ my class Cool {
             my $M = head($matcher($C.cursor($i++)));
             if $M && $M.chars {
                 Q:CgOp { (rnull (set_status (s '$/') {$M})) };
+                $i = $M.to max $i;
                 unless defined($nth) && !_match_nth(++$index, $nth) {
                     $changes++;
                     push @out, substr($str,$to,$M.from-$to);
