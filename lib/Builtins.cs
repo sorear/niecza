@@ -732,7 +732,7 @@ public partial class Builtins {
     public static Variable substr_ro3(Variable v1, Variable v2, Variable v3) {
         P6any o1 = v1.Fetch(), o2 = v2.Fetch(), o3 = v3.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
-            return HandleSpecial3(v1,v2,v3, o1,o2,o3, substr3_d);
+            return HandleSpecial3(v1,v2,v3, o1,o2,o3, substr_ro3_d);
 
         int pos = substr_pos(v1, v2);
         int len = substr_len(v1, pos, v3);
