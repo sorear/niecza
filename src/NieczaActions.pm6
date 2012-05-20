@@ -654,7 +654,7 @@ method quantifier:sym<~> ($/) {
 }
 method quantifier:sym<**> ($/) {
     my $h = $<embeddedblock> ?? { min => 0, closure =>
-                self.inliney_call($/, $<embeddedblock>.ast) } !!
+                self.rxblock($/, $<embeddedblock>) } !!
             $<quantified_atom> ?? { min => 1, sep => $<quantified_atom>.ast } !!
             { min => +~$0, max => ($1 ?? +~$1 !!
                 defined($/.index('..')) ?? Any !! +~$0) };
@@ -705,13 +705,16 @@ method metachar:sigwhite ($/) {
 method metachar:unsp ($/) { make $RxOpSequence.new }
 
 method metachar:sym<{ }> ($/) {
+    make $RxOpVoidBlock.new(block => self.rxblock($/, $<embeddedblock>));
+}
+
+method rxblock($/, $blk) {
     $/.CURSOR.trymop({
-        $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
-        $<embeddedblock>.ast.set_signature($Sig.simple('$¢'));
+        $blk.ast.add_my_name('$¢', :noinit, |mnode($/));
+        $blk.ast.set_signature($Sig.simple('$¢'));
     });
 
-    make $RxOpVoidBlock.new(block => self.inliney_call($/,
-        $<embeddedblock>.ast, $OpMakeCursor.new(pos=>$/)));
+    self.inliney_call($/, $blk.ast, $OpMakeCursor.new(pos=>$/));
 }
 
 method metachar:mod ($/) {
@@ -1099,13 +1102,7 @@ method assertion:sym<!> ($/) {
 }
 
 method assertion:sym<{ }> ($/) {
-    $/.CURSOR.trymop({
-        $<embeddedblock>.ast.add_my_name('$¢', :noinit, |mnode($/));
-        $<embeddedblock>.ast.set_signature($Sig.simple('$¢'));
-    });
-
-    make $RxOpListPrim.new(type => 'scalar_asn', ops => self.inliney_call($/,
-        $<embeddedblock>.ast, $OpMakeCursor.new(pos=>$/)));
+    make $RxOpListPrim.new(type => 'scalar_asn', ops => self.rxblock($/, $<embeddedblock>));
 }
 
 method assertion:sym<:> ($/) { make self.cc_to_rxop($<cclass_expr>.ast) }
