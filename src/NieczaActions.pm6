@@ -2544,6 +2544,9 @@ method sibble($/) {
             $repl = $<infixish>.ast.base.with_args($/,
                 mkcall($/, '&prefix:<~>', $OpLexical.new(name => '$/')),
                 $<right>.ast);
+        } elsif $<infixish>.ast ~~ $Operator_DotEq {
+            $repl = $<right>.ast.with_args($/,
+                mkcall($/, '&prefix:<~>', $OpLexical.new(name => '$/')));
         } else {
             $/.CURSOR.sorry("Unhandled operator in substitution");
             $repl = mklex($/, 'Any');
