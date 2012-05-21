@@ -133,6 +133,10 @@ namespace Niecza {
             return Kernel.NewRWListVar(Kernel.BoxRaw<Variable[]>(
                         items.ToArray(), Kernel.ParcelMO));
         }
+
+        protected Variable GetAll(Variable obj) {
+            return Slice(obj, Builtins.InvokeMethod("keys", obj));
+        }
     }
 
     // NOT P6any; these things should only be exposed through a ClassHOW-like

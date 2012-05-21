@@ -68,7 +68,7 @@ namespace Niecza.Serialization {
             new Dictionary<string,Dictionary<string,MethodInfo>>();
 
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 24;
+        static readonly int version = 25;
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,

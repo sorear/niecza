@@ -3851,6 +3851,8 @@ tryagain:
             P6any ks = key.Fetch();
             if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
+            else if (ks.mo.HasType(Kernel.WhateverMO))
+                return GetAll(obj);
 
             switch (mode) {
                 case 0:  return key;
@@ -3911,6 +3913,8 @@ tryagain:
             P6any ks = key.Fetch();
             if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
+            else if (ks.mo.HasType(Kernel.WhateverMO))
+                return GetAll(obj);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
@@ -3924,6 +3928,8 @@ tryagain:
             P6any ks = key.Fetch();
             if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
+            else if (ks.mo.HasType(Kernel.WhateverMO))
+                return GetAll(obj);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
@@ -3947,6 +3953,8 @@ tryagain:
             P6any ks = key.Fetch();
             if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
+            else if (ks.mo.HasType(Kernel.WhateverMO))
+                return GetAll(obj);
             P6any o = obj.Fetch();
             if (!o.IsDefined())
                 return Kernel.AnyMO.typeVar;
@@ -3960,6 +3968,8 @@ tryagain:
             P6any ks = key.Fetch();
             if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
+            else if (ks.mo.HasType(Kernel.WhateverMO))
+                return GetAll(obj);
 
             P6any o = obj.Fetch();
             if (!o.IsDefined())
@@ -3989,6 +3999,8 @@ tryagain:
             P6any ks = key.Fetch();
             if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
+            else if (ks.mo.HasType(Kernel.WhateverMO))
+                return GetAll(obj);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
@@ -4044,6 +4056,8 @@ tryagain:
             P6any ks = key.Fetch();
             if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
+            else if (ks.mo.HasType(Kernel.WhateverMO))
+                return GetAll(obj);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
@@ -4816,6 +4830,7 @@ saveme:
         [CORESaved] public static STable AssociativeMO;
         [CORESaved] public static STable CallableMO;
         [CORESaved] public static STable CodeMO;
+        [CORESaved] public static STable WhateverMO;
         [CORESaved] public static STable WhateverCodeMO;
         [CORESaved] public static STable RoutineMO;
         [CORESaved] public static STable SubMO;
