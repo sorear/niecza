@@ -2699,7 +2699,12 @@ again:
         } else {
             obj = (ai.flags & P6how.A_HASH) != 0 ?
                 Kernel.CreateHash() : Kernel.CreateArray();
-            if (vx != null) Kernel.Assign(obj, vx);
+            if (vx != null) {
+                // https://github.com/sorear/niecza/issues/104
+                if (!vx.islist)
+                    vx = Kernel.NewRWListVar(vx.Fetch());
+                Kernel.Assign(obj, vx);
+            }
         }
         n.SetSlot(ai.owner, ai.name, obj);
     }
