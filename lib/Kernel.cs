@@ -706,7 +706,6 @@ namespace Niecza {
             this.filename = filename;
             this.source = source;
             this.depended_units = new HashSet<RuntimeUnit>();
-            this.depended_units.Add(this);
             this.stubbed_stashes = new List<KeyValuePair<int,STable>>();
             this.is_mainish = main;
             if (name == "CORE")

@@ -3690,6 +3690,7 @@ dynamic:
                 // this is a module unit
                 Kernel.InitCompartment();
                 Kernel.containerRootUnit = ru;
+                ru.depended_units.Add(ru);
                 ru.owner = ru;
                 ru.globals = Kernel.currentGlobals =
                     new Dictionary<string,StashEnt>();
