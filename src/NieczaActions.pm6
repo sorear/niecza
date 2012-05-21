@@ -2792,7 +2792,7 @@ method do_initialize($/, $parcel?) {
                 $ll]) });
     }
     elsif $lhs.^isa($OpAttribute) {
-        my $init = self.thunk_sub($rhs,
+        my $init = self.thunk_sub($rhs, :params(['self']),
             :name($lhs.initializer.name ~ " init"));
         $init.set_outervar(my $ov = self.gensym);
         $*CURLEX<!sub>.add_my_sub($ov, $init);

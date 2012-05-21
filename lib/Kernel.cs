@@ -5356,7 +5356,7 @@ again:      if (i == prog.Length) {
             } else {
                 P6any init = prog[i].init;
                 th.lexi0 = i;
-                return init.Invoke(th, Variable.None, null);
+                return init.Invoke(th, new [] { NewROScalar(n) }, null);
             }
 
 value:      vx = (Variable) th.resultSlot;
