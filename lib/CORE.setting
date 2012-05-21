@@ -3125,11 +3125,11 @@ our sub Niecza::generate-series(@lhs, $rhs, :$exclude-limit) {
             my @args=@lhs[$i-($arity ~~ Inf ?? $i !! $arity) .. $i-1]; #We make sure there are $arity elems in args
 
             loop {                         #Then we extrapolate using $next and the $args
-                my $current = $next.(|@args) // last;
-                take $current ;
+                my \current = $next.(|@args) // last;
+                take current ;
                 if $arity {
-                    @args.push($current) ;
-                    @args.shift if @args.elems > $arity
+                    @args.push(current) ;
+                    @args.shift while @args.elems > $arity
                 }
             }
         }
