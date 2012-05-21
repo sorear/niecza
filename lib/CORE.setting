@@ -2823,7 +2823,7 @@ my class Regex is Method {
 my class Grammar is Cursor {
     method parse($text, :$rule = "TOP", :$actions) {
         my $match = (head grep { $_.to == chars $text },
-            self.cursor_start($text, $actions)."$rule"()) // self;
+            self.cursor_start($text, $actions)."$rule"()) // Match;
         Q:CgOp { (rnull (set_status (s '$/') {$match})) };
         $match;
     }
