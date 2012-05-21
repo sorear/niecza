@@ -3137,6 +3137,7 @@ grammar P6 is STD {
             | <infix=infix_circumfix_meta_operator> { $O = $<infix><O>; $sym = $<infix><sym>; }
             | <infix=infix_prefix_meta_operator>    { $O = $<infix><O>; $sym = $<infix><sym>; }
             | <infix>                               { $O = $<infix><O>; $sym = $<infix><sym>; }
+            | <?{ $in_meta }> :: <!>
             | {} <?dotty> <.panic: "Method call found where infix expected (change whitespace?)">
             | {} <?postfix> <.panic: "Postfix found where infix expected (change whitespace?)">
             ]
