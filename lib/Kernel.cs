@@ -984,8 +984,10 @@ namespace Niecza {
                 object[] args = new object[srcinfo.Length + 1];
                 Array.Copy(srcinfo, 0, args, 1, srcinfo.Length);
                 args[0] = "check_dated";
-                string result = (string) Builtins.UpCall(args);
-                if (result != "ok")
+                object result = Builtins.UpCall(args);
+                if (result is Exception)
+                    throw (Exception)result;
+                if ((string)result != "ok")
                     throw new ThawException("dated sources");
             }
 
