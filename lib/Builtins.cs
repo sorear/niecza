@@ -2721,7 +2721,7 @@ again:
             Variable vx = null;
             if (ai.init != null) {
                 vx = Kernel.RunInferior(ai.init.Invoke(Kernel.GetInferiorRoot(),
-                            Variable.None, null));
+                    new [] { Kernel.NewROScalar(obj) }, null));
             }
             EstablishSlot(obj, ai, vx);
         }
