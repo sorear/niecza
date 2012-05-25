@@ -4358,6 +4358,8 @@ dynamic:
             // to call methods on the type in the process of defining the
             // type itself.
             nst.mo.superclasses.Clear();
+            // OTOH, it needs call structures set up to avoid internal errors
+            nst.mo.Revalidate();
             if (nst.typeObject == null) // AnyMO.typeObject is set up early
                 nst.typeObject = new P6opaque(nst, 0);
             ((P6opaque)nst.typeObject).slots = null;

@@ -18,7 +18,7 @@ namespace Niecza {
         }
 
         protected Frame Fail(Frame caller, string msg) {
-            return Kernel.Die(caller, msg + " in class " + mo.name);
+            return Kernel.Die(caller, msg + " in type " + mo.name);
         }
 
         public abstract string ReprName();
