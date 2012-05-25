@@ -2825,6 +2825,10 @@ method multi_declarator:only  ($/) { make ($<declarator> // $<routine_def>).ast}
 
 method add_accessor($/, $name, $store_name, $lexical, $public) {
     my $ns = $*CURLEX<!sub>.body_of;
+    if !$ns || !$ns.CAN('add_method') {
+        $/.CURSOR.sorry("Cannot add accessors to a non-class");
+        return;
+    }
     my $nb = $*unit.create_sub(
         outer      => $*CURLEX<!sub>,
         name       => $name,
