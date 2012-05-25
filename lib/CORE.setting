@@ -3219,6 +3219,12 @@ sub infix:<cmp> is equiv<leg> (Mu $a, Mu $b) {
     return 0 if !$a.defined && !$b.defined;
     return $a leg $b if $a ~~ Str;
     return $a.key cmp $b.key || $a.value cmp $b.value if $a ~~ Pair;
+    if $a ~~ List {
+        for @$a Z @$b -> $i1, $i2 {
+            (my $r = $i1 cmp $i2) && return $r
+        }
+        return $a <=> $b;
+    }
     return $a <=> $b;
 }
 sub infix:<eqv> is equiv<==> (Any $a, Any $b) { ($a cmp $b) == 0 }
