@@ -2932,6 +2932,8 @@ method variable_declarator($/) {
     if !defined($v<name>) && ($scope ne any < my anon state >) {
         $/.CURSOR.sorry("Scope $scope requires a name");
         $v<name> = "anon";
+        $v<sigil> = '$';
+        $v<twigil> = $t = '';
     }
 
     if defined($v<pkg>) || defined($v<iname>) {
