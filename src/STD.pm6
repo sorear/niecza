@@ -1807,12 +1807,6 @@ grammar P6 is STD {
                 when '...' { return 1 }
                 when '!!!' { return 1 }
                 when '???' { return 1 }
-                when '*' {
-                    if $*MULTINESS eq 'proto' and $statements.elems == 1 {
-                        self.<blockoid>:delete;
-                        self.<onlystar> = 1;
-                    }
-                }
             }
         }
         return 0;
