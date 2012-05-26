@@ -5107,14 +5107,6 @@ saveme:
             }
 
             SubInfo si;
-            if (cands.Length == 1 && cands[0] != null && proto != null) {
-                si = GetInfo(proto);
-                // minor hack...
-                if (si != null && si.extend != null &&
-                        si.extend.ContainsKey("builtin")) {
-                    return cands[0];
-                }
-            }
 
             si = (proto != null) ? new SubInfo(GetInfo(proto)) :
                 new SubInfo(name, StandardTypeProtoC);
