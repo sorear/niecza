@@ -179,7 +179,11 @@ sub run_optree($body, $op, $nv) {
     return $op unless @inv_lex[0] eq 'sub';
 
     if @inv_lex[4].get_extend('pure') {
-        if check_folding($body, @inv_lex[4], $op) -> $nop { return $nop }
+        # note, we have to use the real dispatcher here!  don't look past it
+        # to the proto
+        my @real_lex = $body.lookup_lex($invname);
+        my $sub = @real_lex[0] eq 'sub' ?? @real_lex[4] !! @real_lex[5];
+        if check_folding($body, $sub, $op) -> $nop { return $nop }
     }
 
     if @inv_lex[4].get_extend('builtin') -> $B {

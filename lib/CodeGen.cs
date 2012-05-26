@@ -3856,7 +3856,7 @@ dynamic:
             return false;
         }
         public static object unit_constant_fold(object[] args) {
-            var callee = (SubInfo)Handle.Unbox(args[2]);
+            var callee = Handle.Unbox(args[2]);
             var pos = new List<Variable>();
             var nam = new VarHash();
 
@@ -3877,7 +3877,9 @@ dynamic:
 
             object r = null;
             try {
-                r = Handle.Wrap(Kernel.RunInferior(callee.protosub.Invoke(
+                P6any tocall = (callee is Variable) ?
+                    ((Variable)callee).Fetch() : ((SubInfo)callee).protosub;
+                r = Handle.Wrap(Kernel.RunInferior(tocall.Invoke(
                     Kernel.GetInferiorRoot(), pos.ToArray(), nam)));
             } catch (Exception ex) {
                 r = ex.ToString();
@@ -4057,7 +4059,8 @@ dynamic:
                 r = new object[] { "simple",null,null,null, lsimp.flags, Handle.Wrap(lsimp.type) };
             var ldisp  = li as LIDispatch;
             if (ldisp != null)
-                r = new object[] { "dispatch",null,null,null, Handle.Wrap(csr) };
+                r = new object[] { "dispatch",null,null,null, Handle.Wrap(csr),
+                    Handle.Wrap(ldisp.Get(csr.protopad)) };
             var llab   = li as LILabel;
             if (llab != null)
                 r = new object[] { "label",null,null,null };
