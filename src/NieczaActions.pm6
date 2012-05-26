@@ -3418,7 +3418,7 @@ method statement_mod_loop:for ($/)    { self.statement_mod_loop($/) }
 method statement_mod_loop:given ($/)  { self.statement_mod_loop($/) }
 
 method statementlist($/) {
-    make $OpStatementList.new(pos=>$/, children =>
+    make $OpStatementList.new(pos=>$/, :statement, children =>
         [ map *.statement_level($/), map *.ast, @( $<statement> ) ]);
 }
 

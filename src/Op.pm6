@@ -44,6 +44,14 @@ method cgop_labelled($body, $label) {
     }
 }
 
+method cgop_statement($body) {
+    if $!pos -> $p {
+        $CgOp.ann($p.CURSOR.lineof($p.pos), $CgOp.statement(self.code($body)));
+    } else {
+        $CgOp.statement(self.code($body));
+    }
+}
+
 method code_labelled($body, $label) { self.code($body) } #OK not used
 
 method statement_level($/) { self }
@@ -82,6 +90,7 @@ method const_value($) { }
 
 class StatementList is Op {
     has $.children = []; # Array of Op
+    has Bool $.statement;
     method new(:$children = [], *%_) {
         self.bless(*, children => [ @$children ], |%_);
     }
@@ -94,7 +103,8 @@ class StatementList is Op {
     method onlystub() { $!children && $!children[0].onlystub }
     method const_value($body) { $!children[0].const_value($body) if $!children == 1 }
     method code($body) {
-        my @ch = map { $_.cgop($body) }, @$.children;
+        my @ch = map ($!statement ?? *.cgop_statement($body) !! *.cgop($body)),
+            @$.children;
         my $end = @ch ?? pop(@ch) !! $CgOp.corelex('Nil');
 
         $CgOp.prog((map { $CgOp.sink($_) }, @ch), $end);

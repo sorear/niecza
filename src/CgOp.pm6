@@ -55,7 +55,7 @@ CgOp._register_ops: <
         rxsetclass rxsetpos rxsetquant rxstripcaps say scopedlex setbox
         setfield setindex setslot set_status sig_slurp_capture sink slurp
         span specificlex spew stab_privatemethod stab_what startgather
-        start_iter status_get str strbuf_append strbuf_new strbuf_seal
+        start_iter statement status_get str strbuf_append strbuf_new strbuf_seal
         str_chr strcmp str_flip str_length str_substring str_tolower
         str_tonum str_toupper take ternary to_json to_jsync treader_getc
         treader_getline treader_open treader_slurp treader_stdin unbox

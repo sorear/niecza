@@ -91,30 +91,30 @@ our %funcs = (
 sub do_builtin($name, $expect) { sub ($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args ~~ $expect;
-    return $OpBuiltin.new(name => $name, args => $args);
+    return $OpBuiltin.new(pos => $op.pos, name => $name, args => $args);
 } }
 
 sub do_return_take($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     my $parcel = ($args == 1 ?? $args[0] !!
-        $args == 0 ?? $OpLexical.new(name => 'Nil') !!
+        $args == 0 ?? $OpLexical.new(pos => $op.pos, name => 'Nil') !!
         $OpCallSub.new(invocant => $OpLexical.new(name => '&infix:<,>'),
-            positionals => [@$args]));
+            pos => $op.pos, positionals => [@$args]));
     return ($invname eq '&take' ??
-        $OpTake.new(value => $parcel) !!
-        $OpControl.new(payload => $parcel,
+        $OpTake.new(pos => $op.pos, value => $parcel) !!
+        $OpControl.new(pos => $op.pos, payload => $parcel,
             number => $invname eq '&return' ?? 4 !! 6));
 }
 
 sub do_nullary_control($number) { sub ($body, $nv, $ , $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args == 0;
-    return $OpControl.new(:$number, payload => $OpLexical.new(name => 'Nil'));
+    return $OpControl.new(:$number, pos => $op.pos, payload => $OpLexical.new(name => 'Nil'));
 } }
 
 sub do_makejunction($typecode) { sub ($body, $nv, $ , $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
-    return $OpMakeJunction.new(:$typecode, zyg => @$args);
+    return $OpMakeJunction.new(pos => $op.pos, :$typecode, zyg => @$args);
 } }
 
 sub do_atkey($body, $nv, $invname, $op) { #OK not used
@@ -126,14 +126,14 @@ sub do_atkey($body, $nv, $invname, $op) { #OK not used
     return $op if $delete && (!$delete.^isa($OpLexical) || $delete.name ne 'True');
     return $op if $exists && (!$exists.^isa($OpLexical) || $exists.name ne 'True');
     return $op if $delete && $exists;
-    return $OpBuiltin.new(name => ($delete ?? 'delete_key' !!
+    return $OpBuiltin.new(pos => $op.pos, name => ($delete ?? 'delete_key' !!
             $exists ?? 'exists_key' !! 'at_key'), args => $args);
 }
 
 sub do_atpos($body, $nv, $invname, $op) { #OK not used
     return $op unless defined my $args = no_named_params($op);
     return $op unless $args == 2;
-    return $OpBuiltin.new(name => 'at_pos', args => $args);
+    return $OpBuiltin.new(pos => $op.pos, name => 'at_pos', args => $args);
 }
 
 # XXX should support folding of SimplePair, SimpleParcel too
@@ -154,7 +154,7 @@ sub check_folding($body, $sub, $op) {
         worry "Operation cannot succeed (constant folding threw exception: $/.prematch())";
         return;
     }
-    $OpGeneralConst.new(value => $ret);
+    $OpGeneralConst.new(pos => $op.pos, value => $ret);
 }
 
 sub run_optree($body, $op, $nv) {
@@ -186,7 +186,7 @@ sub run_optree($body, $op, $nv) {
         return $op unless defined my $args = no_named_params($op);
         return $op unless $args >= $B[1] &&
             (!defined($B[2]) || $args <= $B[2]);
-        return $OpBuiltin.new(name => $B[0], args => $args);
+        return $OpBuiltin.new(pos => $op.pos, name => $B[0], args => $args);
     }
 
     return $op unless @inv_lex[4].unit.name eq 'CORE';

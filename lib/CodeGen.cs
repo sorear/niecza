@@ -1779,6 +1779,20 @@ namespace Niecza.CLRBackend {
             return new CpsOp(stmts.ToArray(), new ClrResult(body.head.Returns));
         }
 
+        public static CpsOp SyncBefore(CpsOp z) {
+            if (z.stmts.Length != 0 && z.stmts[0] == ClrSync.Instance)
+                return z;
+            if (z.head is ClrSync)
+                return z;
+            // TODO: it's not really necessary to force a full cps-format
+            // node here.  But we don't have universal recursion for
+            // non-cps nodes.
+            ClrOp[] body = new ClrOp[z.stmts.Length + 1];
+            Array.Copy(z.stmts, 0, body, 1, body.Length - 1);
+            body[0] = ClrSync.Instance;
+            return new CpsOp(body, z.head);
+        }
+
         public static CpsOp Ternary(CpsOp cond, CpsOp iftrue, CpsOp iffalse) {
             ClrOp iftrue_h = iftrue.head;
             ClrOp iffalse_h = iffalse.head;
@@ -2450,6 +2464,8 @@ namespace Niecza.CLRBackend {
                 return CpsOp.BoolLiteral(FixBool(zyg[1])); };
             handlers["ann"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.Annotate(FixInt(zyg[1]), th.Scan(zyg[2])); };
+            thandlers["statement"] = delegate(CpsOp[] z) {
+                return CpsOp.SyncBefore(z[0]); };
             handlers["label"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.Label(FixStr(z[1]), true);
             };
