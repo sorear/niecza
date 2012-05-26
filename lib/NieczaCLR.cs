@@ -515,6 +515,10 @@ namespace Niecza {
             }
         }
 
+        internal static void LoadWrapper(string tn) {
+            GetWrapper(Type.GetType(tn));
+        }
+
         public static STable GetNamedWrapper(string nm) {
             lock (wrapper_cache_lock) {
                 if (named_wrapper_cache == null)
@@ -765,6 +769,9 @@ for $args (0..9) {
                 foreach (var o in m.mo.type_list)
                     Console.WriteLine("type {0}", o.name);
             }
+
+            RuntimeUnit.reg.InstallFakeUnit("CLR," + t.AssemblyQualifiedName,
+                m, m.who, m.how, m.mo, m.typeObject, m.typeVar);
             return m;
         }
 

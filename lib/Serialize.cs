@@ -45,6 +45,8 @@ namespace Niecza.Serialization {
         internal object[] bynum = new object[8]; // objects in unit
         internal object root; // the RuntimeUnit object
         internal int nobj; // = 0
+
+        internal bool fake; // true for CLR reference units
     }
 
     // The central feature of *bounded* serialization is that object
@@ -68,7 +70,7 @@ namespace Niecza.Serialization {
             new Dictionary<string,Dictionary<string,MethodInfo>>();
 
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 25;
+        static readonly int version = 26;
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,
@@ -111,16 +113,38 @@ namespace Niecza.Serialization {
         }
 
         // Routines for use by compilation manager
+        public void InstallFakeUnit(string name, params object[] items) {
+            SerUnit su = new SerUnit();
+            su.fake = true;
+            su.name = name;
+            su.bynum = items;
+            su.hash = new byte[0];
+            units[name] = su;
+
+            ObjRef or;
+            or.unit = su;
+            for (or.id = 0; or.id < items.Length; or.id++)
+                byref[items[or.id]] = or;
+        }
 
         // Loads a single unit from the compiled-data directory.
         // Will throw a ThawException if a stale reference is encountered
         // or other data format error.
-        public SerUnit LoadUnit(string name) {
+        public SerUnit LoadUnit(string name, bool fake = false) {
             SerUnit su;
 
             // is the unit already loaded?
             if (units.TryGetValue(name, out su))
                 return su;
+
+            if (fake) {
+                if (name.StartsWith("CLR,"))
+                    CLRWrapperProvider.LoadWrapper(name.Substring(4));
+                else
+                    throw new ThawException("No handler for fake unit name " + name);
+
+                return units[name];
+            }
 
             string file = Path.Combine(Backend.obj_dir, Backend.prefix +
                     name.Replace("::",".") + ".ser");
@@ -208,6 +232,7 @@ namespace Niecza.Serialization {
         ForeignRef,
         SelfRef,
         NewUnitRef,
+        FakeUnitRef,
 
         // types of new object
         RuntimeUnit,
@@ -419,7 +444,9 @@ namespace Niecza.Serialization {
                 } else {
                     int altcode;
                     if (!unit_to_offset.TryGetValue(altunit, out altcode)) {
-                        Byte((byte)SerializationCode.NewUnitRef);
+                        Byte(altunit.fake ?
+                            (byte)SerializationCode.FakeUnitRef :
+                            (byte)SerializationCode.NewUnitRef);
                         String(altunit.name);
                         // save the hash too so stale refs can be caught
                         foreach (byte b in altunit.hash) Byte(b);
@@ -677,7 +704,9 @@ namespace Niecza.Serialization {
                     i = Int();
                     return unit.bynum[i];
                 case SerializationCode.NewUnitRef:
-                    return LoadNewUnit();
+                    return LoadNewUnit(false);
+                case SerializationCode.FakeUnitRef:
+                    return LoadNewUnit(true);
 
                 case SerializationCode.RuntimeUnit:
                     return RuntimeUnit.Thaw(this);
@@ -802,12 +831,12 @@ namespace Niecza.Serialization {
             return o;
         }
 
-        object LoadNewUnit() {
+        object LoadNewUnit(bool fake) {
             string name = String();
             if (refed_units == unit_map.Length)
                 Array.Resize(ref unit_map, refed_units * 2);
 
-            SerUnit su = reg.LoadUnit(name);
+            SerUnit su = reg.LoadUnit(name, fake);
             unit_map[refed_units++] = su;
 
             byte[] hash = Bytes(su.hash.Length);
