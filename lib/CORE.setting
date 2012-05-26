@@ -51,12 +51,20 @@ my class KeyBag   { ... }
 grammar Niecza::NumSyntax { ... }
 # }}}
 # Important inlinable definitions {{{
-sub infix:<+>($l,$r) is pure is Niecza::builtin('plus',2,2) { $l + $r }
-sub infix:<->($l,$r) is pure is Niecza::builtin('minus',2,2) { $l - $r }
-sub infix:<*> is pure is Niecza::builtin('mul',2,2) is Niecza::absprec<u=> ($l,$r) { $l * $r }
-sub infix:</> is pure is Niecza::builtin('divide',2,2) is equiv<*> ($l,$r) { $l / $r }
-sub infix:<%> is pure is Niecza::builtin('mod',2,2) is equiv<*> ($l,$r) { $l % $r }
-sub infix:<**> is pure is Niecza::builtin('pow',2,2)  is Niecza::absprec<w= right> ($l,$r) { $l ** $r }
+proto infix:<+>(|) is pure is Niecza::builtin('plus',2,2) {*}
+multi infix:<+>($l,$r) { $l + $r }
+
+proto infix:<->(|) is pure is Niecza::builtin('minus',2,2) {*}
+multi infix:<->($l,$r) { $l - $r }
+
+proto infix:<*> is pure is Niecza::builtin('mul',2,2) is Niecza::absprec<u=> (|) {*}
+multi infix:<*>($l,$r) { $l * $r }
+proto infix:</> is pure is Niecza::builtin('divide',2,2) is equiv<*> (|) {*}
+multi infix:</>($l,$r) { $l / $r }
+proto infix:<%> is pure is Niecza::builtin('mod',2,2) is equiv<*> (|) {*}
+multi infix:<%>($l,$r) { $l % $r }
+proto infix:<**> is pure is Niecza::builtin('pow',2,2)  is Niecza::absprec<w= right> (|) {*}
+multi infix:<**>($l,$r) { $l ** $r }
 
 # sub infix:<gcd>($l,$r) is Niecza::builtin('gcd',2,2) { $l gcd $r }
 sub infix:<gcd>($l,$r) is pure { Q:CgOp { (gcd {$l.Int} {$r.Int}) } }
@@ -96,36 +104,43 @@ sub none (*@p) is pure { none @p }
 sub one  (*@p) is pure { one @p }
 sub any  (*@p) is pure { any @p }
 
-sub infix:<< == >>($l,$r) is pure is Niecza::builtin('numeq',2,2)
-    is Niecza::absprec<m= chain> is diffy is iffy { $l == $r }
-# Needs special handling of junctions
-sub infix:<< != >>(\l,\r) is pure is Niecza::builtin('numne',2,2)
-    is equiv<==> { l != r }
-sub infix:<< < >>($l,$r)  is pure is Niecza::builtin('numlt',2,2)
-    is equiv<==> { $l <  $r }
-sub infix:<< > >>($l,$r)  is pure is Niecza::builtin('numgt',2,2)
-    is equiv<==> { $l >  $r }
-sub infix:<< <= >>($l,$r) is pure is Niecza::builtin('numle',2,2)
-    is equiv<==> { $l <= $r }
-sub infix:<< >= >>($l,$r) is pure is Niecza::builtin('numge',2,2)
-    is equiv<==> { $l >= $r }
+proto infix:<< == >>(|) is pure is Niecza::builtin('numeq',2,2)
+    is Niecza::absprec<m= chain> is diffy is iffy {*}
+proto infix:<< != >>(|) is pure is Niecza::builtin('numne',2,2)
+    is equiv<==> {*}
+proto infix:<< < >>(|)  is pure is Niecza::builtin('numlt',2,2)
+    is equiv<==> {*}
+proto infix:<< > >>(|)  is pure is Niecza::builtin('numgt',2,2)
+    is equiv<==> {*}
+proto infix:<< <= >>(|) is pure is Niecza::builtin('numle',2,2)
+    is equiv<==> {*}
+proto infix:<< >= >>(|) is pure is Niecza::builtin('numge',2,2)
+    is equiv<==> {*}
 
-sub infix:<ge>($s1, $s2) is Niecza::builtin('strge',2,2)
-    is equiv<==> is pure { $s1 ge $s2 }
-sub infix:<gt>($s1, $s2) is Niecza::builtin('strgt',2,2)
-    is equiv<==> is pure { $s1 gt $s2 }
-sub infix:<le>($s1, $s2) is Niecza::builtin('strle',2,2)
-    is equiv<==> is pure { $s1 le $s2 }
-sub infix:<lt>($s1, $s2) is Niecza::builtin('strlt',2,2)
-    is equiv<==> is pure { $s1 lt $s2 }
-sub infix:<eq>($s1, $s2) is Niecza::builtin('streq',2,2)
-    is equiv<==> is pure { $s1 eq $s2 }
-# Needs special handling of junctions
-sub infix:<ne>(\s1, \s2) is Niecza::builtin('strne',2,2)
-    is equiv<==> is pure { s1 ne s2 }
+multi infix:<< == >>($l,$r) { $l == $r }
+multi infix:<< != >>(\l,\r) { l != r } # Needs special handling of junctions
+multi infix:<< < >>($l,$r)  { $l <  $r }
+multi infix:<< > >>($l,$r)  { $l >  $r }
+multi infix:<< <= >>($l,$r) { $l <= $r }
+multi infix:<< >= >>($l,$r) { $l >= $r }
+
+proto infix:<ge>(|) is Niecza::builtin('strge',2,2) is equiv<==> is pure {*}
+proto infix:<gt>(|) is Niecza::builtin('strgt',2,2) is equiv<==> is pure {*}
+proto infix:<le>(|) is Niecza::builtin('strle',2,2) is equiv<==> is pure {*}
+proto infix:<lt>(|) is Niecza::builtin('strlt',2,2) is equiv<==> is pure {*}
+proto infix:<eq>(|) is Niecza::builtin('streq',2,2) is equiv<==> is pure {*}
+proto infix:<ne>(|) is Niecza::builtin('strne',2,2) is equiv<==> is pure {*}
+
+multi infix:<ge>($s1, $s2) { $s1 ge $s2 }
+multi infix:<gt>($s1, $s2) { $s1 gt $s2 }
+multi infix:<le>($s1, $s2) { $s1 le $s2 }
+multi infix:<lt>($s1, $s2) { $s1 lt $s2 }
+multi infix:<eq>($s1, $s2) { $s1 eq $s2 }
+multi infix:<ne>(\s1, \s2) { s1 ne s2 } # Needs special handling of junctions
 
 sub infix:<,> is Niecza::builtin('comma',0) is pure is Niecza::absprec<g= list> (\|$t) { Q:CgOp { (newrwlistvar (@ {$t})) }; }
-sub infix:<=>(\a, \b) is Niecza::absprec<i= right> is Niecza::builtin('assign',2,2) { a = b }
+proto infix:<=>(|) is Niecza::absprec<i= right> is Niecza::builtin('assign',2,2) {*}
+multi infix:<=>(\a, \b) { a = b }
 
 sub chars($str) is pure is Niecza::builtin('chars',1,1) { chars($str) }
 sub codes($str) is pure is Niecza::builtin('codes',1,1) { codes($str) }
@@ -141,14 +156,21 @@ sub prefix:<!>(\v) is pure is Niecza::builtin('not', 1, 1) { !v }
 sub not(\v) is pure is Niecza::builtin('not', 1, 1)    { not(v) }
 sub so(\v)  is pure is Niecza::builtin('asbool', 1, 1) { so v }
 
-sub infix:<+&> is pure is Niecza::builtin('numand',2,2) is equiv<*> ($x, $y) { $x +& $y }
-sub infix:<+|>($x, $y) is pure is Niecza::builtin('numor',2,2) { $x +| $y }
-sub infix:<+^>($x, $y) is pure is Niecza::builtin('numxor',2,2) { $x +^ $y }
-sub infix:<< +< >>($x, $y) is equiv<*> is pure
-    is Niecza::builtin('numlshift',2,2) { $x +< $y }
-sub infix:<< +> >>($x, $y) is equiv<*> is pure
-    is Niecza::builtin('numrshift',2,2) { $x +> $y }
-sub prefix:<< +^ >>($x) is Niecza::builtin('numcompl',1,1) is pure { +^$x }
+proto infix:<+&> is pure is Niecza::builtin('numand',2,2) is equiv<*> (|) {*}
+proto infix:<+|>(|) is pure is Niecza::builtin('numor',2,2) {*}
+proto infix:<+^>(|) is pure is Niecza::builtin('numxor',2,2) {*}
+proto infix:<< +< >>(|) is equiv<*> is pure
+    is Niecza::builtin('numlshift',2,2) {*}
+proto infix:<< +> >>(|) is equiv<*> is pure
+    is Niecza::builtin('numrshift',2,2) {*}
+proto prefix:<< +^ >>(|) is Niecza::builtin('numcompl',1,1) is pure {*}
+
+multi infix:<+&>    ($x, $y) { $x +& $y }
+multi infix:<+|>($x, $y)     { $x +| $y }
+multi infix:<+^>($x, $y)     { $x +^ $y }
+multi infix:<< +< >>($x, $y) { $x +< $y }
+multi infix:<< +> >>($x, $y) { $x +> $y }
+multi prefix:<< +^ >>($x)    { +^$x }
 
 sub infix:<< => >>($k, Mu $v) is equiv<=> is pure
     is Niecza::builtin('pair', 2, 2) { $k => $v }
@@ -2416,6 +2438,34 @@ my class Proxy {
     }
 }
 
+# a few notes:  Not all of these are protos yet, so the failure candidates
+# for x, etc are left out.  No candidates for operators that don't exist yet.
+# No candidates are needed for chain operators or list operators, reduce can
+# handle those fine.
+multi infix:<**>()  { 1 }
+multi infix:<*>()   { 1 }
+multi infix:</>()   { die "No zero-arg meaning for infix:</>" }
+multi infix:<%>()   { die "No zero-arg meaning for infix:<%>" }
+#multi infix:<x>()  { die "No zero-arg meaning for infix:<x>" }
+#multi infix:<xx>() { die "No zero-arg meaning for infix:<xx>" }
+multi infix:<+&>()  { -1 }
+multi infix:«+<»()  { die "No zero-arg meaning for infix:<< +< >>" }
+multi infix:«+>»()  { die "No zero-arg meaning for infix:<< +> >>" }
+#multi infix:«~&»()  { die "No zero-arg meaning for infix:<~&>" }
+#multi infix:«~<»()  { die "No zero-arg meaning for infix:<< ~< >>" }
+#multi infix:«~>»()  { die "No zero-arg meaning for infix:<< ~> >>" }
+multi infix:<+>()   { 0 }
+multi infix:<->()   { 0 }
+multi infix:<+|>()  { 0 }
+multi infix:<+^>()  { 0 }
+#multi infix:<~|>()  { '' }
+#multi infix:<~^>()  { '' }
+
+#multi infix:<&&>()  { True }
+#multi infix:<||>()  { False }
+#multi infix:<^^>()  { False }
+#multi infix:<//>()  { Any }
+
 sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
     if $triangle {
         if $chain {
@@ -2487,7 +2537,7 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
                 my Mu $l = pop @items;
                 push @items, $func($l,$r);
             }
-            @items ?? @items[0] !! 0; # XXX identity
+            @items ?? @items[0] !! $func();
         }
         else { # left
             while @items >= 2 {
@@ -2495,7 +2545,7 @@ sub reduceop($triangle, $list, $right, $chain, $func, *@items) {
                 my Mu $r = shift @items;
                 unshift @items, $func($l,$r);
             }
-            @items ?? @items[0] !! 0; # XXX identity
+            @items ?? @items[0] !! $func();
         }
     }
 }
