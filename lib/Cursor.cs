@@ -724,8 +724,10 @@ retry:
             }
         }
         if (Cursor.Trace)
-            Console.WriteLine("Matching {0} from {1} to {2} (really {3}-{4})",
-                    name, use_from, use_to, from, st.pos);
+            Console.WriteLine((use_from == from && use_to == st.pos) ?
+                    "Matching {0} from {1} to {2}" :
+                    "Matching {0} from {1} to {2} (really {3}-{4})",
+                name, use_from, use_to, from, st.pos);
         _matchObj = new Cursor(global, st.ns.klass, use_from, use_to,
                 st.captures, ast, name);
         return global.CallAction(th, name, _matchObj);
