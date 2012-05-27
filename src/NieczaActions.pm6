@@ -2000,12 +2000,15 @@ method check_strict() {
 # redo a lot of the same scanning.
 method check_variable ($variable) {
     return () unless defined $variable;
+    my $vast = $variable.ast;
+    return () if $vast<term>; # pseudo-var
     my $name = $variable.Str;
     my $here = $variable.CURSOR.cursor($variable.from);
     $here.deb("check_variable $name") if $*DEBUG +& DEBUG::symtab;
-    my ($sigil, $twigil, $first) = $name ~~ /(\$|\@|\%|\&)(\W*)(.?)/;
+    my $sigil  = $vast<sigil>  // '';
+    my $twigil = $vast<twigil> // '';
+    my $first  = substr($vast<name>   // '', 0, 1);
     $variable.ast<checked> || $here.sorry("do_variable_reference must always precede check_variable");
-    ($first,$twigil) = ($twigil, '') if $first eq '';
     given $twigil {
         when '' {
             my $ok = 0;
