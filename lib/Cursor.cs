@@ -22,11 +22,10 @@ public sealed class GState {
         P6any actions_p = actions.Fetch();
         Variable[] pos;
         if (actions_p.mo.mro_methods.TryGetValue(name, out m)) {
-            pos = new Variable[] { actions, Kernel.NewROScalar(match) };
+            pos = new Variable[] { actions, match };
         } else if (actions_p.mo.mro_methods.TryGetValue("FALLBACK", out m)) {
             pos = new Variable[] { actions,
-                Kernel.BoxAnyMO<string>(name, Kernel.StrMO),
-                Kernel.NewROScalar(match) };
+                Kernel.BoxAnyMO<string>(name, Kernel.StrMO), match };
         } else {
             return th;
         }
@@ -35,8 +34,7 @@ public sealed class GState {
     }
 
     public GState(string orig, P6any actions) {
-        this.actions = (actions == Kernel.AnyP) ? null :
-            Kernel.NewROScalar(actions);
+        this.actions = (actions == Kernel.AnyP) ? null : actions;
         orig_s = orig;
         orig_a = orig.ToCharArray();
         highwater = (orig_a.Length < 100 || !Cursor.HwTrace) ?
@@ -219,7 +217,7 @@ public sealed class RxFrame: IFreeze {
                 if (Cursor.Trace)
                     Console.WriteLine("Failing {0}@{1} after no matches",
                             name, from);
-                return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
+                return Kernel.Take(th, Kernel.EMPTYP);
             } else {
                 if (Cursor.Trace)
                     Console.WriteLine("Failing {0}@{1} after some matches",
@@ -290,7 +288,7 @@ public sealed class RxFrame: IFreeze {
         SetPos(child.pos);
 
         if (names != null)
-            PushCapture(names, Kernel.NewROScalar(child));
+            PushCapture(names, child);
     }
 
     public const int IC_ZERO_WIDTH = 1;
@@ -565,8 +563,7 @@ public sealed class RxFrame: IFreeze {
         pad.cursor_class = st.ns.klass;
 
         while (Kernel.IterHasFlat(iter, true)) {
-            Variable svar = iter.Shift();
-            P6any sobj = svar.Fetch();
+            P6any sobj = iter.Shift().Fetch();
 
 retry:
             if (sobj.Isa(Kernel.RegexMO)) {
@@ -579,11 +576,10 @@ retry:
                 pad.info_stack.Clear();
             } else if (eval) {
                 sobj = Builtins.compile_bind_regex(th,
-                        sobj.mo.mro_raw_Str.Get(svar));
-                svar = Kernel.NewROScalar(sobj);
+                        sobj.mo.mro_raw_Str.Get(sobj));
                 goto retry;
             } else {
-                string str = sobj.mo.mro_raw_Str.Get(svar);
+                string str = sobj.mo.mro_raw_Str.Get(sobj);
                 toks.Add(str);
                 lads.Add(new LADStr(str));
             }
@@ -700,16 +696,15 @@ retry:
     }
 
     public Variable StringCapture() {
-        return Kernel.NewROScalar(
-            new Cursor(global, st.ns.klass, st.ns.quant, st.pos,
-                null, null, "ANON"));
+        return new Cursor(global, st.ns.klass, st.ns.quant, st.pos,
+                null, null, "ANON");
     }
 
     public Cursor MakeCursor() {
         return new Cursor(global, st.ns.klass, this, st.ns, bt, st.pos, st.captures);
     }
 
-    public Variable MakeCursorV() { return Kernel.NewROScalar(MakeCursor()); }
+    public Variable MakeCursorV() { return MakeCursor(); }
 
     Cursor _matchObj;
     public Frame MakeMatch(Frame th) {
@@ -739,7 +734,7 @@ retry:
     public Frame FinalEnd(Frame th) {
         if (st.pos > global.highwater)
             global.IncHighwater(st.pos);
-        th.caller.resultSlot = Kernel.NewROScalar(_matchObj);
+        th.caller.resultSlot = _matchObj;
         return th.Return();
     }
     public Frame End(Frame th) {
@@ -750,18 +745,18 @@ retry:
         if (st.pos > global.highwater)
             global.IncHighwater(st.pos);
         if ((flags & RETURN_ONE) != 0) {
-            return Kernel.Take(th, Kernel.NewROScalar(m));
+            return Kernel.Take(th, m);
         } else {
             th.MarkSharedChain();
             flags |= RETURN_ONE;
             VarDeque ks = new VarDeque();
-            ks.Push(Kernel.NewROScalar(m));
+            ks.Push(m);
             th.coro_return = th;
             P6opaque it  = new P6opaque(Kernel.GatherIteratorMO);
             it.slots[0 /*frame*/] = Kernel.NewMuScalar(th);
             it.slots[1 /*reify*/] = Kernel.NewMuScalar(Kernel.AnyP);
             VarDeque iss = new VarDeque();
-            iss.Push(Kernel.NewROScalar(it));
+            iss.Push(it);
             P6opaque lst = new P6opaque(Kernel.ListMO);
             lst.slots[0 /*items*/] = ks;
             lst.slots[1 /*rest*/ ] = iss;
@@ -839,7 +834,7 @@ public class Cursor : P6any {
         }
         Cursor r = new Cursor(parent.global, parent.save_klass, from, to, ci,
                 null, method);
-        th.info.dylex["$*match"].Set(th, Kernel.NewROScalar(r));
+        th.info.dylex["$*match"].Set(th, r);
         if (method == "") {
             return th;
         } else {
@@ -873,7 +868,7 @@ public class Cursor : P6any {
             P6opaque l = new P6opaque(Kernel.ListMO);
             l.slots[0 /*items*/] = caps;
             l.slots[1 /*rest*/ ] = new VarDeque();
-            return Kernel.NewROScalar(l);
+            return l;
         } else {
             return caps.Count() != 0 ? caps[0] : Kernel.AnyMO.typeVar;
         }
@@ -951,7 +946,7 @@ public class Cursor : P6any {
             nw.captures = new CapInfo(nw.captures, new string[] { kv.Key },
                     Kernel.NewMuScalar(kv.Value.Fetch()));
 
-        return Kernel.NewROScalar(nw);
+        return nw;
     }
 
     public Variable SimpleWS() {
@@ -969,7 +964,7 @@ public class Cursor : P6any {
             while (p != l && Char.IsWhiteSpace(backing, p)) { p++; }
             if (Trace)
                 Console.WriteLine("* match <ws> at {0} to {1}", pos, p);
-            return Kernel.NewROScalar(At(p));
+            return At(p);
         }
     }
 }
@@ -2169,7 +2164,7 @@ anew:
                 th.rx.PushBacktrack(2);
                 th.ip = 3;
                 al = (Variable[])(((Variable[])th.lex3).Clone());
-                al[0] = Kernel.NewROScalar(th.rx.MakeCursor());
+                al[0] = th.rx.MakeCursor();
                 return (((P6any[])th.lex1)[th.lexi0++]).Invoke(th, al,
                     (VarHash)th.lex4);
             case 3:

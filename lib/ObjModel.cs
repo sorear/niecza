@@ -107,8 +107,7 @@ namespace Niecza {
         public abstract Variable Get(Variable obj, Variable key);
 
         public virtual P6any GetWHO(P6any obj, string key) {
-            Variable r = Get(Kernel.NewROScalar(obj),
-                    Kernel.BoxAnyMO(key, Kernel.StrMO));
+            Variable r = Get(obj, Kernel.BoxAnyMO(key, Kernel.StrMO));
             return r.Fetch().mo.who;
         }
 
@@ -523,7 +522,7 @@ next_method: ;
                 if (subsetFilter == null)
                     subsetFilter = Kernel.RunInferior(subsetWhereThunk.Invoke(
                         Kernel.GetInferiorRoot(), Variable.None, null));
-                return Kernel.ACCEPTS(Kernel.NewROScalar(obj), subsetFilter);
+                return Kernel.ACCEPTS(obj, subsetFilter);
             }
             if (type == CURRIED_ROLE) {
                 foreach (STable cand in obj.mo.mo.type_list) {
@@ -721,7 +720,7 @@ next_method: ;
 
             n.how = Kernel.BoxAnyMO<STable>(n, Kernel.ClassHOWMO).Fetch();
             n.typeObject = n.initObject = new P6opaque(n);
-            n.typeVar = n.initVar = Kernel.NewROScalar(n.typeObject);
+            n.typeVar = n.initVar = n.typeObject;
             ((P6opaque)n.typeObject).slots = null;
 
             n.mo.local_roles.Add(stable);

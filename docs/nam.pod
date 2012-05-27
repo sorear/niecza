@@ -288,10 +288,6 @@ Wraps C<$obj> in a read-only variable with the list nature.
 
 Creates a new variable of type Any containing C<$obj>.
 
-=head3 newscalar($obj)
-
-Wraps C<$obj> in a read-only variable.
-
 =head3 newvarrayvar
 
 =head3 newvhashvar

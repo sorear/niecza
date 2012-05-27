@@ -38,7 +38,7 @@ CgOp._register_ops: <
         iter_flatten iter_hasarg iter_hasflat iter_to_list label labelid
         letn letscope letvar llhow_name ltm_push_alts mrl_count mrl_index
         ncgoto newblankrwscalar newboundvar newrwlistvar newrwscalar
-        newscalar newtypedscalar newvarrayvar newvhashvar newvnewarrayvar
+        newtypedscalar newvarrayvar newvhashvar newvnewarrayvar
         newvnewhashvar newvsubvar note null num_to_string obj_asbool
         obj_asdef obj_asnum obj_asstr obj_at_key obj_at_pos obj_delete_key
         obj_does obj_exists_key obj_getbool obj_getdef obj_getnum

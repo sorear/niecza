@@ -203,14 +203,14 @@ class CallMethod is CallLike {
                 $.receiver.cgop($body), self.argblock($body));
         } elsif $meta eq '^' {
             $CgOp.let($.receiver.cgop($body), -> $r {
-                $CgOp.methodcall($CgOp.newscalar($CgOp.how($CgOp.fetch($r))),
+                $CgOp.methodcall($CgOp.how($CgOp.fetch($r)),
                     $name, $r, self.argblock($body))});
         } elsif $meta eq '?' {
             # TODO maybe use a lower-level check
             $CgOp.let($.receiver.cgop($body), -> $r { $CgOp.let($name, -> $n {
                 $CgOp.ternary(
-                    $CgOp.obj_getbool($CgOp.methodcall($CgOp.newscalar($CgOp.how(
-                        $CgOp.fetch($r))), "can", $r, $CgOp.box('Str',$n))),
+                    $CgOp.obj_getbool($CgOp.methodcall($CgOp.how(
+                        $CgOp.fetch($r)), "can", $r, $CgOp.box('Str',$n))),
                     $CgOp.methodcall($r, $n, self.argblock($body)),
                     $CgOp.scopedlex('Nil'))})});
         } elsif $meta eq '::(' {
@@ -319,7 +319,7 @@ class Interrogative is Op {
             when "WHAT" { $c = $CgOp.obj_what($c); }
             default { die "Invalid interrogative $_"; }
         }
-        $CgOp.newscalar($c);
+        $c
     }
 }
 
@@ -777,15 +777,14 @@ class Gather is Op {
         # construct a List from the iterator
 
         $CgOp.subcall($CgOp.fetch($CgOp.corelex('&_gather')),
-            $CgOp.newscalar($CgOp.startgather(
-                    $CgOp.fetch($CgOp.scopedlex($.var)))));
+            $CgOp.startgather($CgOp.fetch($CgOp.scopedlex($.var))));
     }
 }
 
 class MakeCursor is Op {
     method code($ ) {
         $CgOp.prog(
-            $CgOp.scopedlex('$/', $CgOp.newscalar($CgOp.rxcall('MakeCursor'))),
+            $CgOp.scopedlex('$/', $CgOp.rxcall('MakeCursor')),
             $CgOp.scopedlex('$/'));
     }
 }
@@ -856,7 +855,7 @@ class GetBlock is Op {
             $body .= outer;
             $op = $CgOp.frame_outer($op);
         }
-        $CgOp.newscalar($CgOp.frame_sub($op));
+        $CgOp.frame_sub($op);
     }
 }
 
@@ -973,7 +972,7 @@ class LexicalBind is Op {
 class ROify is Op {
     has $.child;
     method zyg() { $.child }
-    method code($body) { $CgOp.newscalar($CgOp.fetch($!child.cgop($body))) }
+    method code($body) { $CgOp.fetch($!child.cgop($body)) }
 }
 
 class Op::StateDecl is Op {

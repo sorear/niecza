@@ -35,7 +35,7 @@ public class JsyncWriter {
         } else if (obj.Isa(Kernel.StrMO)) {
             WriteStr(true, Kernel.UnboxAny<string>(obj));
         } else if (obj.Isa(Kernel.NumMO) || obj.Isa(Kernel.IntMO) || obj.Isa(Kernel.RatMO) || obj.Isa(Kernel.FatRatMO)) {
-            WriteNum(obj.mo.mro_raw_Numeric.Get(Kernel.NewROScalar(obj)));
+            WriteNum(obj.mo.mro_raw_Numeric.Get(obj));
         } else {
             WriteGeneral(obj);
         }
@@ -49,7 +49,7 @@ public class JsyncWriter {
     void WriteArray(P6any obj) {
         int a = nextanchor++;
         anchors[obj] = a;
-        VarDeque iter = obj.mo.mro_raw_iterator.Get(Kernel.NewROScalar(obj));
+        VarDeque iter = obj.mo.mro_raw_iterator.Get(obj);
 
         o.AppendFormat("[\"&A{0}\"", a);
         contUsed = true;
@@ -345,7 +345,7 @@ public class JsyncReader {
             }
             SkipWhite(true);
             SkipChar(']');
-            return Kernel.NewROScalar(Builtins.MakeArray(q, new VarDeque()));
+            return Builtins.MakeArray(q, new VarDeque());
         } else if (look == '{') {
             VarHash q = new VarHash();
             int ct = 0;
@@ -804,7 +804,7 @@ public class JsonWriter {
         } else if (obj.Isa(Kernel.BoolMO)) {
             o.Append(Kernel.UnboxAny<int>(obj) != 0 ? "true" : "false");
         } else if (obj.Isa(Kernel.NumMO) || obj.Isa(Kernel.IntMO) || obj.Isa(Kernel.RatMO) || obj.Isa(Kernel.FatRatMO)) {
-            o.Append(Utils.N2S(obj.mo.mro_raw_Numeric.Get(Kernel.NewROScalar(obj))));
+            o.Append(Utils.N2S(obj.mo.mro_raw_Numeric.Get(obj)));
         } else if (obj.Isa(Kernel.StrMO)) {
             o.Append('"');
             JsyncWriter.AddStringContents(o, Kernel.UnboxAny<string>(obj));
@@ -831,7 +831,7 @@ public class JsonWriter {
             }
             o.Append('}');
         } else if (def && obj.Isa(Kernel.ListMO)) {
-            VarDeque iter = obj.mo.mro_raw_iterator.Get(Kernel.NewROScalar(obj));
+            VarDeque iter = obj.mo.mro_raw_iterator.Get(obj);
             o.Append('[');
             while (Kernel.IterHasFlat(iter, true)) {
                 if (comma) o.Append(',');

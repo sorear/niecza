@@ -267,7 +267,7 @@ namespace Niecza {
             object[] argv_ = argv;
             Array.Resize(ref argv_, argv.Length + 1);
             if (!CLRWrapperProvider.CoerceArgument(out argv_[argv.Length],
-                        prop.PropertyType, Kernel.NewROScalar(v)))
+                        prop.PropertyType, v))
                 throw new NieczaException("Unable to coerce value of type " + v.mo.name + " for " + prop.Name); // could also be a range problem
             mi.Invoke(obj, argv_);
         }
@@ -297,8 +297,7 @@ namespace Niecza {
             if (field.IsInitOnly || field.IsLiteral)
                 throw new NieczaException("Field " + field.Name + " is read-only");
             object clr;
-            if (!CLRWrapperProvider.CoerceArgument(out clr, field.FieldType,
-                        Kernel.NewROScalar(v)))
+            if (!CLRWrapperProvider.CoerceArgument(out clr, field.FieldType, v))
                 throw new NieczaException("Unable to coerce value of type " + v.mo.name + " for " + field.Name); // could also be a range problem
             field.SetValue(obj, clr);
         }
@@ -759,7 +758,7 @@ for $args (0..9) {
             m.Invalidate();
             m.box_type = t;
             m.typeObject = m.initObject = new BoxObject<object>(null, m);
-            m.typeVar = m.initVar = Kernel.NewROScalar(m.typeObject);
+            m.typeVar = m.initVar = m.typeObject;
             if (CLROpts.Debug) {
                 Console.WriteLine("--- Created box for {0} ---", m.name);
                 foreach (var o in m.mo.type_list)
@@ -801,7 +800,7 @@ for $args (0..9) {
             if (cty == typeof(Variable))
                 return (Variable)ret;
             if (cty == typeof(P6any))
-                return Kernel.NewROScalar((P6any)ret);
+                return ((P6any)ret);
 
             if (ret == null)
                 return Kernel.AnyMO.typeVar;

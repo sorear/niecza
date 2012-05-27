@@ -151,7 +151,7 @@ namespace Niecza {
             int right = ((length > (str.Length - left)) ? (str.Length - left) :
                 (length < 0) ? 0 : length) + left;
             string lfr = str.Substring(0, left);
-            string mfr = v.mo.mro_raw_Str.Get(Kernel.NewROScalar(v));
+            string mfr = v.mo.mro_raw_Str.Get(v);
             string rfr = str.Substring(right);
             backing.Store(Kernel.BoxRaw<string>(lfr + mfr + rfr, Kernel.StrMO));
         }
@@ -225,7 +225,7 @@ public partial class Builtins {
         P6opaque newJunc = new P6opaque(Kernel.JunctionMO);
         newJunc.slots[0] = j_.slots[0];
         newJunc.slots[1] = newList;
-        return Kernel.NewROScalar(newJunc);
+        return newJunc;
     }
 
     // These three functions implement type checking and junctional
@@ -1060,7 +1060,7 @@ public partial class Builtins {
             else
                 return MakeInt(red);
         }
-        return Kernel.NewROScalar(n1);
+        return n1;
     }
 
     static readonly Func<Variable,Variable,Variable> gcd_d = gcd;
@@ -1513,7 +1513,7 @@ public partial class Builtins {
         v.AssignO(o1.mo.mro_succ.Get(v), false);
         if (!o1.IsDefined()) // note: slightly wrong for my Bool $x; $x++
             o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
-        return Kernel.NewROScalar(o1);
+        return o1;
     }
 
     public static Variable preinc(Variable v) {
@@ -1526,7 +1526,7 @@ public partial class Builtins {
         v.AssignO(o1.mo.mro_pred.Get(v), false);
         if (!o1.IsDefined()) // note: slightly wrong for my Bool $x; $x--
             o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
-        return Kernel.NewROScalar(o1);
+        return o1;
     }
 
     public static Variable predec(Variable v) {
@@ -1619,7 +1619,7 @@ flat_enough:;
         P6opaque nj = new P6opaque(Kernel.JunctionMO);
         nj.slots[0] = Kernel.BoxRaw(type, Kernel.IntMO);
         nj.slots[1] = Kernel.BoxRaw(elems, Kernel.ParcelMO);
-        return Kernel.NewROScalar(nj);
+        return nj;
     }
 
     public static Variable Make(Frame fr, Variable v) {
@@ -1652,7 +1652,7 @@ flat_enough:;
                     P6opaque p = new P6opaque(Kernel.PairMO);
                     p.slots[0] = Kernel.BoxAnyMO<string>(kv.Key, Kernel.StrMO);
                     p.slots[1] = kv.Value;
-                    lv.Push(Kernel.NewROScalar(p));
+                    lv.Push(p);
                     break;
             }
         }
@@ -1933,7 +1933,7 @@ flat_enough:;
     }
 
     public static Variable pair(Variable key, Variable value) {
-        return Kernel.NewROScalar(MakePair(key, value));
+        return MakePair(key, value);
     }
 
     public static VarDeque start_iter(Variable thing) {
@@ -1948,7 +1948,7 @@ flat_enough:;
         VarDeque items = new VarDeque();
         while (Kernel.IterHasFlat(rest, true))
             items.Push(Kernel.NewMuScalar(rest.Shift().Fetch()));
-        return Kernel.NewROScalar(MakeArray(items, rest));
+        return MakeArray(items, rest);
     }
 
     public static string frame_subname(Frame fr) {
@@ -2168,14 +2168,14 @@ again:
                     thunk.slots[1] = Kernel.NewMuScalar(Kernel.AnyP);
                     P6opaque lst = new P6opaque(Kernel.ListMO);
                     lst.slots[0] = outq;
-                    lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
+                    lst.slots[1] = new VarDeque(thunk);
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
                     th.lexi0 = 1;
                     return th.Return();
                 }
                 if (pen == null) {
                     if (tailmode != 0)
-                        return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
+                        return Kernel.Take(th, Kernel.EMPTYP);
                     P6opaque lst = new P6opaque(Kernel.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
@@ -2292,7 +2292,7 @@ again:
                             thunk.slots[1] = Kernel.NewMuScalar(Kernel.AnyP);
                             P6opaque lst = new P6opaque(Kernel.ListMO);
                             lst.slots[0] = outq;
-                            lst.slots[1] = new VarDeque(Kernel.NewROScalar(thunk));
+                            lst.slots[1] = new VarDeque(thunk);
                             th.caller.resultSlot = Kernel.NewRWListVar(lst);
                             th.lexi0 = 1;
                             return th.Return();
@@ -2302,7 +2302,7 @@ again:
                 }
                 if (pen == null) {
                     if (tailmode != 0)
-                        return Kernel.Take(th, Kernel.NewROScalar(Kernel.EMPTYP));
+                        return Kernel.Take(th, Kernel.EMPTYP);
                     P6opaque lst = new P6opaque(Kernel.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
@@ -2637,7 +2637,7 @@ again:
 
         n.how = Kernel.BoxAny<STable>(n, obj.mo.how).Fetch();
         n.typeObject = n.initObject = new P6opaque(n);
-        n.typeVar = n.initVar = Kernel.NewROScalar(n.typeObject);
+        n.typeVar = n.initVar = n.typeObject;
         ((P6opaque)n.typeObject).slots = null;
 
         n.mo.superclasses.Add(obj.mo);
@@ -2660,7 +2660,7 @@ again:
             BuildMostDerived(obj);
             if (aname != null)
                 Kernel.Assign((Variable)obj.GetSlot(n, aname), init);
-            return Kernel.NewROScalar(obj);
+            return obj;
         } else {
             return n.typeVar;
         }
@@ -2671,7 +2671,7 @@ again:
         nobj.ChangeType(type.Fetch().mo);
         nobj.SetSlot(Kernel.PseudoStrMO, "$!value",
                 Kernel.UnboxAny<string>(str.Fetch()));
-        return Kernel.NewROScalar(nobj);
+        return nobj;
     }
 
     public static void EstablishSlot(P6any n, P6how.AttrInfo ai,
@@ -2709,21 +2709,21 @@ again:
             Variable vx = null;
             if (ai.init != null) {
                 vx = Kernel.RunInferior(ai.init.Invoke(Kernel.GetInferiorRoot(),
-                    new [] { Kernel.NewROScalar(obj) }, null));
+                    new [] { obj }, null));
             }
             EstablishSlot(obj, ai, vx);
         }
 
         if (build != null)
             Kernel.RunInferior(build.Invoke(Kernel.GetInferiorRoot(),
-                new Variable[] { Kernel.NewROScalar(obj) }, null));
+                new Variable[] { obj }, null));
     }
 
     public static Variable enum_mixin_role(string name, P6any meth) {
         STable r = new STable('{' + name + '}');
         r.mo.FillRole(new STable[0], null);
         r.typeObject = r.initObject = new P6opaque(r);
-        r.typeVar = r.initVar = Kernel.NewROScalar(r.typeObject);
+        r.typeVar = r.initVar = r.typeObject;
         r.mo.AddMethod(0, name, meth);
         r.mo.Revalidate();
         r.SetupVTables();
@@ -2735,7 +2735,7 @@ again:
         STable r = new STable('{' + name + '}');
         r.mo.FillRole(new STable[0], null);
         r.typeObject = r.initObject = new P6opaque(r);
-        r.typeVar = r.initVar = Kernel.NewROScalar(r.typeObject);
+        r.typeVar = r.initVar = r.typeObject;
         r.mo.AddMethod(P6how.M_MULTI, name, meth);
         r.mo.Revalidate();
         r.SetupVTables();
@@ -2749,7 +2749,7 @@ again:
 
         r.mo.FillRole(new STable[0], null);
         r.typeObject = r.initObject = new P6opaque(r);
-        r.typeVar = r.initVar = Kernel.NewROScalar(r.typeObject);
+        r.typeVar = r.initVar = r.typeObject;
         r.mo.AddMethod(0, name, meth.Fetch());
         r.mo.AddMethod(P6how.V_PRIVATE, name, meth.Fetch());
         r.mo.AddAttribute(name, P6how.A_PUBLIC, null, stype);
@@ -2800,8 +2800,7 @@ again:
 
     public static Variable sig_params(P6any sig) {
         VarDeque items = new VarDeque();
-        foreach (Parameter p in ((Signature)sig).parms)
-            items.Push(Kernel.NewROScalar(p));
+        items.PushN(((Signature)sig).parms);
         return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
     }
 
@@ -2820,9 +2819,9 @@ again:
         if (si.param != null && si.param[0] is P6any[]) {
             foreach (P6any cand in (P6any[])si.param[0])
                 if (cand != null)
-                    items.Push(Kernel.NewROScalar(cand));
+                    items.Push(cand);
         } else {
-            items.Push(Kernel.NewROScalar(sub));
+            items.Push(sub);
         }
         return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
     }

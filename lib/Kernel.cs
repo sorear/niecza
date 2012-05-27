@@ -335,7 +335,7 @@ namespace Niecza {
                 vh.Do(this);
             }
             Kernel.RunInferior(store.Invoke(Kernel.GetInferiorRoot(),
-                new [] { Kernel.AnyMO.typeVar, Kernel.NewROScalar(v) }, null));
+                new [] { Kernel.AnyMO.typeVar, v }, null));
         }
 
         public override void Vivify() {
@@ -1271,7 +1271,7 @@ namespace Niecza {
         public LISub(SubInfo def) { this.def = def; }
         internal LISub(int index, SubInfo def) { this.index = index; this.def = def; }
         public override void Init(Frame f) {
-            Set(f, Kernel.NewROScalar(def.protosub));
+            Set(f, def.protosub);
         }
         internal override void DoFreeze(FreezeBuffer fb) {
             fb.Byte((byte)LexSerCode.Sub);
@@ -1380,8 +1380,7 @@ namespace Niecza {
                 f = f.outer;
             }
 
-            Set(into, Kernel.NewROScalar(Kernel.MakeDispatcher(name, proto,
-                    cands.ToArray())));
+            Set(into, Kernel.MakeDispatcher(name, proto, cands.ToArray()));
         }
     }
 
@@ -1844,7 +1843,7 @@ namespace Niecza {
                     th.named[(string)th.lex2] = (Variable)th.lex9;
                 else
                     th.pos[th.lexi0] = (Variable)th.lex9;
-                th.caller.resultSlot = Kernel.NewROScalar(nj);
+                th.caller.resultSlot = nj;
                 return th.Return();
             }
 
@@ -2438,7 +2437,7 @@ namespace Niecza {
             }
             nw.SetSlot(Kernel.CaptureMO, "$!positionals", poscap);
             nw.SetSlot(Kernel.CaptureMO, "$!named", named);
-            return Kernel.NewROScalar(nw);
+            return nw;
         }
 
         public string DescribeArgs() {
@@ -2687,7 +2686,7 @@ namespace Niecza {
                     }
                     nw.SetSlot(Kernel.CaptureMO, "$!positionals", spos);
                     nw.SetSlot(Kernel.CaptureMO, "$!named", snamed);
-                    src = Kernel.NewROScalar(nw);
+                    src = nw;
                     named = null; namedc = null; posc = pos.Length;
                     goto gotit;
                 }
@@ -3070,7 +3069,7 @@ bound: ;
                 Variable[] pos, VarHash named) {
             Variable[] np = new Variable[pos.Length + 1];
             Array.Copy(pos, 0, np, 1, pos.Length);
-            np[0] = Kernel.NewROScalar(th);
+            np[0] = th;
             return th.InvokeMethod(caller, "postcircumfix:<( )>", np, named);
         }
     }
@@ -3197,28 +3196,27 @@ bound: ;
 
     class CtxReturnSelf : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            return Kernel.NewROScalar(obj.Fetch());
+            return obj.Fetch();
         }
     }
 
     class CtxReturnSelfList : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            if (obj.Mode == Variable.LIST) return obj;
+            if (obj.List) return obj;
             return Kernel.NewRWListVar(obj.Fetch());
         }
     }
 
     class CtxReturnSelfItem : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            if (obj.Mode != Variable.LIST) return obj;
-            return Kernel.NewROScalar(obj.Fetch());
+            if (!obj.List) return obj;
+            return obj.Fetch();
         }
     }
 
     class CtxAnyList : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            VarDeque itr = new VarDeque(obj.Mode == Variable.LIST ?
-                    Kernel.NewROScalar(obj.Fetch()) : obj);
+            VarDeque itr = new VarDeque(obj.List ? obj.Fetch() : obj);
             P6any l = new P6opaque(Kernel.ListMO);
             Kernel.IterToList(l, itr);
             return Kernel.NewRWListVar(l);
@@ -3328,7 +3326,7 @@ bound: ;
             this.inner = inner;
         }
         public override Variable Get(Variable obj) {
-            return Kernel.NewROScalar(inner.Get(obj));
+            return inner.Get(obj);
         }
     }
 
@@ -3438,7 +3436,7 @@ bound: ;
                 } else {
                     if (!Kernel.IterHasFlat(iter, true))
                         throw new NieczaException("Unmatched key in Hash.LISTSTORE");
-                    into[elt.mo.mro_raw_Str.Get(Kernel.NewROScalar(elt))] =
+                    into[elt.mo.mro_raw_Str.Get(elt)] =
                         Kernel.NewMuScalar(iter.Shift().Fetch());
                 }
                 first = false;
@@ -4180,7 +4178,7 @@ tryagain:
             st.who = who;
             st.typeObject = st.initObject = new P6opaque(st, 0);
             ((P6opaque)st.typeObject).slots = null;
-            st.typeVar = st.initVar = Kernel.NewROScalar(st.typeObject);
+            st.typeVar = st.initVar = st.typeObject;
             st.mo.type  = P6how.PACKAGE;
             st.mo.rtype = "package";
             // XXX should be PackageHOW
@@ -4338,13 +4336,12 @@ tryagain:
             else if (type == WHO) {
                 // only special type is PARENT, maybe not even that?
                 P6any who = (P6any) p1;
-                Variable whov = Kernel.NewROScalar(who);
                 Variable keyv = Kernel.BoxAnyMO(key, Kernel.StrMO);
                 if (bind_to != null) {
-                    v = who.mo.mro_bind_key.Bind(whov, keyv, bind_to);
+                    v = who.mo.mro_bind_key.Bind(who, keyv, bind_to);
                     return;
                 }
-                v = who.mo.mro_at_key.Get(whov, keyv);
+                v = who.mo.mro_at_key.Get(who, keyv);
 
                 if (final) return;
 
@@ -4353,7 +4350,7 @@ tryagain:
                         throw new NieczaException("Autovivification only implemented for normal-type stashes");
                     string name = Kernel.UnboxAny<string>(who);
                     P6any new_who = Kernel.BoxRaw(name + "::" + key, Kernel.StashMO);
-                    who.mo.mro_bind_key.Bind(whov, keyv,
+                    who.mo.mro_bind_key.Bind(who, keyv,
                         MakePackage(key, new_who));
                     sc.p1 = new_who;
                     return;
@@ -4516,10 +4513,10 @@ have_v:
                 if (bind_to != null)
                     throw new NieczaException("Cannot bind to a stash");
                 if (sc.type == WHO)
-                    return Kernel.NewROScalar((P6any) sc.p1);
+                    return (P6any) sc.p1;
                 P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
                 who.SetSlot(Kernel.PseudoStashMO, "$!name", Kernel.BoxAnyMO(last, Kernel.StrMO));
-                return Kernel.NewROScalar(who);
+                return who;
             }
             if (bind_to != null) {
                 bool list = key != "" && (key[0] == '@' || key[0] == '%');
@@ -4631,7 +4628,7 @@ saveme:
         public void RunNew() { if (state) Run(); }
 
         public void Add(SubInfo what, bool immed) {
-            to_run.Push(Kernel.NewROScalar(what.protosub));
+            to_run.Push(what.protosub);
             if (immed && state)
                 Run();
         }
@@ -4683,7 +4680,7 @@ saveme:
 
             Frame r = c.coro_return;
             c.coro_return = c;
-            r.LexicalBind("$*nextframe", NewROScalar(th));
+            r.LexicalBind("$*nextframe", th);
             r.resultSlot = payload;
             th.resultSlot = payload;
             return r;
@@ -4748,7 +4745,7 @@ saveme:
                 P6opaque nj = new P6opaque(Kernel.JunctionMO);
                 nj.slots[0] = th.lex2;
                 nj.slots[1] = Kernel.BoxRaw(dst, Kernel.ParcelMO);
-                th.caller.resultSlot = Kernel.NewROScalar(nj);
+                th.caller.resultSlot = nj;
                 return th.Return();
             }
 
@@ -5172,7 +5169,7 @@ ltm:
                 else
                     return ((int) (object) v) != 0 ? TrueV : FalseV;
             }
-            return NewROScalar(new BoxObject<T>(v, ((P6opaque)proto).mo));
+            return new BoxObject<T>(v, ((P6opaque)proto).mo);
         }
 
         public static void SetBox<T>(P6any obj, T v) {
@@ -5186,7 +5183,7 @@ ltm:
                 else
                     return ((int) (object) v) != 0 ? TrueV : FalseV;
             }
-            return NewROScalar(new BoxObject<T>(v, proto));
+            return new BoxObject<T>(v, proto);
         }
 
         public static P6any BoxRaw<T>(T v, STable proto) {
@@ -5243,7 +5240,6 @@ ltm:
             return new SimpleVariable(t, null, t.initObject);
         }
 
-        public static Variable NewROScalar(P6any o) { return o; }
         public static Variable NewRWListVar(P6any container) {
             return new SimpleVariable(container);
         }
@@ -5332,7 +5328,7 @@ ltm:
             }
 
 again:      if (i == prog.Length) {
-                th.caller.resultSlot = NewROScalar(n);
+                th.caller.resultSlot = n;
                 return th.Return();
             }
 
@@ -5358,12 +5354,11 @@ again:      if (i == prog.Length) {
                     }
                 }
 
-                return init.Invoke(th, new Variable[] { NewROScalar(n) },
-                    build_args);
+                return init.Invoke(th, new Variable[] { n }, build_args);
             } else {
                 P6any init = prog[i].init;
                 th.lexi0 = i;
-                return init.Invoke(th, new [] { NewROScalar(n) }, null);
+                return init.Invoke(th, new [] { n }, null);
             }
 
 value:      vx = (Variable) th.resultSlot;
@@ -5443,7 +5438,7 @@ again:
                 th.coro_return = th;
                 thunk.slots[0] = NewMuScalar(th);
                 thunk.slots[1] = NewMuScalar(AnyP);
-                outq.Push(NewROScalar(thunk));
+                outq.Push(thunk);
                 return outq;
             }
             outq.Push(inq0v);
@@ -5456,7 +5451,7 @@ again:
             if (IterHasFlat(inq, true)) {
                 return Take(th, inq.Shift());
             } else {
-                return Take(th, NewROScalar(Kernel.EMPTYP));
+                return Take(th, Kernel.EMPTYP);
             }
         }
 
@@ -5723,7 +5718,7 @@ slow:
             r.mo.role_typecheck_list.Add(r);
             r.mo.local_roles = prole.mo.local_roles;
             r.typeObject = r.initObject = new P6opaque(r);
-            r.typeVar = r.initVar = NewROScalar(r.typeObject);
+            r.typeVar = r.initVar = r.typeObject;
             foreach (var mi in prole.mo.lmethods)
                 r.mo.lmethods.Add(mi);
             foreach (var ai in prole.mo.local_attr)
@@ -5759,7 +5754,7 @@ slow:
                 r.mo.rtype = "role";
                 r.mo.role_typecheck_list = arg.mo.role_typecheck_list;
                 r.typeObject = r.initObject = new P6opaque(r);
-                r.typeVar = r.initVar = NewROScalar(r.typeObject);
+                r.typeVar = r.initVar = r.typeObject;
                 // Hack - reseat role to this closure-clone of methods
                 foreach (var mi in arg.mo.lmethods) {
                     var nmi = mi;
@@ -5891,7 +5886,7 @@ slow:
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
             n.typeObject = n.initObject = new P6opaque(n);
-            n.typeVar = n.initVar = NewROScalar(n.typeObject);
+            n.typeVar = n.initVar = n.typeObject;
             ((P6opaque)n.typeObject).slots = null;
 
             n.mo.superclasses.Add(b);
@@ -6168,8 +6163,8 @@ slow:
                     new CtxBoolUnbox());
             BoolMO.FillProtoClass(IntMO, new string[] { "$!index" },
                 new STable[] { BoolMO });
-            TrueV  = NewROScalar(BoxRaw<int>(1, BoolMO));
-            FalseV = NewROScalar(BoxRaw<int>(0, BoolMO));
+            TrueV  = BoxRaw<int>(1, BoolMO);
+            FalseV = BoxRaw<int>(0, BoolMO);
             FalseV.Fetch().SetSlot(BoolMO, "$!index", BoxAnyMO(0, IntMO));
             TrueV.Fetch().SetSlot(BoolMO, "$!index", BoxAnyMO(1, IntMO));
 
@@ -6322,7 +6317,7 @@ slow:
             fr.MarkSharedChain();
             dob.slots[0] = fr;
             dob.slots[1] = name;
-            return NewROScalar(dob);
+            return dob;
         }
 
         private static string DescribeException(int type, Frame tgt,
@@ -6420,8 +6415,7 @@ slow:
                         new Variable[] {
                             Builtins.MakeParcel(Builtins.MakeInt(type),
                                 Kernel.BoxAnyMO(name, Kernel.StrMO),
-                                tgt == null ? Kernel.AnyMO.typeVar :
-                                    Kernel.NewROScalar(tgt))
+                                tgt == null ? Kernel.AnyMO.typeVar : tgt)
                         }, null, false, null);
                     Variable np = Kernel.RunInferior(nfr);
                     if (np.Fetch().mo.mro_raw_Bool.Get(np)) {

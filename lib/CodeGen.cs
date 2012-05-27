@@ -375,8 +375,6 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("GetGlobal");
         public static readonly MethodInfo Kernel_BindGlobal =
             typeof(Kernel).GetMethod("BindGlobal");
-        public static readonly MethodInfo Kernel_NewROScalar =
-            typeof(Kernel).GetMethod("NewROScalar");
         public static readonly MethodInfo Kernel_NewRWListVar =
             typeof(Kernel).GetMethod("NewRWListVar");
         public static readonly MethodInfo Kernel_NewRWScalar =
@@ -2303,10 +2301,9 @@ namespace Niecza.CLRBackend {
                 if (brk) cands.Add(CpsOp.Null(Tokens.P6any));
             }
 
-            return CpsOp.MethodCall(Tokens.Kernel_NewROScalar,
-                CpsOp.MethodCall(Tokens.Kernel_MakeDispatcher,
+            return CpsOp.MethodCall(Tokens.Kernel_MakeDispatcher,
                     CpsOp.StringLiteral(prefix), proto,
-                    CpsOp.NewArray(Tokens.P6any, cands.ToArray())));
+                    CpsOp.NewArray(Tokens.P6any, cands.ToArray()));
         }
 
         object[] InlineCall(SubInfo tgt, object[] zyg) {
@@ -2617,8 +2614,7 @@ namespace Niecza.CLRBackend {
                     return CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_SFH,
                         CpsOp.IntLiteral(SubInfo.ON_DIE),
                         CpsOp.Null(Tokens.Frame), CpsOp.IntLiteral(-1),
-                        CpsOp.Null(Tokens.String), CpsOp.MethodCall(
-                            Tokens.Kernel_NewROScalar, th.Scan(zyg[1])));
+                        CpsOp.Null(Tokens.String), th.Scan(zyg[1]));
                 }
             };
             handlers["control"] = delegate(NamProcessor th, object[] zyg) {
@@ -2910,7 +2906,6 @@ dynamic:
             thandlers["set_status"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall( Tokens.Kernel_SetStatus,
                     CpsOp.CallFrame(), z[0], z[1]); };
-            thandlers["newscalar"] = Methody(null, Tokens.Kernel_NewROScalar);
             thandlers["newrwlistvar"] = Methody(null, Tokens.Kernel_NewRWListVar);
             thandlers["iter_hasflat"] = delegate(CpsOp[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_IterHasFlat,
@@ -3322,7 +3317,7 @@ dynamic:
                 if (kv.Value is LISub) {
                     LISub ls = (LISub) kv.Value;
                     frags.Add(a(j("scopedlex"), j(kv.Key),
-                        a(j("newscalar"), a(j("_makesub"), ls.def))));
+                        a(j("_makesub"), ls.def)));
                 } else if (kv.Value is LISimple) {
                     LISimple ls = kv.Value as LISimple;
                     int f = ls.flags;
@@ -4230,7 +4225,7 @@ dynamic:
             if (item is STable)
                 vitm = ((STable)item).typeVar;
             else if (item is SubInfo)
-                vitm = Kernel.NewROScalar(((SubInfo)item).protosub);
+                vitm = ((SubInfo)item).protosub;
             else if (item == null)
                 vitm = null;
             else
@@ -4377,7 +4372,7 @@ dynamic:
             if (nst.typeObject == null) // AnyMO.typeObject is set up early
                 nst.typeObject = new P6opaque(nst, 0);
             ((P6opaque)nst.typeObject).slots = null;
-            nst.typeVar = Kernel.NewROScalar(nst.typeObject);
+            nst.typeVar = nst.typeObject;
 
             if (ru.name == "CORE" && name == "Nil") {
                 // this anomalous type object is iterable

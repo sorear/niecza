@@ -406,9 +406,8 @@ class Tilde is RxOp {
         push @code, $CgOp.rxbprim('Exact', $CgOp.str($!closer));
         push @code, $CgOp.goto($pass);
         push @code, $CgOp.label($fail);
-        push @code, $CgOp.sink($CgOp.methodcall($CgOp.newscalar(
-                $CgOp.rxcall("MakeCursor")), 'FAILGOAL',
-            $CgOp.string_var($!closer), $CgOp.string_var($!dba),
+        push @code, $CgOp.sink($CgOp.methodcall($CgOp.rxcall("MakeCursor"),
+            'FAILGOAL', $CgOp.string_var($!closer), $CgOp.string_var($!dba),
             $CgOp.box('Num', $CgOp.cast('num', $CgOp.rxgetquant))));
         push @code, $CgOp.label($pass);
         push @code, $CgOp.rxcall("PopGoal", $CgOp.callframe);

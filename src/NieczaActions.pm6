@@ -2502,7 +2502,6 @@ method cgexp:quote ($/) {
 my %opshortcut = (
     '@'   => [ 'fetch' ],
     'l'   => [ 'letvar' ],
-    'ns'  => [ 'newscalar' ],
     'nsw' => [ 'newrwscalar' ],
     's'   => [ 'str' ],
     'i'   => [ 'int' ],
