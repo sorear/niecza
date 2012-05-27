@@ -62,9 +62,9 @@ namespace Niecza {
         public const int RW   = 1;
         public const int LIST = 2;
 
-        public virtual int Mode { get { return RW; } }
-        public bool Rw { get { return Mode == RW; } }
-        public bool List { get { return Mode == LIST; } }
+        public virtual int Mode { get { return (this is ListVariable) ? LIST : (this is P6any) ? RO : RW; } }
+        public bool Rw { get { return !(this is P6any); } }
+        public bool List { get { return this is ListVariable; } }
         public virtual void Vivify() { }
         public virtual Variable Assign(Variable inp) {
             Store(inp.Fetch());
@@ -214,7 +214,6 @@ namespace Niecza {
 
     public sealed class ListVariable: Variable {
         P6any val;
-        public override int Mode { get { return LIST; } }
 
         public ListVariable(P6any val) { this.val = val; }
 
@@ -277,7 +276,6 @@ namespace Niecza {
             val = v;
         }
 
-        public override int Mode { get { return RW; } }
         public override void Vivify() {
             ViviHook w = whence;
             whence = null;
@@ -867,7 +865,7 @@ namespace Niecza {
         }
 
         static bool IsEmptyAggr(Variable v) {
-            if (v.Mode != Variable.LIST) return false;
+            if (!v.List) return false;
             P6any p = v.Fetch();
             if (p.mo == Kernel.ArrayMO) {
                 return ((VarDeque)p.GetSlot(Kernel.ListMO, "$!items")).Count() == 0 &&
@@ -3226,7 +3224,7 @@ bound: ;
 
             for (int i = 0; i < dsts.Length; i++) {
                 Variable d = dsts[i];
-                if (d.Mode == Variable.LIST) {
+                if (d.List) {
                     srcs[i] = new P6opaque(Kernel.ListMO);
                     Kernel.IterToList(srcs[i], src);
                     src = new VarDeque();
@@ -5505,12 +5503,11 @@ slow:
         }
 
         public static Variable StashyMerge(Variable o, Variable n, string d1, string d2) {
-            if (n.Mode != Variable.RO) return o;
-            if (o.Mode != Variable.RO) return n;
+            P6any oo = o as P6any;
+            P6any nn = n as P6any;
 
-            P6any oo = o.Fetch();
-            P6any nn = n.Fetch();
-
+            if (oo == null) return n;
+            if (nn == null) return o;
             if (oo == nn) return o;
 
             if (!oo.IsDefined() && !nn.IsDefined() && oo.mo.who == nn.mo.who) {

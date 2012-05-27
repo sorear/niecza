@@ -12,7 +12,6 @@ namespace Niecza {
             throw new NieczaException("Writing to readonly scalar");
         }
         public override Variable GetVar() { return this; }
-        public override int Mode { get { return RO; } }
 
         public virtual object GetSlot(STable type, string name) {
             throw new NieczaException("Representation " + ReprName() + " does not support attributes");
