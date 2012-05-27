@@ -218,15 +218,12 @@ namespace Niecza {
         int mode;
 
         private SimpleVariable() { }
-        public SimpleVariable(bool rw, bool islist, STable type, ViviHook whence, P6any val) {
+        public SimpleVariable(STable type, ViviHook whence, P6any val) {
             this.val = val; this.whence = whence;
             this.type = type;
-            mode = rw ? RW : islist ? LIST : RO;
+            mode = RW;
         }
-        public SimpleVariable(P6any val) { this.val = val; }
-        public SimpleVariable(bool islist, P6any val) {
-            this.mode = islist ? LIST : RO; this.val = val;
-        }
+        public SimpleVariable(P6any val) { this.mode = LIST; this.val = val; }
 
         public override P6any  Fetch()       { return val; }
         public override Variable Assign(Variable inp) {
@@ -239,7 +236,8 @@ namespace Niecza {
         }
         public override Variable AssignO(P6any inp, bool listishly) {
             if (mode == LIST) {
-                val.mo.mro_LISTSTORE.Get(this, new SimpleVariable(listishly, inp));
+                val.mo.mro_LISTSTORE.Get(this, listishly ?
+                        (Variable)new SimpleVariable(inp) : inp);
             } else {
                 Store(inp);
             }
@@ -541,7 +539,7 @@ namespace Niecza {
             return RefConstant(s == null ? "" : s.name, "S", s, Tokens.SubInfo);
         }
         internal CpsOp FrameConstant(Frame s) {
-            return RefConstant(s.info.name, "P", s, Tokens.Frame);
+            return RefConstant(s.info.name, "F", s, Tokens.Frame);
         }
 
         internal CpsOp RefConstant(string n1, string n2, object val, Type nty) {
@@ -549,15 +547,14 @@ namespace Niecza {
                 return CpsOp.Null(nty);
             FieldInfo fi;
             if (!constants.TryGetValue(val, out fi))
-                constants[val] = fi = NewField(n1, n2,
-                        val is Variable ? typeof(Variable) : val.GetType());
+                constants[val] = fi = NewField(n1, n2, nty ?? val.GetType());
             return CpsOp.IsConst(CpsOp.GetSField(fi));
         }
 
         internal CpsOp ValConstant(string key, object val) {
             CpsOp r;
             if (!val_constants.TryGetValue(key, out r))
-                val_constants[key] = r = RefConstant(key, "", val, null);
+                val_constants[key] = r = RefConstant(key, "", val, val is Variable ? typeof(Variable) : null);
             return r;
         }
 
@@ -2838,7 +2835,7 @@ gotit:
                     else {
                         if (src.Mode == (islist ? Variable.LIST : Variable.RO))
                             goto bound;
-                        src = new SimpleVariable(islist, srco);
+                        src = islist ? (Variable)new SimpleVariable(srco) : srco;
                     }
 bound: ;
                 }
@@ -4047,8 +4044,8 @@ tryagain:
             Variable r;
             if (h.TryGetValue(kss, out r))
                 return r;
-            return new SimpleVariable(true, false, null,
-                    new HashViviHook(os, kss), Kernel.AnyP);
+            return new SimpleVariable(null, new HashViviHook(os, kss),
+                    Kernel.AnyP);
         }
     }
     class IxHashExistsKey : IndexHandler {
@@ -4119,7 +4116,7 @@ tryagain:
                 return Kernel.AnyMO.typeVar;
             if (items.Count() <= ix) {
                 if (extend) {
-                    return new SimpleVariable(true, false, null,
+                    return new SimpleVariable(null,
                             new ArrayViviHook(os, ix), Kernel.AnyP);
                 } else {
                     return Kernel.AnyMO.typeVar;
@@ -5198,7 +5195,7 @@ ltm:
 
         public static Variable Decontainerize(Variable rhs) {
             if (!rhs.Rw) return rhs;
-            return new SimpleVariable(false, rhs.Fetch());
+            return rhs.Fetch();
         }
 
         public const int NBV_RO = 0;
@@ -5224,36 +5221,31 @@ ltm:
             if (omode == (islist ? Variable.LIST : Variable.RO))
                 return rhs;
 
-            return new SimpleVariable(islist, rhso);
+            return islist ? (Variable)new SimpleVariable(rhso) : rhso;
         }
 
         public static Variable Assign(Variable lhs, Variable rhs) {
             return lhs.Assign(rhs);
         }
 
-        // ro, not rebindable
-        public static Variable NewROScalar(P6any obj) {
-            return new SimpleVariable(obj);
-        }
-
         public static Variable NewRWScalar(STable t, P6any obj) {
-            return new SimpleVariable(true, false, t, null, obj);
+            return new SimpleVariable(t, null, obj);
         }
 
         public static Variable NewMuScalar(P6any obj) {
-            return new SimpleVariable(true, false, null, null, obj);
+            return new SimpleVariable(null, null, obj);
         }
 
         public static Variable NewTypedScalar(STable t) {
             if (t == null)
-                return new SimpleVariable(true, false, null, null,
-                        AnyMO.typeObject);
+                return new SimpleVariable(null, null, AnyMO.typeObject);
 
-            return new SimpleVariable(true, false, t, null, t.initObject);
+            return new SimpleVariable(t, null, t.initObject);
         }
 
+        public static Variable NewROScalar(P6any o) { return o; }
         public static Variable NewRWListVar(P6any container) {
-            return new SimpleVariable(true, container);
+            return new SimpleVariable(container);
         }
 
         public static VarDeque SlurpyHelper(Variable[] pos, int from) {

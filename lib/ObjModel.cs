@@ -4,10 +4,15 @@ using System.Threading;
 using Niecza.Serialization;
 
 namespace Niecza {
-    public abstract class P6any: IFreeze {
+    public abstract class P6any: Variable, IFreeze {
         public STable mo;
 
-        public abstract void Freeze(FreezeBuffer fb);
+        public override P6any Fetch() { return this; }
+        public override void Store(P6any val) {
+            throw new NieczaException("Writing to readonly scalar");
+        }
+        public override Variable GetVar() { return this; }
+        public override int Mode { get { return RO; } }
 
         public virtual object GetSlot(STable type, string name) {
             throw new NieczaException("Representation " + ReprName() + " does not support attributes");
@@ -108,12 +113,12 @@ namespace Niecza {
         }
 
         public static Variable ViviHash(Variable obj, Variable key) {
-            return new SimpleVariable(true, false, Kernel.MuMO,
+            return new SimpleVariable(Kernel.MuMO,
                     new NewHashViviHook(obj, key.Fetch().mo.mro_raw_Str.Get(key)),
                     Kernel.AnyP);
         }
         public static Variable ViviArray(Variable obj, Variable key) {
-            return new SimpleVariable(true, false, Kernel.MuMO,
+            return new SimpleVariable(Kernel.MuMO,
                     new NewArrayViviHook(obj, (int)key.Fetch().mo.mro_raw_Numeric.Get(key)),
                     Kernel.AnyP);
         }
