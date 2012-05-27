@@ -3063,8 +3063,8 @@ dynamic:
                     .GetMethod(name.Substring(ix+1), tx);
                 return CpsOp.CpsCall(cpsrt, mi, JScalar.A<CpsOp>(2, z, th.Scan)); };
 
-            thandlers["var_islist"] = FieldGet(Tokens.Variable, "islist");
-            thandlers["var_is_rw"] = FieldGet(Tokens.Variable, "rw");
+            thandlers["var_islist"] = Methody(null, Tokens.Variable.GetMethod("get_List"));
+            thandlers["var_is_rw"] = Methody(null, Tokens.Variable.GetMethod("get_Rw"));
             thandlers["llhow_name"] = FieldGet(Tokens.STable, "name");
             thandlers["stab_what"] = FieldGet(Tokens.STable, "typeObject");
             thandlers["obj_llhow"] = FieldGet(Tokens.P6any, "mo");
@@ -3862,7 +3862,7 @@ dynamic:
 
             for (int ix = 3; ix < args.Length; ix += 2) {
                 var v = (Variable)Handle.Unbox(args[ix+1]);
-                if (v.rw) return null;
+                if (v.Rw) return null;
                 // this next one is a bit of a hack to get the right results
                 // while compiling the setting...
                 if (v.Fetch().mo.FindMethod("immutable") != null &&
@@ -4164,7 +4164,7 @@ dynamic:
                 StashEnt v;
                 string hkey = (char)who.Length + who + key;
                 if (c.globals.TryGetValue(hkey, out v)) {
-                    if (v.v.rw || v.v.Fetch().IsDefined())
+                    if (v.v.Rw || v.v.Fetch().IsDefined())
                         return new Exception((who + "::" + key).Substring(2) + " names a non-package");
                     pkg = v.v.Fetch().mo;
                 } else if (!auto) {
@@ -4190,9 +4190,9 @@ dynamic:
                 r.Add(kv.Key.Substring(filter.Length));
                 StashEnt b = kv.Value;
 
-                if (!b.v.rw && !b.v.Fetch().IsDefined()) {
+                if (!b.v.Rw && !b.v.Fetch().IsDefined()) {
                     r.Add(new Handle(b.v.Fetch().mo));
-                } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
+                } else if (!b.v.Rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
                     r.Add(new Handle(b.v.Fetch().GetSlot(Kernel.CodeMO, "$!info")));
                 } else {
                     r.Add(null);
@@ -4207,9 +4207,9 @@ dynamic:
             string hkey = (char)who.Length + who + key;
             StashEnt b;
             if (ru.globals.TryGetValue(hkey, out b)) {
-                if (!b.v.rw && !b.v.Fetch().IsDefined()) {
+                if (!b.v.Rw && !b.v.Fetch().IsDefined()) {
                     return new Handle(b.v.Fetch().mo);
-                } else if (!b.v.rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
+                } else if (!b.v.Rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
                     return new Handle(b.v.Fetch().GetSlot(Kernel.CodeMO, "$!info"));
                 } else return null;
             } else {

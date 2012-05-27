@@ -136,9 +136,6 @@ namespace Niecza {
             this.backing = backing;
             this.from = from;
             this.length = length;
-            // XXX Should binding a substr lvalue count as binding the original?
-            this.whence = null;
-            this.rw = backing.rw;
         }
 
         public override P6any Fetch() {
@@ -276,15 +273,6 @@ public partial class Builtins {
         Variable[] avs = new Variable[] { av0, av1, av2 };
         return AutoThread(avs[jpivot].Fetch(), delegate(Variable n) {
             avs[jpivot] = n; return dgt(avs[0], avs[1], avs[2]); });
-    }
-
-    // Assign a value to a variable, while handling list variables sensibly
-    public static void AssignV(Variable lhs, P6any rhs) {
-        if (!lhs.islist) {
-            lhs.Store(rhs);
-        } else {
-            lhs.Fetch().mo.mro_LISTSTORE.Get(lhs, Kernel.NewROScalar(rhs));
-        }
     }
 
     // Truncating substrings useful in some places
@@ -1522,27 +1510,27 @@ public partial class Builtins {
 
     public static Variable postinc(Variable v) {
         P6any o1 = v.Fetch();
-        AssignV(v, o1.mo.mro_succ.Get(v));
+        v.AssignO(o1.mo.mro_succ.Get(v), false);
         if (!o1.IsDefined()) // note: slightly wrong for my Bool $x; $x++
             o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
         return Kernel.NewROScalar(o1);
     }
 
     public static Variable preinc(Variable v) {
-        AssignV(v, v.Fetch().mo.mro_succ.Get(v));
+        v.AssignO(v.Fetch().mo.mro_succ.Get(v), false);
         return v;
     }
 
     public static Variable postdec(Variable v) {
         P6any o1 = v.Fetch();
-        AssignV(v, o1.mo.mro_pred.Get(v));
+        v.AssignO(o1.mo.mro_pred.Get(v), false);
         if (!o1.IsDefined()) // note: slightly wrong for my Bool $x; $x--
             o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
         return Kernel.NewROScalar(o1);
     }
 
     public static Variable predec(Variable v) {
-        AssignV(v, v.Fetch().mo.mro_pred.Get(v));
+        v.AssignO(v.Fetch().mo.mro_pred.Get(v), false);
         return v;
     }
 
@@ -1618,7 +1606,7 @@ public partial class Builtins {
         if (type >= 8) {
             type -= 8;
             foreach (Variable e in elems)
-                if (e.islist) goto need_flatten;
+                if (e.List) goto need_flatten;
             goto flat_enough;
 need_flatten:;
             VarDeque iter = new VarDeque(elems);
@@ -1949,7 +1937,7 @@ flat_enough:;
     }
 
     public static VarDeque start_iter(Variable thing) {
-        if (thing.islist)
+        if (thing.List)
             return thing.Fetch().mo.mro_raw_iterator.Get(thing);
         else
             return new VarDeque(thing);
@@ -2036,7 +2024,7 @@ again:
                 P6any i = v.Fetch();
                 if (i.mo.HasType(Kernel.IterCursorMO))
                     return 0;
-                if (v.islist) {
+                if (v.List) {
                     items.Shift();
                     items.UnshiftD(i.mo.mro_raw_iterator.Get(v));
                     goto again;
@@ -2463,7 +2451,7 @@ again:
         if ((mode & 2) != 0) {
             fr.PushLeave(type, v.Fetch());
         }
-        else if (v.islist) {
+        else if (v.List) {
             fr.PushLeave(type, Kernel.RunInferior(v.Fetch().InvokeMethod(
                     Kernel.GetInferiorRoot(), "TEMP",
                     new Variable[] { v }, null)).Fetch());
@@ -2701,7 +2689,7 @@ again:
                 Kernel.CreateHash() : Kernel.CreateArray();
             if (vx != null) {
                 // https://github.com/sorear/niecza/issues/104
-                if (!vx.islist)
+                if (!vx.List)
                     vx = Kernel.NewRWListVar(vx.Fetch());
                 Kernel.Assign(obj, vx);
             }
@@ -2785,7 +2773,7 @@ again:
         P6any value;
 
         private Blackhole() {}
-        public Blackhole(P6any value) { this.value = value; rw = true; }
+        public Blackhole(P6any value) { this.value = value; }
 
         public override P6any Fetch() { return value; }
         public override void Store(P6any v) { }
@@ -2802,7 +2790,6 @@ again:
             var n = new Blackhole();
             tb.Register(n);
             n.value = (P6any) tb.ObjRef();
-            n.rw = true;
             return n;
         }
     }

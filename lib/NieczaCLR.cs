@@ -247,8 +247,6 @@ namespace Niecza {
         object[]     argv;
 
         public PropertyProxy(PropertyInfo prop, object obj, object[] argv) {
-            this.rw     = true; // make sure Fetch is called repeatedly
-            this.islist = false;
             this.prop   = prop;
             this.obj    = obj;
             this.argv   = argv;
@@ -286,8 +284,6 @@ namespace Niecza {
         object    obj;
 
         public FieldProxy(FieldInfo field, object obj) {
-            this.rw     = true; // make sure Fetch is called repeatedly
-            this.islist = false;
             this.field  = field;
             this.obj    = obj;
         }
@@ -411,7 +407,7 @@ namespace Niecza {
             object dummy;
             for (int i = 0; i < args.Length; i++)
                 if (!CLRWrapperProvider.CoerceArgument(out dummy, args[i], pos[i+1])
-                        || (refs[i] && !pos[i+1].rw))
+                        || (refs[i] && !pos[i+1].Rw))
                     return false;
             // XXX: maybe param arrays should be treated as slurpies?
             for (int i = args.Length; i < pos.Length - 1; i++)

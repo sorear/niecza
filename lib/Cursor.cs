@@ -1642,7 +1642,7 @@ public class LADParam : LAD {
 
         P6any ob = vr.Fetch();
 
-        if (!vr.rw && ob.IsDefined() && ob.mo == Kernel.StrMO) {
+        if (!vr.Rw && ob.IsDefined() && ob.mo == Kernel.StrMO) {
             if (Lexer.LtmTrace)
                 Console.WriteLine("Resolved {0} to \"{1}\"", name,
                         Kernel.UnboxAny<string>(ob));

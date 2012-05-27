@@ -632,7 +632,7 @@ public class JsyncReader {
             Variable v_cursor = Kernel.GetVar(s2.Substring(0, cut),
                     s2.Substring(cut+2)).v;
 
-            if (v_cursor.rw)
+            if (v_cursor.Rw)
                 Err(s2.Substring(2) + " does not name a loaded global class");
             P6any p_cursor = v_cursor.Fetch();
 

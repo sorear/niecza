@@ -57,13 +57,23 @@ namespace Niecza {
     // A Variable is the meaning of function arguments, of any subexpression
     // except the targets of := and ::=.
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public abstract class Variable : IFreeze {
-        public ViviHook whence;
+        public const int RO   = 0;
+        public const int RW   = 1;
+        public const int LIST = 2;
 
-        // these should be treated as ro for the life of the variable
-        public bool rw;
-        public bool islist;
+        public virtual int Mode { get { return RW; } }
+        public bool Rw { get { return Mode == RW; } }
+        public bool List { get { return Mode == LIST; } }
+        public virtual void Vivify() { }
+        public virtual Variable Assign(Variable inp) {
+            Store(inp.Fetch());
+            return this;
+        }
+        public virtual Variable AssignO(P6any inp, bool listishly) {
+            Store(inp);
+            return this;
+        }
 
         public abstract P6any Fetch();
         public abstract void Store(P6any v);
@@ -200,23 +210,43 @@ namespace Niecza {
         }
     }
 
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public sealed class SimpleVariable: Variable {
         STable type; // null for Any/Mu variables, and roish
         P6any val;
+        ViviHook whence;
+        int mode;
 
         private SimpleVariable() { }
         public SimpleVariable(bool rw, bool islist, STable type, ViviHook whence, P6any val) {
-            this.val = val; this.whence = whence; this.rw = rw;
-            this.islist = islist; this.type = type;
+            this.val = val; this.whence = whence;
+            this.type = type;
+            mode = rw ? RW : islist ? LIST : RO;
         }
         public SimpleVariable(P6any val) { this.val = val; }
         public SimpleVariable(bool islist, P6any val) {
-            this.islist = islist; this.val = val;
+            this.mode = islist ? LIST : RO; this.val = val;
         }
 
         public override P6any  Fetch()       { return val; }
+        public override Variable Assign(Variable inp) {
+            if (mode == LIST) {
+                val.mo.mro_LISTSTORE.Get(this, inp);
+            } else {
+                Store(inp.Fetch());
+            }
+            return this;
+        }
+        public override Variable AssignO(P6any inp, bool listishly) {
+            if (mode == LIST) {
+                val.mo.mro_LISTSTORE.Get(this, new SimpleVariable(listishly, inp));
+            } else {
+                Store(inp);
+            }
+            return this;
+        }
         public override void Store(P6any v)  {
-            if (!rw) {
+            if (mode != RW) {
                 throw new NieczaException("Writing to readonly scalar");
             }
             if (v == Kernel.NilP) {
@@ -237,6 +267,13 @@ namespace Niecza {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
 
+        public override int Mode { get { return mode; } }
+        public override void Vivify() {
+            ViviHook w = whence;
+            whence = null;
+            if (w != null) w.Do(this);
+        }
+
         const int S_RO   = 0;
         const int S_LIST = 1;
         const int S_RW   = 2;
@@ -244,11 +281,11 @@ namespace Niecza {
 
         public override void Freeze(FreezeBuffer fb) {
             int code = ((int)SerializationCode.SimpleVariable) +
-                (islist ? S_LIST : !rw ? S_RO : whence == null ? S_RW : S_VIV);
+                (mode == LIST ? S_LIST : mode == RO ? S_RO : whence == null ? S_RW : S_VIV);
             fb.Byte((byte)code);
 
             if (whence != null) fb.ObjRef(whence);
-            if (rw) fb.ObjRef(type);
+            if (mode == RW) fb.ObjRef(type);
             fb.ObjRef(val);
         }
         internal static SimpleVariable Thaw(ThawBuffer tb, int subcode) {
@@ -260,13 +297,13 @@ namespace Niecza {
                     // rw = false islist = false whence = null type = null
                     break;
                 case S_LIST:
-                    n.islist = true;
+                    n.mode = LIST;
                     break;
                 case S_VIV:
                     n.whence = (ViviHook) tb.ObjRef();
                     goto case S_RW;
                 case S_RW:
-                    n.rw = true;
+                    n.mode = RW;
                     n.type = (STable) tb.ObjRef();
                     break;
             }
@@ -278,13 +315,13 @@ namespace Niecza {
     public sealed class TiedVariable: Variable {
         P6any fetch;
         P6any store;
+        ViviHook whence;
 
         private TiedVariable() { }
         public TiedVariable(P6any whsub, P6any fetch, P6any store) {
             this.fetch = fetch;
             this.store = store;
             this.whence = whsub.IsDefined() ? new SubViviHook(whsub) : null;
-            this.rw = true;
         }
 
         public override P6any Fetch() {
@@ -303,6 +340,11 @@ namespace Niecza {
                 new [] { Kernel.AnyMO.typeVar, Kernel.NewROScalar(v) }, null));
         }
 
+        public override void Vivify() {
+            ViviHook w = whence;
+            whence = null;
+            if (w != null) w.Do(this);
+        }
         public override Variable GetVar() {
             return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
@@ -841,7 +883,7 @@ namespace Niecza {
         }
 
         static bool IsEmptyAggr(Variable v) {
-            if (!v.islist) return false;
+            if (v.Mode != Variable.LIST) return false;
             P6any p = v.Fetch();
             if (p.mo == Kernel.ArrayMO) {
                 return ((VarDeque)p.GetSlot(Kernel.ListMO, "$!items")).Count() == 0 &&
@@ -862,18 +904,20 @@ namespace Niecza {
             P6any oseo = ose.v.Fetch();
             bool  nseod = nseo.IsDefined();
             bool  oseod = oseo.IsDefined();
+            int omode = ose.v.Mode;
+            int nmode = nse.v.Mode;
             // lowest priority are empty common symbols
-            if (nse.v.rw && !nseod || !nse.constant && IsEmptyAggr(nse.v)) {
+            if (nmode == Variable.RW && !nseod || !nse.constant && IsEmptyAggr(nse.v)) {
                 nse = ose;
                 return null;
             }
-            if (ose.v.rw && !oseod || !ose.constant && IsEmptyAggr(ose.v)) {
+            if (omode == Variable.RW && !oseod || !ose.constant && IsEmptyAggr(ose.v)) {
                 return null;
             }
 
             // no conflict if items are identical
-            if (ose.v == nse.v || !ose.v.rw && !nse.v.rw &&
-                    ose.v.islist == nse.v.islist && oseo == nseo) {
+            if (ose.v == nse.v || omode != Variable.RW &&
+                    omode == nmode && oseo == nseo) {
                 nse = ose;
                 return null;
             }
@@ -2782,10 +2826,9 @@ gotit:
                     }
 
                     if (rw) {
-                        if (src.rw) {
+                        if (src.Rw) {
                             // this will be a functional RW binding
-                            if (src.whence != null)
-                                Kernel.Vivify(src);
+                            src.Vivify();
                             goto bound;
                         } else {
                             if (quiet) return false;
@@ -2793,7 +2836,7 @@ gotit:
                         }
                     }
                     else {
-                        if (!src.rw && islist == src.islist)
+                        if (src.Mode == (islist ? Variable.LIST : Variable.RO))
                             goto bound;
                         src = new SimpleVariable(islist, srco);
                     }
@@ -3163,22 +3206,22 @@ bound: ;
 
     class CtxReturnSelfList : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            if (obj.islist) return obj;
+            if (obj.Mode == Variable.LIST) return obj;
             return Kernel.NewRWListVar(obj.Fetch());
         }
     }
 
     class CtxReturnSelfItem : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            if (!obj.islist) return obj;
+            if (obj.Mode != Variable.LIST) return obj;
             return Kernel.NewROScalar(obj.Fetch());
         }
     }
 
     class CtxAnyList : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            VarDeque itr = new VarDeque(
-                    obj.islist ? Kernel.NewROScalar(obj.Fetch()) : obj);
+            VarDeque itr = new VarDeque(obj.Mode == Variable.LIST ?
+                    Kernel.NewROScalar(obj.Fetch()) : obj);
             P6any l = new P6opaque(Kernel.ListMO);
             Kernel.IterToList(l, itr);
             return Kernel.NewRWListVar(l);
@@ -3197,7 +3240,7 @@ bound: ;
 
             for (int i = 0; i < dsts.Length; i++) {
                 Variable d = dsts[i];
-                if (d.islist) {
+                if (d.Mode == Variable.LIST) {
                     srcs[i] = new P6opaque(Kernel.ListMO);
                     Kernel.IterToList(srcs[i], src);
                     src = new VarDeque();
@@ -3208,13 +3251,7 @@ bound: ;
             }
 
             for (int i = 0; i < dsts.Length; i++) {
-                Variable d = dsts[i];
-                if (d.islist) {
-                    d.Fetch().mo.mro_LISTSTORE.Get(d,
-                            Kernel.NewRWListVar(srcs[i]));
-                } else {
-                    d.Store(srcs[i]);
-                }
+                dsts[i].AssignO(srcs[i], true);
             }
 
             return lhs;
@@ -3849,7 +3886,7 @@ tryagain:
 
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             else if (ks.mo.HasType(Kernel.WhateverMO))
                 return GetAll(obj);
@@ -3865,7 +3902,7 @@ tryagain:
     class IxAnyDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
@@ -3878,7 +3915,7 @@ tryagain:
     class IxAnyExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
@@ -3911,7 +3948,7 @@ tryagain:
     class IxAnyAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             else if (ks.mo.HasType(Kernel.WhateverMO))
                 return GetAll(obj);
@@ -3926,7 +3963,7 @@ tryagain:
     class IxAnyAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             else if (ks.mo.HasType(Kernel.WhateverMO))
                 return GetAll(obj);
@@ -3951,7 +3988,7 @@ tryagain:
     class IxCursorAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             else if (ks.mo.HasType(Kernel.WhateverMO))
                 return GetAll(obj);
@@ -3966,7 +4003,7 @@ tryagain:
     class IxCursorAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             else if (ks.mo.HasType(Kernel.WhateverMO))
                 return GetAll(obj);
@@ -3982,7 +4019,7 @@ tryagain:
 
     class IxHashBindKey : BindHandler {
         public override Variable Bind(Variable obj, Variable key, Variable to) {
-            if (key.islist)
+            if (key.List)
                 throw new NieczaException("Cannot bind to a hash slice");
             P6any ks = key.Fetch();
             P6any os = obj.Fetch();
@@ -3997,7 +4034,7 @@ tryagain:
     class IxHashAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             else if (ks.mo.HasType(Kernel.WhateverMO))
                 return GetAll(obj);
@@ -4017,7 +4054,7 @@ tryagain:
     class IxHashExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             P6any os = obj.Fetch();
             if (!os.IsDefined()) return Kernel.FalseV;
@@ -4029,7 +4066,7 @@ tryagain:
     class IxHashDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             P6any os = obj.Fetch();
             if (!os.IsDefined()) return Kernel.AnyMO.typeVar;
@@ -4054,7 +4091,7 @@ tryagain:
 
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.islist || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             else if (ks.mo.HasType(Kernel.WhateverMO))
                 return GetAll(obj);
@@ -4094,7 +4131,7 @@ tryagain:
 
     class IxListBindPos : BindHandler {
         public override Variable Bind(Variable obj, Variable key, Variable to) {
-            if (key.islist)
+            if (key.List)
                 throw new NieczaException("Cannot bind to a list slice");
             P6any ks = key.Fetch();
             P6any os = obj.Fetch();
@@ -4314,7 +4351,7 @@ tryagain:
 
                 if (final) return;
 
-                if (v.rw && !v.Fetch().IsDefined()) {
+                if (v.Rw && !v.Fetch().IsDefined()) {
                     if (!who.Isa(Kernel.StashMO))
                         throw new NieczaException("Autovivification only implemented for normal-type stashes");
                     string name = Kernel.UnboxAny<string>(who);
@@ -4324,7 +4361,7 @@ tryagain:
                     sc.p1 = new_who;
                     return;
                 }
-                else if (v.rw || v.Fetch().IsDefined()) {
+                else if (v.Rw || v.Fetch().IsDefined()) {
                     throw new NieczaException(key + " does not point to a package");
                 }
                 else {
@@ -4437,7 +4474,7 @@ have_sc:
 
 have_v:
             if (final) return;
-            if (v.rw || v.Fetch().IsDefined())
+            if (v.Rw || v.Fetch().IsDefined())
                 throw new NieczaException(key + " is not a stash");
             sc.type = WHO;
             sc.p1 = v.Fetch().mo.who;
@@ -5159,23 +5196,17 @@ ltm:
             return new BoxObject<T>(v, proto);
         }
 
-        // check whence before calling
-        public static void Vivify(Variable v) {
-            ViviHook w = v.whence;
-            v.whence = null;
-            w.Do(v);
-        }
-
         public static Variable Decontainerize(Variable rhs) {
-            if (!rhs.rw) return rhs;
-            return new SimpleVariable(rhs.islist, rhs.Fetch());
+            if (!rhs.Rw) return rhs;
+            return new SimpleVariable(false, rhs.Fetch());
         }
 
         public const int NBV_RO = 0;
         public const int NBV_RW = 1;
         public const int NBV_LIST = 2;
         public static Variable NewBoundVar(int mode, STable type, Variable rhs) {
-            bool rw = rhs.rw && (mode & NBV_RW) != 0;
+            int omode = rhs.Mode;
+            bool rw = omode == Variable.RW && (mode & NBV_RW) != 0;
             // we always have to fetch, because of subsets (XXX?)
             P6any rhso = rhs.Fetch();
             if (!rhso.Does(type))
@@ -5184,28 +5215,20 @@ ltm:
             if (rw) {
                 // working RW bind implies !rhs.islist, !islist; will return
                 // rhs if successful
-                if (rhs.whence != null) Vivify(rhs);
+                rhs.Vivify();
                 return rhs;
             }
 
             bool islist = (mode & NBV_LIST) != 0;
             // if source is !rw, we may not need to fetch it
-            if (!rhs.rw && islist == rhs.islist)
+            if (omode == (islist ? Variable.LIST : Variable.RO))
                 return rhs;
 
             return new SimpleVariable(islist, rhso);
         }
 
         public static Variable Assign(Variable lhs, Variable rhs) {
-            if (!lhs.islist) {
-                if (!lhs.rw)
-                    throw new NieczaException("assigning to readonly value");
-
-                lhs.Store(rhs.Fetch());
-            } else {
-                lhs.Fetch().mo.mro_LISTSTORE.Get(lhs, rhs);
-            }
-            return lhs;
+            return lhs.Assign(rhs);
         }
 
         // ro, not rebindable
@@ -5364,7 +5387,7 @@ value:      vx = (Variable) th.resultSlot;
         }
 
         public static Frame PromoteToList(Frame th, Variable v) {
-            if (!v.islist) {
+            if (!v.List) {
                 P6opaque lst = new P6opaque(Kernel.ListMO);
                 lst.slots[0 /*items*/] = new VarDeque(v);
                 lst.slots[1 /*rest*/ ] = new VarDeque();
@@ -5416,7 +5439,7 @@ again:
                 throw new NieczaException("Circular data dependency in list iteration, or last fetch threw exception");
             }
             inq0 = inq0v.Fetch();
-            if (inq0v.islist) {
+            if (inq0v.List) {
                 inq.Shift();
                 inq.UnshiftD(inq0.mo.mro_raw_iterator.Get(inq0v));
                 goto again;
@@ -5453,7 +5476,7 @@ again:
                 if (i0 == null) {
                     throw new NieczaException("Circular data dependency in list iteration, or last fetch threw exception");
                 }
-                if (i0.islist && flat) {
+                if (i0.List && flat) {
                     iter[0] = null;
                     iter.Shift_UnshiftD(i0.Fetch().mo.mro_raw_iterator.Get(i0));
                     continue;
@@ -5470,7 +5493,7 @@ again:
         }
 
         public static Variable GetFirst(Variable lst) {
-            if (!lst.islist) {
+            if (!lst.List) {
                 return lst;
             }
             P6opaque dyl = lst.Fetch() as P6opaque;
@@ -5504,8 +5527,8 @@ slow:
         }
 
         public static Variable StashyMerge(Variable o, Variable n, string d1, string d2) {
-            if (n.rw || n.islist) return o;
-            if (o.rw || o.islist) return n;
+            if (n.Mode != Variable.RO) return o;
+            if (o.Mode != Variable.RO) return n;
 
             P6any oo = o.Fetch();
             P6any nn = n.Fetch();
@@ -5640,7 +5663,7 @@ slow:
                         npos, n);
             } else if (index == null) {
                 // TODO: handle adverbs on Zen slices (XXX does this make sense?)
-                res = self.islist ? self : Kernel.NewRWListVar(self.Fetch());
+                res = self.List ? self : Kernel.NewRWListVar(self.Fetch());
             } else if (n == null) {
                 res = ((IndexHandler)p[0]).Get(self, index);
             } else if (p[1] != null && n.ContainsKey("exists")) {
