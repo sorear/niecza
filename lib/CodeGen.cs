@@ -4060,7 +4060,7 @@ dynamic:
             var ldisp  = li as LIDispatch;
             if (ldisp != null)
                 r = new object[] { "dispatch",null,null,null, Handle.Wrap(csr),
-                    Handle.Wrap(ldisp.Get(csr.protopad)) };
+                    csr.protopad != null ? Handle.Wrap(ldisp.Get(csr.protopad))  : null};
             var llab   = li as LILabel;
             if (llab != null)
                 r = new object[] { "label",null,null,null };
