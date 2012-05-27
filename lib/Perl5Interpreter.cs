@@ -83,10 +83,10 @@ public class Perl5Interpreter : IForeignInterpreter {
     public static Variable SVToVariable(IntPtr sv) {
         if (sv == IntPtr.Zero) {
             //TODO: check - cargo culted
-            return Kernel.NilP.mo.typeVar;
+            return Kernel.Nil;
         }
         if (SvOK(sv) == 0) {
-            return Kernel.NilP.mo.typeVar;
+            return Kernel.Nil;
         }
 
         if (SvIOKp(sv) != 0) {

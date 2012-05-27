@@ -546,7 +546,7 @@ public sealed class RxFrame: IFreeze {
             if (Exact(o.mo.mro_raw_Str.Get(var))) {
                 th.resultSlot = MakeCursorV();
             } else {
-                th.resultSlot = Kernel.NilP.mo.typeVar;
+                th.resultSlot = Kernel.Nil;
             }
             return th;
         }
@@ -959,7 +959,7 @@ public class Cursor : P6any {
                 CC.Word.Accepts(backing[p-1])) {
             if (Trace)
                 Console.WriteLine("! no match <ws> at {0}", pos);
-            return Kernel.NilP.mo.typeVar;
+            return Kernel.Nil;
         } else {
             while (p != l && Char.IsWhiteSpace(backing, p)) { p++; }
             if (Trace)

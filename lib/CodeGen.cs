@@ -4375,8 +4375,8 @@ dynamic:
             nst.typeVar = nst.typeObj;
 
             if (ru.name == "CORE" && name == "Nil") {
-                // this anomalous type object is iterable
-                nst.typeVar = Kernel.NewRWListVar(nst.typeObj);
+                // anomalously requires an iterable value
+                Kernel.Nil = Kernel.NewRWListVar(nst.typeObj);
             }
 
             if (pf != null)

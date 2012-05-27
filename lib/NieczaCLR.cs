@@ -638,7 +638,7 @@ for $args (0..9) {
             if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             object o = Kernel.UnboxAny<object>(((Variable)th.lex0).Fetch());
             ((IDisposable)o).Dispose();
-            th.caller.resultSlot = Kernel.NilP.mo.typeVar;
+            th.caller.resultSlot = Kernel.Nil;
             return th.caller;
         }
 
@@ -772,7 +772,7 @@ for $args (0..9) {
 
         public static Variable BoxResult(Type cty, object ret) {
             if (cty == typeof(void))
-                return Kernel.NewRWListVar(Kernel.NilP);
+                return Kernel.Nil;
             if (cty == typeof(sbyte))
                 return Builtins.MakeInt((sbyte)ret);
             if (cty == typeof(byte))

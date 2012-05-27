@@ -1489,10 +1489,14 @@ namespace Niecza {
     public class LIPackage : LexInfo {
         public STable pkg;
         public LIPackage(STable pkg) { this.pkg = pkg; }
-        public override object Get(Frame f) { return pkg.typeVar; }
+        public override object Get(Frame f) {
+            return pkg == Kernel.NilP.mo ? Kernel.Nil : pkg.typeVar;
+        }
         public override void Init(Frame f) { }
         internal override ClrOp GetCode(int up) {
-            return EmitUnit.Current.TypeConstantV(pkg).head;
+            return pkg == Kernel.NilP.mo ?
+                EmitUnit.Current.RefConstant("Nil", "L", Kernel.Nil, typeof(Variable)).head :
+                EmitUnit.Current.TypeConstantV(pkg).head;
         }
         internal override void DoFreeze(FreezeBuffer fb) {
             fb.Byte((byte)LexSerCode.Package);
@@ -4841,6 +4845,7 @@ saveme:
         [CORESaved] public static STable GatherIteratorMO;
         [CORESaved] public static STable IterCursorMO;
         [CORESaved] public static P6any NilP;
+        [CORESaved] public static SimpleVariable Nil;
         [CORESaved] public static P6any AnyP;
         [CORESaved] public static P6any ArrayP;
         [CORESaved] public static P6any EMPTYP;
@@ -5186,7 +5191,7 @@ ltm:
             return new BoxObject<T>(v, proto);
         }
 
-        public static P6any BoxRaw<T>(T v, STable proto) {
+        public static BoxObject<T> BoxRaw<T>(T v, STable proto) {
             return new BoxObject<T>(v, proto);
         }
 
@@ -5240,7 +5245,7 @@ ltm:
             return new SimpleVariable(t, null, t.initObj);
         }
 
-        public static Variable NewRWListVar(P6any container) {
+        public static SimpleVariable NewRWListVar(P6any container) {
             return new SimpleVariable(container);
         }
 
@@ -6165,8 +6170,8 @@ slow:
                 new STable[] { BoolMO });
             TrueV  = BoxRaw<int>(1, BoolMO);
             FalseV = BoxRaw<int>(0, BoolMO);
-            FalseV.Fetch().SetSlot(BoolMO, "$!index", BoxAnyMO(0, IntMO));
-            TrueV.Fetch().SetSlot(BoolMO, "$!index", BoxAnyMO(1, IntMO));
+            FalseV.SetSlot(BoolMO, "$!index", BoxAnyMO(0, IntMO));
+            TrueV.SetSlot(BoolMO, "$!index", BoxAnyMO(1, IntMO));
 
             Handler_Vonly(StrMO, "Str", new CtxReturnSelf(),
                     new CtxJustUnbox<string>(""));
@@ -6493,8 +6498,7 @@ slow:
                 } else {
                     if (csr.caller == null) Panic(csr.info.name + " has no caller?");
                     // TODO: catch generated exceptions and add to @!
-                    csr.caller.resultSlot = Kernel.NilP == null ? null :
-                        Kernel.NilP.mo.typeVar;
+                    csr.caller.resultSlot = Kernel.Nil;
                     Kernel.SetTopFrame(csr);
                     csr = csr.Return();
                 }
@@ -6535,7 +6539,7 @@ slow:
             if (tip < 0) {
                 // catch IP of -1 means to force an immediate return, as
                 // when a CATCH phaser is triggered.
-                tf.caller.resultSlot = Kernel.NilP.mo.typeVar;
+                tf.caller.resultSlot = Kernel.Nil;
                 return tf.Return();
             } else {
                 return tf;
