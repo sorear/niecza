@@ -1,19 +1,48 @@
 module Niecza::Benchmark;
 
-sub timethis($nr, $fun) {
-    my $i = -$nr;
-    my $start = times[0];
-    $fun() while $i++;
-    my $end = times[0];
-    ($end - $start) / $nr;
+my ($prologue, $baseline);
+
+sub mktimer($code is copy) {
+    $code = "$code ;" x 20;
+    $code = '\qq[$prologue]; sub ($__j is copy) { my $__i = times[0]; (\qq[$code]) while --$__j; times[0] - $__i } #OK';
+    eval $code;
 }
 
-my $base1 = timethis(1000000, sub () {});
-my $base2 = timethis(1000000, sub () {});
-my $avg = ($base1 + $base2) / 2;
-INIT { say "null check: rd = {abs ($base1 - $base2) / $avg}  ($base1 $base2)" };
+sub fnum($n) { $n ~~ /:i e/ ?? $n !! substr($n,0,6) }
 
-sub bench($name, $nr, $f) is export {
-    my $time = timethis($nr, $f);
-    say "$name = {($time - $avg)*1e6}µs [{$time*$nr}s / $nr]";
+sub bench($code) is export {
+    my $block = mktimer $code;
+
+    my $runs = 1;
+    $runs *= 2 until $block($runs) >= 0.2;
+
+    say $code;
+
+    my @times;
+    my $total = 0;
+    until $total >= 5 {
+        push @times, $block($runs);
+        $total += @times[*-1];
+    }
+
+    my $baseblock = $baseline * $runs; # using *loop* count
+
+    $runs *= 20; # compensate for repetition above
+
+    # mean and sd time per run-block, in secs
+    my $mean = ($total / @times);
+    my $sd = sqrt(([+] ((@times «-» $mean) «**» 2)) / (@times - 1));
+
+    my $mean_µs = ($mean - $baseblock) / $runs * 1e6;
+    my $sd_µs = ($sd / $runs) * 1e6;
+
+    say "  ==> {fnum $mean_µs} ± {fnum $sd_µs} µs";
+    say "      [{map &fnum, @times}] ($runs runs) - {fnum $baseblock}";
+}
+
+sub start is export ($p) {
+    $prologue = $p;
+    say 'prologue :: ', $p;
+    $baseline = mktimer('')(1_000_001) / 1e6;
+    bench '';
 }
