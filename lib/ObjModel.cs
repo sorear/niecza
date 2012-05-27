@@ -112,12 +112,12 @@ namespace Niecza {
         }
 
         public static Variable ViviHash(Variable obj, Variable key) {
-            return new SimpleVariable(Kernel.MuMO,
+            return new RWVariable(Kernel.MuMO,
                     new NewHashViviHook(obj, key.Fetch().mo.mro_raw_Str.Get(key)),
                     Kernel.AnyP);
         }
         public static Variable ViviArray(Variable obj, Variable key) {
-            return new SimpleVariable(Kernel.MuMO,
+            return new RWVariable(Kernel.MuMO,
                     new NewArrayViviHook(obj, (int)key.Fetch().mo.mro_raw_Numeric.Get(key)),
                     Kernel.AnyP);
         }

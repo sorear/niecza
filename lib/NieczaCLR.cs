@@ -272,10 +272,6 @@ namespace Niecza {
             mi.Invoke(obj, argv_);
         }
 
-        public override Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
-        }
-
         public override void Freeze(Niecza.Serialization.FreezeBuffer fb) { throw new NotImplementedException(); }
     }
 
@@ -302,9 +298,6 @@ namespace Niecza {
             field.SetValue(obj, clr);
         }
 
-        public override Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
-        }
         public override void Freeze(Niecza.Serialization.FreezeBuffer fb) { throw new NotImplementedException(); }
     }
 

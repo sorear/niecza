@@ -78,7 +78,9 @@ namespace Niecza {
         public abstract P6any Fetch();
         public abstract void Store(P6any v);
 
-        public abstract Variable GetVar();
+        public virtual Variable GetVar() {
+            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
+        }
 
         public abstract void Freeze(FreezeBuffer fb);
 
@@ -210,43 +212,57 @@ namespace Niecza {
         }
     }
 
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    public sealed class SimpleVariable: Variable {
-        STable type; // null for Any/Mu variables, and roish
+    public sealed class ListVariable: Variable {
         P6any val;
-        ViviHook whence;
-        int mode;
+        public override int Mode { get { return LIST; } }
 
-        private SimpleVariable() { }
-        public SimpleVariable(STable type, ViviHook whence, P6any val) {
-            this.val = val; this.whence = whence;
-            this.type = type;
-            mode = RW;
-        }
-        public SimpleVariable(P6any val) { this.mode = LIST; this.val = val; }
+        public ListVariable(P6any val) { this.val = val; }
 
         public override P6any  Fetch()       { return val; }
         public override Variable Assign(Variable inp) {
-            if (mode == LIST) {
-                val.mo.mro_LISTSTORE.Get(this, inp);
-            } else {
-                Store(inp.Fetch());
-            }
+            val.mo.mro_LISTSTORE.Get(this, inp);
             return this;
         }
         public override Variable AssignO(P6any inp, bool listishly) {
-            if (mode == LIST) {
-                val.mo.mro_LISTSTORE.Get(this, listishly ?
-                        (Variable)new SimpleVariable(inp) : inp);
-            } else {
-                Store(inp);
-            }
+            val.mo.mro_LISTSTORE.Get(this, listishly ?
+                    (Variable)new ListVariable(inp) : inp);
             return this;
         }
         public override void Store(P6any v)  {
-            if (mode != RW) {
-                throw new NieczaException("Writing to readonly scalar");
-            }
+            throw new NieczaException("Writing to readonly scalar");
+        }
+        public override void Freeze(FreezeBuffer fb) {
+            fb.Byte((byte)SerializationCode.ListVariable);
+            fb.ObjRef(val);
+        }
+        internal static ListVariable Thaw(ThawBuffer tb) {
+            ListVariable n = new ListVariable(null);
+            tb.Register(n);
+            n.val = (P6any) tb.ObjRef();
+            return n;
+        }
+    }
+
+    public sealed class RWVariable: Variable {
+        STable type; // null for Any/Mu variables, and roish
+        P6any val;
+        ViviHook whence;
+
+        public RWVariable(STable type, ViviHook whence, P6any val) {
+            this.val = val; this.whence = whence;
+            this.type = type;
+        }
+
+        public override P6any  Fetch()       { return val; }
+        public override Variable Assign(Variable inp) {
+            Store(inp.Fetch());
+            return this;
+        }
+        public override Variable AssignO(P6any inp, bool listishly) {
+            Store(inp);
+            return this;
+        }
+        public override void Store(P6any v)  {
             if (v == Kernel.NilP) {
                 v = type == null ? Kernel.AnyP : type.initObj;
             }
@@ -261,50 +277,27 @@ namespace Niecza {
             val = v;
         }
 
-        public override Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
-        }
-
-        public override int Mode { get { return mode; } }
+        public override int Mode { get { return RW; } }
         public override void Vivify() {
             ViviHook w = whence;
             whence = null;
             if (w != null) w.Do(this);
         }
 
-        const int S_RO   = 0;
-        const int S_LIST = 1;
-        const int S_RW   = 2;
-        const int S_VIV  = 3;
-
         public override void Freeze(FreezeBuffer fb) {
-            int code = ((int)SerializationCode.SimpleVariable) +
-                (mode == LIST ? S_LIST : mode == RO ? S_RO : whence == null ? S_RW : S_VIV);
+            int code = ((int)SerializationCode.RWVariable) +
+                (whence != null ? 1 : 0);
             fb.Byte((byte)code);
 
             if (whence != null) fb.ObjRef(whence);
-            if (mode == RW) fb.ObjRef(type);
+            fb.ObjRef(type);
             fb.ObjRef(val);
         }
-        internal static SimpleVariable Thaw(ThawBuffer tb, int subcode) {
-            SimpleVariable n = new SimpleVariable();
+        internal static RWVariable Thaw(ThawBuffer tb, int subcode) {
+            RWVariable n = new RWVariable(null, null, null);
             tb.Register(n);
-            switch (subcode) {
-                default: throw new ArgumentException(subcode.ToString());
-                case S_RO:
-                    // rw = false islist = false whence = null type = null
-                    break;
-                case S_LIST:
-                    n.mode = LIST;
-                    break;
-                case S_VIV:
-                    n.whence = (ViviHook) tb.ObjRef();
-                    goto case S_RW;
-                case S_RW:
-                    n.mode = RW;
-                    n.type = (STable) tb.ObjRef();
-                    break;
-            }
+            if (subcode != 0) n.whence = (ViviHook) tb.ObjRef();
+            n.type = (STable) tb.ObjRef();
             n.val = (P6any) tb.ObjRef();
             return n;
         }
@@ -342,9 +335,6 @@ namespace Niecza {
             ViviHook w = whence;
             whence = null;
             if (w != null) w.Do(this);
-        }
-        public override Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
         }
         public override void Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.TiedVariable);
@@ -2835,7 +2825,7 @@ gotit:
                     else {
                         if (src.Mode == (islist ? Variable.LIST : Variable.RO))
                             goto bound;
-                        src = islist ? (Variable)new SimpleVariable(srco) : srco;
+                        src = islist ? (Variable)new ListVariable(srco) : srco;
                     }
 bound: ;
                 }
@@ -4043,7 +4033,7 @@ tryagain:
             Variable r;
             if (h.TryGetValue(kss, out r))
                 return r;
-            return new SimpleVariable(null, new HashViviHook(os, kss),
+            return new RWVariable(null, new HashViviHook(os, kss),
                     Kernel.AnyP);
         }
     }
@@ -4115,8 +4105,8 @@ tryagain:
                 return Kernel.AnyP;
             if (items.Count() <= ix) {
                 if (extend) {
-                    return new SimpleVariable(null,
-                            new ArrayViviHook(os, ix), Kernel.AnyP);
+                    return new RWVariable(null, new ArrayViviHook(os, ix),
+                            Kernel.AnyP);
                 } else {
                     return Kernel.AnyP;
                 }
@@ -4841,7 +4831,7 @@ saveme:
         [CORESaved] public static STable GatherIteratorMO;
         [CORESaved] public static STable IterCursorMO;
         [CORESaved] public static P6any NilP;
-        [CORESaved] public static SimpleVariable Nil;
+        [CORESaved] public static ListVariable Nil;
         [CORESaved] public static P6any AnyP;
         [CORESaved] public static P6any ArrayP;
         [CORESaved] public static P6any EMPTYP;
@@ -5219,7 +5209,7 @@ ltm:
             if (omode == (islist ? Variable.LIST : Variable.RO))
                 return rhs;
 
-            return islist ? (Variable)new SimpleVariable(rhso) : rhso;
+            return islist ? (Variable)new ListVariable(rhso) : rhso;
         }
 
         public static Variable Assign(Variable lhs, Variable rhs) {
@@ -5227,22 +5217,22 @@ ltm:
         }
 
         public static Variable NewRWScalar(STable t, P6any obj) {
-            return new SimpleVariable(t, null, obj);
+            return new RWVariable(t, null, obj);
         }
 
         public static Variable NewMuScalar(P6any obj) {
-            return new SimpleVariable(null, null, obj);
+            return new RWVariable(null, null, obj);
         }
 
         public static Variable NewTypedScalar(STable t) {
             if (t == null)
-                return new SimpleVariable(null, null, AnyMO.typeObj);
+                return new RWVariable(null, null, AnyMO.typeObj);
 
-            return new SimpleVariable(t, null, t.initObj);
+            return new RWVariable(t, null, t.initObj);
         }
 
-        public static SimpleVariable NewRWListVar(P6any container) {
-            return new SimpleVariable(container);
+        public static ListVariable NewRWListVar(P6any container) {
+            return new ListVariable(container);
         }
 
         public static VarDeque SlurpyHelper(Variable[] pos, int from) {

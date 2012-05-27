@@ -70,7 +70,7 @@ namespace Niecza.Serialization {
             new Dictionary<string,Dictionary<string,MethodInfo>>();
 
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 28;
+        static readonly int version = 29;
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,
@@ -271,10 +271,9 @@ namespace Niecza.Serialization {
         Type,
 
         // variables
-        SimpleVariable, // allow 4 for flags
-        SimpleVariable_1,
-        SimpleVariable_2,
-        SimpleVariable_3,
+        RWVariable, // allow 2 for flag
+        RWVariable_1,
+        ListVariable,
         SubstrLValue,
         TiedVariable,
         Blackhole,
@@ -770,12 +769,12 @@ namespace Niecza.Serialization {
                 case SerializationCode.Type:
                     return Register(Type.GetType(String(), true));
 
-                case SerializationCode.SimpleVariable:
-                case SerializationCode.SimpleVariable_1:
-                case SerializationCode.SimpleVariable_2:
-                case SerializationCode.SimpleVariable_3:
-                    return SimpleVariable.Thaw(this,
-                            (int)tag - (int)SerializationCode.SimpleVariable);
+                case SerializationCode.ListVariable:
+                    return ListVariable.Thaw(this);
+                case SerializationCode.RWVariable:
+                case SerializationCode.RWVariable_1:
+                    return RWVariable.Thaw(this,
+                            (int)tag - (int)SerializationCode.RWVariable);
                 case SerializationCode.SubstrLValue:
                     return SubstrLValue.Thaw(this);
                 case SerializationCode.TiedVariable:

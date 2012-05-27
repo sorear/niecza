@@ -156,9 +156,6 @@ namespace Niecza {
             backing.Store(Kernel.BoxRaw<string>(lfr + mfr + rfr, Kernel.StrMO));
         }
 
-        public override Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
-        }
         public override void Freeze(Niecza.Serialization.FreezeBuffer fb) {
             fb.Byte((byte)Niecza.Serialization.SerializationCode.SubstrLValue);
             fb.ObjRef(backing);
@@ -2773,10 +2770,6 @@ again:
 
         public override P6any Fetch() { return value; }
         public override void Store(P6any v) { }
-
-        public override Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
-        }
 
         public override void Freeze(Niecza.Serialization.FreezeBuffer fb) {
             fb.Byte((byte)Niecza.Serialization.SerializationCode.Blackhole);

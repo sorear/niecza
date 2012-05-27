@@ -316,7 +316,7 @@ namespace Niecza.CLRBackend {
         public static readonly ConstructorInfo RxFrame_ctor =
             RxFrame.GetConstructor(new Type[] { String, Cursor, Boolean });
         public static readonly ConstructorInfo SV_ctor =
-            typeof(SimpleVariable).GetConstructor(new Type[] {
+            typeof(RWVariable).GetConstructor(new Type[] {
                     STable, typeof(ViviHook), P6any });
         public static readonly ConstructorInfo SubViviHook_ctor =
             typeof(SubViviHook).GetConstructor(new Type[] { P6any });

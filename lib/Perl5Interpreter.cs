@@ -151,10 +151,6 @@ public class SVVariable : Variable {
     }
     public override void Store(P6any v) {
     }
-    public override Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
-
-    }
     public override void Freeze(FreezeBuffer fb) {
             throw new NieczaException("Freezing perl5 SV* NYI.");
     }
