@@ -720,7 +720,6 @@ next_method: ;
 
             n.how = Kernel.BoxAnyMO<STable>(n, Kernel.ClassHOWMO).Fetch();
             n.typeObj = n.initObj = new P6opaque(n);
-            n.typeVar = n.initVar = n.typeObj;
             ((P6opaque)n.typeObj).slots = null;
 
             n.mo.local_roles.Add(stable);
@@ -896,7 +895,6 @@ next_method: ;
 
         public P6any how, who;
         public P6any typeObj, initObj;
-        public Variable typeVar, initVar;
         public string name;
         public bool useAcceptsType;
 
@@ -1065,7 +1063,7 @@ next_method: ;
                 var pun = mo.PunRole();
                 var punfunc = Kernel.GetVar("::GLOBAL::Niecza", "&autopun").v;
                 var clone = Kernel.RunInferior(punfunc.Fetch().Invoke(
-                    Kernel.GetInferiorRoot(), new Variable[] { pun.typeVar,
+                    Kernel.GetInferiorRoot(), new Variable[] { pun.typeObj,
                         Builtins.MakeStr(name) }, null));
                 return new DispatchEnt(null, clone.Fetch());
             }
@@ -1114,8 +1112,6 @@ next_method: ;
             fb.ObjRef(who);
             fb.ObjRef(typeObj);
             fb.ObjRef(initObj);
-            fb.ObjRef(typeVar);
-            fb.ObjRef(initVar);
             fb.String(name);
             fb.Byte((byte)(useAcceptsType ? 1 : 0));
             fb.String(box_type == null ? null : box_type.AssemblyQualifiedName);
@@ -1131,8 +1127,6 @@ next_method: ;
             n.who = (P6any)tb.ObjRef();
             n.typeObj = (P6any)tb.ObjRef();
             n.initObj = (P6any)tb.ObjRef();
-            n.typeVar = (Variable)tb.ObjRef();
-            n.initVar = (Variable)tb.ObjRef();
             n.name = tb.String();
             n.useAcceptsType = tb.Byte() != 0;
             string box_type = tb.String();

@@ -611,7 +611,7 @@ for $args (0..9) {
             // XXX there HAS to be a better way to do this.
             STable mo = ((Variable)th.lex0).Fetch().mo;
             object obj = Array.CreateInstance(mo.box_type, 1).GetValue(0);
-            th.caller.resultSlot = obj == null ? mo.typeVar :
+            th.caller.resultSlot = obj == null ? mo.typeObj :
                 Kernel.BoxAnyMO<object>(obj, mo);
             return th.caller;
         }
@@ -622,7 +622,7 @@ for $args (0..9) {
             object clr;
             if (!CoerceArgument(out clr, mo.box_type, (Variable)th.lex1))
                 return Kernel.Die(th, "Cannot coerce value of type " + ((Variable)th.lex1).Fetch().mo.name + " to " + mo.box_type.FullName);
-            th.caller.resultSlot = clr == null ? mo.typeVar :
+            th.caller.resultSlot = clr == null ? mo.typeObj :
                 Kernel.BoxAnyMO<object>(clr, mo);
             return th.caller;
         }
@@ -758,7 +758,6 @@ for $args (0..9) {
             m.Invalidate();
             m.box_type = t;
             m.typeObj = m.initObj = new BoxObject<object>(null, m);
-            m.typeVar = m.initVar = m.typeObj;
             if (CLROpts.Debug) {
                 Console.WriteLine("--- Created box for {0} ---", m.name);
                 foreach (var o in m.mo.type_list)
@@ -766,7 +765,7 @@ for $args (0..9) {
             }
 
             RuntimeUnit.reg.InstallFakeUnit("CLR," + t.AssemblyQualifiedName,
-                m, m.who, m.how, m.mo, m.typeObj, m.typeVar);
+                m, m.who, m.how, m.mo, m.typeObj);
             return m;
         }
 
@@ -803,7 +802,7 @@ for $args (0..9) {
                 return ((P6any)ret);
 
             if (ret == null)
-                return Kernel.AnyMO.typeVar;
+                return Kernel.AnyP;
             return Kernel.BoxAnyMO<object>(ret, GetWrapper(ret.GetType()));
         }
 

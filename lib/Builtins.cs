@@ -726,7 +726,7 @@ public partial class Builtins {
         int len = substr_len(v1, pos, v3);
         string str = v1.Fetch().mo.mro_raw_Str.Get(v1);
         string sub = Builtins.LaxSubstring2(str, pos, len);
-        return sub == null ? Kernel.StrMO.typeVar : MakeStr(sub);
+        return sub == null ? Kernel.StrMO.typeObj : MakeStr(sub);
     }
 
     static readonly Func<Variable,Variable,Variable> plus_d = plus;
@@ -1574,7 +1574,7 @@ public partial class Builtins {
 
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
-        if (r.Length == 0) return Kernel.AnyMO.typeVar;
+        if (r.Length == 0) return Kernel.AnyP;
         else if (r.Length >= 2 &&
                 r[0] >= (char)0xD800 && r[0] <= (char)0xDBFF &&
                 r[1] >= (char)0xDC00 && r[1] <= (char)0xDFFF)
@@ -1591,7 +1591,7 @@ public partial class Builtins {
 
         int r = (int)o1.mo.mro_raw_Numeric.Get(v);
         if (r >= 0x110000)
-            return Kernel.AnyMO.typeVar; // XXX failure
+            return Kernel.AnyP; // XXX failure
         return Kernel.BoxAnyMO(Utils.Chr(r), Kernel.StrMO);
     }
 
@@ -2428,7 +2428,7 @@ again:
         lkey = (char)lkey.Length + lkey + key;
         StashEnt r;
         if (!Kernel.currentGlobals.TryGetValue(lkey, out r))
-            return Kernel.AnyMO.typeVar;
+            return Kernel.AnyP;
         Kernel.currentGlobals.Remove(key);
         return r.v;
     }
@@ -2637,7 +2637,6 @@ again:
 
         n.how = Kernel.BoxAny<STable>(n, obj.mo.how).Fetch();
         n.typeObj = n.initObj = new P6opaque(n);
-        n.typeVar = n.initVar = n.typeObj;
         ((P6opaque)n.typeObj).slots = null;
 
         n.mo.superclasses.Add(obj.mo);
@@ -2646,7 +2645,7 @@ again:
         newtype.Store(n.typeObj);
 
         string aname = null;
-        if (init != Kernel.AnyMO.typeVar) {
+        if (init != Kernel.AnyP) {
             if (!obj.IsDefined())
                 throw new NieczaException("Cannot initialize a slot when mixing into a type object");
             if (n.mo.local_attr.Count != 1 || (n.mo.local_attr[0].flags & P6how.A_PUBLIC) == 0)
@@ -2662,7 +2661,7 @@ again:
                 Kernel.Assign((Variable)obj.GetSlot(n, aname), init);
             return obj;
         } else {
-            return n.typeVar;
+            return n.typeObj;
         }
     }
 
@@ -2723,11 +2722,10 @@ again:
         STable r = new STable('{' + name + '}');
         r.mo.FillRole(new STable[0], null);
         r.typeObj = r.initObj = new P6opaque(r);
-        r.typeVar = r.initVar = r.typeObj;
         r.mo.AddMethod(0, name, meth);
         r.mo.Revalidate();
         r.SetupVTables();
-        return r.typeVar;
+        return r.typeObj;
     }
 
     // TODO: merge
@@ -2735,11 +2733,10 @@ again:
         STable r = new STable('{' + name + '}');
         r.mo.FillRole(new STable[0], null);
         r.typeObj = r.initObj = new P6opaque(r);
-        r.typeVar = r.initVar = r.typeObj;
         r.mo.AddMethod(P6how.M_MULTI, name, meth);
         r.mo.Revalidate();
         r.SetupVTables();
-        return r.typeVar;
+        return r.typeObj;
     }
 
     public static Variable type_mixin_role(Variable type, Variable meth) {
@@ -2749,12 +2746,11 @@ again:
 
         r.mo.FillRole(new STable[0], null);
         r.typeObj = r.initObj = new P6opaque(r);
-        r.typeVar = r.initVar = r.typeObj;
         r.mo.AddMethod(0, name, meth.Fetch());
         r.mo.AddMethod(P6how.V_PRIVATE, name, meth.Fetch());
         r.mo.AddAttribute(name, P6how.A_PUBLIC, null, stype);
         r.mo.Revalidate();
-        return r.typeVar;
+        return r.typeObj;
     }
 
     public static void raise(string sig) { PosixWrapper.raise(sig); }
@@ -2835,7 +2831,7 @@ again:
     }
 
     public static Variable param_type(P6any param) {
-        return (((Parameter)param).type ?? Kernel.AnyMO).typeVar;
+        return (((Parameter)param).type ?? Kernel.AnyMO).typeObj;
     }
 
     public static P6any param_subsig(P6any param) {

@@ -324,7 +324,7 @@ namespace Niecza {
 
         public override P6any Fetch() {
             Variable vr = Kernel.RunInferior(fetch.Invoke(
-                Kernel.GetInferiorRoot(), new [] {Kernel.AnyMO.typeVar}, null));
+                Kernel.GetInferiorRoot(), new [] {Kernel.AnyP}, null));
             return vr.Fetch();
         }
 
@@ -335,7 +335,7 @@ namespace Niecza {
                 vh.Do(this);
             }
             Kernel.RunInferior(store.Invoke(Kernel.GetInferiorRoot(),
-                new [] { Kernel.AnyMO.typeVar, v }, null));
+                new [] { Kernel.AnyP, v }, null));
         }
 
         public override void Vivify() {
@@ -531,9 +531,6 @@ namespace Niecza {
         }
         internal CpsOp TypeConstantP(STable s) {
             return RefConstant(s.name, "P", s.typeObj, Tokens.P6any);
-        }
-        internal CpsOp TypeConstantV(STable s) {
-            return RefConstant(s.name, "V", s.typeVar, Tokens.Variable);
         }
         internal CpsOp SubConstant(SubInfo s) {
             return RefConstant(s == null ? "" : s.name, "S", s, Tokens.SubInfo);
@@ -1242,7 +1239,7 @@ namespace Niecza {
 
     public class LIConstant : LexInfo {
         public Variable value;
-        public LIConstant() { this.value = Kernel.AnyMO.typeVar; }
+        public LIConstant() { this.value = Kernel.AnyP; }
         internal LIConstant(Variable value) { this.value = value; }
         public override void Init(Frame f) { }
         public override void BindFields() { }
@@ -1308,7 +1305,7 @@ namespace Niecza {
             if ((flags & NOINIT) != 0)
                 return;
             if ((flags & ROINIT) != 0)
-                Set(f, Kernel.AnyMO.typeVar);
+                Set(f, Kernel.AnyP);
             else if ((flags & DEFOUTER) != 0)
                 Set(f, f.info.GetOuterTopic(f));
             else if ((flags & LIST) != 0)
@@ -1490,13 +1487,13 @@ namespace Niecza {
         public STable pkg;
         public LIPackage(STable pkg) { this.pkg = pkg; }
         public override object Get(Frame f) {
-            return pkg == Kernel.NilP.mo ? Kernel.Nil : pkg.typeVar;
+            return pkg == Kernel.NilP.mo ? (Variable)Kernel.Nil : pkg.typeObj;
         }
         public override void Init(Frame f) { }
         internal override ClrOp GetCode(int up) {
             return pkg == Kernel.NilP.mo ?
                 EmitUnit.Current.RefConstant("Nil", "L", Kernel.Nil, typeof(Variable)).head :
-                EmitUnit.Current.TypeConstantV(pkg).head;
+                EmitUnit.Current.TypeConstantP(pkg).head;
         }
         internal override void DoFreeze(FreezeBuffer fb) {
             fb.Byte((byte)LexSerCode.Package);
@@ -2540,7 +2537,7 @@ namespace Niecza {
                 }
                 csr = csr.outer;
             }
-            return Kernel.AnyMO.typeVar;
+            return Kernel.AnyP;
         }
 
         public void LexicalBind(string name, Variable to) {
@@ -2667,13 +2664,13 @@ namespace Niecza {
                 Variable src = null;
                 if ((flags & Parameter.SLURPY_PCL) != 0) {
                     src = (slot >= 0) ? Kernel.BoxAnyMO(pos, Kernel.ParcelMO) :
-                        Kernel.AnyMO.typeVar;
+                        Kernel.AnyP;
                     posc  = pos.Length;
                     goto gotit;
                 }
                 if ((flags & Parameter.SLURPY_CAP) != 0) {
                     if (slot < 0) {
-                        src = Kernel.AnyMO.typeVar;
+                        src = Kernel.AnyP;
                         named = null; namedc = null; posc = pos.Length;
                         goto gotit;
                     }
@@ -2747,7 +2744,7 @@ get_default:
                 if ((flags & Parameter.DEFOUTER) != 0) {
                     Frame f = th;
                     if (th.info.outer_topic_key < 0) {
-                        src = Kernel.AnyMO.typeVar;
+                        src = Kernel.AnyP;
                         goto gotit;
                     }
                     for (int i = 0; i < th.info.outer_topic_rank; i++) f = f.outer;
@@ -2761,7 +2758,7 @@ get_default:
                     else if ((flags & Parameter.IS_HASH) != 0)
                         src = Kernel.CreateHash();
                     else
-                        src = type.initVar;
+                        src = type.initObj;
                     goto gotit;
                 }
                 if (quiet) return false;
@@ -3368,25 +3365,25 @@ bound: ;
     class PopList : ContextHandler<Variable> {
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
-            if (!o.IsDefined()) return Kernel.AnyMO.typeVar;
+            if (!o.IsDefined()) return Kernel.AnyP;
             VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
             VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "$!rest");
             while (Kernel.IterHasFlat(rest, false))
                 items.Push(rest.Shift());
-            return (items.Count() != 0) ? items.Pop() : Kernel.AnyMO.typeVar;
+            return (items.Count() != 0) ? items.Pop() : Kernel.AnyP;
         }
     }
     class ShiftList : ContextHandler<Variable> {
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
-            if (!o.IsDefined()) return Kernel.AnyMO.typeVar;
+            if (!o.IsDefined()) return Kernel.AnyP;
             VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
             VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "$!rest");
             if (items.Count() != 0)
                 return items.Shift();
             if (Kernel.IterHasFlat(rest, false))
                 return rest.Shift();
-            return Kernel.AnyMO.typeVar;
+            return Kernel.AnyP;
         }
     }
     class UnshiftList : PushyHandler {
@@ -3906,7 +3903,7 @@ tryagain:
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return Kernel.AnyMO.typeVar;
+                return Kernel.AnyP;
             return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                 "delete_key", new Variable[] { obj, key }, null));
         }
@@ -3993,7 +3990,7 @@ tryagain:
                 return GetAll(obj);
             P6any o = obj.Fetch();
             if (!o.IsDefined())
-                return Kernel.AnyMO.typeVar;
+                return Kernel.AnyP;
 
             Cursor os = (Cursor)o;
             return os.GetKey(ks.mo.mro_raw_Str.Get(key));
@@ -4009,7 +4006,7 @@ tryagain:
 
             P6any o = obj.Fetch();
             if (!o.IsDefined())
-                return Kernel.AnyMO.typeVar;
+                return Kernel.AnyP;
 
             Cursor os = (Cursor)o;
             return os.GetKey(Utils.N2S(ks.mo.mro_raw_Numeric.Get(key)));
@@ -4068,7 +4065,7 @@ tryagain:
             if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
                 return Slice(obj, key);
             P6any os = obj.Fetch();
-            if (!os.IsDefined()) return Kernel.AnyMO.typeVar;
+            if (!os.IsDefined()) return Kernel.AnyP;
             string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
             Variable r;
@@ -4076,7 +4073,7 @@ tryagain:
                 h.Remove(kss);
                 return r;
             } else {
-                return Kernel.AnyMO.typeVar;
+                return Kernel.AnyP;
             }
         }
     }
@@ -4115,13 +4112,13 @@ tryagain:
                 items.Push(rest.Shift());
             }
             if (ix < 0)
-                return Kernel.AnyMO.typeVar;
+                return Kernel.AnyP;
             if (items.Count() <= ix) {
                 if (extend) {
                     return new SimpleVariable(null,
                             new ArrayViviHook(os, ix), Kernel.AnyP);
                 } else {
-                    return Kernel.AnyMO.typeVar;
+                    return Kernel.AnyP;
                 }
             }
             return items[ix];
@@ -4182,14 +4179,13 @@ tryagain:
             st.who = who;
             st.typeObj = st.initObj = new P6opaque(st, 0);
             ((P6opaque)st.typeObj).slots = null;
-            st.typeVar = st.initVar = st.typeObj;
             st.mo.type  = P6how.PACKAGE;
             st.mo.rtype = "package";
             // XXX should be PackageHOW
             st.how = new BoxObject<STable>(st, Kernel.ClassHOWMO, 0);
             st.mo.Revalidate();
             st.SetupVTables();
-            return st.typeVar;
+            return st.typeObj;
         }
 
         bool HasCaller() {
@@ -4326,7 +4322,7 @@ tryagain:
                 }
                 if (bind_to != null)
                     throw new NieczaException("No slot to bind");
-                v = Kernel.AnyMO.typeVar;
+                v = Kernel.AnyP;
                 goto have_v;
             }
             else if (type == CLR) {
@@ -4334,7 +4330,7 @@ tryagain:
                     throw new NieczaException("CLR objects may not be used directly in safe mode");
                 if (bind_to != null)
                     throw new NieczaException("Cannot bind interop namespaces");
-                v = CLRWrapperProvider.GetNamedWrapper((string)p1 + "." + key).typeVar;
+                v = CLRWrapperProvider.GetNamedWrapper((string)p1 + "." + key).typeObj;
                 goto have_v;
             }
             else if (type == WHO) {
@@ -4370,7 +4366,7 @@ tryagain:
             else if (type == ROOT) {
                 // semantic root, handles most of the special names
                 if (key == "OUR") {
-                    v = ToInfo().cur_pkg.typeVar;
+                    v = ToInfo().cur_pkg.typeObj;
                     goto have_v;
                 } else if (key == "GLOBAL") {
                     sc.p1 = Kernel.GetVar("", "GLOBAL").v.Fetch().mo.who;
@@ -4451,7 +4447,7 @@ tryagain:
                     }
                     if (bind_to != null)
                         throw new NieczaException("No slot to bind");
-                    v = Kernel.AnyMO.typeVar;
+                    v = Kernel.AnyP;
                     goto have_v;
                 }
             }
@@ -4706,7 +4702,7 @@ saveme:
                 th.ip = 1;
                 return ((P6any)th.lex0).Invoke(th, Variable.None, null);
             } else {
-                return Take(th, Kernel.EMPTYP.mo.typeVar);
+                return Take(th, Kernel.EMPTYP);
             }
         }
 
@@ -5296,7 +5292,7 @@ ltm:
             } else if (currentGlobals.TryGetValue("\x9::PROCESS" + name, out v)) {
                 return v.v;
             } else {
-                return AnyMO.typeVar;
+                return AnyP;
             }
         }
 
@@ -5495,7 +5491,7 @@ again:
             if (itemsl.Count() == 0) {
                 VarDeque restl = (VarDeque) dyl.GetSlot(ListMO, "$!rest");
                 if (restl.Count() == 0) {
-                    return AnyMO.typeVar;
+                    return AnyP;
                 }
                 goto slow;
             }
@@ -5701,7 +5697,7 @@ slow:
         }
 
         public static Frame InstantiateRole(Frame th, Variable[] pcl) {
-            th.resultSlot = DoInstantiateRole(pcl[0].Fetch().mo,pcl[1]).typeVar;
+            th.resultSlot = DoInstantiateRole(pcl[0].Fetch().mo,pcl[1]).typeObj;
             return th;
         }
 
@@ -5723,7 +5719,6 @@ slow:
             r.mo.role_typecheck_list.Add(r);
             r.mo.local_roles = prole.mo.local_roles;
             r.typeObj = r.initObj = new P6opaque(r);
-            r.typeVar = r.initVar = r.typeObj;
             foreach (var mi in prole.mo.lmethods)
                 r.mo.lmethods.Add(mi);
             foreach (var ai in prole.mo.local_attr)
@@ -5747,7 +5742,7 @@ slow:
             if (arg.mo.type == P6how.CURRIED_ROLE) {
                 STable r;
                 Variable[] pass = new Variable[arg.mo.curriedArgs.Length+1];
-                pass[0] = cls.typeVar;
+                pass[0] = cls.typeObj;
                 Array.Copy(arg.mo.curriedArgs, 0, pass, 1, pass.Length-1);
                 Frame ifr = (Frame)RunInferior(arg.mo.roleFactory.
                     Invoke(GetInferiorRoot(), pass, null)).Fetch();
@@ -5759,7 +5754,6 @@ slow:
                 r.mo.rtype = "role";
                 r.mo.role_typecheck_list = arg.mo.role_typecheck_list;
                 r.typeObj = r.initObj = new P6opaque(r);
-                r.typeVar = r.initVar = r.typeObj;
                 // Hack - reseat role to this closure-clone of methods
                 foreach (var mi in arg.mo.lmethods) {
                     var nmi = mi;
@@ -5891,7 +5885,6 @@ slow:
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
             n.typeObj = n.initObj = new P6opaque(n);
-            n.typeVar = n.initVar = n.typeObj;
             ((P6opaque)n.typeObj).slots = null;
 
             n.mo.superclasses.Add(b);
@@ -6420,7 +6413,7 @@ slow:
                         new Variable[] {
                             Builtins.MakeParcel(Builtins.MakeInt(type),
                                 Kernel.BoxAnyMO(name, Kernel.StrMO),
-                                tgt == null ? Kernel.AnyMO.typeVar : tgt)
+                                tgt == null ? Kernel.AnyP : tgt)
                         }, null, false, null);
                     Variable np = Kernel.RunInferior(nfr);
                     if (np.Fetch().mo.mro_raw_Bool.Get(np)) {
@@ -6524,7 +6517,7 @@ slow:
                     return de.info.SetupCall(tf.caller, de.outer, de.ip6, p, n,
                             false, de);
                 } else {
-                    tf.caller.resultSlot = AnyMO.typeVar;
+                    tf.caller.resultSlot = AnyP;
                     return tf.caller;
                 }
             } else if (type == SubInfo.ON_DIE) {
@@ -6532,7 +6525,7 @@ slow:
                 if (exn.Fetch().mo.mro_raw_Numeric.Get(exn) == 1)
                     exn = exn.Fetch().mo.mro_at_pos.Get(exn, Builtins.MakeInt(0));
                 tf.LexicalBind("$!", (Variable)exn);
-                td = AnyMO.typeVar;
+                td = AnyP;
             }
             tf.ip = tip;
             tf.resultSlot = td;

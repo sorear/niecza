@@ -870,7 +870,7 @@ public class Cursor : P6any {
             l.slots[1 /*rest*/ ] = new VarDeque();
             return l;
         } else {
-            return caps.Count() != 0 ? caps[0] : Kernel.AnyMO.typeVar;
+            return caps.Count() != 0 ? caps[0] : Kernel.AnyP;
         }
     }
 
@@ -1632,7 +1632,7 @@ public class LADParam : LAD {
         // alternatively, we could generalize to any variable, and add rechecks
         Frame outer = pad.outer_stack[pad.outer_stack.Count - 1];
 
-        Variable vr = outer == null ? Kernel.AnyMO.typeVar :
+        Variable vr = outer == null ? Kernel.AnyP :
             outer.LexicalFind(name);
 
         P6any ob = vr.Fetch();

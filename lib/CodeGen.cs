@@ -482,12 +482,8 @@ namespace Niecza.CLRBackend {
             P6opaque.GetField("slots");
         public static readonly FieldInfo DMO_typeObj =
             STable.GetField("typeObj");
-        public static readonly FieldInfo DMO_typeVar =
-            STable.GetField("typeVar");
         public static readonly FieldInfo DMO_initObj =
             STable.GetField("initObj");
-        public static readonly FieldInfo DMO_initVar =
-            STable.GetField("initVar");
         public static readonly FieldInfo DMO_how =
             STable.GetField("how");
         public static readonly FieldInfo Kernel_NumMO =
@@ -2506,7 +2502,7 @@ namespace Niecza.CLRBackend {
                     } else if ((flags & Parameter.DEFOUTER) != 0) {
                         get = th.RawAccessLex("outerlex", lex, null);
                     } else if ((flags & Parameter.OPTIONAL) != 0) {
-                        get = eu.TypeConstantV(type);
+                        get = eu.TypeConstantP(type);
                     } else {
                         get = CpsOp.CpsCall(Tokens.Variable, Tokens.Kernel_Die,
                             CpsOp.StringLiteral("No value in "+name+" available for parameter "+sig.parms[i].name));
@@ -2721,8 +2717,6 @@ dynamic:
                 }
                 if (kind == "mo")
                     return th.cpb.eu.TypeConstant(m);
-                if (kind == "typeVar")
-                    return th.cpb.eu.TypeConstantV(m);
                 if (kind == "typeObj")
                     return th.cpb.eu.TypeConstantP(m);
                 throw new NotImplementedException("class_ref " + kind);
@@ -3326,7 +3320,7 @@ dynamic:
                     object bit;
                     CpsOp tc = EmitUnit.Current.TypeConstant(ls.type);
                     if ((f & LISimple.ROINIT) != 0) {
-                        bit = a(j("class_ref"), j("typeVar"), Kernel.AnyMO);
+                        bit = a(j("class_ref"), j("typeObj"), Kernel.AnyMO);
                     } else if ((f & LISimple.DEFOUTER) != 0) {
                         bit = a(j("outerlex"), j(kv.Key));
                     } else if ((f & (LISimple.HASH | LISimple.LIST)) != 0) {
@@ -4223,7 +4217,7 @@ dynamic:
 
             Variable vitm = null;
             if (item is STable)
-                vitm = ((STable)item).typeVar;
+                vitm = ((STable)item).typeObj;
             else if (item is SubInfo)
                 vitm = ((SubInfo)item).protosub;
             else if (item == null)
@@ -4372,7 +4366,6 @@ dynamic:
             if (nst.typeObj == null) // AnyMO.typeObj is set up early
                 nst.typeObj = new P6opaque(nst, 0);
             ((P6opaque)nst.typeObj).slots = null;
-            nst.typeVar = nst.typeObj;
 
             if (ru.name == "CORE" && name == "Nil") {
                 // anomalously requires an iterable value
@@ -4382,7 +4375,6 @@ dynamic:
             if (pf != null)
                 pf.SetValue(null, nst.typeObj);
 
-            nst.initVar    = nst.typeVar;
             nst.initObj = nst.typeObj;
             nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
             nst.how        = Kernel.BoxRaw<STable>(nst, Kernel.ClassHOWMO);
@@ -4407,14 +4399,13 @@ dynamic:
 
             subset.mo.FillSubset(basety);
             subset.initObj = basety.initObj;
-            subset.initVar = basety.initVar;
             return null;
         }
         public static object type_get_basetype(object[] args) {
             return Handle.Wrap(((STable)Handle.Unbox(args[1])).mo.superclasses[0]);
         }
         public static object type_get_type_var(object[] args) {
-            return Handle.Wrap(((STable)Handle.Unbox(args[1])).typeVar);
+            return Handle.Wrap(((STable)Handle.Unbox(args[1])).typeObj);
         }
         public static object type_set_where(object[] args) {
             STable  subset = (STable)Handle.Unbox(args[1]);

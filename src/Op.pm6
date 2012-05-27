@@ -220,7 +220,7 @@ class CallMethod is CallLike {
                     $!receiver.cgop($body), self.argblock($body))));
         } elsif $!pclass {
             $CgOp.methodcall($.receiver.cgop($body), 'dispatch:<::>',
-                $CgOp.class_ref('typeVar', $!pclass), $CgOp.box("Str",$name),
+                $CgOp.class_ref('typeObj', $!pclass), $CgOp.box("Str",$name),
                 self.argblock($body));
         } else {
             $CgOp.methodcall($.receiver.cgop($body),
