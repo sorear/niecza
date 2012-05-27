@@ -1770,7 +1770,9 @@ namespace Niecza.CLRBackend {
             stmts.Add(new ClrLabel(l2, true));
             foreach (ClrEhSpan cl in co) stmts.Add(cl);
 
-            return new CpsOp(stmts.ToArray(), new ClrResult(body.head.Returns));
+            // TODO: this is currently only used for exceptiony stuff so
+            // Variable is required.
+            return new CpsOp(stmts.ToArray(), new ClrResult(Tokens.Variable));
         }
 
         public static CpsOp SyncBefore(CpsOp z) {
@@ -1815,6 +1817,13 @@ namespace Niecza.CLRBackend {
             stmts.Add(new ClrLabel(l2, false));
 
             Type ty = iffalse.head.Returns;
+            if (iftrue.head.Returns != ty) {
+                if (Tokens.Variable.IsAssignableFrom(iftrue.head.Returns) &&
+                        Tokens.Variable.IsAssignableFrom(ty))
+                    ty = Tokens.Variable;
+                else
+                    throw new Exception("Cannot match types in ternary: " + iftrue.head.Returns + " " + ty);
+            }
             return new CpsOp(stmts.ToArray(),
                     (ty == Tokens.Void) ? (ClrOp)ClrNoop.Instance :
                     new ClrResult(ty));
@@ -2016,7 +2025,8 @@ namespace Niecza.CLRBackend {
             return Primitive(zyg, delegate(ClrOp[] heads) {
                 return new CpsOp((heads.Length >= 1)
                     ? l.SetCode(up, heads[0], EmitUnit.Current.np.sub)
-                    : l.GetCode(up, EmitUnit.Current.np.sub));
+                    : new ClrWiden(Tokens.Variable,
+                        l.GetCode(up, EmitUnit.Current.np.sub)));
             });
         }
 
@@ -2563,6 +2573,8 @@ namespace Niecza.CLRBackend {
                 th.scope_stack.RemoveAt(th.scope_stack.Count - 1);
                 return CpsOp.Span(s, e, false, xn, co);
             };
+            handlers["widen"] = delegate(NamProcessor th, object[] zyg) {
+                return CpsOp.Widen(namtype(zyg[1]), th.Scan(zyg[2])); };
             handlers["letvar"] = delegate(NamProcessor th, object[] zyg) {
                 return th.AccessLet(zyg); };
             handlers["scopedlex"] =
