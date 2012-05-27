@@ -248,7 +248,7 @@ namespace Niecza {
                 throw new NieczaException("Writing to readonly scalar");
             }
             if (v == Kernel.NilP) {
-                v = type == null ? Kernel.AnyP : type.initObject;
+                v = type == null ? Kernel.AnyP : type.initObj;
             }
             if (type != null && !v.Does(type)) {
                 throw new NieczaException("Nominal type check failed for scalar store; got " + v.mo.name + ", needed " + type.name + " or subtype");
@@ -530,7 +530,7 @@ namespace Niecza {
             return RefConstant(s == null ? "" : s.name, "MO", s, Tokens.STable);
         }
         internal CpsOp TypeConstantP(STable s) {
-            return RefConstant(s.name, "P", s.typeObject, Tokens.P6any);
+            return RefConstant(s.name, "P", s.typeObj, Tokens.P6any);
         }
         internal CpsOp TypeConstantV(STable s) {
             return RefConstant(s.name, "V", s.typeVar, Tokens.Variable);
@@ -4176,9 +4176,9 @@ tryagain:
         public static Variable MakePackage(string name, P6any who) {
             STable st = new STable(name);
             st.who = who;
-            st.typeObject = st.initObject = new P6opaque(st, 0);
-            ((P6opaque)st.typeObject).slots = null;
-            st.typeVar = st.initVar = st.typeObject;
+            st.typeObj = st.initObj = new P6opaque(st, 0);
+            ((P6opaque)st.typeObj).slots = null;
+            st.typeVar = st.initVar = st.typeObj;
             st.mo.type  = P6how.PACKAGE;
             st.mo.rtype = "package";
             // XXX should be PackageHOW
@@ -4888,8 +4888,8 @@ saveme:
         [CORESaved] public static STable SignatureMO;
         [CORESaved] public static P6any StashP;
 
-        [CORESaved] public static Variable TrueV;
-        [CORESaved] public static Variable FalseV;
+        [CORESaved] public static BoxObject<int> TrueV;
+        [CORESaved] public static BoxObject<int> FalseV;
 
         public static P6any MakeSub(SubInfo info, Frame outer) {
             P6opaque n = new P6opaque(info.mo ?? CodeMO, 2);
@@ -5163,7 +5163,7 @@ ltm:
                 info.code = SaferTrap;
         }
         public static Variable BoxAny<T>(T v, P6any proto) {
-            if (proto == BoolMO.typeObject) {
+            if (proto == BoolMO.typeObj) {
                 if (v is bool)
                     return ((bool) (object) v) ? TrueV : FalseV;
                 else
@@ -5235,9 +5235,9 @@ ltm:
 
         public static Variable NewTypedScalar(STable t) {
             if (t == null)
-                return new SimpleVariable(null, null, AnyMO.typeObject);
+                return new SimpleVariable(null, null, AnyMO.typeObj);
 
-            return new SimpleVariable(t, null, t.initObject);
+            return new SimpleVariable(t, null, t.initObj);
         }
 
         public static Variable NewRWListVar(P6any container) {
@@ -5717,8 +5717,8 @@ slow:
             r.mo.role_typecheck_list = new List<STable>(prole.mo.role_typecheck_list);
             r.mo.role_typecheck_list.Add(r);
             r.mo.local_roles = prole.mo.local_roles;
-            r.typeObject = r.initObject = new P6opaque(r);
-            r.typeVar = r.initVar = r.typeObject;
+            r.typeObj = r.initObj = new P6opaque(r);
+            r.typeVar = r.initVar = r.typeObj;
             foreach (var mi in prole.mo.lmethods)
                 r.mo.lmethods.Add(mi);
             foreach (var ai in prole.mo.local_attr)
@@ -5753,8 +5753,8 @@ slow:
                 r.mo.type  = P6how.ROLE;
                 r.mo.rtype = "role";
                 r.mo.role_typecheck_list = arg.mo.role_typecheck_list;
-                r.typeObject = r.initObject = new P6opaque(r);
-                r.typeVar = r.initVar = r.typeObject;
+                r.typeObj = r.initObj = new P6opaque(r);
+                r.typeVar = r.initVar = r.typeObj;
                 // Hack - reseat role to this closure-clone of methods
                 foreach (var mi in arg.mo.lmethods) {
                     var nmi = mi;
@@ -5885,9 +5885,9 @@ slow:
             STable n = new STable(b.name + " but " + role.name);
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
-            n.typeObject = n.initObject = new P6opaque(n);
-            n.typeVar = n.initVar = n.typeObject;
-            ((P6opaque)n.typeObject).slots = null;
+            n.typeObj = n.initObj = new P6opaque(n);
+            n.typeVar = n.initVar = n.typeObj;
+            ((P6opaque)n.typeObj).slots = null;
 
             n.mo.superclasses.Add(b);
             n.mo.local_roles.Add(role);
@@ -6102,9 +6102,9 @@ slow:
             MuMO.FillProtoClass(null, new string[0], new STable[0]);
             MuMO.Invalidate();
 
-            // AnyMO.typeObject is needed very early, while setting up the
+            // AnyMO.typeObj is needed very early, while setting up the
             // root $_
-            AnyMO.typeObject = new P6opaque(AnyMO, 0);
+            AnyMO.typeObj = new P6opaque(AnyMO, 0);
             Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
             WrapIndexy(AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
                     null, null, new IxAnyBindPos());

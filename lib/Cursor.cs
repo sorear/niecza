@@ -884,7 +884,7 @@ public class Cursor : P6any {
     public string Reduced() { return reduced; }
     public P6any AST() {
         P6any a = (feedback != null) ? feedback.ast : ast;
-        return a ?? Kernel.AnyMO.typeObject;
+        return a ?? Kernel.AnyMO.typeObj;
     }
 
     // TODO: cache generated lists

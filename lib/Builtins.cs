@@ -141,7 +141,7 @@ namespace Niecza {
         public override P6any Fetch() {
             string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
             string sub = Builtins.LaxSubstring2(str, from, length);
-            return sub == null ? Kernel.StrMO.typeObject :
+            return sub == null ? Kernel.StrMO.typeObj :
                 Kernel.BoxRaw(sub,Kernel.StrMO);
         }
 
@@ -2636,14 +2636,14 @@ again:
         STable n = new STable(obj.mo.name + "+" + Kernel.JoinS(",", roles));
 
         n.how = Kernel.BoxAny<STable>(n, obj.mo.how).Fetch();
-        n.typeObject = n.initObject = new P6opaque(n);
-        n.typeVar = n.initVar = n.typeObject;
-        ((P6opaque)n.typeObject).slots = null;
+        n.typeObj = n.initObj = new P6opaque(n);
+        n.typeVar = n.initVar = n.typeObj;
+        ((P6opaque)n.typeObj).slots = null;
 
         n.mo.superclasses.Add(obj.mo);
         n.mo.local_roles = roles;
         n.mo.Compose();
-        newtype.Store(n.typeObject);
+        newtype.Store(n.typeObj);
 
         string aname = null;
         if (init != Kernel.AnyMO.typeVar) {
@@ -2680,10 +2680,10 @@ again:
         if ((ai.flags & P6how.A_TYPE) == P6how.A_SCALAR) {
             if (ai.type == null)
                 obj = Kernel.NewMuScalar(
-                    vx != null ? vx.Fetch() : Kernel.AnyMO.typeObject);
+                    vx != null ? vx.Fetch() : Kernel.AnyMO.typeObj);
             else
                 obj = Kernel.NewRWScalar(ai.type,
-                    vx != null ? vx.Fetch() : ai.type.initObject);
+                    vx != null ? vx.Fetch() : ai.type.initObj);
         } else {
             obj = (ai.flags & P6how.A_HASH) != 0 ?
                 Kernel.CreateHash() : Kernel.CreateArray();
@@ -2722,8 +2722,8 @@ again:
     public static Variable enum_mixin_role(string name, P6any meth) {
         STable r = new STable('{' + name + '}');
         r.mo.FillRole(new STable[0], null);
-        r.typeObject = r.initObject = new P6opaque(r);
-        r.typeVar = r.initVar = r.typeObject;
+        r.typeObj = r.initObj = new P6opaque(r);
+        r.typeVar = r.initVar = r.typeObj;
         r.mo.AddMethod(0, name, meth);
         r.mo.Revalidate();
         r.SetupVTables();
@@ -2734,8 +2734,8 @@ again:
     public static Variable cat_mixin_role(string name, P6any meth) {
         STable r = new STable('{' + name + '}');
         r.mo.FillRole(new STable[0], null);
-        r.typeObject = r.initObject = new P6opaque(r);
-        r.typeVar = r.initVar = r.typeObject;
+        r.typeObj = r.initObj = new P6opaque(r);
+        r.typeVar = r.initVar = r.typeObj;
         r.mo.AddMethod(P6how.M_MULTI, name, meth);
         r.mo.Revalidate();
         r.SetupVTables();
@@ -2748,8 +2748,8 @@ again:
         STable r = new STable("ANON");
 
         r.mo.FillRole(new STable[0], null);
-        r.typeObject = r.initObject = new P6opaque(r);
-        r.typeVar = r.initVar = r.typeObject;
+        r.typeObj = r.initObj = new P6opaque(r);
+        r.typeVar = r.initVar = r.typeObj;
         r.mo.AddMethod(0, name, meth.Fetch());
         r.mo.AddMethod(P6how.V_PRIVATE, name, meth.Fetch());
         r.mo.AddAttribute(name, P6how.A_PUBLIC, null, stype);
@@ -2809,7 +2809,7 @@ again:
     }
 
     public static P6any code_signature(P6any obj) {
-        return Kernel.GetInfo(obj).sig ?? Kernel.AnyMO.typeObject;
+        return Kernel.GetInfo(obj).sig ?? Kernel.AnyMO.typeObj;
     }
 
     public static Variable code_candidates(P6any sub) {
@@ -2846,7 +2846,7 @@ again:
                     return (P6any)o;
             }
         }
-        return Kernel.AnyMO.typeObject;
+        return Kernel.AnyMO.typeObj;
     }
 
     public static Variable param_value_constraints(P6any param) {

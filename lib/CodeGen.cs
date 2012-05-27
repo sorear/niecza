@@ -480,12 +480,12 @@ namespace Niecza.CLRBackend {
             SubInfo.GetField("mo");
         public static readonly FieldInfo P6opaque_slots =
             P6opaque.GetField("slots");
-        public static readonly FieldInfo DMO_typeObject =
-            STable.GetField("typeObject");
+        public static readonly FieldInfo DMO_typeObj =
+            STable.GetField("typeObj");
         public static readonly FieldInfo DMO_typeVar =
             STable.GetField("typeVar");
-        public static readonly FieldInfo DMO_initObject =
-            STable.GetField("initObject");
+        public static readonly FieldInfo DMO_initObj =
+            STable.GetField("initObj");
         public static readonly FieldInfo DMO_initVar =
             STable.GetField("initVar");
         public static readonly FieldInfo DMO_how =
@@ -3056,7 +3056,7 @@ dynamic:
             thandlers["var_islist"] = Methody(null, Tokens.Variable.GetMethod("get_List"));
             thandlers["var_is_rw"] = Methody(null, Tokens.Variable.GetMethod("get_Rw"));
             thandlers["llhow_name"] = FieldGet(Tokens.STable, "name");
-            thandlers["stab_what"] = FieldGet(Tokens.STable, "typeObject");
+            thandlers["stab_what"] = FieldGet(Tokens.STable, "typeObj");
             thandlers["obj_llhow"] = FieldGet(Tokens.P6any, "mo");
             thandlers["varhash_clear"] = Methody(null, Tokens.VarHash.GetMethod("Clear"));
             thandlers["varhash_new"] = Constructy(Tokens.VarHash.GetConstructor(new Type[0]));
@@ -4369,21 +4369,21 @@ dynamic:
             nst.mo.superclasses.Clear();
             // OTOH, it needs call structures set up to avoid internal errors
             nst.mo.Revalidate();
-            if (nst.typeObject == null) // AnyMO.typeObject is set up early
-                nst.typeObject = new P6opaque(nst, 0);
-            ((P6opaque)nst.typeObject).slots = null;
-            nst.typeVar = nst.typeObject;
+            if (nst.typeObj == null) // AnyMO.typeObj is set up early
+                nst.typeObj = new P6opaque(nst, 0);
+            ((P6opaque)nst.typeObj).slots = null;
+            nst.typeVar = nst.typeObj;
 
             if (ru.name == "CORE" && name == "Nil") {
                 // this anomalous type object is iterable
-                nst.typeVar = Kernel.NewRWListVar(nst.typeObject);
+                nst.typeVar = Kernel.NewRWListVar(nst.typeObj);
             }
 
             if (pf != null)
-                pf.SetValue(null, nst.typeObject);
+                pf.SetValue(null, nst.typeObj);
 
             nst.initVar    = nst.typeVar;
-            nst.initObject = nst.typeObject;
+            nst.initObj = nst.typeObj;
             nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
             nst.how        = Kernel.BoxRaw<STable>(nst, Kernel.ClassHOWMO);
             nst.mo.rtype   = type;
@@ -4406,7 +4406,7 @@ dynamic:
             STable basety = (STable)Handle.Unbox(args[2]);
 
             subset.mo.FillSubset(basety);
-            subset.initObject = basety.initObject;
+            subset.initObj = basety.initObj;
             subset.initVar = basety.initVar;
             return null;
         }

@@ -757,8 +757,8 @@ for $args (0..9) {
 
             m.Invalidate();
             m.box_type = t;
-            m.typeObject = m.initObject = new BoxObject<object>(null, m);
-            m.typeVar = m.initVar = m.typeObject;
+            m.typeObj = m.initObj = new BoxObject<object>(null, m);
+            m.typeVar = m.initVar = m.typeObj;
             if (CLROpts.Debug) {
                 Console.WriteLine("--- Created box for {0} ---", m.name);
                 foreach (var o in m.mo.type_list)
@@ -766,7 +766,7 @@ for $args (0..9) {
             }
 
             RuntimeUnit.reg.InstallFakeUnit("CLR," + t.AssemblyQualifiedName,
-                m, m.who, m.how, m.mo, m.typeObject, m.typeVar);
+                m, m.who, m.how, m.mo, m.typeObj, m.typeVar);
             return m;
         }
 

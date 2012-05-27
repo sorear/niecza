@@ -66,7 +66,7 @@ namespace Niecza {
         }
 
         public P6any GetTypeObject() {
-            return mo.typeObject;
+            return mo.typeObj;
         }
 
         public string GetTypeName() {
@@ -719,9 +719,9 @@ next_method: ;
             STable n = new STable(stable.name);
 
             n.how = Kernel.BoxAnyMO<STable>(n, Kernel.ClassHOWMO).Fetch();
-            n.typeObject = n.initObject = new P6opaque(n);
-            n.typeVar = n.initVar = n.typeObject;
-            ((P6opaque)n.typeObject).slots = null;
+            n.typeObj = n.initObj = new P6opaque(n);
+            n.typeVar = n.initVar = n.typeObj;
+            ((P6opaque)n.typeObj).slots = null;
 
             n.mo.local_roles.Add(stable);
             n.mo.Compose();
@@ -895,7 +895,7 @@ next_method: ;
         public P6how mo;
 
         public P6any how, who;
-        public P6any typeObject, initObject;
+        public P6any typeObj, initObj;
         public Variable typeVar, initVar;
         public string name;
         public bool useAcceptsType;
@@ -1112,8 +1112,8 @@ next_method: ;
             fb.ObjRef(mo);
             fb.ObjRef(how);
             fb.ObjRef(who);
-            fb.ObjRef(typeObject);
-            fb.ObjRef(initObject);
+            fb.ObjRef(typeObj);
+            fb.ObjRef(initObj);
             fb.ObjRef(typeVar);
             fb.ObjRef(initVar);
             fb.String(name);
@@ -1129,8 +1129,8 @@ next_method: ;
             n.mo = (P6how)tb.ObjRef();
             n.how = (P6any)tb.ObjRef();
             n.who = (P6any)tb.ObjRef();
-            n.typeObject = (P6any)tb.ObjRef();
-            n.initObject = (P6any)tb.ObjRef();
+            n.typeObj = (P6any)tb.ObjRef();
+            n.initObj = (P6any)tb.ObjRef();
             n.typeVar = (Variable)tb.ObjRef();
             n.initVar = (Variable)tb.ObjRef();
             n.name = tb.String();
@@ -1221,7 +1221,7 @@ next_method: ;
         }
 
         public override bool IsDefined() {
-            return this != mo.typeObject;
+            return this != mo.typeObj;
         }
 
         public override void Freeze(FreezeBuffer fb) {
