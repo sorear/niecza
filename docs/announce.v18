@@ -1,0 +1,66 @@
+    Announce: Niecza Perl 6 v17
+
+This is the eighteenth release of Niecza Perl 6, as usual scheduled on
+the last Monday of the month.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you still need a
+binary for bootstrapping.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+[Breaking changes]
+
+substr now returns a read-only value in accordance with specification changes.
+To modify the substr return value, use substr-rw (new in this release).
+
+Default new() methods, when passed arguments to initialize @.attributes,
+now treat the argument as a whole array.  In other words,
+(class :: { has @.foo }).new(foo => [1, 2, 3]) no longer results in an
+additional level of boxing.
+
+
+[Exciting major features]
+
+Exceptions and warnings generated within a span of call-less statements
+are now much more likely to give the correct line number.  (Exciting to me!)
+
+Many setting operators like + are now multis and can be extended by user code.
+
+
+[Minor changes]
+
+Added ms// syntax (Solomon Foster).
+
+Added Rat.Rat, Rat.norm (Solomon Foster).
+
+Numerous bug fixes.
+
+Niecza::Benchmark has been rewritten and is now a bit more robust.
+
+
+[Major internals changes]
+
+Containerization of values is no longer mandatory; bare values are now used
+everywhere read-only Scalars were in v17.  In particular, the NewROScalar
+function has been removed.
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-17.zip
+[2] https://github.com/sorear/niecza
