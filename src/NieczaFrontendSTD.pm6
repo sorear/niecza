@@ -187,7 +187,7 @@ method FAILGOAL ($stop, $name, $startpos) {
 method deb(*@str) { note @str }
 
 method cursor_fresh($k = self) { Q:CgOp {
-    (ns (cursor_fresh (cast cursor (@ {self})) (@ {$k})))
+    (cursor_fresh (cast cursor (@ {self})) (@ {$k}))
 } }
 method cursor_force($pos) {
     $*HIGHWATER = $pos;

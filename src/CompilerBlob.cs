@@ -123,7 +123,7 @@ namespace Niecza {
         }
 
         internal static Variable DCResult(object r) {
-            if (r == null) return Kernel.AnyMO.typeVar;
+            if (r == null) return Kernel.AnyP;
             else if (r is string) return Kernel.BoxAnyMO((string)r, Kernel.StrMO);
             else if (r is int) return Builtins.MakeInt((int)r);
             else if (r is bool) return ((bool)r) ? Kernel.TrueV : Kernel.FalseV;
