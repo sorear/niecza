@@ -6567,7 +6567,9 @@ slow:
             InitCompartment();
             InitGlobal();
 
-            if (cmd == "-field-inventory") {
+            if (cmd == "-test-nobs") {
+                Niecza.Compiler.Test.Run();
+            } else if (cmd == "-field-inventory") {
                 foreach (Type ty in typeof(Kernel).Assembly.GetTypes()) {
                     if (ty.GetCustomAttributes(typeof(CompilerGeneratedAttribute), true).Length != 0)
                         continue;
