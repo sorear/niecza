@@ -538,14 +538,14 @@ namespace Niecza.Compiler {
 
         // cc_expr
 
-        static CgOp process_arglist(string kind, object a1, object a2,
-                object[] raw) {
+        static CgOp process_arglist(string kind, object[] raw) {
+            var meth = kind == "methodcall";
             var bits = new List<object>();
             var sig  = new StringBuilder();
-            bits.Add(a1);
+            bits.Add(meth ? raw[1] : raw[0]);
             bits.Add(null); // sig space
-            if (a2 != null) bits.Add(a2);
-            int ix = 0;
+            if (meth) bits.Add(raw[0]);
+            int ix = meth ? 2 : 1;
             while (ix < raw.Length) {
                 if (raw[ix] is CgOp) {
                     sig.Append((char) 0);
@@ -560,12 +560,12 @@ namespace Niecza.Compiler {
             return N(kind, bits.ToArray());
         }
 
-        public static CgOp subcall(CgOp sub, params object[] args) {
-            return process_arglist("subcall", sub, null, args);
+        public static CgOp subcall(params object[] args) {
+            return process_arglist("subcall", args);
         }
 
-        public static CgOp methodcall(CgOp self, object name, params object[] args) {
-            return process_arglist("methodcall", name, self, args);
+        public static CgOp methodcall(params object[] args) {
+            return process_arglist("methodcall", args);
         }
 
 
@@ -601,7 +601,7 @@ namespace Niecza.Compiler {
 
     public class Test {
         public static void Run() {
-            var c = CgOp.subcall(CgOp.corelex("&say"), CgOp.string_var("Hello, World"));
+            var c = CgOp.subcall(CgOp.corelex("&say"), CgOp.methodcall(CgOp.string_var("Hello, World"), "flip"));
             Console.WriteLine(c);
         }
     }
