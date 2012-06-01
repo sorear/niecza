@@ -282,6 +282,7 @@ my class Mu {
     method clone(*%_) { Q:CgOp { (repr_clone (@ {self}) (unbox varhash (@ {%_}))) } }
     method dispatch:<::>(|) { Q:CgOp { (dispatch_fromtype) } }
     method immutable() { !defined(self) }
+    method take() { take self }
     multi method WHICH() { ObjAt.new(str => '', ref => self) }
 }
 
