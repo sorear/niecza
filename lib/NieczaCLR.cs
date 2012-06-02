@@ -330,8 +330,7 @@ namespace Niecza {
 
             if (pi.Length != 0 && pi[pi.Length-1].GetCustomAttributes(
                         typeof(ParamArrayAttribute), false).Length != 0) {
-                Type[] args2 = new Type[args1.Length - 1];
-                Array.Copy(args1, 0, args2, 0, args2.Length);
+                Type[] args2 = Utils.TrimArr(args1, 0, 1);
                 into.Add(new OverloadCandidate(what, args2, refs,
                             args1[args1.Length - 1].GetElementType()));
             }
@@ -651,9 +650,7 @@ for $args (0..9) {
             m.how = Kernel.BoxRaw(m, Kernel.ClassHOWMO);
             STable pm = t.BaseType == null ? Kernel.AnyMO :
                 GetWrapper(t.BaseType);
-            STable[] mro = new STable[pm.mo.mro.Length + 1];
-            Array.Copy(pm.mo.mro, 0, mro, 1, pm.mo.mro.Length);
-            mro[0] = m;
+            var mro = Utils.PrependArr(pm.mo.mro, m);
             m.FillClass(new string[] { }, new STable[] { }, new STable[] { pm }, mro);
             foreach (Type ity in t.GetInterfaces())
                 m.mo.role_typecheck_list.Add(GetWrapper(ity));

@@ -54,12 +54,9 @@ namespace Niecza {
                         pos, named, false, m);
             }
             if (mo.mro_methods.TryGetValue("FALLBACK", out m)) {
-                Variable[] npos = new Variable[pos.Length + 1];
-                Array.Copy(pos, 1, npos, 2, pos.Length - 1);
-                npos[0] = pos[0];
-                npos[1] = Kernel.BoxAnyMO(name, Kernel.StrMO);
                 return m.info.SetupCall(caller, m.outer, m.ip6,
-                        npos, named, false, m);
+                    Utils.PrependArr(pos, 1, pos[0], Builtins.MakeStr(name)),
+                    named, false, m);
             }
             return Fail(caller, "Unable to resolve method " + name);
         }
@@ -495,10 +492,8 @@ next_method: ;
             if (parent == null) {
                 FillClass(slots, slot_types, new STable[] {}, new STable[] { stable });
             } else {
-                STable[] mro = new STable[parent.mo.mro.Length + 1];
-                Array.Copy(parent.mo.mro, 0, mro, 1, mro.Length-1);
-                mro[0] = stable;
-                FillClass(slots, slot_types, new STable[] { parent }, mro);
+                FillClass(slots, slot_types, new STable[] { parent },
+                    Utils.PrependArr(parent.mo.mro, stable));
             }
             Invalidate();
         }
@@ -506,10 +501,8 @@ next_method: ;
         public void FillSubset(STable super) {
             stable.useAcceptsType = true;
             type = SUBSET; rtype = "subset";
-            STable[] mro = new STable[super.mo.mro.Length + 1];
-            Array.Copy(super.mo.mro, 0, mro, 1, mro.Length - 1);
-            mro[0] = stable;
-            FillClass(super.all_slot, super.type_slot, new STable[] { super }, mro);
+            FillClass(super.all_slot, super.type_slot, new STable[] { super },
+                    Utils.PrependArr(super.mo.mro, stable));
             Revalidate();
             stable.SetupVTables();
         }

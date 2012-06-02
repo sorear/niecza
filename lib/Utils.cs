@@ -684,9 +684,9 @@ namespace Niecza {
             return narr;
         }
 
-        public static T[] PrependArr<T>(T[] arr,T addit) {
-            T[] narr = new T[arr.Length + 1];
-            Array.Copy(arr, 0, narr, 1, arr.Length);
+        public static T[] PrependArr<T>(T[] arr,T addit,int cut = 0) {
+            T[] narr = new T[arr.Length + 1 - cut];
+            Array.Copy(arr, cut, narr, 1, arr.Length - cut);
             narr[0] = addit;
             return narr;
         }

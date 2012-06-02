@@ -2577,11 +2577,9 @@ again:
     }
 
     public static Frame dispatch_fromtype(Frame th) {
-        Variable[] npos = new Variable[th.pos.Length - 2];
         STable from = th.pos[1].Fetch().mo;
         string name = th.pos[2].Fetch().mo.mro_raw_Str.Get(th.pos[2]);
-        npos[0] = th.pos[0];
-        Array.Copy(th.pos, 3, npos, 1, npos.Length - 1);
+        var npos = Utils.PrependArr(th.pos, th.pos[0], 3);
 
         if (!npos[0].Fetch().Does(from)) {
             return Kernel.Die(th, "Cannot dispatch to a method on " +

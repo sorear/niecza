@@ -1783,10 +1783,8 @@ namespace Niecza.CLRBackend {
             // TODO: it's not really necessary to force a full cps-format
             // node here.  But we don't have universal recursion for
             // non-cps nodes.
-            ClrOp[] body = new ClrOp[z.stmts.Length + 1];
-            Array.Copy(z.stmts, 0, body, 1, body.Length - 1);
-            body[0] = ClrSync.Instance;
-            return new CpsOp(body, z.head);
+            return new CpsOp(Utils.PrependArr(z.stmts, ClrSync.Instance),
+                    z.head);
         }
 
         public static CpsOp Ternary(CpsOp cond, CpsOp iftrue, CpsOp iffalse) {
@@ -2554,9 +2552,8 @@ namespace Niecza.CLRBackend {
                 return CpsOp.Sequence(ops.ToArray());
             };
             handlers["_inline"] = delegate(NamProcessor th, object[] zyg) {
-                object[] rzyg = new object[zyg.Length - 2];
-                Array.Copy(zyg, 2, rzyg, 0, rzyg.Length);
-                return th.Scan(th.InlineCall((SubInfo)zyg[1], rzyg));
+                return th.Scan(th.InlineCall((SubInfo)zyg[1],
+                    Utils.TrimArr(zyg,2,0)));
             };
             handlers["letscope"] = delegate(NamProcessor th, object[] zyg) {
                 List<ClrEhSpan> xn = new List<ClrEhSpan>();
@@ -3233,10 +3230,8 @@ dynamic:
         static Func<CpsOp[], CpsOp> RxCall(Type cps, string name) {
             MethodInfo mi = Tokens.RxFrame.GetMethod(name);
             return delegate(CpsOp[] cpses) {
-                CpsOp[] n = new CpsOp[cpses.Length + 1];
-                Array.Copy(cpses, 0, n, 1, cpses.Length);
-                n[0] = CpsOp.RxFrame();
-                return CpsOp.CpsCall(cps, mi, n); };
+                return CpsOp.CpsCall(cps, mi,
+                        Utils.PrependArr(cpses, CpsOp.RxFrame())); };
         }
 
         static Func<CpsOp[], CpsOp> Constructy(ConstructorInfo mi) {
@@ -3262,10 +3257,9 @@ dynamic:
             FieldInfo f = Tokens.STable.GetField(name);
             MethodInfo g = f.FieldType.GetMethod("Invoke");
             return delegate(CpsOp[] cpses) {
-                CpsOp[] args = new CpsOp[cpses.Length - 1];
-                Array.Copy(cpses, 1, args, 0, args.Length);
                 return CpsOp.Contexty(f, g, new CpsOp[2] {
-                    cpses[0], CpsOp.NewArray(Tokens.Variable, args) });
+                    cpses[0], CpsOp.NewArray(Tokens.Variable,
+                        Utils.TrimArr(cpses,1,0)) });
             };
         }
 
@@ -4622,11 +4616,9 @@ dynamic:
         }
         public static object sub_set_extend(object[] args) {
             SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-            object[] val = new object[args.Length - 3];
-            Array.Copy(args, 3, val, 0, val.Length);
             if (s.extend == null)
                 s.extend = new Dictionary<string,object[]>();
-            s.extend[(string)args[2]] = val;
+            s.extend[(string)args[2]] = Utils.TrimArr(args,3,0);
             return null;
         }
         public static object sub_get_extend(object[] args) {

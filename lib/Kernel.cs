@@ -1006,10 +1006,8 @@ namespace Niecza {
             n.name     = tb.String();
             string[] srcinfo = tb.Strings();
             if (Builtins.upcall_receiver != null) {
-                object[] args = new object[srcinfo.Length + 1];
-                Array.Copy(srcinfo, 0, args, 1, srcinfo.Length);
-                args[0] = "check_dated";
-                object result = Builtins.UpCall(args);
+                object result = Builtins.UpCall(Utils.PrependArr<object>(
+                    srcinfo, "check_dated"));
                 if (result is Exception)
                     throw (Exception)result;
                 if ((string)result != "ok")
@@ -2421,8 +2419,7 @@ namespace Niecza {
             if (sub != null && poscap.Length > 0 && sub.Does(Kernel.MethodMO)) {
                 // Hide the self value so that using |callframe.args in a
                 // nextwith call will DTRT
-                poscap = new Variable[pos.Length - 1];
-                Array.Copy(pos, 1, poscap, 0, poscap.Length);
+                poscap = Utils.TrimArr(pos,1,0);
             }
             nw.SetSlot(Kernel.CaptureMO, "$!positionals", poscap);
             nw.SetSlot(Kernel.CaptureMO, "$!named", named);
@@ -2663,8 +2660,7 @@ namespace Niecza {
                         goto gotit;
                     }
                     P6any nw = new P6opaque(Kernel.CaptureMO);
-                    Variable[] spos = new Variable[pos.Length - posc];
-                    Array.Copy(pos, posc, spos, 0, spos.Length);
+                    var spos = Utils.TrimArr(pos, posc, 0);
                     VarHash snamed = null;
                     if (named != null) {
                         snamed = new VarHash();
@@ -3056,10 +3052,8 @@ bound: ;
     class InvokeCallMethod : InvokeHandler {
         public override Frame Invoke(P6any th, Frame caller,
                 Variable[] pos, VarHash named) {
-            Variable[] np = new Variable[pos.Length + 1];
-            Array.Copy(pos, 0, np, 1, pos.Length);
-            np[0] = th;
-            return th.InvokeMethod(caller, "postcircumfix:<( )>", np, named);
+            return th.InvokeMethod(caller, "postcircumfix:<( )>",
+                Utils.PrependArr(pos, th), named);
         }
     }
 
@@ -3071,10 +3065,7 @@ bound: ;
         protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override Variable Invoke(Variable obj, Variable[] args) {
-            Variable[] rargs = new Variable[args.Length + 1];
-            Array.Copy(args, 0, rargs, 1, args.Length);
-            rargs[0] = obj;
-            return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, rargs, null));
+            return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, Utils.PrependArr(args, obj), null));
         }
     }
 
@@ -4704,11 +4695,8 @@ saveme:
         }
 
         private static Frame SubInvokeSubC(Frame th) {
-            Variable[] post;
-            post = new Variable[th.pos.Length - 1];
-            Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
             return CodeMO.mro_INVOKE.Invoke((P6opaque)th.pos[0].Fetch(),
-                    th.Return(), post, th.named);
+                    th.Return(), Utils.TrimArr(th.pos,1,0), th.named);
         }
 
         private static Frame JunctionFallbackC(Frame th) {
@@ -4720,8 +4708,7 @@ saveme:
                 th.lex1 = new Variable[((Variable[])th.lex0).Length];
                 th.lex2 = jo.slots[0];
                 th.lex3 = th.pos[1].Fetch().mo.mro_raw_Str.Get(th.pos[1]);
-                th.lex4 = new Variable[th.pos.Length - 1];
-                Array.Copy(th.pos, 2, (Variable[])th.lex4, 1, th.pos.Length-2);
+                th.lex4 = Utils.PrependArr(th.pos, null, 2);
             }
 
             Variable[] src = (Variable[]) th.lex0;
@@ -5600,9 +5587,8 @@ slow:
             PushyHandler fcv = (PushyHandler) th.info.param[1];
             Variable[] fullpc = UnboxAny<Variable[]>(
                     ((Variable)th.lex1).Fetch());
-            Variable[] chop = new Variable[fullpc.Length - 1];
-            Array.Copy(fullpc, 1, chop, 0, chop.Length);
-            th.caller.resultSlot = fcv.Invoke((Variable)th.lex0, chop);
+            th.caller.resultSlot = fcv.Invoke((Variable)th.lex0,
+                Utils.TrimArr(fullpc, 1, 0));
             return th.Return();
         }
         private static void WrapPushy(STable kl, string name,
@@ -5631,11 +5617,8 @@ slow:
 
             if (pos.Length > 2) {
                 Variable inter = ((IndexHandler)p[0]).Get(self, index);
-                Variable[] npos = new Variable[pos.Length - 1];
-                Array.Copy(pos, 2, npos, 1, pos.Length - 2);
-                npos[0] = inter;
                 return inter.Fetch().InvokeMethod(th.Return(), (string)p[4],
-                        npos, n);
+                    Utils.PrependArr(pos, inter, 2), n);
             } else if (index == null) {
                 // TODO: handle adverbs on Zen slices (XXX does this make sense?)
                 res = self.List ? self : Kernel.NewRWListVar(self.Fetch());
@@ -5728,9 +5711,7 @@ slow:
         static STable ToComposable(STable arg, STable cls) {
             if (arg.mo.type == P6how.CURRIED_ROLE) {
                 STable r;
-                Variable[] pass = new Variable[arg.mo.curriedArgs.Length+1];
-                pass[0] = cls.typeObj;
-                Array.Copy(arg.mo.curriedArgs, 0, pass, 1, pass.Length-1);
+                var pass = Utils.PrependArr(arg.mo.curriedArgs, cls.typeObj);
                 Frame ifr = (Frame)RunInferior(arg.mo.roleFactory.
                     Invoke(GetInferiorRoot(), pass, null)).Fetch();
 
@@ -6497,9 +6478,7 @@ slow:
                         var tp = (Variable[]) o.slots[0];
                         n = o.slots[1] as VarHash;
                         // nextdispatch copies over the old self
-                        p = new Variable[tp.Length + 1];
-                        Array.Copy(tp, 0, p, 1, tp.Length);
-                        p[0] = tf.pos[0];
+                        p = Utils.PrependArr(tp, tf.pos[0]);
                     }
                     return de.info.SetupCall(tf.caller, de.outer, de.ip6, p, n,
                             false, de);
