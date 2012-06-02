@@ -143,6 +143,16 @@ sub eval_lives_ok($code,$why?) is export {
 sub eval_dies_ok($code,$why?) is export {
     $*TEST-BUILDER.ok(no-control({ eval $code }) eq "die", $why);
 }
+sub eval_dies_with_error($code, $error_pattern, $why?) is export {
+    my $died_with_error;
+    try {
+        CATCH {
+            $died_with_error = "$_" ~~ $error_pattern;
+        }
+        eval $code;
+    }
+    $*TEST-BUILDER.ok($died_with_error, $why);
+}
 sub eval_succeeds_ok($code,$why?,:$ignore = ()) is export {
     $*TEST-BUILDER.ok(?(no-control({ eval $code }) eq any("", @$ignore)), $why);
 }
