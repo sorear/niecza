@@ -13,6 +13,7 @@ namespace Niecza.Compiler.Op {
         // These are just placeholders until more of the system is online
         public int LineOf(Cursor c) { return 0; }
         public void Sorry(Cursor c, string msg) { throw new NotImplementedException(); }
+        public int GenId() { throw new NotImplementedException(); }
 
         // replaces both zyg and ctxzyg
         public virtual Op VisitOps(Func<Op,Op> post) { return post(this); }
@@ -480,6 +481,98 @@ namespace Niecza.Compiler.Op {
         public StringLiteral(Cursor c, string t) : base(c) { text = t; }
         protected override CgOp code(SubInfo body) { return CgOp.@const(CgOp.string_var(text)); }
         public override Variable const_value(SubInfo body) { return Builtins.MakeStr(text); }
+    }
+
+    class Conditional : Op {
+        Op check, iftrue, iffalse;
+
+        public Conditional(Cursor c, Op i, Op t, Op f) : base(c) {
+            check = i; iftrue = t; iffalse = f;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            check = check.VisitOps(post);
+            if (iftrue != null) iftrue = iftrue.VisitOps(post);
+            if (iffalse != null) iffalse = iffalse.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.ternary(CgOp.obj_getbool(check.cgop(body)),
+                iftrue != null ? iftrue.cgop(body) : CgOp.corelex("Nil"),
+                iffalse != null ? iffalse.cgop(body) : CgOp.corelex("Nil"));
+        }
+    }
+
+    class WhileLoop : Op {
+        Op check, body;
+        bool once, until, need_cond;
+
+        public WhileLoop(Cursor p, Op c, Op b, bool o, bool u, bool n = false)
+                : base(p) {
+            check = c; body = b; once = o; until = u; need_cond = n;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            check = check.VisitOps(post);
+            body  = body.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return code_labelled(body, "");
+        }
+        protected override CgOp code_labelled(SubInfo sub, string l) {
+            var id = GenId();
+            var cond = need_cond ?
+                CgOp.prog(CgOp.letvar("!cond", check.cgop(sub)),
+                        CgOp.obj_getbool(CgOp.letvar("!cond"))) :
+                CgOp.obj_getbool(check.cgop(sub));
+            var loop = CgOp.prog(
+                CgOp.whileloop(until?1:0, once?1:0, cond,
+                    CgOp.sink(CgOp.xspan("redo"+id,"next"+id,0,body.cgop(sub),
+                        1, l, "next"+id, 2, l, "last"+id, 3, l, "redo"+id))),
+                CgOp.label("last"+id),
+                CgOp.corelex("Nil"));
+            return need_cond ? CgOp.letn("!cond", CgOp.scopedlex("Any"), loop) :
+                loop;
+        }
+    }
+
+    class GeneralLoop : Op {
+        Op init, cond, step, body;
+
+        public GeneralLoop(Cursor p, Op i, Op c, Op s, Op l) : base(p) {
+            init = i; cond = c; step = s; body = l;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            init = init.VisitOps(post);
+            cond = cond.VisitOps(post);
+            step = step.VisitOps(post);
+            body = body.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return code_labelled(body, "");
+        }
+        protected override CgOp code_labelled(SubInfo sub, string l) {
+            var id = GenId();
+
+            return CgOp.prog(
+                init != null ? CgOp.sink(init.cgop(sub)) : CgOp.noop(),
+                CgOp.whileloop(0, 0,
+                    (cond != null ? CgOp.obj_getbool(cond.cgop(sub)) :
+                        CgOp.@bool(1)),
+                    CgOp.prog(
+                        CgOp.sink(CgOp.xspan("redo"+id, "next"+id, 0,
+                            body.cgop(sub), 1, l, "next"+id,
+                            2, l, "last"+id, 3, l, "redo"+id)),
+                        (step != null ? CgOp.sink(step.cgop(sub)) : CgOp.noop()))),
+                CgOp.label("last"+id),
+                CgOp.corelex("Nil"));
+        }
     }
 
     // forward defined
