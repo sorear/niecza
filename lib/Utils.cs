@@ -670,6 +670,33 @@ namespace Niecza {
             Array.Reverse(tempCharArray);
             return new string(tempCharArray);
         }
+
+        public static T[] TrimArr<T>(T[] arr, int begin, int end) {
+            T[] narr = new T[arr.Length - begin - end];
+            Array.Copy(arr, begin, narr, 0, narr.Length);
+            return narr;
+        }
+
+        public static T[] PrependArr<T>(T[] arr, int cut, params T[] addit) {
+            T[] narr = new T[arr.Length - cut + addit.Length];
+            Array.Copy(arr, cut, narr, addit.Length, narr.Length -addit.Length);
+            Array.Copy(addit, 0, narr, 0, addit.Length);
+            return narr;
+        }
+
+        public static T[] PrependArr<T>(T[] arr,T addit) {
+            T[] narr = new T[arr.Length + 1];
+            Array.Copy(arr, 0, narr, 1, arr.Length);
+            narr[0] = addit;
+            return narr;
+        }
+
+        public static T[] AppendArr<T>(T[] arr, T addit) {
+            T[] narr = new T[arr.Length + 1];
+            Array.Copy(arr, 0, narr, 1, arr.Length);
+            narr[arr.Length] = addit;
+            return narr;
+        }
     }
 
     public sealed class Complex : IFreeze {
