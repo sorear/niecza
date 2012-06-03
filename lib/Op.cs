@@ -968,7 +968,36 @@ namespace Niecza.Compiler.Op {
         protected override CgOp code(SubInfo body) { return CgOp.letvar(name); }
     }
 
-    // forward defined
+    // punt on regexbody for now
+    class YouAreHere : Op {
+        string unitname;
+        public YouAreHere(Cursor c, string u) : base(c) { unitname = u; }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.you_are_here(CgOp.str(unitname));
+        }
+    }
+
+    class GetBlock : Op {
+        bool routine;
+        public GetBlock(Cursor c, bool r) : base(c) { routine = r; }
+
+        protected override CgOp code(SubInfo body) {
+            var op = CgOp.callframe();
+            while(true) {
+                if ((body.special & SubInfo.TRANSPARENT) == 0 &&
+                        (!routine || body.mo.HasType(Kernel.RoutineMO)))
+                    break;
+                body = body.outer;
+                op = CgOp.frame_outer(op);
+            }
+            return CgOp.frame_sub(op);
+        }
+    }
+
+    // BEGIN DESUGARING OPS
+    // These don't appear in source code, but are used by other ops to preserve
+    // useful structure.
     class Assign : Op {
         Op left, right;
 
@@ -1022,6 +1051,8 @@ namespace Niecza.Compiler.Op {
         }
     }
 
+    // LetScope, TopicalHook, LeaveHook, LabelHook not used
+
     class LexicalBind: Op {
         string name;
         bool ro;
@@ -1058,5 +1089,172 @@ namespace Niecza.Compiler.Op {
         protected override CgOp code(SubInfo body) {
             return CgOp.fetch(child.cgop(body));
         }
+    }
+
+    class StateDecl : Op {
+        Op inside;
+        public StateDecl(Cursor c, Op i) : base(c) { inside = i; }
+        public override Op VisitOps(Func<Op,Op> post) {
+            inside = inside.VisitOps(post);
+            return post(this);
+        }
+        protected override CgOp code(SubInfo body) { return inside.cgop(body); }
+        public override Op to_bind(Cursor at, bool ro, Op rhs) { return inside.to_bind(at, ro, rhs); }
+    }
+
+    class DoOnceLoop : Op {
+        Op body;
+        public DoOnceLoop(Cursor c, Op i) : base(c) { body = i; }
+        public override Op VisitOps(Func<Op,Op> post) {
+            body = body.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo sub) { return code_labelled(sub,""); }
+        protected override CgOp code_labelled(SubInfo sub, string l) {
+            var id = GenId();
+
+            return CgOp.xspan("redo"+id, "next"+id, 0, body.cgop(sub),
+                SubInfo.ON_NEXT, l, "next"+id, SubInfo.ON_LAST, l, "next"+id,
+                SubInfo.ON_REDO, l, "redo"+id);
+        }
+    }
+
+    class FlipFlop : Op {
+        Op lhs, rhs;
+        bool excl_lhs, excl_rhs, sedlike;
+        string state_var;
+
+        public FlipFlop(Cursor c, Op lhs, Op rhs, bool excl_lhs, bool excl_rhs,
+                bool sedlike, string state_var) : base(c) {
+            this.lhs = lhs; this.rhs = rhs; this.excl_lhs = excl_lhs;
+            this.excl_rhs = excl_rhs; this.sedlike = sedlike;
+            this.state_var = state_var;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            lhs = lhs.VisitOps(post);
+            rhs = rhs.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            var c = new List<object>();
+            var id = GenId();
+
+            var use_hide = excl_lhs && !sedlike;
+            c.Add("!ret");
+            c.Add(CgOp.newrwscalar(CgOp.fetch(CgOp.string_var(""))));
+            if (use_hide) {
+                c.Add("!hide"); c.Add(CgOp.@int(0));
+            }
+
+            c.Add(CgOp.cgoto("flop"+id,
+                CgOp.obj_getbool(CgOp.scopedlex(state_var))));
+            c.Add(CgOp.ncgoto("end"+id, CgOp.obj_getbool(lhs.cgop(body))));
+
+            if (sedlike) {
+                c.Add(CgOp.sink(CgOp.N("preinc", CgOp.scopedlex(state_var))));
+                if (!excl_lhs) c.Add(CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
+                    CgOp.scopedlex(state_var))));
+                c.Add(CgOp.@goto("end"+id));
+            }
+            else {
+                if (use_hide) c.Add(CgOp.letvar("!hide", CgOp.@int(1)));
+            }
+
+            c.Add(CgOp.label("flop"+id));
+            c.Add(CgOp.sink(CgOp.N("preinc", CgOp.scopedlex(state_var))));
+            c.Add(CgOp.ncgoto("check"+id, CgOp.obj_getbool(rhs.cgop(body))));
+            if (!excl_rhs) c.Add(CgOp.sink(CgOp.assign(
+                CgOp.scopedlex(state_var), CgOp.@const(CgOp.exactnum(10,0)))));
+            c.Add(CgOp.@goto("end"+id));
+
+            c.Add(CgOp.label("check"+id));
+            // reached if !flopping, !ret will NOT be set at this point, we
+            // may be in a lhs if !sedlike
+            c.Add(CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),
+                CgOp.scopedlex(state_var))));
+
+            c.Add(CgOp.label("end"+id));
+            if (use_hide) c.Add(CgOp.ternary(
+                CgOp.compare("==", CgOp.letvar("!hide"), CgOp.@int(1)),
+                CgOp.sink(CgOp.assign(CgOp.letvar("!ret"),CgOp.string_var(""))),
+                CgOp.prog()));
+
+            c.Add(CgOp.letvar("!ret"));
+
+            return CgOp.letn(c.ToArray());
+        }
+    }
+
+    class Temporize : Op {
+        Op var;
+        int mode;
+
+        public Temporize(Cursor c, Op v, int m) : base(c) { var=v; mode=m; }
+        public override Op VisitOps(Func<Op,Op> post) {
+            var = var.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.temporize(var.cgop(body), CgOp.callframe(),
+                CgOp.@int(mode));
+        }
+    }
+
+    class IndirectVar : Op {
+        Op name;
+        bool bind_ro;
+        Op bind;
+
+        public IndirectVar(Cursor c, Op n, bool r=false, Op b=null) : base(c) {
+            name = n; bind_ro = r; bind = b;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            name = name.VisitOps(post);
+            if (bind != null) bind = bind.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.sc_indir(CgOp.sc_root(),
+                CgOp.obj_getstr(name.cgop(body)), CgOp.@bool(bind_ro?1:0),
+                bind != null ? bind.cgop(body) : CgOp.@null("var"));
+        }
+
+        public override Op to_bind(Cursor at, bool ro, Op rhs) {
+            return new IndirectVar(pos, name, ro, rhs);
+        }
+    }
+
+    // this one IS still used.
+    class CatchyWrapper : Op {
+        Op inside;
+        public CatchyWrapper(Cursor c, Op i) : base(c) { inside = i; }
+        public override Op VisitOps(Func<Op,Op> post) {
+            inside = inside.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            var id = GenId();
+
+            return CgOp.xspan("start"+id, "end"+id, 0, CgOp.prog(
+                CgOp.sink(inside.cgop(body)),
+                CgOp.@return(CgOp.corelex("False")),
+                CgOp.label("caught"+id),
+                CgOp.corelex("True")),
+                SubInfo.ON_SUCCEED, "", "caught"+id);
+        }
+    }
+
+    class GeneralConst : Op {
+        Variable value;
+        public GeneralConst(Cursor c, Variable v) : base(c) { value = v; }
+        public override Variable const_value(SubInfo s) { return value; }
+        protected override CgOp code(SubInfo s) { return CgOp.@const(value); }
     }
 }
