@@ -14,6 +14,14 @@ namespace Niecza.Compiler.Op {
         public int LineOf(Cursor c) { return 0; }
         public void Sorry(Cursor c, string msg) { throw new NotImplementedException(); }
         public int GenId() { throw new NotImplementedException(); }
+        public string GenSym() { throw new NotImplementedException(); }
+        public SubInfo GetCurSub() { throw new NotImplementedException(); }
+        public void SetRunOnce(SubInfo s) { throw new NotImplementedException(); }
+        public LexInfo LookupLex(SubInfo s, string n) { throw new NotImplementedException(); }
+        public STable CompileGetPkg(SubInfo s, string n) { throw new NotImplementedException(); }
+        public SubInfo ThunkSub(Op body, string[] args) { throw new NotImplementedException(); }
+        public Lexical BlockExpr(Cursor at, SubInfo blk) { throw new NotImplementedException(); }
+        public Op BetaCall(Cursor at, string name, params Op[] pos) { throw new NotImplementedException(); }
 
         // replaces both zyg and ctxzyg
         public virtual Op VisitOps(Func<Op,Op> post) { return post(this); }
@@ -403,8 +411,7 @@ namespace Niecza.Compiler.Op {
     }
 
     class Yada : Op {
-        string kind;
-        public Yada(Cursor c, string kind) : base(c) { this.kind = kind; }
+        public Yada(Cursor c, string kind) : base(c) { }
 
         public override bool onlystub() { return true; }
         protected override CgOp code(SubInfo body) { return CgOp.die(">>>Stub code executed"); }
@@ -575,15 +582,393 @@ namespace Niecza.Compiler.Op {
         }
     }
 
-    // forward defined
+    class ForLoop : Op {
+        Op source;
+        string sink;
+
+        public ForLoop(Cursor p, Op src, string snk) : base(p) {
+            source = src; sink = snk;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            source = source.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.methodcall(CgOp.subcall(CgOp.fetch(
+                CgOp.corelex("&flat")), source.cgop(body)), "map",
+                    CgOp.scopedlex(sink));
+        }
+
+        public override Op statement_level(Cursor at) {
+            var body = ((LISub)LookupLex(GetCurSub(), sink)).def;
+            var vars = new string[Builtins.sig_count(body.sig)];
+            var args = new Op[vars.Length];
+            for (int i = 0; i < vars.Length; i++) {
+                vars[i] = GenSym();
+                args[i] = new LetVar(pos, vars[i]);
+            }
+            return new ImmedForLoop(pos, source, vars, BetaCall(at,sink,args));
+        }
+    }
+
+    // A for-loop which must be run immediately because it is at statement
+    // level, as contrasted with a ForLoop, which turns into a map call.
+    // ForLoops turn into this at statement level; if a ForLoop is in any
+    // other context, it is regarded as a lazy comprehension.
+    class ImmedForLoop : Op {
+        Op source;
+        string[] vars;
+        Op sink;
+
+        public ImmedForLoop(Cursor c, Op src, string[] vs, Op snk) : base(c) {
+            source = src;
+            vars = vs;
+            sink = snk;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            source = source.VisitOps(post);
+            sink = sink.VisitOps(post);
+            return post(this);
+        }
+
+        // used only with 'foo ($_ for 1,2,3)'
+        // vars will be a single gensym
+        public override Op semilist_level(Cursor at) {
+            var aname = GenSym();
+            var sub = ThunkSub(new Let(pos,vars[0], new Lexical(pos,aname),
+                        sink), new [] { aname });
+            var sname = BlockExpr(at, sub).name;
+
+            return new ForLoop(pos, source, sname);
+        }
+
+        protected override CgOp code(SubInfo body) { return code_labelled(body, ""); }
+        protected override CgOp code_labelled(SubInfo body, string l) {
+            var id = GenId();
+
+            var letargs = new List<object>();
+            letargs.Add("!iter"+id);
+            letargs.Add(CgOp.start_iter(source.cgop(body)));
+            foreach (string v in vars) {
+                letargs.Add(v);
+                letargs.Add(CgOp.@null("var"));
+            }
+            letargs.Add(CgOp.label("again"+id));
+            foreach (string v in vars) {
+                letargs.Add(CgOp.ncgoto("last"+id, CgOp.iter_hasflat(
+                    CgOp.letvar("!iter"+id))));
+                letargs.Add(CgOp.letvar(v,CgOp.vvarlist_shift(CgOp.letvar("!iter"+id))));
+            }
+            letargs.Add(CgOp.sink(CgOp.xspan("redo"+id,"next"+id,0,
+                sink.cgop(body), 1, l, "next"+id,
+                2, l, "last"+id, 3, l, "redo"+id)));
+            letargs.Add(CgOp.@goto("again"+id));
+            letargs.Add(CgOp.label("last"+id));
+            return CgOp.rnull(CgOp.letn(letargs.ToArray()));
+        }
+    }
+
+    class Labelled : Op {
+        string name;
+        Op stmt;
+
+        public Labelled(Cursor c, string n, Op s) : base(c) { name=n; stmt=s; }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            stmt = stmt.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.prog(CgOp.label("goto_"+name),
+                stmt.cgop_labelled(body, name));
+        }
+
+        public override Op statement_level(Cursor at) {
+            return new Labelled(pos, name, stmt.statement_level(at));
+        }
+    }
+
+    class When : Op {
+        Op match, body;
+
+        public When(Cursor c, Op m, Op b) : base(c) { match=m; body=b; }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            match = match.VisitOps(post);
+            body = body.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo sub) {
+            var id = GenId();
+
+            return CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
+                        match.cgop(sub), "ACCEPTS", CgOp.scopedlex("$_"))),
+                CgOp.xspan("start"+id, "end"+id, 0, CgOp.prog(
+                        CgOp.control(SubInfo.ON_SUCCEED, CgOp.@null("frame"),
+                            CgOp.@int(-1), CgOp.@null("str"), body.cgop(sub))),
+                    SubInfo.ON_PROCEED, "", "end"+id),
+                CgOp.corelex("Nil"));
+        }
+    }
+
+    class Start : Op {
+        string condvar;
+        Op stmt;
+
+        public Start(Cursor c, string v, Op s) : base(c) { condvar=v; stmt=s; }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            stmt = stmt.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.ternary(CgOp.obj_getbool(CgOp.scopedlex(condvar)),
+                CgOp.corelex("Nil"),
+                CgOp.prog(CgOp.sink(CgOp.assign(CgOp.scopedlex(condvar),
+                    CgOp.box("Bool", CgOp.@bool(1)))), stmt.cgop(body)));
+        }
+    }
+
+    class Try : Op {
+        Op body;
+
+        public Try(Cursor c, Op b) : base(c) { body = b; }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            body = body.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo sub) {
+            var id = GenId();
+            return CgOp.xspan("start"+id, "end"+id, 1, body.cgop(sub),
+                SubInfo.ON_DIE, "", "end"+id);
+        }
+    }
+
+    class Control : Op {
+        int type;
+        string name;
+        Op payload;
+
+        public Control(Cursor c, int k, string n, Op b) : base(c) {
+            type = k; name = n; payload = b;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            payload = payload.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.control(type, CgOp.@null("frame"), CgOp.@int(-1),
+                (name == "" ? CgOp.@null("str") : CgOp.str(name)),
+                payload.cgop(body));
+        }
+    }
+
+    class MakeJunction : Op {
+        int type;
+        Op[] args;
+
+        public MakeJunction(Cursor c, int k, Op[] a) : base(c) { type=k; args=a; }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            for (int i = 0; i < args.Length; i++)
+                args[i] = args[i].VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            object[] jargs = new object[args.Length+1];
+            jargs[0] = type;
+            for (int i = 0; i < args.Length; i++)
+                jargs[i+1] = args[i].cgop(body);
+            return CgOp.makejunction(jargs);
+        }
+    }
+
+    // XXX needs better typing
+    class Num : Op {
+        object value;
+
+        public Num(Cursor c, object v) : base(c) { value = v; }
+
+        protected override CgOp code(SubInfo body) {
+            if (value is Array) {
+                return CgOp.@const(CgOp.exactnum((object[])value));
+            } else {
+                return CgOp.@const(CgOp.box("Num", CgOp.@double(value)));
+            }
+        }
+
+        public override Variable const_value(SubInfo body) {
+            var ar = value as object[];
+            if (ar != null) {
+                return EmitUnit.ExactNum((int)ar[0], (string)ar[1]);
+            } else {
+                return Builtins.MakeFloat(value is double ? (double)value : (int)value);
+            }
+        }
+    }
+
+    // just a little hook for rewriting
+    class Attribute : Op {
+        internal string name;
+        internal STable pkg;
+
+        public Attribute(Cursor c, string n, STable p) : base(c) {name=n;pkg=p;}
+
+        protected override CgOp code(SubInfo body) { return CgOp.corelex("Nil"); }
+    }
+
+    class Whatever : Op {
+        public Whatever(Cursor c) : base(c) { }
+
+        protected override CgOp code(SubInfo body) { return CgOp.corelex("$__Whatever"); }
+    }
+
+    class WhateverCode : Op {
+        string slot;
+        public WhateverCode(Cursor c, string s) : base(c) { slot = s; }
+
+        protected override CgOp code(SubInfo body) { return CgOp.scopedlex(slot); }
+    }
+
+    class BareBlock : Op {
+        string slot;
+        public BareBlock(Cursor c, string s) : base(c) { slot = s; }
+
+        protected override CgOp code(SubInfo body) { return CgOp.scopedlex(slot); }
+        public override Op statement_level(Cursor at) {
+            SetRunOnce(((LISub)LookupLex(GetCurSub(), slot)).def);
+            return BetaCall(at,slot);
+        }
+    }
+
+    // SubDef: actually completely unused!
+
     class Lexical : Op {
         internal readonly string name;
-        internal bool state_decl, list, hash; // XXX are these still needed?
 
         public Lexical(Cursor c, string name) : base(c) { this.name = name; }
         protected override CgOp code(SubInfo body) { return CgOp.scopedlex(name); }
+
+        public override Variable const_value(SubInfo body) {
+            var li = LookupLex(body, name);
+            if (li is LICommon) {
+                StashEnt se;
+                Kernel.currentGlobals.TryGetValue(((LICommon)li).hkey, out se);
+                if (se.constant) return se.v;
+            }
+            return (li is LIConstant) ? ((LIConstant)li).value : null;
+        }
+
+        public override Op to_bind(Cursor at, bool ro, Op rhs) {
+            var lex = LookupLex(GetCurSub(), name);
+            if (lex == null) {
+                Sorry(at, "Cannot find definition for binding???");
+                return new StatementList(null, new Op[0]);
+            }
+            var list = false;
+            var type = CompileGetPkg(GetCurSub(), "Mu");
+            string realname = null;
+            var lex_s = lex as LISimple;
+            if (lex_s != null) {
+                list = (lex_s.flags & (LISimple.LIST | LISimple.HASH)) != 0;
+                type = lex_s.type;
+            }
+            else if (lex is LICommon)
+                realname = ((LICommon)lex).VarName();
+            else if (lex is LIAttrAlias)
+                realname = ((LIAttrAlias)lex).aname;
+            else
+                return base.to_bind(at,ro,rhs);
+            if (realname != null)
+                list = realname[0] == '@' || realname[0] == '%';
+            return new LexicalBind(pos,name,ro,list,type,rhs);
+        }
     }
 
+    class ConstantDecl : Op {
+        internal string name;
+        internal bool init;
+
+        public ConstantDecl(Cursor c, string n, bool i) :base(c){name=n;init=i;}
+
+        protected override CgOp code(SubInfo sub) { return CgOp.scopedlex(name); }
+    }
+
+    class ContextVar : Op {
+        string name;
+        int uplevel;
+
+        public ContextVar(Cursor c,string n,int u) : base(c) {name=n;uplevel=u;}
+
+        protected override CgOp code(SubInfo sub) { return CgOp.context_get(name, uplevel); }
+    }
+
+    class Require : Op {
+        string unit;
+
+        public Require(Cursor c, string u) : base(c) { unit = u; }
+
+        protected override CgOp code(SubInfo sub) { return CgOp.rnull(CgOp.do_require(unit)); }
+    }
+
+    class Take : Op {
+        Op value;
+        public Take(Cursor c, Op v) : base(c) { value = v; }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            value = value.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) { return CgOp.take(value.cgop(body)); }
+    }
+
+    class Gather : Op {
+        string var;
+        public Gather(Cursor c, string v) : base(c) { var = v; }
+
+        protected override CgOp code(SubInfo body) {
+            // construct a frame for our sub ip=0
+            // construct a GatherIterator with said frame
+            // construct a List from the iterator
+
+            return CgOp.subcall(CgOp.fetch(CgOp.corelex("&_gather")),
+                CgOp.startgather(CgOp.fetch(CgOp.scopedlex(var))));
+        }
+    }
+
+    class MakeCursor : Op {
+        public MakeCursor(Cursor c) : base(c) { }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.prog(CgOp.scopedlex("$/", CgOp.rxcall("MakeCursor")),
+                CgOp.scopedlex("$/"));
+        }
+    }
+
+    // Provides access to a variable with a scope smaller than the sub.  Used
+    // internally in a few places; should not be exposed to the user, because
+    // these can't be closed over.
+    // the existance of these complicates cross-sub inlining a bit
+    class LetVar : Op {
+        string name;
+        public LetVar(Cursor c, string n) : base(c) { name = n; }
+
+        protected override CgOp code(SubInfo body) { return CgOp.letvar(name); }
+    }
+
+    // forward defined
     class Assign : Op {
         Op left, right;
 
@@ -597,6 +982,69 @@ namespace Niecza.Compiler.Op {
 
         protected override CgOp code(SubInfo body) {
             return CgOp.assign(left.cgop(body), right.cgop(body));
+        }
+    }
+
+    class Builtin: Op {
+        string name;
+        Op[] args;
+        public Builtin(Cursor c, string n, Op[] a): base(c) { name=n;args=a; }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            for (int i = 0; i < args.Length; i++)
+                args[i] = args[i].VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            object[] cops = new object[args.Length];
+            for (int i = 0; i < args.Length; i++)
+                cops[i] = args[i].cgop(body);
+            return CgOp.N(name, args);
+        }
+    }
+
+    class Let: Op {
+        string var;
+        Op to;
+        Op @in;
+
+        public Let(Cursor c, string v, Op t, Op i) : base(c) {var=v;to=t;@in=i;}
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            to = to.VisitOps(post);
+            @in = @in.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.letn(var, to.cgop(body), @in.cgop(body));
+        }
+    }
+
+    class LexicalBind: Op {
+        string name;
+        bool ro;
+        bool list;
+        STable type;
+        Op rhs;
+
+        public LexicalBind(Cursor c, string name, bool ro, bool ls,
+                STable tp, Op r) : base(c) {
+            this.name = name; this.ro = ro; list = ls; type = tp; rhs = r;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            rhs = rhs.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            return CgOp.prog(
+                CgOp.scopedlex(name, type == null ? rhs.cgop(body) :
+                    CgOp.newboundvar(ro?1:0, list?1:0,
+                        CgOp.class_ref("mo", type), rhs.cgop(body))),
+                CgOp.scopedlex(name));
         }
     }
 
