@@ -19,8 +19,15 @@ namespace Niecza.Compiler.RxOp {
             foreach (RxOp z in zyg) z.VisitOps(post);
         }
 
+        public virtual void oplift(List<Op.Op> post) {
+            foreach (RxOp z in zyg) z.oplift(post);
+        }
+
         public abstract void code(SubInfo body, List<object> acc);
-        public abstract object[] lad();
+        // synthetic node types need not implement lad()
+        public virtual object[] lad() {
+            throw new NotImplementedException();
+        }
 
         // add your caps to the accumulator.  Only 0-1-infty matters.
         public virtual void used_caps(int quant, Dictionary<string,int> acc) {
@@ -30,6 +37,9 @@ namespace Niecza.Compiler.RxOp {
         protected string label() {
             return "b" + (Kernel.containerRootUnit.nextid++);
         }
+
+        // placeholders...
+        protected void AddMyName(params object[] args) { throw new NotImplementedException(); }
     }
 
     abstract class Capturing : RxOp {
@@ -330,9 +340,385 @@ namespace Niecza.Compiler.RxOp {
         }
     }
 
-    class Subrule : RxOp {
-        public Subrule(params object[] args) { }
-        public override object[] lad() { return null; }
-        public override void code(SubInfo b, List<object> to) { }
+    class BeforeString : RxOp {
+        string str;
+        public BeforeString(string s) { str = s; }
+
+        public override void code(SubInfo sub, List<object> to) {
+            to.Add(CgOp.rxbprim("BeforeStr", CgOp.@bool(0), CgOp.str(str)));
+        }
+    }
+
+    class ZeroWidthCCs : RxOp {
+        CClass[] ccs;
+        bool after, neg;
+
+        public ZeroWidthCCs(CClass[] c, bool a, bool n) { ccs=c;after=a;neg=n;}
+
+        public override object[] lad() { return new [] { "Null" }; }
+
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.rxbprim(after ? "AfterCCs" : "BeforeCCs",
+                CgOp.@bool(neg?1:0), CgOp.@const(ccs)));
+        }
+    }
+
+    class NotBeforeString : RxOp {
+        string str;
+        public NotBeforeString(string s) { str = s; }
+
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.rxbprim("BeforeStr", CgOp.@bool(1), CgOp.str(str)));
+        }
+    }
+
+    class ZeroWidth : RxOp {
+        int type;
+        public ZeroWidth(int type) { this.type = type; }
+
+        public override object[] lad() { return new [] { "Null" }; }
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.rxbprim("ZeroWidth", CgOp.@int(type)));
+        }
+    }
+
+    class NotBefore : RxOp {
+        public NotBefore(RxOp z) : base(z) { }
+        public override object[] lad() { return new [] { "Null" }; }
+
+        public override void code(SubInfo body, List<object> to) {
+            var pass = label();
+            to.Add(CgOp.pushcut("NOTBEFORE"));
+            to.Add(CgOp.rxpushb("NOTBEFORE", pass));
+            zyg[0].code(body, to);
+            to.Add(CgOp.rxcall("CommitGroup", CgOp.str("NOTBEFORE")));
+            to.Add(CgOp.@goto("backtrack"));
+            to.Add(CgOp.label(pass));
+            to.Add(CgOp.popcut());
+        }
+    }
+
+    class Before : RxOp {
+        public Before(RxOp z) : base(z) { }
+        public override object[] lad() {
+            return new object[] { "Sequence", new [] { zyg[0].lad(), new [] { "Imp" } } };
+        }
+        public override void code(SubInfo body, List<object> to) {
+            (new NotBefore(new NotBefore(zyg[0]))).code(body,to);
+        }
+    }
+
+    class Tilde : RxOp {
+        string closer, dba;
+
+        public Tilde(RxOp z, string c, string d) : base(z) { closer=c; dba=d; }
+
+        public override void code(SubInfo body, List<object> to) {
+            var fail = label();
+            var pass = label();
+
+            if (!body.dylex.ContainsKey("$*GOAL"))
+                AddMyName(body, "$*GOAL");
+
+            to.Add(CgOp.rxcall("PushGoal", CgOp.callframe(), CgOp.str(closer)));
+            zyg[0].code(body, to);
+            to.Add(CgOp.rxpushb("TILDE", fail));
+            to.Add(CgOp.rxbprim("Exact", CgOp.str(closer)));
+            to.Add(CgOp.@goto(pass));
+            to.Add(CgOp.label(fail));
+            to.Add(CgOp.sink(CgOp.methodcall(CgOp.rxcall("MakeCursor"),
+                "FAILGOAL", CgOp.string_var(closer), CgOp.string_var(dba),
+                CgOp.box("Int", CgOp.rxgetquant()))));
+            to.Add(CgOp.label(pass));
+            to.Add(CgOp.rxcall("PopGoal", CgOp.callframe()));
+        }
+
+        public override object[] lad() { return new [] { "Imp" }; }
+    }
+
+    class Subrule : Capturing {
+        string method;
+        Op.Op regex;
+        object[] ltm;
+        bool selfcut, zerowidth, negative;
+
+        Subrule(string m, Op.Op r, object[] l, bool s, bool z, bool n) {
+            method=m; regex=r; ltm=l; selfcut=s; zerowidth=z; negative=n;
+        }
+        public Subrule(string method, bool selfcut) { this.method = method; this.selfcut = selfcut; }
+
+        public override void VisitOps(Func<Op.Op,Op.Op> post) {
+            if (regex != null) regex = regex.VisitOps(post);
+        }
+
+        public override Capturing withcaps(string[] caps) {
+            var n = new Subrule(method,regex,ltm,selfcut,zerowidth,negative);
+            n.captures = caps;
+            return n;
+        }
+
+        public override void code(SubInfo body, List<object> to) {
+            var callf = regex != null ? regex.cgop(body) :
+                CgOp.methodcall(CgOp.rxcall("MakeCursorV"), method);
+
+            if (selfcut) {
+                to.Add(CgOp.rxincorpcut(captures, zerowidth?1:0,
+                    negative?1:0, callf));
+            } else {
+                var bt = label();
+
+                to.Add(CgOp.rxcall("InitCursorList", callf));
+                to.Add(CgOp.label(bt));
+                to.Add(CgOp.rxincorpshift(captures, bt));
+            }
+        }
+
+        public override object[] lad() {
+            return ltm ?? (method != null ? new [] { "Method", method } : new [] { "Imp" });
+        }
+    }
+
+    class Sigspace : RxOp {
+        bool selfcut;
+        public Sigspace(bool c) { selfcut = c; }
+
+        public override object[] lad() { return new [] { "Null" }; }
+
+        public override void code(SubInfo body, List<object> to){
+            (new Subrule("ws", selfcut)).code(body, to);
+        }
+    }
+
+    class CutLTM : RxOp {
+        public override object[] lad() { return new [] { "Imp" }; } // special
+        public override void code(SubInfo s, List<object> to) {
+            to.Add(CgOp.rxcall("CommitGroup", CgOp.str("LTM")));
+        }
+    }
+
+    class CutRule : RxOp {
+        public override object[] lad() { return new [] { "Null" }; }
+        public override void code(SubInfo s, List<object> to) {
+            to.Add(CgOp.rxcall("CommitRule"));
+        }
+    }
+
+    class CutBrack : RxOp {
+        public override object[] lad() { return new [] { "Null" }; }
+        public override void code(SubInfo s, List<object> to) {
+            to.Add(CgOp.rxcall("CommitGroup", CgOp.str("BRACK")));
+        }
+    }
+
+    class SetLang : RxOp {
+        Op.Op expr;
+        public SetLang(Op.Op x) { expr = x; }
+        public override void VisitOps(Func<Op.Op,Op.Op> post) {
+            expr = expr.VisitOps(post);
+        }
+
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.rxsetclass(CgOp.obj_llhow(CgOp.fetch(expr.cgop(body)))));
+        }
+        public override object[] lad() { return new [] { "Imp" }; }
+    }
+
+    class Alt : AltBase {
+        object[] optimized_lads;
+        public Alt(RxOp[] z, string d) : base(z,d) {}
+
+        public override void code(SubInfo body, List<object> to) {
+            var ls = new string[zyg.Length];
+            for (int i = 0; i < zyg.Length; i++) ls[i] = label();
+            var end = label();
+
+            to.Add(CgOp.ltm_push_alts(optimized_lads, dba, ls));
+            to.Add(CgOp.@goto("backtrack"));
+            for (int i = 0; i < zyg.Length; i++) {
+                to.Add(CgOp.label(ls[i]));
+                zyg[i].code(body, to);
+                if (i != ls.Length) to.Add(CgOp.@goto(end));
+            }
+            to.Add(CgOp.label(end));
+            to.Add(CgOp.popcut());
+        }
+
+        public override object[] lad() {
+            object[] z = new object[] { zyg.Length };
+            for (int i = 0; i < z.Length; i++) z[i] = zyg[i].lad();
+            return new object[] { "Any", z };
+        }
+    }
+
+    class CheckBlock : RxOp {
+        Op.Op block;
+        bool negate;
+        public CheckBlock(Op.Op b, bool n) { block=b; negate=n; }
+        public override void VisitOps(Func<Op.Op,Op.Op> post) {
+            block = block.VisitOps(post);
+        }
+        public override object[] lad() { return new [] { "Null" }; }
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.N(negate ? "cgoto" : "ncgoto", "backtrack",
+                CgOp.obj_getbool(block.cgop(body))));
+        }
+    }
+
+    class SaveValue : RxOp {
+        string capid;
+        Op.Op block;
+        public SaveValue(string c, Op.Op b) { block=b; capid=c; }
+        public override void VisitOps(Func<Op.Op,Op.Op> post) {
+            block = block.VisitOps(post);
+        }
+        public override object[] lad() { return new [] { "Imp" }; }
+        public override void used_caps(int quant, Dictionary<string,int> acc) {
+            acc[capid] = acc.GetDefault(capid, 0) + quant;
+        }
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.rxpushcapture(block.cgop(body), new [] { capid }));
+        }
+    }
+
+    class VoidBlock : RxOp {
+        Op.Op block;
+        public VoidBlock(Op.Op b) { block=b; }
+        public override void VisitOps(Func<Op.Op,Op.Op> post) {
+            block = block.VisitOps(post);
+        }
+        public override object[] lad() { return new [] { "Imp" }; }
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.sink(block.cgop(body)));
+        }
+    }
+
+    class Statement : RxOp {
+        Op.Op stmt;
+        public Statement(Op.Op s) { stmt = s; }
+        public override void oplift(List<Op.Op> z) { z.Add(stmt); }
+        // no need to handle VisitOps here because stmt will be reparented
+        // to the RegexBody node.
+        public override void code(SubInfo body, List<object> to) {}
+        public override object[] lad() { return new [] { "Null" }; }
+    }
+
+    class ProtoRedis : Capturing {
+        public override Capturing withcaps(string[] caps) {
+            var n = new ProtoRedis();
+            n.captures = caps;
+            return n;
+        }
+
+        public override void code(SubInfo body, List<object> to) {
+            var bt = label();
+            to.Add(CgOp.rxcall("InitCursorList", CgOp.rxlprim("proto_dispatch",
+                CgOp.corelex("Any"))));
+            to.Add(CgOp.label(bt));
+            to.Add(CgOp.rxincorpshift(captures, bt));
+        }
+
+        public override object[] lad() { return new [] { "Dispatcher" }; }
+    }
+
+    class Any : RxOp {
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.rxbprim("AnyChar"));
+        }
+        public override object[] lad() { return new [] { "Dot" }; }
+    }
+
+    // generated by optimizer so needs no lad; always greedy
+    class QuantCClass : RxOp {
+        CClass cc;
+        int min, max;
+        public QuantCClass(CClass c, int l, int h) { cc=c; min=l; max=h; }
+
+        public override void code(SubInfo sub, List<object> to) {
+            to.Add(CgOp.rxbprim("ScanCClass", CgOp.@int(min), CgOp.@int(max),
+                CgOp.@const(cc)));
+        }
+    }
+
+    class CClassElem : RxOp {
+        CClass cc;
+        public CClassElem(CClass c) { cc = c; }
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.rxbprim("CClass", CgOp.@const(cc)));
+        }
+        public override object[] lad() {
+            object[] terms = new object[cc.terms.Length+1];
+            terms[0] = "CC";
+            Array.Copy(cc.terms,0,terms,1,terms.Length-1);
+            return terms;
+        }
+    }
+
+    class None : RxOp {
+        public override void code(SubInfo s,List<object> to) {
+            to.Add(CgOp.@goto("backtrack"));
+        }
+        public override object[] lad() { return new [] { "None" }; }
+    }
+
+    class Newline : RxOp {
+        public override void code(SubInfo s, List<object> to) {
+            to.Add(CgOp.rxbprim("Newline"));
+        }
+        public override object[] lad() {
+            return new object[] { "Any", new [] { new [] { "Str", "\x0D\x0A" },
+                (new CClassElem(CClass.VSpace)).lad() } };
+        }
+    }
+
+    class StringCap : Capturing {
+        public StringCap(RxOp z) : base(new [] { z }) { }
+        public override Capturing withcaps(string[] caps) {
+            var n = new StringCap(zyg[0]);
+            n.captures = caps;
+            return n;
+        }
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.pushcut("CAP"));
+            to.Add(CgOp.rxsetquant(CgOp.rxgetpos()));
+            zyg[0].code(body, to);
+            to.Add(CgOp.rxpushcapture(CgOp.rxcall("StringCapture"), captures));
+            to.Add(CgOp.popcut());
+        }
+        public override object[] lad() { return zyg[0].lad(); }
+    }
+
+    class ListPrim : Capturing {
+        string name, type;
+        Op.Op ops;
+        public override void VisitOps(Func<Op.Op,Op.Op> post) {
+            ops = ops.VisitOps(post);
+        }
+        public override Capturing withcaps(string[] caps) {
+            var n = new ListPrim(name, type, ops);
+            n.captures = caps;
+            return n;
+        }
+        public ListPrim(string n, string t, Op.Op o) { name=n;type=t;ops=o; }
+
+        public override void code(SubInfo body, List<object> to) {
+            var bt = label();
+            to.Add(CgOp.rxcall("InitCursorList", CgOp.rxlprim(type,
+                ops.cgop(body))));
+            to.Add(CgOp.label(bt));
+            to.Add(CgOp.rxincorpshift(captures, bt));
+        }
+
+        public override object[] lad() {
+            return type == "scalar_var" ? new [] { "Param", name } : new [] { "Imp" };
+        }
+    }
+
+    class Endpoint : RxOp {
+        string type;
+        public Endpoint(string t) { type = t; }
+        public override object[] lad() { return new [] { "Null" }; }
+        public override void code(SubInfo body, List<object> to) {
+            to.Add(CgOp.rxcall("SetEndpoint", CgOp.str(type)));
+        }
     }
 }

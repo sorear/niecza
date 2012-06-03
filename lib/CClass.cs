@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Niecza.Compiler {
     class CClass {
-        int[] terms;
+        internal int[] terms;
 
         public CClass(params int[] terms) { this.terms = terms; }
 

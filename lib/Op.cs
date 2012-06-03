@@ -968,7 +968,49 @@ namespace Niecza.Compiler.Op {
         protected override CgOp code(SubInfo body) { return CgOp.letvar(name); }
     }
 
-    // punt on regexbody for now
+    class RegexBody : Op {
+        string name;
+        RxOp.RxOp rxop;
+        Op[] pre;
+        bool passcut, canback;
+
+        public RegexBody(Cursor c, string na, RxOp.RxOp rx, Op[] p, bool cut,
+                bool back) : base(c) {
+            name=na; rxop=rx; pre=p; passcut=cut; canback=back;
+        }
+
+        public override Op VisitOps(Func<Op,Op> post) {
+            for (int i = 0; i < pre.Length; i++)
+                pre[i] = pre[i].VisitOps(post);
+            rxop.VisitOps(post);
+            return post(this);
+        }
+
+        protected override CgOp code(SubInfo body) {
+            var mcaps = new List<string>();
+            var capdict = new Dictionary<string,int>();
+            rxop.used_caps(1, capdict);
+            foreach (var kv in capdict)
+                if (kv.Value >= 2) mcaps.Add(kv.Key);
+
+            var ops = new List<object>();
+            foreach (var p in pre)
+                ops.Add(CgOp.sink(p.cgop(body)));
+            ops.Add(CgOp.rxinit(CgOp.str(name), CgOp.cast("cursor",
+                CgOp.fetch(CgOp.scopedlex("self"))), passcut?1:0));
+            ops.Add(CgOp.rxpushcapture(CgOp.@null("var"), mcaps.ToArray()));
+            rxop.code(body, ops);
+            if (body.dylex.ContainsKey("$*GOAL"))
+                ops.Insert(0, CgOp.scopedlex("$*GOAL",
+                    CgOp.context_get("$*GOAL", 1)));
+            ops.Add(canback ? CgOp.rxend() : CgOp.rxfinalend());
+            ops.Add(CgOp.label("backtrack"));
+            ops.Add(CgOp.rxbacktrack());
+            ops.Add(CgOp.@null("var"));
+            return CgOp.prog(ops.ToArray());
+        }
+    }
+
     class YouAreHere : Op {
         string unitname;
         public YouAreHere(Cursor c, string u) : base(c) { unitname = u; }
