@@ -699,6 +699,16 @@ namespace Niecza {
         }
     }
 
+    public static class UtilsExt {
+        public static V GetDefault<K,V>(this IDictionary<K,V> dict, K key, V def) {
+            V real;
+            if (dict.TryGetValue(key, out real))
+                return real;
+            else
+                return def;
+        }
+    }
+
     public sealed class Complex : IFreeze {
         public readonly double re;
         public readonly double im;
