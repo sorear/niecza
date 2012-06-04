@@ -7,7 +7,7 @@ RM=rm -f
 CP=cp
 
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
-	 ObjModel.cs BigInteger.cs Printf.cs CodeGen.cs CClass.cs \
+	 ObjModel.cs BigInteger.cs Printf.cs CodeGen.cs CClass.cs CompMgr.cs \
 	 GeneratedTrigFunctions.cs Serialize.cs UCD.cs CgOp.cs Op.cs RxOp.cs
 
 # Tell make to regard the following targets as not being filenames

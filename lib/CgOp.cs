@@ -598,11 +598,4 @@ namespace Niecza.Compiler {
             return sb.ToString();
         }
     }
-
-    public class Test {
-        public static void Run() {
-            var c = CgOp.subcall(CgOp.corelex("&say"), CgOp.methodcall(CgOp.string_var("Hello, World"), "flip"));
-            Console.WriteLine(c);
-        }
-    }
 }
