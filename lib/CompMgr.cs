@@ -138,4 +138,29 @@ output options:
             }
         }
     }
+
+    static class CompUtils {
+        public static int GenId() {
+            return Kernel.containerRootUnit.nextid++;
+        }
+        public static string GenSym() {
+            return "!anon_" + GenId();
+        }
+
+        public static int LineOf(Cursor c) { return 0; }
+        public static void Sorry(Cursor c, string msg) { throw new NotImplementedException(); }
+        public static SubInfo GetCurSub() { throw new NotImplementedException(); }
+        public static void SetRunOnce(SubInfo s) {
+            if ((s.outer.special & SubInfo.RUN_ONCE) != 0) {
+                s.CreateProtopad(null);
+                s.special |= SubInfo.RUN_ONCE;
+            }
+        }
+        public static LexInfo LookupLex(SubInfo s, string n) { throw new NotImplementedException(); }
+        public static STable CompileGetPkg(SubInfo s, string n) { throw new NotImplementedException(); }
+        public static SubInfo ThunkSub(Op.Op body, string[] args) { throw new NotImplementedException(); }
+        public static Op.Lexical BlockExpr(Cursor at, SubInfo blk) { throw new NotImplementedException(); }
+        public static Op.Op BetaCall(Cursor at, string name, params Op.Op[] pos) { throw new NotImplementedException(); }
+        public static void MarkUsed(Cursor at, string name) { throw new NotImplementedException(); }
+    }
 }

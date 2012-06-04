@@ -11,24 +11,13 @@ namespace Niecza.Compiler.Op {
         protected Op(Cursor pos) { this.pos = pos; }
 
         // These are just placeholders until more of the system is online
-        public int LineOf(Cursor c) { return 0; }
-        public void Sorry(Cursor c, string msg) { throw new NotImplementedException(); }
-        public int GenId() { throw new NotImplementedException(); }
-        public string GenSym() { throw new NotImplementedException(); }
-        public SubInfo GetCurSub() { throw new NotImplementedException(); }
-        public void SetRunOnce(SubInfo s) { throw new NotImplementedException(); }
-        public LexInfo LookupLex(SubInfo s, string n) { throw new NotImplementedException(); }
-        public STable CompileGetPkg(SubInfo s, string n) { throw new NotImplementedException(); }
-        public SubInfo ThunkSub(Op body, string[] args) { throw new NotImplementedException(); }
-        public Lexical BlockExpr(Cursor at, SubInfo blk) { throw new NotImplementedException(); }
-        public Op BetaCall(Cursor at, string name, params Op[] pos) { throw new NotImplementedException(); }
 
         // replaces both zyg and ctxzyg
         public virtual Op VisitOps(Func<Op,Op> post) { return post(this); }
 
         public CgOp cgop(SubInfo body) {
             if (pos != null) {
-                return CgOp.ann(LineOf(pos), code(body));
+                return CgOp.ann(CompUtils.LineOf(pos), code(body));
             } else {
                 return code(body);
             }
@@ -37,7 +26,7 @@ namespace Niecza.Compiler.Op {
         // minorly ick
         public CgOp cgop_statement(SubInfo body) {
             if (pos != null) {
-                return CgOp.ann(LineOf(pos), CgOp.statement(code(body)));
+                return CgOp.ann(CompUtils.LineOf(pos), CgOp.statement(code(body)));
             } else {
                 return CgOp.statement(code(body));
             }
@@ -45,15 +34,15 @@ namespace Niecza.Compiler.Op {
 
         public CgOp cgop_labelled(SubInfo body, string label) {
             if (pos != null) {
-                return CgOp.ann(LineOf(pos), code_labelled(body, label));
+                return CgOp.ann(CompUtils.LineOf(pos), code_labelled(body, label));
             } else {
                 return code_labelled(body, label);
             }
         }
 
         public virtual Op to_bind(Cursor at, bool ro, Op rhs) {
-            Sorry(at, "Cannot use bind operator with this LHS");
-            return new StatementList(null, new Op[0]);
+            CompUtils.Sorry(at, "Cannot use bind operator with this LHS");
+            return new StatementList(at);
         }
 
         protected abstract CgOp code(SubInfo body);
@@ -112,9 +101,10 @@ namespace Niecza.Compiler.Op {
     class StatementList : Op {
         Op[] children;
         bool statement;
-        public StatementList(Cursor c, Op[] children, bool stmt = false) : base(c) {
+        public StatementList(Cursor c, Op[] children, bool stmt) : base(c) {
             this.children = children; statement = stmt;
         }
+        public StatementList(Cursor c, params Op[] children) : this(c, children, false) {}
         public override Op VisitOps(Func<Op,Op> post) {
             for (int i = 0; i < children.Length; i++)
                 children[i] = children[i].VisitOps(post);
@@ -483,7 +473,7 @@ namespace Niecza.Compiler.Op {
     }
 
     class StringLiteral : Op {
-        string text;
+        internal readonly string text;
 
         public StringLiteral(Cursor c, string t) : base(c) { text = t; }
         protected override CgOp code(SubInfo body) { return CgOp.@const(CgOp.string_var(text)); }
@@ -530,7 +520,7 @@ namespace Niecza.Compiler.Op {
             return code_labelled(body, "");
         }
         protected override CgOp code_labelled(SubInfo sub, string l) {
-            var id = GenId();
+            var id = CompUtils.GenId();
             var cond = need_cond ?
                 CgOp.prog(CgOp.letvar("!cond", check.cgop(sub)),
                         CgOp.obj_getbool(CgOp.letvar("!cond"))) :
@@ -565,7 +555,7 @@ namespace Niecza.Compiler.Op {
             return code_labelled(body, "");
         }
         protected override CgOp code_labelled(SubInfo sub, string l) {
-            var id = GenId();
+            var id = CompUtils.GenId();
 
             return CgOp.prog(
                 init != null ? CgOp.sink(init.cgop(sub)) : CgOp.noop(),
@@ -602,14 +592,15 @@ namespace Niecza.Compiler.Op {
         }
 
         public override Op statement_level(Cursor at) {
-            var body = ((LISub)LookupLex(GetCurSub(), sink)).def;
+            var body = ((LISub)CompUtils.LookupLex(CompUtils.GetCurSub(), sink)).def;
             var vars = new string[Builtins.sig_count(body.sig)];
             var args = new Op[vars.Length];
             for (int i = 0; i < vars.Length; i++) {
-                vars[i] = GenSym();
+                vars[i] = CompUtils.GenSym();
                 args[i] = new LetVar(pos, vars[i]);
             }
-            return new ImmedForLoop(pos, source, vars, BetaCall(at,sink,args));
+            return new ImmedForLoop(pos, source, vars,
+                    CompUtils.BetaCall(at, sink, args));
         }
     }
 
@@ -637,17 +628,17 @@ namespace Niecza.Compiler.Op {
         // used only with 'foo ($_ for 1,2,3)'
         // vars will be a single gensym
         public override Op semilist_level(Cursor at) {
-            var aname = GenSym();
-            var sub = ThunkSub(new Let(pos,vars[0], new Lexical(pos,aname),
+            var aname = CompUtils.GenSym();
+            var sub = CompUtils.ThunkSub(new Let(pos,vars[0], new Lexical(pos,aname),
                         sink), new [] { aname });
-            var sname = BlockExpr(at, sub).name;
+            var sname = CompUtils.BlockExpr(at, sub).name;
 
             return new ForLoop(pos, source, sname);
         }
 
         protected override CgOp code(SubInfo body) { return code_labelled(body, ""); }
         protected override CgOp code_labelled(SubInfo body, string l) {
-            var id = GenId();
+            var id = CompUtils.GenId();
 
             var letargs = new List<object>();
             letargs.Add("!iter"+id);
@@ -704,7 +695,7 @@ namespace Niecza.Compiler.Op {
         }
 
         protected override CgOp code(SubInfo sub) {
-            var id = GenId();
+            var id = CompUtils.GenId();
 
             return CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
                         match.cgop(sub), "ACCEPTS", CgOp.scopedlex("$_"))),
@@ -746,7 +737,7 @@ namespace Niecza.Compiler.Op {
         }
 
         protected override CgOp code(SubInfo sub) {
-            var id = GenId();
+            var id = CompUtils.GenId();
             return CgOp.xspan("start"+id, "end"+id, 1, body.cgop(sub),
                 SubInfo.ON_DIE, "", "end"+id);
         }
@@ -847,8 +838,8 @@ namespace Niecza.Compiler.Op {
 
         protected override CgOp code(SubInfo body) { return CgOp.scopedlex(slot); }
         public override Op statement_level(Cursor at) {
-            SetRunOnce(((LISub)LookupLex(GetCurSub(), slot)).def);
-            return BetaCall(at,slot);
+            CompUtils.SetRunOnce(((LISub)CompUtils.LookupLex(CompUtils.GetCurSub(), slot)).def);
+            return CompUtils.BetaCall(at,slot);
         }
     }
 
@@ -861,7 +852,7 @@ namespace Niecza.Compiler.Op {
         protected override CgOp code(SubInfo body) { return CgOp.scopedlex(name); }
 
         public override Variable const_value(SubInfo body) {
-            var li = LookupLex(body, name);
+            var li = CompUtils.LookupLex(body, name);
             if (li is LICommon) {
                 StashEnt se;
                 Kernel.currentGlobals.TryGetValue(((LICommon)li).hkey, out se);
@@ -871,13 +862,13 @@ namespace Niecza.Compiler.Op {
         }
 
         public override Op to_bind(Cursor at, bool ro, Op rhs) {
-            var lex = LookupLex(GetCurSub(), name);
+            var lex = CompUtils.LookupLex(CompUtils.GetCurSub(), name);
             if (lex == null) {
-                Sorry(at, "Cannot find definition for binding???");
-                return new StatementList(null, new Op[0]);
+                CompUtils.Sorry(at, "Cannot find definition for binding???");
+                return new StatementList(at);
             }
             var list = false;
-            var type = CompileGetPkg(GetCurSub(), "Mu");
+            var type = CompUtils.CompileGetPkg(CompUtils.GetCurSub(), "Mu");
             string realname = null;
             var lex_s = lex as LISimple;
             if (lex_s != null) {
@@ -1154,7 +1145,7 @@ namespace Niecza.Compiler.Op {
 
         protected override CgOp code(SubInfo sub) { return code_labelled(sub,""); }
         protected override CgOp code_labelled(SubInfo sub, string l) {
-            var id = GenId();
+            var id = CompUtils.GenId();
 
             return CgOp.xspan("redo"+id, "next"+id, 0, body.cgop(sub),
                 SubInfo.ON_NEXT, l, "next"+id, SubInfo.ON_LAST, l, "next"+id,
@@ -1182,7 +1173,7 @@ namespace Niecza.Compiler.Op {
 
         protected override CgOp code(SubInfo body) {
             var c = new List<object>();
-            var id = GenId();
+            var id = CompUtils.GenId();
 
             var use_hide = excl_lhs && !sedlike;
             c.Add("!ret");
@@ -1282,7 +1273,7 @@ namespace Niecza.Compiler.Op {
         }
 
         protected override CgOp code(SubInfo body) {
-            var id = GenId();
+            var id = CompUtils.GenId();
 
             return CgOp.xspan("start"+id, "end"+id, 0, CgOp.prog(
                 CgOp.sink(inside.cgop(body)),
@@ -1298,5 +1289,61 @@ namespace Niecza.Compiler.Op {
         public GeneralConst(Cursor c, Variable v) : base(c) { value = v; }
         public override Variable const_value(SubInfo s) { return value; }
         protected override CgOp code(SubInfo s) { return CgOp.@const(value); }
+    }
+
+    static class Helpers {
+        public static Op mklet(Cursor p, Op value, Func<Op,Op> body) {
+            var v = CompUtils.GenSym();
+            return new Let(p, v, value, body(new LetVar(p, v)));
+        }
+
+        public static Op mkcall(Cursor p, string name, params Op[] positionals){
+            CompUtils.MarkUsed(p, name);
+            if (name == "&eval") CompUtils.GetCurSub().special |=
+                SubInfo.CANNOT_INLINE; // HACK
+            return new CallSub(p, new Lexical(p, name), true, positionals);
+        }
+
+        public static Op mklex(Cursor p, string name) {
+            CompUtils.MarkUsed(p, name);
+            if (name == "&eval") CompUtils.GetCurSub().special |=
+                SubInfo.CANNOT_INLINE; // HACK
+            return new Lexical(p, name);
+        }
+
+        public static Op mkbool(Cursor at, bool b) {
+            return new Lexical(at, b ? "True" : "False");
+        }
+
+        public static Op mktemptopic(Cursor at, Op item, Op expr) {
+            return mklet(at, mklex(at, "$_"), (old_) =>
+                new StatementList(at,
+                    new LexicalBind(at, "$_", false,false,null, item),
+                    mklet(at, expr, (result) =>
+                        new StatementList(at,
+                            new LexicalBind(at,"$_",false,false,null,old_),
+                            result))));
+        }
+
+        public static Op mkstringycat(Cursor at, params Op[] strings) {
+            var a = new List<Op>();
+            foreach (Op s in strings) {
+                var ac = a.Count;
+                if (ac != 0 && a[ac-1] is StringLiteral && s is StringLiteral) {
+                    a[ac-1] = new StringLiteral(at,
+                            ((StringLiteral)a[ac-1]).text +
+                            ((StringLiteral)s).text);
+                } else {
+                    a.Add(s);
+                }
+            }
+            if (a.Count == 0)
+                return new StringLiteral(at, "");
+            else if (a.Count == 1)
+                return (a[0] is StringLiteral) ? a[0] :
+                    mkcall(at, "&prefix:<~>", a[0]);
+            else
+                return mkcall(at, "&infix:<~>", a.ToArray());
+        }
     }
 }
