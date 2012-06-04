@@ -160,7 +160,16 @@ output options:
         public static STable CompileGetPkg(SubInfo s, string n) { throw new NotImplementedException(); }
         public static SubInfo ThunkSub(Op.Op body, string[] args) { throw new NotImplementedException(); }
         public static Op.Lexical BlockExpr(Cursor at, SubInfo blk) { throw new NotImplementedException(); }
-        public static Op.Op BetaCall(Cursor at, string name, params Op.Op[] pos) { throw new NotImplementedException(); }
+        public static Op.Op BetaCall(Cursor at, string name,
+                params Op.Op[] pos) {
+            LISub lis = LookupLex(GetCurSub(), name) as LISub;
+            if (lis == null || !lis.def.IsInlinable())
+                return new Op.CallSub(at, new Op.Lexical(at, name), true, pos);
+
+            lis.def.SetInlined();
+            return new Op.RawCgOp(at, Utils.PrependArr<object>(pos, 0,
+                        "_inline", lis.def));
+        }
         public static void MarkUsed(Cursor at, string name) { throw new NotImplementedException(); }
     }
 }
