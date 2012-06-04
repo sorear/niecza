@@ -1033,4 +1033,105 @@ namespace Niecza {
             deno = sden;
         }
     }
+
+    public sealed class GetoptLong {
+        public bool Permute { get; set; }
+        public Action<string> OnArg { get; set; }
+        public Action<string> OnError { get; set; }
+
+        List<string> opkeys;
+        List<string> nonopt;
+        bool breakout;
+        Dictionary<string,int> needarg = new Dictionary<string,int>();
+        Dictionary<string,Action<string>> handlers =
+            new Dictionary<string,Action<string>>();
+
+        public GetoptLong() {
+            Permute = true;
+            OnArg = delegate (string s) {
+                nonopt.Add(s);
+                if (!Permute) breakout = true;
+            };
+            OnError = delegate (string s) {
+                Console.Error.WriteLine(s);
+                Environment.Exit(1);
+            };
+            opkeys = new List<string>();
+            nonopt = new List<string>();
+        }
+
+        string pick_long(string arg) {
+            var cand = new List<string>();
+            foreach (string s in opkeys)
+                if (s.Length > 1 && s.Length >= arg.Length &&
+                        s.Substring(0, arg.Length) == arg) cand.Add(s);
+            if (cand.Count > 1)
+                OnError("Ambiguous long option --"+arg+"; could be any of "+Kernel.JoinS(" ",cand));
+            if (cand.Count == 0)
+                OnError("No match for long option --"+arg);
+            return cand[0];
+        }
+
+        // 0=no 1=yes 2=opt
+        public void Opt(string ops, int reqd, Action<string> handler) {
+            foreach (var s in ops.Split('|')) {
+                opkeys.Add(s);
+                needarg[s] = reqd;
+                handlers[s] = handler;
+            }
+        }
+
+        public void Parse(ref string[] argv) {
+            breakout = false;
+            nonopt.Clear();
+            for (int i = 0; i < argv.Length; ) {
+                string opt = argv[i++];
+                if (opt == "--" || breakout) {
+                    if (breakout) i--;
+                    while (i < argv.Length) OnArg(argv[i++]);
+                    break;
+                }
+                if (opt.Length >= 2 && opt.Substring(0,2) == "--") {
+                    int eq = opt.IndexOf('=');
+                    if (eq >= 0) {
+                        var obl = pick_long(opt.Substring(2,eq-2));
+                        if (needarg[obl] == 0)
+                            OnError("Long option --"+obl+" does not accept an argument");
+                        handlers[obl](opt.Substring(eq+1));
+                    }
+                    else {
+                        var obl = pick_long(opt.Substring(2));
+                        if (needarg[obl] == 1) {
+                            if (i == argv.Length - 1)
+                                OnError("Argument required for long option --"+obl);
+                            handlers[obl](argv[i++]);
+                        } else {
+                            handlers[obl](null);
+                        }
+                    }
+                }
+                else if (opt.Length > 1 && opt[0] == '-') {
+                    int chi = 1;
+                    while (chi != opt.Length) {
+                        string ch = opt.Substring(chi++, 1);
+                        if (!handlers.ContainsKey(ch))
+                            OnError("No match for short option -"+ch);
+                        var req = needarg[ch];
+                        if (req == 0 || req == 2 && chi == opt.Length)
+                            handlers[ch](null);
+                        else if (chi != opt.Length) {
+                            handlers[ch](opt.Substring(chi));
+                            chi = opt.Length;
+                        } else if (i != argv.Length)
+                            handlers[ch](argv[i++]);
+                        else
+                            OnError("Argument required for short option -"+ch);
+                    }
+                }
+                else
+                    OnArg(opt);
+            }
+            argv = nonopt.ToArray();
+        }
+    }
 }
