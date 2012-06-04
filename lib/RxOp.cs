@@ -40,6 +40,49 @@ namespace Niecza.Compiler.RxOp {
 
         // placeholders...
         protected void AddMyName(params object[] args) { throw new NotImplementedException(); }
+
+        public static object[] optimize_lad(object[] lad) {
+            if ((string)lad[0] != "Sequence")
+                return lad;
+            var zyg = (object[][])lad[1];
+            var fzyg = new List<object[]>();
+            foreach(object[] z in zyg) {
+                var oz = optimize_lad(z);
+                if ((string)oz[0] == "Sequence") {
+                    foreach (var zz in (object[][])oz[1])
+                        fzyg.Add(zz);
+                } else if ((string)oz[0] == "Null") {
+                } else {
+                    fzyg.Add(oz);
+                }
+            }
+            var ozyg = new List<object[]>();
+            foreach (var fz in fzyg) {
+                if ((string)fz[0] == "None") return fz;
+                if ((string)fz[0] == "Imp") {
+                    ozyg.Add(fz);
+                    break;
+                } else if (ozyg.Count != 0 && (string)ozyg[ozyg.Count - 1][0] == "Str" && (string)fz[0] == "Str") {
+                    ozyg[ozyg.Count-1] = new [] { "Str", ((string)ozyg[ozyg.Count-1][1]) + ((string)fz[1]) };
+                } else {
+                    ozyg.Add(fz);
+                }
+            }
+            if (ozyg.Count == 0) {
+                return new object[] { "Null" };
+            } else if (ozyg.Count == 1) {
+                return ozyg[0];
+            } else {
+                return new object[] { "Sequence", ozyg.ToArray() };
+            }
+        }
+
+        public virtual bool mayback() { return true; }
+        public virtual RxOp rxsimp(bool cut) {
+            for (int i = 0; i < zyg.Length; i++)
+                zyg[i] = zyg[i].rxsimp(false);
+            return this;
+        }
     }
 
     abstract class Capturing : RxOp {
@@ -94,10 +137,11 @@ namespace Niecza.Compiler.RxOp {
             return endsym != null ? new object[] { "Sequence",
                 new [] { m, new [] { "Method", endsym } } } : m;
         }
+        public override bool mayback() { return false; }
     }
 
     class String : RxOp {
-        string text;
+        internal string text;
         bool igcase;
 
         public String(string text, bool igcase=false) {
@@ -119,6 +163,7 @@ namespace Niecza.Compiler.RxOp {
         public override object[] lad() {
             return new [] { igcase ? "StrNoCase": "Str", text };
         }
+        public override bool mayback() { return false; }
     }
 
     class VarString : RxOp {
@@ -133,6 +178,7 @@ namespace Niecza.Compiler.RxOp {
             acc.Add(CgOp.rxbprim("Exact", CgOp.obj_getstr(ops.cgop(body))));
         }
 
+        public override bool mayback() { return false; }
         public override object[] lad() { return new[] { "Imp" }; }
     }
 
@@ -147,6 +193,13 @@ namespace Niecza.Compiler.RxOp {
             this.min = min; this.max = max; this.closure = closure;
             this.minimal = minimal; this.nonlisty = nonlisty;
             this.opsep = opsep;
+        }
+
+        public override RxOp rxsimp(bool cut) {
+            base.rxsimp(cut);
+            if (cut && zyg.Length == 1 && zyg[0] is CClassElem)
+                return new QuantCClass(((CClassElem)zyg[0]).cc, min, max);
+            return this;
         }
 
         public override void VisitOps(Func<Op.Op,Op.Op> post) {
@@ -236,7 +289,7 @@ namespace Niecza.Compiler.RxOp {
     }
 
     class Sequence : RxOp {
-        public Sequence(RxOp[] z) : base(z) { }
+        public Sequence(RxOp[] z = null) : base(z ?? new RxOp[0]) { }
 
         public override void code(SubInfo body, List<object> acc) {
             foreach (RxOp z in zyg) z.code(body, acc);
@@ -251,6 +304,24 @@ namespace Niecza.Compiler.RxOp {
             for (int i = 0; i < zyg.Length; i++)
                 ar[i] = zyg[i].lad();
             return new object[] { "Sequence", ar };
+        }
+
+        public override RxOp rxsimp(bool cut) {
+            var kids = new List<RxOp>();
+            for (int i = 0; i < zyg.Length; i++) {
+                var k = zyg[i].rxsimp(cut && (i == zyg.Length - 1));
+                if (k is Sequence) {
+                    foreach (var kz in k.zyg) kids.Add(kz);
+                } else {
+                    kids.Add(k);
+                }
+            }
+            return (kids.Count == 1) ? kids[0] : new Sequence(kids.ToArray());
+        }
+
+        public override bool mayback() {
+            foreach (RxOp z in zyg) if (z.mayback()) return true;
+            return false;
         }
     }
 
@@ -324,6 +395,7 @@ namespace Niecza.Compiler.RxOp {
             acc.Add(CgOp.popcut());
         }
         public override object[] lad() { return zyg[0].lad(); }
+        public override bool mayback() { return zyg[0].mayback(); }
     }
 
     class Cut : RxOp {
@@ -338,15 +410,22 @@ namespace Niecza.Compiler.RxOp {
             to.Add(CgOp.rxcommitgroup(CgOp.str("CUTGRP")));
             to.Add(CgOp.popcut());
         }
+
+        public override RxOp rxsimp(bool cut) {
+            var kid = zyg[0].rxsimp(true);
+            return kid.mayback() ? new Cut(kid) : kid;
+        }
+        public override bool mayback() { return false; }
     }
 
     class BeforeString : RxOp {
-        string str;
-        public BeforeString(string s) { str = s; }
+        internal string text;
+        public BeforeString(string s) { text = s; }
 
         public override void code(SubInfo sub, List<object> to) {
-            to.Add(CgOp.rxbprim("BeforeStr", CgOp.@bool(0), CgOp.str(str)));
+            to.Add(CgOp.rxbprim("BeforeStr", CgOp.@bool(0), CgOp.str(text)));
         }
+        public override bool mayback() { return false; }
     }
 
     class ZeroWidthCCs : RxOp {
@@ -361,15 +440,18 @@ namespace Niecza.Compiler.RxOp {
             to.Add(CgOp.rxbprim(after ? "AfterCCs" : "BeforeCCs",
                 CgOp.@bool(neg?1:0), CgOp.@const(ccs)));
         }
+        public ZeroWidthCCs zerowidthify(bool n) { return new ZeroWidthCCs(ccs, after, !neg); }
+        public override bool mayback() { return false; }
     }
 
     class NotBeforeString : RxOp {
-        string str;
+        internal string str;
         public NotBeforeString(string s) { str = s; }
 
         public override void code(SubInfo body, List<object> to) {
             to.Add(CgOp.rxbprim("BeforeStr", CgOp.@bool(1), CgOp.str(str)));
         }
+        public override bool mayback() { return false; }
     }
 
     class ZeroWidth : RxOp {
@@ -380,6 +462,7 @@ namespace Niecza.Compiler.RxOp {
         public override void code(SubInfo body, List<object> to) {
             to.Add(CgOp.rxbprim("ZeroWidth", CgOp.@int(type)));
         }
+        public override bool mayback() { return false; }
     }
 
     class NotBefore : RxOp {
@@ -396,6 +479,24 @@ namespace Niecza.Compiler.RxOp {
             to.Add(CgOp.label(pass));
             to.Add(CgOp.popcut());
         }
+
+        public override bool mayback() { return false; }
+        public override RxOp rxsimp(bool c) {
+            var z = zyg[0].rxsimp(true);
+            if (z is BeforeString)
+                return new NotBeforeString(((BeforeString)z).text);
+            if (z is Before)
+                return new NotBefore(z.zyg[0]);
+            if (z is String)
+                return new NotBeforeString(((String)z).text);
+            if (z is Subrule)
+                return ((Subrule)z).zerowidthify(true);
+            if (z is ZeroWidthCCs)
+                return ((ZeroWidthCCs)z).zerowidthify(true);
+            if (z is CClassElem)
+                return new ZeroWidthCCs(new [] { ((CClassElem)z).cc }, false, true);
+            return new NotBefore(z);
+        }
     }
 
     class Before : RxOp {
@@ -405,6 +506,21 @@ namespace Niecza.Compiler.RxOp {
         }
         public override void code(SubInfo body, List<object> to) {
             (new NotBefore(new NotBefore(zyg[0]))).code(body,to);
+        }
+        public override bool mayback() { return false; }
+        // it's not unusual to write <!before> and <?before>
+        public override RxOp rxsimp(bool c) {
+            var z = zyg[0].rxsimp(true);
+            if (z is BeforeString || z is ZeroWidthCCs || z is ZeroWidth ||
+                    z is Before || z is NotBefore)
+                return z;
+            if (z is String)
+                return new BeforeString(((String)z).text);
+            if (z is Subrule)
+                return ((Subrule)z).zerowidthify(false);
+            if (z is CClassElem)
+                return new ZeroWidthCCs(new [] { ((CClassElem)z).cc }, false, false);
+            return new Before(z);
         }
     }
 
@@ -447,6 +563,11 @@ namespace Niecza.Compiler.RxOp {
         }
         public Subrule(string method, bool selfcut) { this.method = method; this.selfcut = selfcut; }
 
+        public override RxOp rxsimp(bool cut) {
+            return cut ? new Subrule(method,regex,ltm,true,zerowidth,negative) : this;
+        }
+        public override bool mayback() { return !selfcut; }
+
         public override void VisitOps(Func<Op.Op,Op.Op> post) {
             if (regex != null) regex = regex.VisitOps(post);
         }
@@ -455,6 +576,10 @@ namespace Niecza.Compiler.RxOp {
             var n = new Subrule(method,regex,ltm,selfcut,zerowidth,negative);
             n.captures = caps;
             return n;
+        }
+
+        internal RxOp zerowidthify(bool negate) {
+            return new Subrule(method,regex,ltm,selfcut,true,negate?!negative:negative);
         }
 
         public override void code(SubInfo body, List<object> to) {
@@ -487,6 +612,11 @@ namespace Niecza.Compiler.RxOp {
         public override void code(SubInfo body, List<object> to){
             (new Subrule("ws", selfcut)).code(body, to);
         }
+
+        public override RxOp rxsimp(bool cut) {
+            return cut ? new Sigspace(true) : this;
+        }
+        public override bool mayback() { return !selfcut; }
     }
 
     class CutLTM : RxOp {
@@ -494,6 +624,7 @@ namespace Niecza.Compiler.RxOp {
         public override void code(SubInfo s, List<object> to) {
             to.Add(CgOp.rxcall("CommitGroup", CgOp.str("LTM")));
         }
+        public override bool mayback() { return false; }
     }
 
     class CutRule : RxOp {
@@ -501,6 +632,7 @@ namespace Niecza.Compiler.RxOp {
         public override void code(SubInfo s, List<object> to) {
             to.Add(CgOp.rxcall("CommitRule"));
         }
+        public override bool mayback() { return false; }
     }
 
     class CutBrack : RxOp {
@@ -508,6 +640,7 @@ namespace Niecza.Compiler.RxOp {
         public override void code(SubInfo s, List<object> to) {
             to.Add(CgOp.rxcall("CommitGroup", CgOp.str("BRACK")));
         }
+        public override bool mayback() { return false; }
     }
 
     class SetLang : RxOp {
@@ -521,6 +654,7 @@ namespace Niecza.Compiler.RxOp {
             to.Add(CgOp.rxsetclass(CgOp.obj_llhow(CgOp.fetch(expr.cgop(body)))));
         }
         public override object[] lad() { return new [] { "Imp" }; }
+        public override bool mayback() { return false; }
     }
 
     class Alt : AltBase {
@@ -548,6 +682,18 @@ namespace Niecza.Compiler.RxOp {
             for (int i = 0; i < z.Length; i++) z[i] = zyg[i].lad();
             return new object[] { "Any", z };
         }
+
+        public override RxOp rxsimp(bool cut) {
+            var lads = new object[zyg.Length][];
+            var kids = new RxOp[zyg.Length];
+            for (int i = 0; i < zyg.Length; i++) {
+                lads[i] = optimize_lad(zyg[i].lad());
+                kids[i] = zyg[i].rxsimp(cut);
+            }
+            var n = new Alt(kids, dba);
+            n.optimized_lads = lads;
+            return n;
+        }
     }
 
     class CheckBlock : RxOp {
@@ -562,6 +708,7 @@ namespace Niecza.Compiler.RxOp {
             to.Add(CgOp.N(negate ? "cgoto" : "ncgoto", "backtrack",
                 CgOp.obj_getbool(block.cgop(body))));
         }
+        public override bool mayback() { return false; }
     }
 
     class SaveValue : RxOp {
@@ -578,6 +725,7 @@ namespace Niecza.Compiler.RxOp {
         public override void code(SubInfo body, List<object> to) {
             to.Add(CgOp.rxpushcapture(block.cgop(body), new [] { capid }));
         }
+        public override bool mayback() { return false; }
     }
 
     class VoidBlock : RxOp {
@@ -586,6 +734,7 @@ namespace Niecza.Compiler.RxOp {
         public override void VisitOps(Func<Op.Op,Op.Op> post) {
             block = block.VisitOps(post);
         }
+        public override bool mayback() { return false; }
         public override object[] lad() { return new [] { "Imp" }; }
         public override void code(SubInfo body, List<object> to) {
             to.Add(CgOp.sink(block.cgop(body)));
@@ -600,6 +749,8 @@ namespace Niecza.Compiler.RxOp {
         // to the RegexBody node.
         public override void code(SubInfo body, List<object> to) {}
         public override object[] lad() { return new [] { "Null" }; }
+        public override RxOp rxsimp(bool cut) { return new Sequence(); }
+        public override bool mayback() { return false; }
     }
 
     class ProtoRedis : Capturing {
@@ -625,6 +776,7 @@ namespace Niecza.Compiler.RxOp {
             to.Add(CgOp.rxbprim("AnyChar"));
         }
         public override object[] lad() { return new [] { "Dot" }; }
+        public override bool mayback() { return false; }
     }
 
     // generated by optimizer so needs no lad; always greedy
@@ -637,10 +789,11 @@ namespace Niecza.Compiler.RxOp {
             to.Add(CgOp.rxbprim("ScanCClass", CgOp.@int(min), CgOp.@int(max),
                 CgOp.@const(cc)));
         }
+        public override bool mayback() { return false; }
     }
 
     class CClassElem : RxOp {
-        CClass cc;
+        internal CClass cc;
         public CClassElem(CClass c) { cc = c; }
         public override void code(SubInfo body, List<object> to) {
             to.Add(CgOp.rxbprim("CClass", CgOp.@const(cc)));
@@ -651,6 +804,7 @@ namespace Niecza.Compiler.RxOp {
             Array.Copy(cc.terms,0,terms,1,terms.Length-1);
             return terms;
         }
+        public override bool mayback() { return false; }
     }
 
     class None : RxOp {
@@ -658,6 +812,7 @@ namespace Niecza.Compiler.RxOp {
             to.Add(CgOp.@goto("backtrack"));
         }
         public override object[] lad() { return new [] { "None" }; }
+        public override bool mayback() { return false; }
     }
 
     class Newline : RxOp {
