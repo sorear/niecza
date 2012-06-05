@@ -38,6 +38,62 @@ namespace Niecza.Compiler {
         public void compile_file(string fname, bool run) {
             throw new NotImplementedException();
         }
+
+        // borrowed from STD, try to allow p5 and p6 to coexist
+        bool heuristic_check_p5(string text) {
+            int len = text.Length;
+            CC hs = new CC(CClass.HSpace.terms);
+            CC sp = new CC(CClass.Space.terms);
+            for (int ix = 0; ix < len; ix++) {
+                if (!CC.VSpace.Accepts(text[ix]))
+                    continue;
+                int i2 = ix;
+                while (i2 < len && hs.Accepts(text[i2])) i2++;
+                if (len - i2 < 8 || text.Substring(i2, 7) != "package" ||
+                        !sp.Accepts(text[i2+7]))
+                    continue;
+                i2 += 8;
+                while (i2 < len && sp.Accepts(text[i2])) i2++;
+                if (i2 < len && text[i2] == ';') return true;
+            }
+            return false;
+        }
+
+        string find_module(string name, out string src) {
+            var sub = ".";
+            var ntmp = name;
+            int ix;
+            while ((ix = ntmp.IndexOf("::")) >= 0) {
+                sub = Path.Combine(sub, ntmp.Substring(0,ix));
+                ntmp = ntmp.Substring(ix+2);
+            }
+            var path = new List<string>();
+            if (Kernel.containerRootUnit != null) {
+                StashEnt bv;
+                if (Kernel.currentGlobals.TryGetValue(
+                            "\u0008::GLOBAL@INC", out bv))
+                    foreach (string i in Builtins.UnboxLoS(bv.v))
+                        path.Add(i);
+            }
+            foreach (string i in lib_path)
+                path.Add(i);
+
+            foreach (string pe in path) {
+                foreach (string ext in new [] { ".pm6", ".pm", ".setting" }) {
+                    var fn = Path.Combine(pe, sub + ext);
+                    if (File.Exists(fn)) {
+                        var text = File.ReadAllText(fn);
+                        if (ext == ".pm" && heuristic_check_p5(text))
+                            continue;
+                        src = text;
+                        return Path.GetFullPath(fn);
+                    }
+                }
+            }
+
+            throw new NieczaException("Unable to locate module "+name+" in "+
+                Kernel.JoinS(" ", path));
+        }
     }
 
     class CommandDriver {
