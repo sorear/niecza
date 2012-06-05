@@ -15,6 +15,12 @@ namespace Niecza.Compiler {
         public string obj_dir;
         public string[] run_args;
 
+        public Frame repl_outer_frame;
+        public SubInfo repl_outer_sub;
+
+        // used to exclude recursive compilations from time accounting
+        internal double discount_time;
+
         public CompMgr() {
             string base_dir = Path.Combine(
                 AppDomain.CurrentDomain.BaseDirectory, "..");
@@ -23,19 +29,67 @@ namespace Niecza.Compiler {
             lib_path.Add(Path.GetFullPath("."));
         }
 
-        public void compile_string_repl(string code, bool run) {
-            throw new NotImplementedException();
+        public RuntimeUnit compile_string(string code, bool run, bool eval, bool repl) {
+            var job = new CompJob(this);
+            job.unitname = main_name();
+            job.from_string("(eval)", code);
+            job.is_main = true;
+            job.is_eval = eval;
+            job.is_repl = repl;
+            return job.run(run);
         }
 
-        public void compile_string(string code, bool run) {
-            throw new NotImplementedException();
-        }
-
-        public void compile_module(string code) {
-            throw new NotImplementedException();
+        public void compile_module(string name) {
+            var job = new CompJob(this);
+            job.from_module(name);
+            job.run(false);
         }
 
         public void compile_file(string fname, bool run) {
+            var job = new CompJob(this);
+            job.unitname = main_name();
+            job.from_file(fname);
+            job.is_main = true;
+            job.run(run);
+        }
+
+        int next_main;
+        string main_name() { var i = next_main++; return i != 0 ? "MAIN_"+i : "MAIN"; }
+    }
+
+    class CompJob {
+        public CompMgr mgr;
+        public string source;
+        public string filename;
+
+        public string unitname;
+        public bool is_main, is_eval, is_repl;
+
+        public CompJob(CompMgr mgr) { this.mgr = mgr; }
+
+        public RuntimeUnit run(bool runit) {
+            // fudge to make -L NULL useful
+            if (mgr.language == "NULL")
+                unitname = "CORE";
+            double start = Builtins.usertime() - mgr.discount_time;
+
+            var u = run_internal(runit);
+
+            double time = Builtins.usertime() - mgr.discount_time - start;
+
+            if (mgr.verbose > 0) {
+                Console.WriteLine("{0}: took {1}", unitname, time);
+            }
+
+            // don't count this time towards any other timing in progress
+            mgr.discount_time += time;
+            return u;
+        }
+
+        RuntimeUnit run_internal(bool runit) {
+            Console.WriteLine("unitname = " + unitname);
+            Console.WriteLine("filename = " + filename);
+            Console.WriteLine("source   = " + source.Length);
             throw new NotImplementedException();
         }
 
@@ -59,14 +113,26 @@ namespace Niecza.Compiler {
             return false;
         }
 
-        string find_module(string name, out string src) {
+        public void from_file(string name) {
+            filename = Path.GetFullPath(name);
+            source = File.ReadAllText(filename);
+        }
+
+        public void from_string(string name, string source) {
+            filename = name;
+            this.source = source;
+        }
+
+        public void from_module(string name) {
             var sub = ".";
             var ntmp = name;
+            unitname = name;
             int ix;
             while ((ix = ntmp.IndexOf("::")) >= 0) {
                 sub = Path.Combine(sub, ntmp.Substring(0,ix));
                 ntmp = ntmp.Substring(ix+2);
             }
+            sub = Path.Combine(sub, ntmp);
             var path = new List<string>();
             if (Kernel.containerRootUnit != null) {
                 StashEnt bv;
@@ -75,7 +141,7 @@ namespace Niecza.Compiler {
                     foreach (string i in Builtins.UnboxLoS(bv.v))
                         path.Add(i);
             }
-            foreach (string i in lib_path)
+            foreach (string i in mgr.lib_path)
                 path.Add(i);
 
             foreach (string pe in path) {
@@ -85,8 +151,9 @@ namespace Niecza.Compiler {
                         var text = File.ReadAllText(fn);
                         if (ext == ".pm" && heuristic_check_p5(text))
                             continue;
-                        src = text;
-                        return Path.GetFullPath(fn);
+                        source = text;
+                        filename = Path.GetFullPath(fn);
+                        return;
                     }
                 }
             }
@@ -133,7 +200,7 @@ output options:
             var o = new GetoptLong();
             o.Permute = false;
             o.Opt("evaluate|e",       1, (s) => { eval.Add(s); });
-            o.Opt("compile-module|C", 1, (s) => { comp_module = true; });
+            o.Opt("compile-module|C", 0, (s) => { comp_module = true; });
             o.Opt("backend|B",        1, (s) => { Console.Error.WriteLine(
                 "niecza: The backend option is deprecated and ignored."); });
             o.Opt("language|L",       1, (s) => { cm.language = s; });
@@ -150,7 +217,7 @@ output options:
             o.Parse(ref argv);
 
             if (print_version) {
-                cm.compile_string("say qq[This is Niecza Perl 6 {$?PERL<version>}]", true);
+                cm.compile_string("say qq[This is Niecza Perl 6 {$?PERL<version>}]", true, false, false);
                 Environment.Exit(0);
             }
 
@@ -169,15 +236,15 @@ output options:
             else if (eval.Count != 0) {
                 cm.run_args = argv;
                 foreach (string e in eval)
-                    cm.compile_string(e, !compile_only);
+                    cm.compile_string(e, !compile_only, false, false);
             }
             else if (argv.Length != 0) {
                 cm.run_args = Utils.TrimArr(argv, 1, 0);
                 cm.compile_file(argv[0], !compile_only);
             }
             else {
-                cm.compile_string_repl("$PROCESS::OUTPUT_USED ::= True",
-                    !compile_only);
+                cm.compile_string("$PROCESS::OUTPUT_USED ::= True",
+                    !compile_only, true, true);
                 // XXX the child will also open a TextReader; could be problem
                 var inp = Builtins.treader_stdin();
                 while (true) {
@@ -186,7 +253,7 @@ output options:
                     if (line == null)
                         break;
                     try {
-                        cm.compile_string_repl(line, !compile_only);
+                        cm.compile_string(line, !compile_only, true, true);
                     } catch (Exception ex) {
                         Console.WriteLine(ex);
                     }

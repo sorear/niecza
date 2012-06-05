@@ -1673,6 +1673,11 @@ flat_enough:;
         return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
     }
 
+    public static double usertime() {
+        Process p = Process.GetCurrentProcess();
+        return ((double)p.UserProcessorTime.Ticks) / 10000000.0;
+    }
+
     public static Variable times() {
         Process p = Process.GetCurrentProcess();
         Variable[] ret = new Variable[4];

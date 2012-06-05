@@ -1050,7 +1050,6 @@ namespace Niecza {
             Permute = true;
             OnArg = delegate (string s) {
                 nonopt.Add(s);
-                if (!Permute) breakout = true;
             };
             OnError = delegate (string s) {
                 Console.Error.WriteLine(s);
@@ -1086,9 +1085,12 @@ namespace Niecza {
             nonopt.Clear();
             for (int i = 0; i < argv.Length; ) {
                 string opt = argv[i++];
-                if (opt == "--" || breakout) {
-                    if (breakout) i--;
-                    while (i < argv.Length) OnArg(argv[i++]);
+                if (breakout) {
+                    OnArg(opt);
+                    continue;
+                }
+                if (opt == "--") {
+                    breakout = true;
                     break;
                 }
                 if (opt.Length >= 2 && opt.Substring(0,2) == "--") {
@@ -1128,8 +1130,10 @@ namespace Niecza {
                             OnError("Argument required for short option -"+ch);
                     }
                 }
-                else
+                else {
                     OnArg(opt);
+                    if (!Permute) breakout = true;
+                }
             }
             argv = nonopt.ToArray();
         }
