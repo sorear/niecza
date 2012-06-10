@@ -73,7 +73,15 @@ namespace Niecza.Compiler {
                 unitname = "CORE";
             double start = Builtins.usertime() - mgr.discount_time;
 
-            var u = run_internal(runit);
+            RuntimeUnit u;
+            if (!is_eval)
+                Compartment.Push();
+            try {
+                u = run_internal(runit);
+            } finally {
+                if (!is_eval)
+                    Compartment.Pop();
+            }
 
             double time = Builtins.usertime() - mgr.discount_time - start;
 
@@ -90,7 +98,58 @@ namespace Niecza.Compiler {
             Console.WriteLine("unitname = " + unitname);
             Console.WriteLine("filename = " + filename);
             Console.WriteLine("source   = " + source.Length);
+
+            RuntimeUnit ru = new RuntimeUnit(unitname, filename,
+                    (mgr.no_source ? Utils.HashString(source) : source),
+                    is_main, runit);
+
+            if (Kernel.containerRootUnit == null) {
+                // this is a module unit
+                Kernel.InitCompartment();
+                Kernel.containerRootUnit = ru;
+                ru.depended_units.Add(ru);
+                ru.owner = ru;
+                ru.globals = Kernel.currentGlobals =
+                    new Dictionary<string,StashEnt>();
+            } else {
+                // needs to use the same globals as the other units in
+                // this serialization unit
+                ru.globals = Kernel.currentGlobals;
+                ru.owner = Kernel.containerRootUnit;
+                ru.owner.subordinates.Add(ru);
+            }
+
+            string lang = mgr.language;
+            if (unitname == "CORE") {
+                lang = "NULL";
+                string altname = Path.Combine(Path.GetDirectoryName(filename),
+                        "Parser.src");
+                string altsrc  = File.ReadAllText(altname);
+
+                new MiniParser(altsrc, ru).Parse();
+            } else if (unitname != "MAIN") { // modules aren't affected by -L
+                lang = "CORE";
+            }
+
+            CompUtils.rel_pkg(ru, true, null, "GLOBAL");
+            CompUtils.rel_pkg(ru, true, null, "PROCESS");
+
+            // Parser/actions tree runs here
             throw new NotImplementedException();
+
+            if (runit) {
+                //if (!is_repl) setnames(execname(), filename);
+                //run_unit(ru, is_eval, run_args);
+                if (is_repl) {
+                    // mgr.repl_outer_frame = replrun();
+                    // mgr.repl_outer = ru.mainline;
+                }
+            } else {
+                // save_unit(ru);
+                // if (is_repl) mgr.repl_outer = ru.mainline;
+            }
+
+            return is_eval ? ru : null;
         }
 
         // borrowed from STD, try to allow p5 and p6 to coexist
@@ -294,5 +353,34 @@ output options:
                         "_inline", lis.def));
         }
         public static void MarkUsed(Cursor at, string name) { throw new NotImplementedException(); }
+        public static STable rel_pkg(RuntimeUnit c, bool auto, STable pkg,
+                params string[] args) {
+
+            for (int i = 0; i < args.Length; i++) {
+                string key = args[i];
+                string who = "";
+                if (pkg != null) {
+                    if (!pkg.who.Isa(Kernel.StashMO))
+                        throw new NieczaException(pkg.name + " fails to name a standard package");
+                    who = Kernel.UnboxAny<string>(pkg.who);
+                }
+                StashEnt v;
+                string hkey = (char)who.Length + who + key;
+                if (c.globals.TryGetValue(hkey, out v)) {
+                    if (v.v.Rw || v.v.Fetch().IsDefined())
+                        throw new NieczaException((who + "::" + key).Substring(2) + " names a non-package");
+                    pkg = v.v.Fetch().mo;
+                } else if (!auto) {
+                    throw new NieczaException((who + "::" + key).Substring(2) + " does not name any package");
+                } else {
+                    c.globals[hkey] = v = new StashEnt();
+                    v.constant = true;
+                    v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, Kernel.StashMO));
+                    pkg = v.v.Fetch().mo;
+                }
+            }
+            return pkg;
+        }
+
     }
 }

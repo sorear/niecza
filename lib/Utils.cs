@@ -584,6 +584,11 @@ namespace Niecza {
             return new string(buf);
         }
 
+        public static string HashString(string inp) {
+            return HashToStr(ObjectRegistry.NewHash().ComputeHash(
+                    new System.Text.UTF8Encoding().GetBytes(inp)));
+        }
+
         public static void HexDump(byte[] heap) {
             for (int offs = 0; offs < heap.Length; offs += 16) {
                 Console.Write("{0:X6}   ", offs);
