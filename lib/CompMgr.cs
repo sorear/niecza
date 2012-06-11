@@ -65,6 +65,10 @@ namespace Niecza.Compiler {
         public string unitname;
         public bool is_main, is_eval, is_repl;
 
+        // state vars
+        public RuntimeUnit unit;
+        public SubInfo     curlex;
+
         public CompJob(CompMgr mgr) { this.mgr = mgr; }
 
         public RuntimeUnit run(bool runit) {
@@ -122,11 +126,14 @@ namespace Niecza.Compiler {
             string lang = mgr.language;
             if (unitname == "CORE") {
                 lang = "NULL";
-                string altname = Path.Combine(Path.GetDirectoryName(filename),
-                        "Parser.src");
-                string altsrc  = File.ReadAllText(altname);
 
-                new MiniParser(altsrc, ru).Parse();
+                CompJob alt = new CompJob(mgr);
+                alt.filename = Path.Combine(Path.GetDirectoryName(filename),
+                        "Parser.src");
+                alt.source = File.ReadAllText(alt.filename);
+                alt.unit   = ru;
+
+                new MiniParser(alt).Parse();
             } else if (unitname != "MAIN") { // modules aren't affected by -L
                 lang = "CORE";
             }

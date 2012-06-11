@@ -7,86 +7,74 @@
 
 # note: rather heavily modified -sorear
 
-our ($Sig, $SigParameter, $Actions);
-grammar STD:ver<6.0.0.alpha>:auth<cpan:SOREAR>;
+grammar STD {
 
-sub mnode($M) {
-    $M.^isa(Match) ??
-        { file => $*FILE<name>, line => $M.CURSOR.lineof($M.from), pos => $M.from } !!
-        { file => $*FILE<name>, line => $M.lineof($M.pos), pos => $M.pos }
-}
-
-package DEBUG {
-    our constant symtab = 1;
-    our constant EXPR   = 2;
-}
-
-=begin comment
-
-    Contextuals used in STD
-    =======================
-    # per parse
-    my $*ACTIONS;         # class or object which defines reduce actions
-    my $*SETTINGNAME;     # name of core setting
-    my $*TMP_PREFIX;      # where to put tmp files
-    my $*ORIG;            # the original program string
-    my @*ORIG;            # same thing as individual chars
-    my @*MEMOS;           # per-position info such as ws and line number
-    my $*HIGHWATER;      # where we were last looking for things
-    my $*HIGHMESS;       # current parse failure message
-    my $*HIGHEXPECT;     # things we were looking for at the bleeding edge
-    my $*IN_PANIC;       # don't panic recursively
-
-    # symbol table management
-    our $ALL;            # all the stashes, keyed by id
-    my $*CORE;            # the CORE scope
-    my $*SETTING;         # the SETTING scope
-    my $*GLOBAL;          # the GLOBAL scope
-    my $*PROCESS;         # the PROCESS scope
-    my $*UNIT;            # the UNIT scope
-    my $*CURLEX;          # current lexical scope info
-
-    my %*MYSTERY;     # names we assume may be post-declared functions
-
-    # tree attributes, marked as propagating up (u) down (d) or up-and-down (u/d)
-    my %*LANG;            # (d) braided languages: MAIN, Q, Regex, etc
-
-    my $*IN_DECL;     # (d) a declarator is looking for a name to declare
-    my $*HAS_SELF;     # (d) in a context where 'self' exists
-    my $*SCOPE = "";      # (d) which scope declarator we're under
-    my $*MULTINESS;       # (d) which multi declarator we're under
-    my $*PKGDECL ::= "";         # (d) current package declarator
-
-    my $*GOAL ::= "(eof)";  # (d) which special terminator we're most wanting
-    my $*IN_REDUCE;   # (d) attempting to parse an [op] construct
-    my $*IN_META;     # (d) parsing a metaoperator like [..]
-    my $*QUASIMODO;   # (d) don't carp about quasi variables
-    my $*LEFTSIGIL;   # (u) sigil of LHS for item vs list assignment
-    my $*QSIGIL;      # (d) sigil of current interpolation
-
-    my $*INVOCANT_OK; # (d) parsing a list that allows an invocant
-    my $*INVOCANT_IS; # (u) invocant of args match
-
-    my $*BORG;            # (u/d) who to blame if we're missing a block
-
-=end comment
-
-=begin notes
-
-    Some rules are named by syntactic category plus an additional symbol
-    specified in adverbial form, either in bare :name form or in :sym<name>
-    form.  (It does not matter which form you use for identifier symbols,
-    except that to specify a symbol "sym" you must use the :sym<sym> form
-    of adverb.)  If you use the <sym> rule within the rule, it will parse the
-    symbol at that point.  At the final reduction point of a rule, if $sym
-    has been set, that is used as the final symbol name for the rule.  This
-    need not match the symbol specified as part the rule name; that is just
-    for disambiguating the name.  However, if no $sym is set, the original
-    symbol will be used by default.
-
-    This grammar relies on transitive longest-token semantics.
-
-=end notes
+# =begin comment
+#
+#     Contextuals used in STD
+#     =======================
+#     # per parse
+#     my $*ACTIONS;         # class or object which defines reduce actions
+#     my $*SETTINGNAME;     # name of core setting
+#     my $*TMP_PREFIX;      # where to put tmp files
+#     my $*ORIG;            # the original program string
+#     my @*ORIG;            # same thing as individual chars
+#     my @*MEMOS;           # per-position info such as ws and line number
+#     my $*HIGHWATER;      # where we were last looking for things
+#     my $*HIGHMESS;       # current parse failure message
+#     my $*HIGHEXPECT;     # things we were looking for at the bleeding edge
+#     my $*IN_PANIC;       # don't panic recursively
+#
+#     # symbol table management
+#     our $ALL;            # all the stashes, keyed by id
+#     my $*CORE;            # the CORE scope
+#     my $*SETTING;         # the SETTING scope
+#     my $*GLOBAL;          # the GLOBAL scope
+#     my $*PROCESS;         # the PROCESS scope
+#     my $*UNIT;            # the UNIT scope
+#     my $*CURLEX;          # current lexical scope info
+#
+#     my %*MYSTERY;     # names we assume may be post-declared functions
+#
+#     # tree attributes, marked as propagating up (u) down (d) or up-and-down (u/d)
+#     my %*LANG;            # (d) braided languages: MAIN, Q, Regex, etc
+#
+#     my $*IN_DECL;     # (d) a declarator is looking for a name to declare
+#     my $*HAS_SELF;     # (d) in a context where 'self' exists
+#     my $*SCOPE = "";      # (d) which scope declarator we're under
+#     my $*MULTINESS;       # (d) which multi declarator we're under
+#     my $*PKGDECL ::= "";         # (d) current package declarator
+#
+#     my $*GOAL ::= "(eof)";  # (d) which special terminator we're most wanting
+#     my $*IN_REDUCE;   # (d) attempting to parse an [op] construct
+#     my $*IN_META;     # (d) parsing a metaoperator like [..]
+#     my $*QUASIMODO;   # (d) don't carp about quasi variables
+#     my $*LEFTSIGIL;   # (u) sigil of LHS for item vs list assignment
+#     my $*QSIGIL;      # (d) sigil of current interpolation
+#
+#     my $*INVOCANT_OK; # (d) parsing a list that allows an invocant
+#     my $*INVOCANT_IS; # (u) invocant of args match
+#
+#     my $*BORG;            # (u/d) who to blame if we're missing a block
+#
+# =end comment
+#
+# =begin notes
+#
+#     Some rules are named by syntactic category plus an additional symbol
+#     specified in adverbial form, either in bare :name form or in :sym<name>
+#     form.  (It does not matter which form you use for identifier symbols,
+#     except that to specify a symbol "sym" you must use the :sym<sym> form
+#     of adverb.)  If you use the <sym> rule within the rule, it will parse the
+#     symbol at that point.  At the final reduction point of a rule, if $sym
+#     has been set, that is used as the final symbol name for the rule.  This
+#     need not match the symbol specified as part the rule name; that is just
+#     for disambiguating the name.  However, if no $sym is set, the original
+#     symbol will be used by default.
+#
+#     This grammar relies on transitive longest-token semantics.
+#
+# =end notes
 
 method p6class () { ::STD::P6 }
 
@@ -5679,6 +5667,8 @@ token term:sym<miscbad> {
         self.badinfix($bad.Str) if $bad;
     }
     <!>
+}
+
 }
 
 ## vim: expandtab sw=4 ft=perl6
