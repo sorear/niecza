@@ -788,7 +788,7 @@ for $args (0..9) {
             if (cty == typeof(bool))
                 return Kernel.BoxAnyMO((bool)ret, Kernel.BoolMO);
             if (cty == typeof(string))
-                return Kernel.BoxAnyMO((string)ret, Kernel.StrMO);
+                return ret == null ? Kernel.StrMO.typeObj : Kernel.BoxAnyMO((string)ret, Kernel.StrMO);
             if (cty == typeof(Variable))
                 return (Variable)ret;
             if (cty == typeof(P6any))
