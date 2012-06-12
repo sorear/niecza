@@ -30,8 +30,15 @@ namespace Niecza.Compiler {
         P6any pow(Variable v1,Variable v2) { return (P6any)Builtins.pow(v1,v2); }
 
         // SSTO TODO integrate with parser
-        void sorry(string fmt, params object[] args) {
+        void sorry(Cursor m, string fmt, params object[] args) {
             throw new NotImplementedException();
+        }
+        void trymop(Cursor m, Action a) {
+            try {
+                a();
+            } catch (Exception e) {
+                sorry(m, e.Message);
+            }
         }
 
         T ast<T>(Variable v) {
@@ -62,7 +69,7 @@ namespace Niecza.Compiler {
         // TODO Merge with the corresponding setting/runtime code?
         // using p6numbers because we need bignum support here
         // TODO Unicode
-        P6any from_base(Variable str, int based_) {
+        P6any from_base(Cursor m, Variable str, int based_) {
             var acc = mkint(0);
             var based = mkint(based_);
             int punto = -1;
@@ -74,16 +81,16 @@ namespace Niecza.Compiler {
                 if (punto >= 0) punto++;
                 var digit = ch >= 'a' ? ((int)ch) - 87 : ((int)ch) - 48;
                 if (digit >= based_)
-                    sorry("Digit <{0}> too large for radix {1}", ch, based_);
+                    sorry(m, "Digit <{0}> too large for radix {1}", ch, based_);
                 acc = plus(mkint(digit), mul(based, acc));
             }
             return punto < 0 ? acc : div(acc, pow(based, mkint(punto)));
         }
 
-        public void decint(Cursor m) { make(m,from_base(m, 10)); }
-        public void hexint(Cursor m) { make(m,from_base(m, 16)); }
-        public void octint(Cursor m) { make(m,from_base(m, 8)); }
-        public void binint(Cursor m) { make(m,from_base(m, 2)); }
+        public void decint(Cursor m) { make(m,from_base(m, m, 10)); }
+        public void hexint(Cursor m) { make(m,from_base(m, m, 16)); }
+        public void octint(Cursor m) { make(m,from_base(m, m, 8)); }
+        public void binint(Cursor m) { make(m,from_base(m, m, 2)); }
         public void integer(Cursor m) {
             Variable v = null;
             if (isdef(v = atk(m, "decint")) || isdef(v = atk(m, "octint")) ||
@@ -101,7 +108,7 @@ namespace Niecza.Compiler {
                 // SSTO use the real number parser here
                 make(m, (P6any)Builtins.MakeFloat(
                             Utils.S2N(asstr(m).Replace("_",""))));
-            } else make(m,from_base(m,10));
+            } else make(m,from_base(m,m,10));
         }
 
         public void radint(Cursor m) {
@@ -121,11 +128,11 @@ namespace Niecza.Compiler {
                     new object[] { 10, radix.ToString() }), ast<Op.Op>(f)));
                 return;
             }
-            var value = istrue(f=atk(m,"int")) ? from_base(f,radix) : mkint(0);
+            var value = istrue(f=atk(m,"int")) ? from_base(m,f,radix):mkint(0);
 
             if (istrue(f = atk(m,"frac"))) {
                 var shift = asstr(f).Replace("_","").Length;
-                value = plus(value, div(from_base(f, radix),
+                value = plus(value, div(from_base(m, f, radix),
                             pow(mkint(radix), mkint(shift))));
             }
             if (istrue(f = atk(m,"base"))) {
@@ -135,6 +142,38 @@ namespace Niecza.Compiler {
                 // exponential notation is always imprecise here
             }
             make(m,value);
+        }
+
+        public void number(Cursor m) {
+            var child = atk(m,"integer");
+            if (!isdef(child)) child = atk(m,"dec_number");
+            if (!isdef(child)) child = atk(m,"rad_number");
+            object val;
+            if (!isdef(child)) {
+                val = asstr(m) == "NaN" ? double.NaN : double.PositiveInfinity;
+            } else {
+                val = ast<object>(child);
+            }
+            make(m, val is Op.Op ? val : new Op.Const(m,(P6any)val));
+        }
+
+        public void charname(Cursor m) {
+            var radint = atk(m,"radint");
+            string res;
+            if (istrue(radint)) {
+                var ast = ast<P6any>(radint);
+                int val = (int)Builtins.ToNum(ast);
+                if (!ast.Isa(Kernel.IntMO) || val < 0 || val > 0x10FFFF) {
+                    res = " ";
+                    sorry(m, "Numeric character identifiers must be integers between 0 and 0x10FFFF");
+                } else {
+                    res = new string((char) val, 1);
+                }
+            } else {
+                res = " ";
+                trymop(m, () => { res = Niecza.UCD.DataSet.GetCodepoint(asstr(m)); });
+            }
+            make(m, mkstr(res));
         }
     }
 }
