@@ -7,6 +7,7 @@ using System.Collections.Generic;
 namespace Niecza.Compiler {
     class Actions {
         internal CompJob job;
+        public Actions(CompJob job) { this.job = job; }
 
         // Little things to make writing wads of data-extraction code nicer...
         string asstr(Variable v) { return v.Fetch().mo.mro_raw_Str.Get(v); }
@@ -19,8 +20,14 @@ namespace Niecza.Compiler {
             return v.Fetch().mo.mro_at_pos.Get(v, mkint(at));
         }
 
-        Variable mkint(int i) { return Builtins.MakeInt(i); }
-        Variable mkstr(string s) { return Builtins.MakeStr(s); }
+        P6any mkint(int i) { return (P6any)Builtins.MakeInt(i); }
+        P6any mkstr(string s) { return (P6any)Builtins.MakeStr(s); }
+
+        P6any plus(Variable v1,Variable v2) { return (P6any)Builtins.plus(v1,v2); }
+        P6any minus(Variable v1,Variable v2) { return (P6any)Builtins.minus(v1,v2); }
+        P6any mul(Variable v1,Variable v2) { return (P6any)Builtins.mul(v1,v2); }
+        P6any div(Variable v1,Variable v2) { return (P6any)Builtins.divide(v1,v2); }
+        P6any pow(Variable v1,Variable v2) { return (P6any)Builtins.pow(v1,v2); }
 
         // SSTO TODO integrate with parser
         void sorry(string fmt, params object[] args) {
@@ -31,7 +38,23 @@ namespace Niecza.Compiler {
             return (T)Kernel.UnboxAny<object>(((Cursor)v.Fetch()).ast);
         }
         void make(Cursor m, object val) {
-            m.ast = Kernel.BoxAnyMO(Kernel.AnyMO, val);
+            m.ast = Kernel.BoxRaw(val, Kernel.AnyMO);
+        }
+
+        Variable[] flist(Variable list) {
+            // we force the list to iterate here
+            VarDeque iter = Builtins.start_iter(list.Fetch().mo.mro_list.Get(list));
+            VarDeque into = new VarDeque();
+            while (Kernel.IterHasFlat(iter, true))
+                into.Push(iter.Shift());
+            return into.CopyAsArray();
+        }
+
+        B[] map<A,B>(Func<A,B> fn, A[] args) {
+            B[] ret = new B[args.Length];
+            for (int i = 0; i < args.Length; i++)
+                ret[i] = fn(args[i]);
+            return ret;
         }
 
         // SSTO TODO: how are we handling categoricals?  FALLBACK
@@ -52,10 +75,9 @@ namespace Niecza.Compiler {
                 var digit = ch >= 'a' ? ((int)ch) - 87 : ((int)ch) - 48;
                 if (digit >= based_)
                     sorry("Digit <{0}> too large for radix {1}", ch, based_);
-                acc = Builtins.plus(mkint(digit), Builtins.mul(based, acc));
+                acc = plus(mkint(digit), mul(based, acc));
             }
-            return (P6any)(punto < 0 ? acc : Builtins.div(acc,
-                    Builtins.pow(based, mkint(punto))));
+            return punto < 0 ? acc : div(acc, pow(based, mkint(punto)));
         }
 
         public void decint(Cursor m) { make(m,from_base(m, 10)); }
@@ -88,5 +110,31 @@ namespace Niecza.Compiler {
                 make(m,ast<P6any>(var));
         }
 
-        public void rad_number(Cursor m) {
+        public void rad_number(Cursor m) { // returns Op *or* P6any ...
+            int radix = (int)Utils.S2N(asstr(atk(m,"radix")));
 
+            var f = atk(m,"circumfix");
+            if (istrue(f)) {
+                // STD guarantees this can never happen from within radint;
+                // only number can see this
+                make(m, Op.Helpers.mkcall(m, "&unbase", new Op.Num(m,
+                    new object[] { 10, radix.ToString() }), ast<Op.Op>(f)));
+                return;
+            }
+            var value = istrue(f=atk(m,"int")) ? from_base(f,radix) : mkint(0);
+
+            if (istrue(f = atk(m,"frac"))) {
+                var shift = asstr(f).Replace("_","").Length;
+                value = plus(value, div(from_base(f, radix),
+                            pow(mkint(radix), mkint(shift))));
+            }
+            if (istrue(f = atk(m,"base"))) {
+                value = mul(value, pow(ast<P6any>(f), istrue(atk(m,"exp")) ?
+                    ast<P6any>(atk(m,"exp")) : mkint(0)));
+                value = (P6any)Builtins.coerce_to_num(value);
+                // exponential notation is always imprecise here
+            }
+            make(m,value);
+        }
+    }
+}

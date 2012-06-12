@@ -1284,9 +1284,9 @@ namespace Niecza.Compiler.Op {
         }
     }
 
-    class GeneralConst : Op {
+    class Const : Op {
         Variable value;
-        public GeneralConst(Cursor c, Variable v) : base(c) { value = v; }
+        public Const(Cursor c, Variable v) : base(c) { value = v; }
         public override Variable const_value(SubInfo s) { return value; }
         protected override CgOp code(SubInfo s) { return CgOp.@const(value); }
     }
