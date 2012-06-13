@@ -1555,12 +1555,7 @@ public partial class Builtins {
 
         string r = o1.mo.mro_raw_Str.Get(v);
 
-        int i = 0;
-        foreach (char ch in r)
-            if (((uint)(ch - 0xDC00)) >= 0x400)
-                i++;
-
-        return MakeInt(i);
+        return MakeInt(Utils.Codes(r));
     }
 
     static readonly Func<Variable,Variable> ord_d = ord;
@@ -1572,12 +1567,7 @@ public partial class Builtins {
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
         if (r.Length == 0) return Kernel.AnyP;
-        else if (r.Length >= 2 &&
-                r[0] >= (char)0xD800 && r[0] <= (char)0xDBFF &&
-                r[1] >= (char)0xDC00 && r[1] <= (char)0xDFFF)
-            return MakeInt((0x10000 - 0xDC00) +
-                    ((int)r[0] - 0xD800) * 0x400 + (int)r[1]);
-        return MakeInt((int)r[0]);
+        else return MakeInt(Utils.Ord(r));
     }
 
     static readonly Func<Variable,Variable> chr_d = chr;

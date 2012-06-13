@@ -636,6 +636,23 @@ namespace Niecza {
             return new string((char)r, 1);
         }
 
+        public static int Ord(string r) {
+            if (r.Length >= 2 &&
+                    r[0] >= (char)0xD800 && r[0] <= (char)0xDBFF &&
+                    r[1] >= (char)0xDC00 && r[1] <= (char)0xDFFF)
+                return ((0x10000 - 0xDC00) +
+                        ((int)r[0] - 0xD800) * 0x400 + (int)r[1]);
+            return ((int)r[0]);
+        }
+
+        public static int Codes(string r) {
+            int i = 0;
+            foreach (char ch in r)
+                if (((uint)(ch - 0xDC00)) >= 0x400)
+                    i++;
+            return i;
+        }
+
         static NumberFormatInfo p6nfi;
         static Utils() {
             p6nfi = new NumberFormatInfo();

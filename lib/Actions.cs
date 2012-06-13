@@ -65,6 +65,15 @@ namespace Niecza.Compiler {
             return into.CopyAsArray();
         }
 
+        T[] flist_ast<T>(Variable list) {
+            // we force the list to iterate here
+            VarDeque iter = Builtins.start_iter(list.Fetch().mo.mro_list.Get(list));
+            List<T> into = new List<T>();
+            while (Kernel.IterHasFlat(iter, true))
+                into.Add(ast<T>(iter.Shift()));
+            return into.ToArray();
+        }
+
         B[] map<A,B>(Func<A,B> fn, A[] args) {
             B[] ret = new B[args.Length];
             for (int i = 0; i < args.Length; i++)
@@ -106,10 +115,10 @@ namespace Niecza.Compiler {
                 make(m,ast<P6any>(v));
         }
 
-        public void decints(Cursor m) { make(m, map(v => ast<P6any>(v), flist(atk(m,"decint")))); }
-        public void hexints(Cursor m) { make(m, map(v => ast<P6any>(v), flist(atk(m,"hexint")))); }
-        public void octints(Cursor m) { make(m, map(v => ast<P6any>(v), flist(atk(m,"octint")))); }
-        public void binints(Cursor m) { make(m, map(v => ast<P6any>(v), flist(atk(m,"binint")))); }
+        public void decints(Cursor m) { make(m, flist_ast<P6any>(atk(m,"decint"))); }
+        public void hexints(Cursor m) { make(m, flist_ast<P6any>(atk(m,"hexint"))); }
+        public void octints(Cursor m) { make(m, flist_ast<P6any>(atk(m,"octint"))); }
+        public void binints(Cursor m) { make(m, flist_ast<P6any>(atk(m,"binint"))); }
 
         public void dec_number(Cursor m) {
             if (istrue(atk(m,"escale"))) {
@@ -186,8 +195,8 @@ namespace Niecza.Compiler {
 
         public void charnames(Cursor m) {
             var sb = new System.Text.StringBuilder();
-            foreach (var charname in flist(atk(m,"charname")))
-                sb.Append(ast<string>(charname));
+            foreach (var charname in flist_ast<string>(atk(m,"charname")))
+                sb.Append(charname);
             make(m,sb.ToString());
         }
 
@@ -291,7 +300,7 @@ namespace Niecza.Compiler {
         }
         public void name(Cursor m) {
             Name r = default(Name);
-            r.names = map(v => ast<object>(v), flist(atk(m,"morename")));
+            r.names = flist_ast<object>(atk(m,"morename"));
             if (istrue(atk(m,"identifier"))) {
                 r.names = Utils.PrependArr(r.names, asstr(atk(m,"identifier")));
                 r.dc = true;
@@ -311,6 +320,7 @@ namespace Niecza.Compiler {
             public STable pkg;
             public string name;
             public Op.Op ind;
+            public string capid;
         };
 
         // This is to be the one place where names are processed
@@ -657,9 +667,8 @@ dyn:
             make(m,new QuantInfo { mod = "" });
         }
         public void quantifier__7e(Cursor m) {
-            var tl = flist(atk(m,"quantified_atom"));
-            make(m, new QuantInfo { tilde = ast<RxOp.RxOp>(tl[0]),
-                tilde_inner = ast<RxOp.RxOp>(tl[1]) });
+            var tl = flist_ast<RxOp.RxOp>(atk(m,"quantified_atom"));
+            make(m, new QuantInfo { tilde = tl[0], tilde_inner = tl[1] });
         }
         public void quantifier__2a2a(Cursor m) {
             var r = new QuantInfo();
@@ -695,13 +704,13 @@ dyn:
         }
 
         public void quant_atom_list(Cursor m) {
-            make(m, new RxOp.Sequence(map(v => ast<RxOp.RxOp>(v),
-                flist(atk(m,"quantified_atom")))));
+            make(m, new RxOp.Sequence(
+                flist_ast<RxOp.RxOp>(atk(m,"quantified_atom"))));
         }
 
         void LISTrx(Cursor m) {
             var tag = asstr(atk(atk(atk(m,"delims"),"0"),"sym"));
-            var zyg = map(z => ast<RxOp.RxOp>(z), flist(atk(m,"list")));
+            var zyg = flist_ast<RxOp.RxOp>(atk(m,"list"));
             var dba = asstr(atk(job.rxinfo,"dba"));
             if (tag == "&" || tag == "&") make(m,new RxOp.Conj(zyg));
             if (tag == "||") make(m,new RxOp.SeqAlt(zyg,dba));
@@ -784,8 +793,258 @@ dyn:
             make(m, new RxOp.Alt(strings.ToArray(), asstr(atk(job.rxinfo,"dba"))));
         }
 
+        public void metachar__3c_3e(Cursor m) { // < >
+            make(m, ast<RxOp.RxOp>(atk(m,"assertion")));
+        }
+        public void metachar__5c(Cursor m) { // \
+            var cc = ast<object>(atk(m,"backslash"));
+            make(m, (cc is string) ? new RxOp.String((string)cc,
+                istrue(atk(job.rxinfo,"i"))) : cc_to_rxop((CCinfo)cc));
+        }
+
+        public void metachar__2e(Cursor m) { // .
+            make(m, new RxOp.Any());
+        }
+
+        public void metachar__5e(Cursor m) { // ^
+            make(m, new RxOp.ZeroWidth(RxFrame.BEGIN_STRING));
+        }
+        public void metachar__5e5e(Cursor m) { // ^^
+            make(m, new RxOp.ZeroWidth(RxFrame.BEGIN_LINE));
+        }
+        public void metachar__24(Cursor m) { // $
+            make(m, new RxOp.ZeroWidth(RxFrame.END_STRING));
+        }
+        public void metachar__2424(Cursor m) { // $$
+            make(m, new RxOp.ZeroWidth(RxFrame.END_LINE));
+        }
+
+        public void metachar__27_27(Cursor m) { // ' '
+            var qa = ast<Op.Op>(atk(m,"quote"));
+            if (!(qa is Op.StringLiteral)) {
+                make(m,new RxOp.VarString(rxembed(m, qa)));
+            } else {
+                make(m, new RxOp.String(((Op.StringLiteral)qa).text,
+                    istrue(atk(job.rxinfo,"i"))));
+            }
+        }
+        public void metachar__22_22(Cursor m) { // " "
+            metachar__27_27(m);
+        }
+
+        bool all_digits(string s) {
+            foreach (char c in s)
+                if (c < '0' || c > '9') return false;
+            return true;
+        }
+
+        public void metachar__var(Cursor m) {
+            if (istrue(atk(m,"binding"))) {
+                var a = ast<RxOp.RxOp>(atk(atk(m,"binding"),"quantified_atom")).uncut();
+                var cid = ast<VarInfo>(atk(m,"variable")).capid;
+
+                if (cid == null) {
+                    sorry(m, "Non-Match bindings NYI");
+                    cid = "moo";
+                }
+
+                if (a is RxOp.VoidBlock) {
+                    make(m, new RxOp.SaveValue(cid, ((RxOp.VoidBlock)a).block));
+                    return;
+                }
+
+                if (all_digits(cid))
+                    assign(atk(job.rxinfo,"paren"), mkint(1+(int)Utils.S2N(cid)));
+
+                make(m,rxcapturize(m, cid, a));
+                return;
+            }
+
+            var kind = "scalar_var";
+            var vs = asstr(atk(m,"variable"));
+            if (vs[0] == '$') kind = "scalar_var";
+            else if (vs[0] == '@') kind = "list_var";
+            else sorry(m, "Only $ and @ variables may be used on regexes for now");
+
+            make(m, new RxOp.ListPrim(vs, kind, rxembed(m,
+                do_variable_reference(m, ast<VarInfo>(atk(m,"variable"))))));
+            check_variable(atk(m,"variable"));
+        }
+
+        RxOp.RxOp rxcapturize(Cursor m, string name, RxOp.RxOp rxop) {
+            RxOp.Capturing crxop = rxop as RxOp.Capturing;
+            if (crxop == null) {
+                // $<foo> = [...]
+                crxop = new RxOp.StringCap(rxop);
+            }
+
+            // $<foo>=(...)
+            // XXX might not quite be right
+            if (crxop.captures.Length == 1 && all_digits(crxop.captures[0])) {
+                return crxop.withcaps(new [] { name });
+            }
+
+            return crxop.withcaps(Utils.PrependArr(crxop.captures, name));
+        }
+
+        // UTS18 specifies a rule for "pulling up" negations in character
+        // classes, so we have to delay the negation, it seems.
+        struct CCinfo {
+            public bool neg;
+            public RxOp.RxOp rxop;
+        }
+
+        CCinfo negate_cc(CCinfo a) {
+            return new CCinfo { neg = !a.neg, rxop = a.rxop };
+        }
+        CCinfo void_cc() { return cclass_cc(CClass.Empty); }
+        CCinfo cclass_cc(CClass cc) {
+            return new CCinfo { rxop = new RxOp.CClassElem(cc) };
+        }
+        CCinfo op_cc(bool neg, RxOp.RxOp rxop) { return new CCinfo { neg = neg, rxop = rxop }; }
+        CCinfo neg_cclass_cc(CClass cc) { return negate_cc(cclass_cc(cc)); }
+        CCinfo string_cc(string str) {
+            return Utils.Codes(str) == 1 ? cclass_cc(CClass.list(Utils.Ord(str))) :
+                new CCinfo { rxop = new RxOp.String(str, false) };
+        }
+
+        // TODO: implement this more directly
+        CCinfo xor_cc(CCinfo lhs, CCinfo rhs) {
+            return or_cc(and_cc(lhs, negate_cc(rhs)),
+                         and_cc(negate_cc(lhs), rhs));
+        }
+        CCinfo and_cc(CCinfo lhs, CCinfo rhs) {
+            return negate_cc(or_cc(negate_cc(lhs), negate_cc(rhs)));
+        }
+
+        CCinfo or_cc(CCinfo lhs, CCinfo rhs) {
+            if (Config.CCTrace) Console.WriteLine("or({0} {1})", lhs.rxop, rhs.rxop);
+
+            var ccl = lhs.rxop as RxOp.CClassElem;
+            var ccr = rhs.rxop as RxOp.CClassElem;
+
+            if (lhs.neg) {
+                if (rhs.neg) {
+                    return (ccl != null && ccr != null) ?
+                        neg_cclass_cc(ccl.cc.minus(ccr.cc.negate())) :
+                        op_cc(true, new RxOp.Conj(new [] { lhs.rxop, rhs.rxop }));
+                } else { // !L | R = !(L & !R)
+                    return (ccl != null && ccr != null) ?
+                        neg_cclass_cc(ccl.cc.minus(ccr.cc)) :
+                        op_cc(true, new RxOp.Sequence(new [] {
+                            new RxOp.NotBefore(rhs.rxop), lhs.rxop }));
+                }
+            } else {
+                if (rhs.neg) {
+                    return or_cc(rhs, lhs);
+                } else {
+                    return (ccl != null && ccr != null) ?
+                        cclass_cc(ccl.cc.plus(ccr.cc)) :
+                        op_cc(false, new RxOp.Alt(new [] { lhs.rxop, rhs.rxop },
+                            "character class"));
+                }
+            }
+        }
+
+        RxOp.RxOp cc_to_rxop(CCinfo z) {
+            if (Config.CCTrace) Console.WriteLine("do_cc {0}", z.rxop);
+            if (z.neg && z.rxop is RxOp.CClassElem)
+                return new RxOp.CClassElem(((RxOp.CClassElem)z.rxop).cc.negate());
+            return z.neg ? new RxOp.Sequence(new RxOp.RxOp[] {
+                    new RxOp.NotBefore(z.rxop), new RxOp.Any() }) : z.rxop;
+        }
+
+        public void cclass_expr(Cursor m) {
+            var ops = flist(atk(m,"ops"));
+            var zyg = flist_ast<CCinfo>(atk(m,"cclass_union"));
+            int sh = 0;
+            var a = zyg[sh++];
+            foreach (var op in ops) {
+                a = (asstr(op) == "^") ? xor_cc(a,zyg[sh]) : or_cc(a,zyg[sh]);
+                sh++;
+            }
+            if (Config.CCTrace) Console.WriteLine("cclass_expr {0}", a.rxop);
+            make(m,a);
+        }
+
+        public void cclass_union(Cursor m) {
+            var zyg = flist_ast<CCinfo>(atk(m,"cclass_add"));
+            var a = zyg[0];
+            for (int sh = 1; sh < zyg.Length; sh++) a = and_cc(a, zyg[sh]);
+            if (Config.CCTrace) Console.WriteLine("cclass_union {0}", a.rxop);
+            make(m,a);
+        }
+
+        public void cclass_add(Cursor m) {
+            var zyg = flist_ast<CCinfo>(atk(m,"cclass_elem"));
+            int sh = 0;
+            var a = zyg[sh++];
+            if (asstr(atk(m,"sign")) == "-") a = negate_cc(a);
+            foreach (var op in flist(atk(m,"op"))) {
+                a = asstr(op) == "+" ? or_cc(a, zyg[sh++])
+                                     : and_cc(a, negate_cc(zyg[sh++]));
+            }
+            if (Config.CCTrace) Console.WriteLine("cclass_add {0}", a.rxop);
+            make(m,a);
+        }
+
+
+        public void cclass_elem__name(Cursor m) {
+            var ns = asstr(atk(m,"name"));
+            make(m, ns == "INTERNAL::alpha" ?
+                cclass_cc(CClass.Alpha) :
+                op_cc(false, new RxOp.Subrule(ns, false)));
+            if (Config.CCTrace)
+                Console.WriteLine(":name {0} {1}", ns, ast<CCinfo>(m).rxop);
+        }
+
+        public void cclass_elem__5b_5d(Cursor m) { // [ ]
+            make(m, ast<CCinfo>(atk(m,"nibble")));
+            if (Config.CCTrace)
+                Console.WriteLine(":[] {0}", ast<CCinfo>(m).rxop);
+        }
+
+        public void cclass_elem__28_29(Cursor m) { // ( )
+            make(m, ast<CCinfo>(atk(m,"cclass_expr")));
+        }
+
+        struct Colonpair {
+            public Op.Op term;
+        }
+
+        public void cclass_elem__property(Cursor m) {
+            var body = thunk_sub(ast<Colonpair>(atk(m,"colonpair")).term,
+                new string[0], asstr(atk(m,"colonpair")));
+            body.outer.CreateProtopad(null);
+            make(m,void_cc());
+            trymop(m, () => {
+                var oa = (object[])Niecza.UCD.DataSet.CompileCClass(body.RunBEGIN());
+                var ia = new int[oa.Length];
+                Array.Copy(oa,0, ia,0, ia.Length);
+                make(m, cclass_cc(new CClass(ia)));
+            });
+        }
+
+        public void cclass_elem__quote(Cursor m) {
+            var qa = ast<Op.Op>(atk(m,"quote"));
+            var sqa = qa as Op.StringLiteral;
+            var ic = istrue(atk(job.rxinfo,"i"));
+            if (sqa == null) {
+                make(m,new RxOp.VarString(rxembed(m, qa)));
+            } else if (!ic) {
+                make(m,string_cc(sqa.text));
+            } else {
+                make(m,op_cc(false,new RxOp.String(sqa.text, ic)));
+            }
+        }
+
+        RxOp.RxOp decapturize(Cursor m) {
+            var a = ast<RxOp.RxOp>(atk(m,"assertion"));
+            var ac = a as RxOp.Capturing;
+            return ac == null ? a : ac.withcaps(new string[0]);
+        }
+
         // forward...
-        RxOp.RxOp rxcapturize(Cursor m, string nm, RxOp.RxOp inp) { throw new NotImplementedException(); }
         Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
         Op.Op do_variable_reference(Cursor m, VarInfo ast) { throw new NotImplementedException(); }
         void check_variable(Variable v) { throw new NotImplementedException(); }

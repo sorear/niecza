@@ -728,7 +728,7 @@ namespace Niecza.Compiler.RxOp {
     }
 
     class VoidBlock : RxOp {
-        Op.Op block;
+        internal Op.Op block;
         public VoidBlock(Op.Op b) { block=b; }
         public override void VisitOps(Func<Op.Op,Op.Op> post) {
             block = block.VisitOps(post);

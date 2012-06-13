@@ -6678,5 +6678,7 @@ slow:
             Environment.GetEnvironmentVariable("NIECZA_SER_FAIL_INFO") != null;
         public static readonly bool KeepIL =
             Environment.GetEnvironmentVariable("NIECZA_KEEP_IL") != null;
+        public static readonly bool CCTrace =
+            Environment.GetEnvironmentVariable("NIECZA_CC_TRACE") != null;
     }
 }
