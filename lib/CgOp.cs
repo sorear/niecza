@@ -568,18 +568,16 @@ namespace Niecza.Compiler {
             return process_arglist("methodcall", args);
         }
 
-
-        void Output(StringBuilder to) {
+        void Output(StringBuilder to, List<object> refs) {
             to.Append("[\"");
             to.Append(kind);
             to.Append('"');
             foreach (object k in kids) {
                 to.Append(',');
-                CgOp zs = k as CgOp;
-                if (zs != null)
-                    zs.Output(to);
-                else {
-                    string ks = k.ToString();
+                if (k is CgOp) {
+                    ((CgOp)k).Output(to, refs);
+                } else if (k is string) {
+                    string ks = (string)k;
                     to.Append('"');
                     foreach (char ksc in ks) {
                         if (ksc >= ' ' && ksc <= '~' && ksc != '"' && ksc != '\\')
@@ -588,14 +586,28 @@ namespace Niecza.Compiler {
                             to.AppendFormat("\\u{0:X4}", (int)ksc);
                     }
                     to.Append('"');
+                } else if (k is double) {
+                    to.Append(Utils.N2S((double)k));
+                } else if (k is int) {
+                    to.Append(Utils.N2S((int)k));
+                } else if (k is bool) {
+                    to.Append((bool)k ? "true" : "false");
+                } else if (k == null) {
+                    to.Append("null");
+                } else {
+                    to.AppendFormat("!{0}", refs.Count);
+                    refs.Add(k);
                 }
             }
             to.Append("]");
         }
-        public override string ToString() {
+        public string ToString(out object[] rarr) {
             var sb = new StringBuilder();
-            Output(sb);
+            var refs = new List<object>();
+            Output(sb, refs);
+            rarr = refs.ToArray();
             return sb.ToString();
         }
+        public override string ToString() { object[] ra; return ToString(out ra); }
     }
 }

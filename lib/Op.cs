@@ -54,6 +54,8 @@ namespace Niecza.Compiler.Op {
         public virtual Op semilist_level(Cursor at) { return this; }
         public virtual bool onlystub() { return false; }
         public virtual Variable const_value(SubInfo body) { return null; }
+
+        public virtual Op simplify(SubInfo body) { throw new NotImplementedException(); } // SSTO
     }
 
     class RawCgOp : Op {
@@ -520,7 +522,7 @@ namespace Niecza.Compiler.Op {
             return code_labelled(body, "");
         }
         protected override CgOp code_labelled(SubInfo sub, string l) {
-            var id = CompUtils.GenId();
+            var id = CompJob.cur.genid();
             var cond = need_cond ?
                 CgOp.prog(CgOp.letvar("!cond", check.cgop(sub)),
                         CgOp.obj_getbool(CgOp.letvar("!cond"))) :
@@ -555,7 +557,7 @@ namespace Niecza.Compiler.Op {
             return code_labelled(body, "");
         }
         protected override CgOp code_labelled(SubInfo sub, string l) {
-            var id = CompUtils.GenId();
+            var id = CompJob.cur.genid();
 
             return CgOp.prog(
                 init != null ? CgOp.sink(init.cgop(sub)) : CgOp.noop(),
@@ -596,7 +598,7 @@ namespace Niecza.Compiler.Op {
             var vars = new string[Builtins.sig_count(body.sig)];
             var args = new Op[vars.Length];
             for (int i = 0; i < vars.Length; i++) {
-                vars[i] = CompUtils.GenSym();
+                vars[i] = CompJob.cur.gensym();
                 args[i] = new LetVar(pos, vars[i]);
             }
             return new ImmedForLoop(pos, source, vars,
@@ -628,7 +630,7 @@ namespace Niecza.Compiler.Op {
         // used only with 'foo ($_ for 1,2,3)'
         // vars will be a single gensym
         public override Op semilist_level(Cursor at) {
-            var aname = CompUtils.GenSym();
+            var aname = CompJob.cur.gensym();
             var sub = CompUtils.ThunkSub(new Let(pos,vars[0], new Lexical(pos,aname),
                         sink), new [] { aname });
             var sname = CompUtils.BlockExpr(at, sub).name;
@@ -638,7 +640,7 @@ namespace Niecza.Compiler.Op {
 
         protected override CgOp code(SubInfo body) { return code_labelled(body, ""); }
         protected override CgOp code_labelled(SubInfo body, string l) {
-            var id = CompUtils.GenId();
+            var id = CompJob.cur.genid();
 
             var letargs = new List<object>();
             letargs.Add("!iter"+id);
@@ -695,7 +697,7 @@ namespace Niecza.Compiler.Op {
         }
 
         protected override CgOp code(SubInfo sub) {
-            var id = CompUtils.GenId();
+            var id = CompJob.cur.genid();
 
             return CgOp.ternary(CgOp.obj_getbool(CgOp.methodcall(
                         match.cgop(sub), "ACCEPTS", CgOp.scopedlex("$_"))),
@@ -737,7 +739,7 @@ namespace Niecza.Compiler.Op {
         }
 
         protected override CgOp code(SubInfo sub) {
-            var id = CompUtils.GenId();
+            var id = CompJob.cur.genid();
             return CgOp.xspan("start"+id, "end"+id, 1, body.cgop(sub),
                 SubInfo.ON_DIE, "", "end"+id);
         }
@@ -1145,7 +1147,7 @@ namespace Niecza.Compiler.Op {
 
         protected override CgOp code(SubInfo sub) { return code_labelled(sub,""); }
         protected override CgOp code_labelled(SubInfo sub, string l) {
-            var id = CompUtils.GenId();
+            var id = CompJob.cur.genid();
 
             return CgOp.xspan("redo"+id, "next"+id, 0, body.cgop(sub),
                 SubInfo.ON_NEXT, l, "next"+id, SubInfo.ON_LAST, l, "next"+id,
@@ -1173,7 +1175,7 @@ namespace Niecza.Compiler.Op {
 
         protected override CgOp code(SubInfo body) {
             var c = new List<object>();
-            var id = CompUtils.GenId();
+            var id = CompJob.cur.genid();
 
             var use_hide = excl_lhs && !sedlike;
             c.Add("!ret");
@@ -1273,7 +1275,7 @@ namespace Niecza.Compiler.Op {
         }
 
         protected override CgOp code(SubInfo body) {
-            var id = CompUtils.GenId();
+            var id = CompJob.cur.genid();
 
             return CgOp.xspan("start"+id, "end"+id, 0, CgOp.prog(
                 CgOp.sink(inside.cgop(body)),
@@ -1293,7 +1295,7 @@ namespace Niecza.Compiler.Op {
 
     static class Helpers {
         public static Op mklet(Cursor p, Op value, Func<Op,Op> body) {
-            var v = CompUtils.GenSym();
+            var v = CompJob.cur.gensym();
             return new Let(p, v, value, body(new LetVar(p, v)));
         }
 

@@ -1058,6 +1058,7 @@ public sealed class CC : IFreeze {
     [Immutable] public static readonly CC All   = new CC(MAll);
     [Immutable] public static readonly CC None  = new CC(0);
     [Immutable] public static readonly CC AlNum = new CC(MAlNum);
+    [Immutable] public static readonly CC Digit = new CC(MNum);
 
     [Immutable]
     private static readonly int[] masks = new int[] {

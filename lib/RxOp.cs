@@ -34,7 +34,7 @@ namespace Niecza.Compiler.RxOp {
             foreach (RxOp z in zyg) z.used_caps(quant, acc);
         }
 
-        protected string label() { return "b" + CompUtils.GenId(); }
+        protected string label() { return "b" + CompJob.cur.genid(); }
 
         // placeholders...
         protected void AddMyName(params object[] args) { throw new NotImplementedException(); }

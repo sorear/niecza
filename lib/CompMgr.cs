@@ -69,7 +69,15 @@ namespace Niecza.Compiler {
         public RuntimeUnit unit;
         public SubInfo     curlex;
 
+        int nextid;
+
         public CompJob(CompMgr mgr) { this.mgr = mgr; }
+
+        public int genid() { return nextid++; }
+        public string gensym() { return "!anon_" + genid(); }
+
+        [ThreadStatic] [CompartmentGlobal]
+        public static CompJob cur;
 
         public RuntimeUnit run(bool runit) {
             // fudge to make -L NULL useful
@@ -80,9 +88,12 @@ namespace Niecza.Compiler {
             RuntimeUnit u;
             if (!is_eval)
                 Compartment.Push();
+            var old = cur;
             try {
+                cur = this;
                 u = run_internal(runit);
             } finally {
+                cur = old;
                 if (!is_eval)
                     Compartment.Pop();
             }
@@ -329,13 +340,6 @@ output options:
     }
 
     static class CompUtils {
-        public static int GenId() {
-            return Kernel.containerRootUnit.nextid++;
-        }
-        public static string GenSym() {
-            return "!anon_" + GenId();
-        }
-
         public static int LineOf(Cursor c) { return 0; }
         public static void Sorry(Cursor c, string msg) { throw new NotImplementedException(); }
         public static SubInfo GetCurSub() { throw new NotImplementedException(); }

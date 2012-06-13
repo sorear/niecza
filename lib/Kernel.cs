@@ -1951,6 +1951,18 @@ namespace Niecza {
             return 1u << (int)(hash >> 27);
         }
 
+        public object[] GetExtend(string name) {
+            object[] ret = null;
+            if (extend != null) extend.TryGetValue(name, out ret);
+            return ret ?? new object[0];
+        }
+
+        public void SetExtend(string name, params object[] args) {
+            if (extend == null)
+                extend = new Dictionary<string,object[]>();
+            extend[name] = args;
+        }
+
         private SubInfo() { }
 
         // This is a _shallow_ clone.  The children wind up shared, as do
