@@ -66,8 +66,12 @@ namespace Niecza.Compiler {
         public bool is_main, is_eval, is_repl;
 
         // state vars
-        public RuntimeUnit unit;
-        public SubInfo     curlex;
+        public RuntimeUnit unit;    // $*unit
+        public SubInfo     curlex;  // $*CURLEX
+        public Variable    rxinfo;  // %*RX
+
+        public Dictionary<string,string> proto_endsym =
+            new Dictionary<string,string>();
 
         int nextid;
 

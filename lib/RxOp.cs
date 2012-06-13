@@ -560,6 +560,7 @@ namespace Niecza.Compiler.RxOp {
             method=m; regex=r; ltm=l; selfcut=s; zerowidth=z; negative=n;
         }
         public Subrule(string method, bool selfcut) { this.method = method; this.selfcut = selfcut; }
+        public Subrule(Op.Op regex, object[] lad) { this.regex=regex; this.ltm=lad; }
 
         public override RxOp rxsimp(bool cut) {
             return cut ? new Subrule(method,regex,ltm,true,zerowidth,negative) : this;
@@ -603,7 +604,7 @@ namespace Niecza.Compiler.RxOp {
 
     class Sigspace : RxOp {
         bool selfcut;
-        public Sigspace(bool c) { selfcut = c; }
+        public Sigspace(bool c = false) { selfcut = c; }
 
         public override object[] lad() { return new [] { "Null" }; }
 

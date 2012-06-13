@@ -430,6 +430,12 @@ public sealed class RxFrame: IFreeze {
         return CC.VSpace.Accepts(next);
     }
 
+    public const int BEFORE_WORD  = 0;
+    public const int AFTER_WORD   = 1;
+    public const int BEGIN_STRING = 2;
+    public const int END_STRING   = 3;
+    public const int BEGIN_LINE   = 4;
+    public const int END_LINE     = 5;
     public bool ZeroWidth(int type) {
         int next = (st.pos == end) ? -1 : orig[st.pos];
         int prev = (st.pos == 0) ? -1 : orig[st.pos-1];

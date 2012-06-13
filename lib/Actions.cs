@@ -7,6 +7,7 @@ using System.Collections.Generic;
 namespace Niecza.Compiler {
     class Actions {
         internal CompJob job;
+        RxOp.RxOp rnoop = new RxOp.Sequence(new RxOp.RxOp[0]);
         public Actions(CompJob job) { this.job = job; }
 
         // Little things to make writing wads of data-extraction code nicer...
@@ -21,13 +22,14 @@ namespace Niecza.Compiler {
         }
 
         P6any mkint(int i) { return (P6any)Builtins.MakeInt(i); }
-        P6any mkstr(string s) { return (P6any)Builtins.MakeStr(s); }
+        P6any mkstr(string s) { return s==null ? Kernel.StrMO.typeObj : (P6any)Builtins.MakeStr(s); }
 
         P6any plus(Variable v1,Variable v2) { return (P6any)Builtins.plus(v1,v2); }
         P6any minus(Variable v1,Variable v2) { return (P6any)Builtins.minus(v1,v2); }
         P6any mul(Variable v1,Variable v2) { return (P6any)Builtins.mul(v1,v2); }
         P6any div(Variable v1,Variable v2) { return (P6any)Builtins.divide(v1,v2); }
         P6any pow(Variable v1,Variable v2) { return (P6any)Builtins.pow(v1,v2); }
+        void assign(Variable a, Variable b) { Kernel.Assign(a,b); }
 
         // SSTO TODO integrate with parser
         void sorry(Cursor m, string fmt, params object[] args) {
@@ -457,12 +459,334 @@ dyn:
         public void quote__Q(Cursor m) { make(m,ast<Op.Op>(atk(m,"quibble")));}
         public void quote__s(Cursor m) { make(m,ast<Op.Op>(atk(m,"pat")));}
 
-        public Op.Op rxembed(Cursor m, Op.Op ops) {
+        public void quote__2f_2f(Cursor m) { make(m,op_for_regex(m,ast<RxOp.RxOp>(atk(m,"nibble")))); }
+        public void quote__rx(Cursor m) {
+            extract_rx_adverbs(false, false, atk(m,"quibble"));
+            make(m,op_for_regex(m,ast<RxOp.RxOp>(atk(m,"quibble"))));
+        }
+
+        public void quote__m(Cursor m) {
+            make(m,new Op.CallMethod(m, "match", Op.Helpers.mklex(m,"$/"),
+                false, Utils.PrependArr(
+                    extract_rx_adverbs(true,false,atk(m,"quibble")),
+                    op_for_regex(m, ast<RxOp.RxOp>(atk(m,"quibble"))))));
+        }
+
+        public void quote__ms(Cursor m) { quote__m(m); }
+
+        internal Op.Op rxembed(Cursor m, Op.Op ops) {
             return inliney_call(m, thunk_sub(ops, new[] { "$¢" }),
                 new Op.MakeCursor(m));
         }
 
+        internal Op.Op op_for_regex(Cursor m, RxOp.RxOp rxop) {
+            var lift = new List<Op.Op>();
+            rxop.oplift(lift);
+            var ltm = RxOp.RxOp.optimize_lad(rxop.lad());
+            rxop = rxop.rxsimp(false);
+            var ops = new Op.RegexBody(m, "", rxop, lift.ToArray());
+            var sub = thunk_sub(ops, new [] { "self" }, null, Kernel.RegexMO,
+                    Niecza.CLRBackend.DowncallReceiver.BuildLad(ltm));
+            addlex(m, sub, "$/", new LISimple(0, null));
+            return block_expr(m, sub);
+        }
+
+        internal RxOp.RxOp encapsulate_regex(Cursor m, RxOp.RxOp rxop,
+                    bool passcut = false) {
+            var lift = new List<Op.Op>();
+            rxop.oplift(lift);
+            var lad = rxop.lad();
+            var nrxop = rxop.rxsimp(false);
+            var subbody = new Op.RegexBody(m, "", nrxop, lift.ToArray(),
+                    passcut);
+            var sub = thunk_sub(subbody, new [] { "self" }, null,
+                Kernel.RegexMO);
+            var subop = new Op.CallSub(m,block_expr(m,sub),true,
+                new [] { new Op.MakeCursor(m) });
+            return new RxOp.Subrule(subop, lad);
+        }
+
+        public void regex_block(Cursor m) {
+            if (istrue(atk(m,"quotepair")))
+                sorry(m, "Regex adverbs NYI");
+            if (istrue(atk(m,"onlystar")))
+                make(m,new RxOp.ProtoRedis());
+            else
+                make(m,ast<RxOp.RxOp>(atk(m,"nibble")));
+        }
+
+        public void regex_def_1(Cursor m) {
+            throw new NotImplementedException(); // SSTO install_sub
+        }
+
+        public void regex_def_2(Cursor m) {
+            if (flist(atk(m,"signature")).Length > 1)
+                sorry(m, "Too many signatures on regex");
+
+            foreach (var tx in flist(atk(m, "trait"))) {
+                var t = ast<Prod<string,object>>(tx);
+                if (t.v1 == "unary" || t.v1 == "binary" || t.v1 == "defequiv" ||
+                        t.v1 == "of") {
+                    // Ignored for now
+                } else if (t.v1 == "endsym") {
+                    assign(atk(job.rxinfo,"endsym"), mkstr((string)t.v2));
+                } else {
+                    sorry(m, "Unhandled regex trait {0}", t.v1);
+                }
+            }
+
+            string cn = (string)job.curlex.GetExtend0("cleanname");
+            if ((string)job.curlex.GetExtend0("multi") == "proto") {
+                if (cn != null) job.proto_endsym[cn] = asstr(atk(job.rxinfo,"endsym"));
+            } else {
+                if (cn != null && !isdef(atk(job.rxinfo,"endsym")))
+                    assign(atk(job.rxinfo,"endsym"),mkstr(
+                        job.proto_endsym.GetDefault(cn, null)));
+            }
+
+            assign(atk(job.rxinfo,"dba"), mkstr((string)job.curlex.GetExtend0("name") ?? "anonymous regex"));
+        }
+
+        public void regex_def(Cursor m) {
+            var ast = ast<RxOp.RxOp>(atk(m,"regex_block"));
+
+            var lift = new List<Op.Op>();
+            ast.oplift(lift);
+            var ltm = RxOp.RxOp.optimize_lad(ast.lad());
+
+            job.curlex.ltm = Niecza.CLRBackend.DowncallReceiver.BuildLad(ltm);
+            ast = ast.rxsimp(false);
+            if (ast is RxOp.ProtoRedis) {
+                finish_dispatcher(job.curlex, "regex");
+            } else {
+                finish(job.curlex, new Op.RegexBody(m, (string)(job.curlex.GetExtend0("name") ?? ""), ast, lift.ToArray()));
+            }
+            // SSTO: reexamine match pruning
+            make(m, Op.Helpers.mklex(m, job.curlex.outervar));
+        }
+
+        public void regex_declarator__regex(Cursor m) {
+            make(m,ast<Op.Op>(atk(m,"regex_def")));
+        }
+        public void regex_declarator__rule(Cursor m) { regex_declarator__regex(m); }
+        public void regex_declarator__token(Cursor m) { regex_declarator__regex(m); }
+
+        public void atom(Cursor m) {
+            if (istrue(atk(m,"metachar"))) {
+                make(m,ast<RxOp.RxOp>(atk(m,"metachar")));
+            } else {
+                make(m,new RxOp.String(asstr(m), istrue(atk(job.rxinfo,"i"))));
+            }
+        }
+
+        struct QuantInfo {
+            public Op.Op closure;
+            public RxOp.RxOp sep, tilde, tilde_inner;
+            public string mod;
+            public int min, max;
+            public bool minimal, nonlisty, opsep, space, general;
+        }
+
+        public void quantified_atom(Cursor m) {
+            var atom = ast<RxOp.RxOp>(atk(m,"atom"));
+            var q    = istrue(atk(m,"quantifier")) ? ast<QuantInfo>(atk(m,"quantifier")) : default(QuantInfo);
+
+            if (istrue(atk(job.rxinfo, "r"))) {
+                // quantifier without explicit :? / :! gets :
+                if (q.mod == null) q.mod = "";
+            }
+
+            var ss = istrue(atk(job.rxinfo,"s"));
+
+            if (q.max > 0 || q.general) {
+                var z = new List<RxOp.RxOp> { atom };
+                if (istrue(atk(m,"separator"))) {
+                    if (q.sep != null)
+                        sorry(m, "Cannot use two separators in one quantifier_atom");
+                    var q2 = ast<QuantInfo>(atk(m,"separator"));
+                    q.opsep = q2.opsep;
+                    q.sep   = q2.sep;
+                    q.space = q2.space;
+                }
+                if (q.sep != null) z.Add(q.sep);
+                // parsing quirk. x #`(1) ** #`(21) y, the 1* position is
+                // counted as $<normspace> but the 2* is parsed by the
+                // quantifier
+                if ((q.general || q.sep != null) && ss &&
+                        (q.space || istrue(atk(m,"normspace")))) {
+                    if (q.sep != null) {
+                        z[1] = new RxOp.Sequence(new [] {
+                            new RxOp.Sigspace(), z[1], new RxOp.Sigspace() });
+                    } else {
+                        z.Add(new RxOp.Sigspace());
+                    }
+                }
+                atom = new RxOp.Quantifier(z.ToArray(), q.min, q.max,
+                    q.closure, q.mod == "?", q.nonlisty, q.opsep);
+            }
+
+            if (q.mod == "")
+                atom = new RxOp.Cut(atom);
+
+            if (q.tilde != null) {
+                var closer = q.tilde;
+                if (closer is RxOp.Cut)
+                    closer = closer.zyg[0];
+                if (!(closer is RxOp.String)) {
+                    sorry(m,"Non-literal closers for ~ NYI");
+                    closer = new RxOp.String("",false);
+                }
+                atom = new RxOp.Sequence(new [] { atom,
+                    new RxOp.Tilde(q.tilde_inner, ((RxOp.String)closer).text,
+                        asstr(atk(job.rxinfo, "dba"))) });
+            }
+
+            make(m,atom);
+        }
+
+        public void quantifier__2a(Cursor m) {
+            make(m,new QuantInfo { min = 0, max = int.MaxValue, mod = ast<string>(atk(m,"quantmod")) });
+        }
+        public void quantifier__2b(Cursor m) {
+            make(m,new QuantInfo { min = 1, max = int.MaxValue, mod = ast<string>(atk(m,"quantmod")) });
+        }
+        public void quantifier__3f(Cursor m) {
+            make(m,new QuantInfo { min = 0, max = 1, mod = ast<string>(atk(m,"quantmod")) });
+        }
+        public void quantifier__3a(Cursor m) {
+            make(m,new QuantInfo { mod = "" });
+        }
+        public void quantifier__7e(Cursor m) {
+            var tl = flist(atk(m,"quantified_atom"));
+            make(m, new QuantInfo { tilde = ast<RxOp.RxOp>(tl[0]),
+                tilde_inner = ast<RxOp.RxOp>(tl[1]) });
+        }
+        public void quantifier__2a2a(Cursor m) {
+            var r = new QuantInfo();
+            Variable v;
+            if (istrue(v = atk(m,"embeddedblock")))
+                r = new QuantInfo { min=0, max=int.MaxValue, closure = rxblock(m, v) };
+            else if (istrue(v = atk(m, "quantified_atom")))
+                r = new QuantInfo { min=1, max=int.MaxValue, sep = ast<RxOp.RxOp>(v) };
+            else {
+                r = new QuantInfo();
+                r.min = (int)Utils.S2N(asstr(atk(m,"0")));
+                r.max = istrue(atk(m,"1")) ? (int)Utils.S2N(asstr(atk(m,"1"))) :
+                    asstr(m).IndexOf("..") >= 0 ? int.MaxValue : r.min;
+            }
+            r.mod = ast<string>(atk(m,"quantmod"));
+            r.general = true;
+            r.space = istrue(atk(m,"normspace"));
+            make(m,r);
+        }
+
+        public void separator(Cursor m) {
+            make(m, new QuantInfo { sep = ast<RxOp.RxOp>(atk(m,"quantified_atom")),
+                space = istrue(atk(m,"normspace")),
+                opsep = m.global.orig_s[m.from] == '%' });
+        }
+
+        public void quantmod(Cursor m) {
+            var t = asstr(m);
+            if (t == "") { make(m,null); return; }
+            if (t[0] == ':') t = t.Substring(1);
+            if (t == "+") t = "";
+            make(m,t);
+        }
+
+        public void quant_atom_list(Cursor m) {
+            make(m, new RxOp.Sequence(map(v => ast<RxOp.RxOp>(v),
+                flist(atk(m,"quantified_atom")))));
+        }
+
+        void LISTrx(Cursor m) {
+            var tag = asstr(atk(atk(atk(m,"delims"),"0"),"sym"));
+            var zyg = map(z => ast<RxOp.RxOp>(z), flist(atk(m,"list")));
+            var dba = asstr(atk(job.rxinfo,"dba"));
+            if (tag == "&" || tag == "&") make(m,new RxOp.Conj(zyg));
+            if (tag == "||") make(m,new RxOp.SeqAlt(zyg,dba));
+            if (tag == "|") make(m,new RxOp.Alt(zyg,dba));
+        }
+
+        public void metachar__sigwhite(Cursor m) {
+            make(m, istrue(atk(job.rxinfo,"s")) ? (RxOp.RxOp)new RxOp.Sigspace() : rnoop);
+        }
+
+        public void metachar__unsp(Cursor m) { make(m, rnoop); }
+
+        public void metachar__7b_7d(Cursor m) {
+            make(m, new RxOp.VoidBlock(rxblock(m, atk(m,"embeddedblock"))));
+        }
+
+        public Op.Op rxblock(Cursor m, Variable blk) {
+            var si = ast<SubInfo>(blk);
+            trymop(m, () => {
+                addlex(m, si, "$¢", new LISimple(LISimple.NOINIT, null));
+                si.sig = new Signature(new [] { Parameter.TPos("$¢",
+                    si.dylex["$¢"].SigIndex()) });
+            });
+
+            return inliney_call(m, si, new Op.MakeCursor(m));
+        }
+
+        public void metachar__mod(Cursor m) {
+            // most of these have only parse-time effects
+            make(m,ast<RxOp.RxOp>(atk(m,"mod_internal")));
+        }
+
+        public void metachar__3a3a(Cursor m) { make(m,new RxOp.CutLTM()); } //::
+        public void metachar__3a3a3e(Cursor m) { make(m, new RxOp.CutBrack()); } // ::>
+        public void metachar__3a3a3a(Cursor m) { make(m, new RxOp.CutRule()); } // :::
+
+        public void metachar__5b_5d(Cursor m) { // [ ]
+            make(m,new RxOp.ConfineLang(ast<RxOp.RxOp>(atk(m,"nibbler"))));
+        }
+
+        public void metachar__28_29(Cursor m) { // ( )
+            var pnum = asstr(Builtins.postinc(atk(job.rxinfo,"paren")));
+            make(m, rxcapturize(m, pnum, encapsulate_regex(m,
+                ast<RxOp.RxOp>(atk(m,"nibbler")), true)));
+        }
+
+        public void metachar__3c28(Cursor m) { // <(
+            make(m, new RxOp.Endpoint("from"));
+        }
+
+        public void metachar__293e(Cursor m) { // )>
+            make(m, new RxOp.Endpoint("to"));
+        }
+
+        public void metachar__3c3c (Cursor m) { // <<
+            make(m, new RxOp.ZeroWidth(RxFrame.BEFORE_WORD));
+        }
+        public void metachar__3e3e (Cursor m) { // >>
+            make(m, new RxOp.ZeroWidth(RxFrame.AFTER_WORD));
+        }
+        public void metachar__ab (Cursor m) { // «
+            make(m, new RxOp.ZeroWidth(RxFrame.BEFORE_WORD));
+        }
+        public void metachar__bb (Cursor m) { // »
+            make(m, new RxOp.ZeroWidth(RxFrame.AFTER_WORD));
+        }
+
+        public void metachar__7b2a7d(Cursor m) { // {*}
+            make(m, new RxOp.ProtoRedis());
+        }
+
+        public void metachar__qw(Cursor m) {
+            var strings = new List<RxOp.RxOp>();
+            trymop(m, () => {
+                var words = eval_ast(m, ast<Op.Op>(atk(m,"circumfix")));
+                var igcase = istrue(atk(job.rxinfo,"i"));
+                foreach (var w in Builtins.UnboxLoS(words))
+                    strings.Add(new RxOp.String(w, igcase));
+            });
+            make(m, new RxOp.Alt(strings.ToArray(), asstr(atk(job.rxinfo,"dba"))));
+        }
+
         // forward...
+        RxOp.RxOp rxcapturize(Cursor m, string nm, RxOp.RxOp inp) { throw new NotImplementedException(); }
+        Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
         Op.Op do_variable_reference(Cursor m, VarInfo ast) { throw new NotImplementedException(); }
         void check_variable(Variable v) { throw new NotImplementedException(); }
         string get_cp_ext(Variable c) { throw new NotImplementedException(); }
@@ -511,7 +835,7 @@ dyn:
             return n;
         }
 
-        internal void finish(SubInfo n, Op.Op code, bool done) {
+        internal void finish(SubInfo n, Op.Op code, bool done = false) {
             if (!done) code = code.simplify(n);
             if (code.onlystub()) n.SetExtend("onlystub", true);
             // serialize cgops
@@ -519,6 +843,17 @@ dyn:
             n.code = RuntimeUnit.JitCompileSub;
             if (n.protopad != null)
                 n.protopad.code = n.code;
+        }
+
+        internal void finish_dispatcher(SubInfo s, string k) {
+            if (k == "regex")
+                s.code = Lexer.StandardProtoC;
+            else if (k == "multi")
+                s.code = Kernel.StandardTypeProtoC;
+            else
+                throw new Exception("Unknown dispatcher type " + k);
+            if (s.protopad != null)
+                s.protopad.code = s.code;
         }
     }
 }

@@ -222,6 +222,9 @@ namespace Niecza.Compiler.Op {
             pclass = pcl; meta = mt;
         }
 
+        public CallMethod(Cursor pos, string name, Op rcvr, bool po,
+                params Op[] a) : this(pos,rcvr,name,false,null,"",po,a) {}
+
         public Op adverb(Op adv) {
             return new CallMethod(pos, receiver, name, is_private, pclass,
                    meta, posonly, Utils.AppendArr(getargs(), adv));
@@ -965,11 +968,11 @@ namespace Niecza.Compiler.Op {
         string name;
         RxOp.RxOp rxop;
         Op[] pre;
-        bool passcut, canback;
+        bool passcut;
 
-        public RegexBody(Cursor c, string na, RxOp.RxOp rx, Op[] p, bool cut,
-                bool back) : base(c) {
-            name=na; rxop=rx; pre=p; passcut=cut; canback=back;
+        public RegexBody(Cursor c, string na, RxOp.RxOp rx, Op[] p,
+                bool cut=false) : base(c) {
+            name=na; rxop=rx; pre=p; passcut=cut;
         }
 
         public override Op VisitOps(Func<Op,Op> post) {
@@ -996,7 +999,7 @@ namespace Niecza.Compiler.Op {
             if (body.dylex.ContainsKey("$*GOAL"))
                 ops.Insert(0, CgOp.scopedlex("$*GOAL",
                     CgOp.context_get("$*GOAL", 1)));
-            ops.Add(canback ? CgOp.rxend() : CgOp.rxfinalend());
+            ops.Add(rxop.mayback() ? CgOp.rxend() : CgOp.rxfinalend());
             ops.Add(CgOp.label("backtrack"));
             ops.Add(CgOp.rxbacktrack());
             ops.Add(CgOp.@null("var"));

@@ -1956,6 +1956,11 @@ namespace Niecza {
             if (extend != null) extend.TryGetValue(name, out ret);
             return ret ?? new object[0];
         }
+        public object GetExtend0(string name) {
+            object[] ret = null;
+            if (extend != null) extend.TryGetValue(name, out ret);
+            return ret != null && ret.Length > 0 ? ret[0] : null;
+        }
 
         public void SetExtend(string name, params object[] args) {
             if (extend == null)

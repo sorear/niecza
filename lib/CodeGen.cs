@@ -3586,7 +3586,7 @@ dynamic:
             }
         }
 
-        static LAD BuildLad(object[] tree) {
+        internal static LAD BuildLad(object[] tree) {
             string key = (string) tree[0];
 
             if (key == "CC") {
