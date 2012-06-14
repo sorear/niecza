@@ -559,7 +559,8 @@ namespace Niecza.Compiler.RxOp {
         Subrule(string m, Op.Op r, object[] l, bool s, bool z, bool n) {
             method=m; regex=r; ltm=l; selfcut=s; zerowidth=z; negative=n;
         }
-        public Subrule(string method, bool selfcut) { this.method = method; this.selfcut = selfcut; }
+        public Subrule(string method, bool selfcut=false) { this.method = method; this.selfcut = selfcut; }
+        public Subrule(Op.Op regex, bool selfcut=false) { this.regex = regex; this.selfcut = selfcut; }
         public Subrule(Op.Op regex, object[] lad) { this.regex=regex; this.ltm=lad; }
 
         public override RxOp rxsimp(bool cut) {
@@ -843,7 +844,7 @@ namespace Niecza.Compiler.RxOp {
 
     class ListPrim : Capturing {
         string name, type;
-        Op.Op ops;
+        internal Op.Op ops;
         public override void VisitOps(Func<Op.Op,Op.Op> post) {
             ops = ops.VisitOps(post);
         }

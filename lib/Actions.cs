@@ -740,7 +740,10 @@ dyn:
 
         public void metachar__mod(Cursor m) {
             // most of these have only parse-time effects
-            make(m,ast<RxOp.RxOp>(atk(m,"mod_internal")));
+            if (((Cursor)atk(m,"mod_internal").Fetch()).ast == null)
+                make(m,rnoop);
+            else
+                make(m,ast<RxOp.RxOp>(atk(m,"mod_internal")));
         }
 
         public void metachar__3a3a(Cursor m) { make(m,new RxOp.CutLTM()); } //::
@@ -1089,9 +1092,111 @@ dyn:
 
                 Op.Op callop = null;
                 if (is_lexical) {
+                    callop = new Op.CallSub(m, Op.Helpers.mklex(m,"&"+name),
+                        true, Utils.PrependArr(args,Op.Helpers.mklex(m,"$¢")));
+                } else if (pname.ind != null) {
+                    callop = (new Operator.Method(pname.ind, args, "::(",
+                        false, null)).with_args(m, Op.Helpers.mklex(m,"$¢"));
+                } else {
+                    callop = (new Operator.Method(pname.name, args, "",
+                        false, pname.pkg)).with_args(m, Op.Helpers.mklex(m,"$¢"));
                 }
+
+                make(m, new RxOp.Subrule(rxembed(m, callop), false));
+            }
+
+            make(m, rxcapturize(m, name, ast<RxOp.RxOp>(m)));
+        }
+
+        public void assertion__variable(Cursor m) {
+            var va = ast<Op.Op>(atk(m,"variable"));
+            var vacs = va as Op.CallSub;
+            switch(asstr(m)[0]) {
+                case '&':
+                    if (vacs != null) {
+                        make(m,new RxOp.Subrule(new Op.CallSub(m, vacs.invocant,
+                            false, Utils.PrependArr(vacs.getargs(),
+                                new Op.MakeCursor(m)))));
+                    } else {
+                        make(m,new RxOp.Subrule(new Op.CallSub(m, va, true,
+                            new Op.MakeCursor(m))));
+                    }
+                    break;
+                case '$':
+                    make(m,new RxOp.ListPrim("", "scalar_asn", rxembed(m,va)));
+                    break;
+                case '@':
+                    make(m,new RxOp.ListPrim("", "list_asn", rxembed(m,va)));
+                    break;
+                default:
+                    make(m,rnoop);
+                    sorry(m,"Sigil {0} is not allowed for regex assertions", asstr(m)[0]);
+                    break;
             }
         }
+
+        public void assertion__method(Cursor m) {
+            if (istrue(atk(m,"dottyop"))) {
+                make(m,new RxOp.Subrule(rxembed(m,
+                    ast<Operator>(atk(m,"dottyop")).with_args(m,
+                        new Op.MakeCursor(m)))));
+            } else {
+                make(m,decapturize(m));
+            }
+        }
+
+        void booly_assertion(Cursor m, bool neg) {
+            var asrt = atk(m,"assertion").Fetch();
+            if (istrue(asrt)) {
+               if (((Cursor)asrt).reduced == "assertion:sym<{ }>") {
+                   make(m,new RxOp.CheckBlock(ast<RxOp.ListPrim>(asrt).ops, neg));
+                } else if (neg) {
+                    make(m,new RxOp.NotBefore(decapturize(m)));
+                } else {
+                    make(m,new RxOp.Before(decapturize(m)));
+                }
+            } else {
+                make(m,neg ? new RxOp.None() : rnoop);
+            }
+        }
+        public void assertion__3f(Cursor m) { booly_assertion(m, false); } //?
+        public void assertion__21(Cursor m) { booly_assertion(m, true); }  //!
+
+        public void assertion__7b_7d(Cursor m) { // { }
+            make(m,new RxOp.ListPrim("", "scalar_asn",
+                        rxblock(m,atk(m,"embeddedblock"))));
+        }
+
+        public void assertion__3a(Cursor m) { // :
+            make(m,cc_to_rxop(ast<CCinfo>(atk(m,"cclass_expr"))));
+        }
+        public void assertion__5b(Cursor m) { assertion__3a(m); } // [
+        public void assertion__2d(Cursor m) { assertion__3a(m); } // -
+        public void assertion__2b(Cursor m) { assertion__3a(m); } // +
+
+        public void mod_internal__3amy(Cursor m) {
+            make(m,new RxOp.Statement(ast<Op.Op>(atk(m,"statement"))));
+        }
+
+        public void mod_internal__p6adv(Cursor m) {
+            make(m,rnoop);
+            var k = atk(atk(m,"quotepair"),"k");
+            var v = atk(atk(m,"quotepair"),"v");
+            if (!v.Fetch().Isa(Kernel.MatchMO)) {
+                sorry(m,":{0} requires an expression argument",asstr(k));
+                return;
+            }
+            var va = ast<Op.Op>(v);
+            var ks = asstr(k);
+
+            if (ks == "lang") {
+                make(m,new RxOp.SetLang(rxembed(m, va)));
+            } else if (ks == "dba") {
+                job.rxinfo.dba = asstr(eval_ast(m,va));
+            }
+        }
+
+        public void backslash__qq(Cursor m) { make(m,ast<Op.Op>(atk(m,"quote"))); }
 
         // forward...
         Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
