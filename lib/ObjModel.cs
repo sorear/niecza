@@ -1068,6 +1068,10 @@ next_method: ;
             return code;
         }
 
+        public bool Trusts(STable other) {
+            return this == other || mo.trustees.Contains(other);
+        }
+
         public void AddMethod(int flags, string name, P6any code) {
             mo.AddMethod(flags, name, code);
         }

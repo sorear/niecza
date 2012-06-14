@@ -1968,6 +1968,10 @@ namespace Niecza {
             extend[name] = args;
         }
 
+        public SubInfo StateOuter() {
+            return (special & MAINLINE) != 0 ? this : outer;
+        }
+
         private SubInfo() { }
 
         // This is a _shallow_ clone.  The children wind up shared, as do

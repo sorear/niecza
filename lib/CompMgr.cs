@@ -65,10 +65,17 @@ namespace Niecza.Compiler {
         public string unitname;
         public bool is_main, is_eval, is_repl;
 
+        public struct RxInfo {
+            public string sym, endsym, dba;
+            public bool i, a, r, s;
+            public int paren;
+        };
+
         // state vars
         public RuntimeUnit unit;    // $*unit
         public SubInfo     curlex;  // $*CURLEX
-        public Variable    rxinfo;  // %*RX
+        public RxInfo      rxinfo;  // %*RX
+        public Actions     actions; // $*ACTIONS
 
         public Dictionary<string,string> proto_endsym =
             new Dictionary<string,string>();

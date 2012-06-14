@@ -179,7 +179,7 @@ namespace Niecza.Compiler.Op {
     class CallSub : CallLike {
         public Op invocant;
 
-        public CallSub(Cursor c, Op i, bool po, Op[] a) : base(c,po,a) {
+        public CallSub(Cursor c, Op i, bool po, params Op[] a) : base(c,po,a) {
             invocant = i;
         }
 
@@ -350,7 +350,7 @@ namespace Niecza.Compiler.Op {
     }
 
     class SimpleParcel : Op {
-        Op[] items;
+        internal Op[] items;
         public SimpleParcel(Cursor c, Op[] its) : base(c) { items = its; }
 
         public override Op VisitOps(Func<Op,Op> post) {
@@ -902,8 +902,8 @@ namespace Niecza.Compiler.Op {
     }
 
     class ContextVar : Op {
-        string name;
-        int uplevel;
+        internal string name;
+        internal int uplevel;
 
         public ContextVar(Cursor c,string n,int u) : base(c) {name=n;uplevel=u;}
 
@@ -1239,6 +1239,16 @@ namespace Niecza.Compiler.Op {
         protected override CgOp code(SubInfo body) {
             return CgOp.temporize(var.cgop(body), CgOp.callframe(),
                 CgOp.@int(mode));
+        }
+    }
+
+    // Hack to support the $x .= foo; syntax; wraps an Operator
+    class DotEqRHS : Op {
+        internal Operator wrap;
+        public DotEqRHS(Cursor c, Operator w) : base(c) { wrap = w; }
+
+        protected override CgOp code(SubInfo body) {
+            throw new NotSupportedException("How did you manage to separate the methodish operator from the .= ?");
         }
     }
 

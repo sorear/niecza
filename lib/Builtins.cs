@@ -2438,6 +2438,9 @@ again:
         return th.Return();
     }
 
+    public const int T_LET   = 1;
+    public const int T_TEMP  = 0;
+    public const int T_BLOCK = 2;
     public static Variable temporize(Variable v, Frame fr, int mode) {
         int type = (mode & 1) != 0 ? LeaveHook.UNDO : LeaveHook.UNDO + LeaveHook.KEEP;
         if ((mode & 2) != 0) {

@@ -32,13 +32,16 @@ namespace Niecza.Compiler {
         void assign(Variable a, Variable b) { Kernel.Assign(a,b); }
 
         // SSTO TODO integrate with parser
-        void sorry(Cursor m, string fmt, params object[] args) {
+        internal void sorry(Cursor m, string fmt, params object[] args) {
             throw new NotImplementedException();
         }
         STable compile_get_pkg(bool auto, params string[] path) {
             throw new NotImplementedException();
         }
-        void addlex(Cursor pos, SubInfo to, string name, LexInfo li) {
+        internal void addlex(Cursor pos, SubInfo to, string name, LexInfo li) {
+            throw new NotImplementedException();
+        }
+        LexInfo lookup_lex(SubInfo from, string name, Cursor mark = null) {
             throw new NotImplementedException();
         }
         void trymop(Cursor m, Action a) {
@@ -539,7 +542,7 @@ dyn:
                         t.v1 == "of") {
                     // Ignored for now
                 } else if (t.v1 == "endsym") {
-                    assign(atk(job.rxinfo,"endsym"), mkstr((string)t.v2));
+                    job.rxinfo.endsym = (string)t.v2;
                 } else {
                     sorry(m, "Unhandled regex trait {0}", t.v1);
                 }
@@ -547,14 +550,13 @@ dyn:
 
             string cn = (string)job.curlex.GetExtend0("cleanname");
             if ((string)job.curlex.GetExtend0("multi") == "proto") {
-                if (cn != null) job.proto_endsym[cn] = asstr(atk(job.rxinfo,"endsym"));
+                if (cn != null) job.proto_endsym[cn] = job.rxinfo.endsym;
             } else {
-                if (cn != null && !isdef(atk(job.rxinfo,"endsym")))
-                    assign(atk(job.rxinfo,"endsym"),mkstr(
-                        job.proto_endsym.GetDefault(cn, null)));
+                if (cn != null && job.rxinfo.endsym == null)
+                    job.rxinfo.endsym = job.proto_endsym.GetDefault(cn, null);
             }
 
-            assign(atk(job.rxinfo,"dba"), mkstr((string)job.curlex.GetExtend0("name") ?? "anonymous regex"));
+            job.rxinfo.dba = (string)job.curlex.GetExtend0("name") ?? "anonymous regex";
         }
 
         public void regex_def(Cursor m) {
@@ -585,7 +587,7 @@ dyn:
             if (istrue(atk(m,"metachar"))) {
                 make(m,ast<RxOp.RxOp>(atk(m,"metachar")));
             } else {
-                make(m,new RxOp.String(asstr(m), istrue(atk(job.rxinfo,"i"))));
+                make(m,new RxOp.String(asstr(m), job.rxinfo.i));
             }
         }
 
@@ -601,12 +603,10 @@ dyn:
             var atom = ast<RxOp.RxOp>(atk(m,"atom"));
             var q    = istrue(atk(m,"quantifier")) ? ast<QuantInfo>(atk(m,"quantifier")) : default(QuantInfo);
 
-            if (istrue(atk(job.rxinfo, "r"))) {
+            if (job.rxinfo.r) {
                 // quantifier without explicit :? / :! gets :
                 if (q.mod == null) q.mod = "";
             }
-
-            var ss = istrue(atk(job.rxinfo,"s"));
 
             if (q.max > 0 || q.general) {
                 var z = new List<RxOp.RxOp> { atom };
@@ -622,7 +622,7 @@ dyn:
                 // parsing quirk. x #`(1) ** #`(21) y, the 1* position is
                 // counted as $<normspace> but the 2* is parsed by the
                 // quantifier
-                if ((q.general || q.sep != null) && ss &&
+                if ((q.general || q.sep != null) && job.rxinfo.s &&
                         (q.space || istrue(atk(m,"normspace")))) {
                     if (q.sep != null) {
                         z[1] = new RxOp.Sequence(new [] {
@@ -648,7 +648,7 @@ dyn:
                 }
                 atom = new RxOp.Sequence(new [] { atom,
                     new RxOp.Tilde(q.tilde_inner, ((RxOp.String)closer).text,
-                        asstr(atk(job.rxinfo, "dba"))) });
+                        job.rxinfo.dba) });
             }
 
             make(m,atom);
@@ -711,14 +711,14 @@ dyn:
         void LISTrx(Cursor m) {
             var tag = asstr(atk(atk(atk(m,"delims"),"0"),"sym"));
             var zyg = flist_ast<RxOp.RxOp>(atk(m,"list"));
-            var dba = asstr(atk(job.rxinfo,"dba"));
+            var dba = job.rxinfo.dba;
             if (tag == "&" || tag == "&") make(m,new RxOp.Conj(zyg));
             if (tag == "||") make(m,new RxOp.SeqAlt(zyg,dba));
             if (tag == "|") make(m,new RxOp.Alt(zyg,dba));
         }
 
         public void metachar__sigwhite(Cursor m) {
-            make(m, istrue(atk(job.rxinfo,"s")) ? (RxOp.RxOp)new RxOp.Sigspace() : rnoop);
+            make(m, job.rxinfo.s ? (RxOp.RxOp)new RxOp.Sigspace() : rnoop);
         }
 
         public void metachar__unsp(Cursor m) { make(m, rnoop); }
@@ -752,8 +752,8 @@ dyn:
         }
 
         public void metachar__28_29(Cursor m) { // ( )
-            var pnum = asstr(Builtins.postinc(atk(job.rxinfo,"paren")));
-            make(m, rxcapturize(m, pnum, encapsulate_regex(m,
+            var pnum = job.rxinfo.paren++;
+            make(m, rxcapturize(m, pnum.ToString(), encapsulate_regex(m,
                 ast<RxOp.RxOp>(atk(m,"nibbler")), true)));
         }
 
@@ -786,11 +786,10 @@ dyn:
             var strings = new List<RxOp.RxOp>();
             trymop(m, () => {
                 var words = eval_ast(m, ast<Op.Op>(atk(m,"circumfix")));
-                var igcase = istrue(atk(job.rxinfo,"i"));
                 foreach (var w in Builtins.UnboxLoS(words))
-                    strings.Add(new RxOp.String(w, igcase));
+                    strings.Add(new RxOp.String(w, job.rxinfo.i));
             });
-            make(m, new RxOp.Alt(strings.ToArray(), asstr(atk(job.rxinfo,"dba"))));
+            make(m, new RxOp.Alt(strings.ToArray(), job.rxinfo.dba));
         }
 
         public void metachar__3c_3e(Cursor m) { // < >
@@ -798,8 +797,8 @@ dyn:
         }
         public void metachar__5c(Cursor m) { // \
             var cc = ast<object>(atk(m,"backslash"));
-            make(m, (cc is string) ? new RxOp.String((string)cc,
-                istrue(atk(job.rxinfo,"i"))) : cc_to_rxop((CCinfo)cc));
+            make(m, (cc is string) ? new RxOp.String((string)cc, job.rxinfo.i)
+                    : cc_to_rxop((CCinfo)cc));
         }
 
         public void metachar__2e(Cursor m) { // .
@@ -825,7 +824,7 @@ dyn:
                 make(m,new RxOp.VarString(rxembed(m, qa)));
             } else {
                 make(m, new RxOp.String(((Op.StringLiteral)qa).text,
-                    istrue(atk(job.rxinfo,"i"))));
+                    job.rxinfo.i));
             }
         }
         public void metachar__22_22(Cursor m) { // " "
@@ -854,7 +853,7 @@ dyn:
                 }
 
                 if (all_digits(cid))
-                    assign(atk(job.rxinfo,"paren"), mkint(1+(int)Utils.S2N(cid)));
+                    job.rxinfo.paren = 1 + (int)Utils.S2N(cid);
 
                 make(m,rxcapturize(m, cid, a));
                 return;
@@ -1028,13 +1027,12 @@ dyn:
         public void cclass_elem__quote(Cursor m) {
             var qa = ast<Op.Op>(atk(m,"quote"));
             var sqa = qa as Op.StringLiteral;
-            var ic = istrue(atk(job.rxinfo,"i"));
             if (sqa == null) {
                 make(m,new RxOp.VarString(rxembed(m, qa)));
-            } else if (!ic) {
+            } else if (!job.rxinfo.i) {
                 make(m,string_cc(sqa.text));
             } else {
-                make(m,op_cc(false,new RxOp.String(sqa.text, ic)));
+                make(m,op_cc(false,new RxOp.String(sqa.text, job.rxinfo.i)));
             }
         }
 
@@ -1044,6 +1042,57 @@ dyn:
             return ac == null ? a : ac.withcaps(new string[0]);
         }
 
+
+        public void assertion__name(Cursor m) {
+            var pname = process_name(atk(m,"longname"), DEFER);
+            var name  = asstr(atk(m,"longname"));
+
+            if (pname.name == null && pname.ind == null) {
+                pname.name = "alpha";
+                sorry(m,"Method call requires a method name");
+            }
+
+            var lex = lookup_lex(job.curlex, "&" + name) as LISub;
+            var is_lexical = m.global.orig_s[m.from-1] != '.' &&
+                lex != null && lex.def.mo.HasType(Kernel.RegexMO);
+
+            if (istrue(atk(m,"assertion"))) {
+                make(m,ast<RxOp.RxOp>(atk(m,"assertion")));
+            } else if (name == "sym") {
+                if (job.rxinfo.sym == null)
+                    sorry(m,"<sym> is only valid in multiregexes");
+                make(m,new RxOp.Sym(job.rxinfo.sym ?? "", job.rxinfo.endsym,
+                    job.rxinfo.i, job.rxinfo.a));
+            } else if (name == "before") {
+                make(m,new RxOp.Before(ast<RxOp.RxOp>(atk(m,"nibbler"))));
+                return; // no capture needed
+            } else if (name == "after") {
+                var ll = new List<CClass>();
+                ast<RxOp.RxOp>(atk(m,"nibbler")).tocclist(ll);
+                foreach (var l in ll) {
+                    if (l == null) {
+                        sorry(m,"Unsupported elements in after list");
+                        ll.Clear();
+                        break;
+                    }
+                }
+                make(m,new RxOp.ZeroWidthCCs(ll.ToArray(),true,false));
+                return; // no capture needed
+            } else if (!istrue(atk(m,"nibbler")) && !istrue(atk(m,"arglist")) &&
+                    pname.pkg == null && pname.ind == null && !is_lexical) {
+                make(m,new RxOp.Subrule(pname.name, false));
+            } else {
+                var args = istrue(atk(m,"nibbler")) ?
+                    new [] { op_for_regex(m, ast<RxOp.RxOp>(atk(m,"nibbler")))}:
+                    istrue(atk(m,"arglist")) ? ast<Op.Op[]>(atk(m,"arglist")) :
+                    new Op.Op[0];
+
+                Op.Op callop = null;
+                if (is_lexical) {
+                }
+            }
+        }
+
         // forward...
         Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
         Op.Op do_variable_reference(Cursor m, VarInfo ast) { throw new NotImplementedException(); }
@@ -1051,7 +1100,7 @@ dyn:
         string get_cp_ext(Variable c) { throw new NotImplementedException(); }
         Variable eval_ast(Cursor c, Op.Op o) { throw new NotImplementedException(); }
 
-        Op.Op block_expr(Cursor m, SubInfo blk) {
+        internal Op.Op block_expr(Cursor m, SubInfo blk) {
             var name = job.gensym();
             addlex(m, job.curlex, name, new LISub(blk));
             return Op.Helpers.mklex(m, name);
