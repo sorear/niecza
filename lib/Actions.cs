@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 // Public methods with the same name as a STD rule are assumed to be handlers
 // for that rule.
@@ -1200,6 +1201,80 @@ dyn:
         }
 
         public void backslash__qq(Cursor m) { make(m,ast<Op.Op>(atk(m,"quote"))); }
+
+        void bslash(Cursor m, string ss) {
+            make(m, char.IsUpper(asstr(m)[0]) ? negate_cc(string_cc(ss)) :
+                    (object)ss);
+        }
+        void bslash(Cursor m, CClass cc) {
+            make(m, char.IsUpper(asstr(m)[0]) ? negate_cc(cclass_cc(cc)) :
+                    cclass_cc(cc));
+        }
+
+        public void backslash__x(Cursor m) {
+            var sb = new StringBuilder();
+            if (istrue(atk(m,"hexint"))) {
+                sb.Append(asstr(Builtins.chr(ast<P6any>(atk(m,"hexint")))));
+            } else {
+                foreach (var hi in ast<P6any[]>(atk(m,"hexints")))
+                    sb.Append(asstr(Builtins.chr(hi)));
+            }
+            bslash(m, sb.ToString());
+        }
+
+        public void backslash__o(Cursor m) {
+            var sb = new StringBuilder();
+            if (istrue(atk(m,"octint"))) {
+                sb.Append(asstr(Builtins.chr(ast<P6any>(atk(m,"octint")))));
+            } else {
+                foreach (var hi in ast<P6any[]>(atk(m,"octints")))
+                    sb.Append(asstr(Builtins.chr(hi)));
+            }
+            bslash(m, sb.ToString());
+        }
+
+        public void backslash__5c(Cursor m) { make(m,"\\"); }
+        public void backslash__stopper(Cursor m) { make(m,asstr(atk(m,"text"))); }
+        public void backslash__unspace(Cursor m) { make(m,""); }
+        public void backslash__misc(Cursor m) {
+            make(m, isdef(atk(m,"text")) ? asstr(atk(m,"text")) :
+                    asstr(atk(m,"litchar")));
+        }
+        public void backslash__0(Cursor m) { make(m,"\0"); }
+        public void backslash__a(Cursor m) { bslash(m,"\a"); }
+        public void backslash__b(Cursor m) { bslash(m,"\b"); }
+        public void backslash__c(Cursor m) { bslash(m,ast<string>(atk(m,"charspec"))); }
+        public void backslash__d(Cursor m) { bslash(m,CClass.Digit); }
+        public void backslash__e(Cursor m) { bslash(m,"\u001B"); }
+        public void backslash__f(Cursor m) { bslash(m,"\f"); }
+        public void backslash__h(Cursor m) { bslash(m,CClass.HSpace); }
+
+        public void backslash__n(Cursor m) {
+            if (m.mo.FindMethod("backslash:d") != null) {
+                // HACK - only use this form when we're looking for regexy stuff
+                bslash(m, op_cc(false, new RxOp.Newline()));
+            } else {
+                make(m,"\n");
+            }
+        }
+
+        public void backslash__r(Cursor m) { bslash(m,"\r"); }
+        public void backslash__s(Cursor m) { bslash(m,CClass.Space); }
+        public void backslash__t(Cursor m) { bslash(m,"\t"); }
+        public void backslash__v(Cursor m) { bslash(m,"\v"); }
+        public void backslash__w(Cursor m) { bslash(m,CClass.Word); }
+
+        public void escape__5c(Cursor m) { make(m,ast<object>(atk(m,"item"))); }
+        public void escape__7b_7d(Cursor m) {
+            make(m, inliney_call(m, ast<SubInfo>(atk(m,"embeddedblock"))));
+        }
+        public void escape__24(Cursor m) { make(m,ast<Op.Op>(atk(m,"EXPR"))); } // $
+        public void escape__40(Cursor m) { make(m,ast<Op.Op>(atk(m,"EXPR"))); } // @
+        public void escape__25(Cursor m) { make(m,ast<Op.Op>(atk(m,"EXPR"))); } // %
+        public void escape__ch(Cursor m) { make(m,asstr(atk(m,"ch"))); }
+        public void escape__ws(Cursor m) { make(m,""); }
+        class RangeSymbol { }
+        public void escape__2e2e(Cursor m) { make(m,new RangeSymbol()); }
 
         // forward...
         Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
