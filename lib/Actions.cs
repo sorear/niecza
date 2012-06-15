@@ -35,13 +35,16 @@ namespace Niecza.Compiler {
         internal void sorry(Cursor m, string fmt, params object[] args) {
             throw new NotImplementedException();
         }
+        internal void worry(Cursor m, string fmt, params object[] args) {
+            throw new NotImplementedException();
+        }
         STable compile_get_pkg(bool auto, params string[] path) {
             throw new NotImplementedException();
         }
         internal void addlex(Cursor pos, SubInfo to, string name, LexInfo li) {
             throw new NotImplementedException();
         }
-        LexInfo lookup_lex(SubInfo from, string name, Cursor mark = null) {
+        internal LexInfo lookup_lex(SubInfo from, string name, Cursor mark = null) {
             throw new NotImplementedException();
         }
         void trymop(Cursor m, Action a) {

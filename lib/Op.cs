@@ -55,7 +55,218 @@ namespace Niecza.Compiler.Op {
         public virtual bool onlystub() { return false; }
         public virtual Variable const_value(SubInfo body) { return null; }
 
-        public virtual Op simplify(SubInfo body) { throw new NotImplementedException(); } // SSTO
+        class Simplifier {
+            internal Actions actions;
+            internal SubInfo body;
+
+            static Dictionary<string,Func<Simplifier,string,CallSub,Op>> funcs =
+                new Dictionary<string,Func<Simplifier,string,CallSub,Op>> {
+                    { "&postcircumfix:<{ }>", do_atkey },
+                    { "&postcircumfix:<[ ]>", do_atpos },
+                    { "&last", do_nullary_control(2) },
+                    { "&next", do_nullary_control(1) },
+                    { "&proceed", do_nullary_control(7) },
+                    { "&term:<proceed>", do_nullary_control(7) },
+                    { "&redo", do_nullary_control(3) },
+
+                    { "&infix:<&>", do_makejunction(0) },
+                    { "&infix:<^>", do_makejunction(2) },
+                    { "&infix:<|>", do_makejunction(3) },
+                    { "&all", do_makejunction(8) },
+                    { "&none", do_makejunction(9) },
+                    { "&one", do_makejunction(10) },
+                    { "&any", do_makejunction(11) },
+
+                    { "&return", do_return_take },
+                    { "&succeed", do_return_take },
+                    { "&take", do_return_take },
+                };
+
+            Op[] no_named_params(CallSub op) {
+                if (!op.posonly) {
+                    foreach (Op arg in op.args) {
+                        if (arg is SimplePair)
+                            return null;
+                        var argcs = arg as CallSub;
+                        if (argcs != null && argcs.invocant is Lexical &&
+                                ((Lexical)argcs.invocant).name == "&prefix:<|>")
+                            return null;
+                    }
+                }
+
+                return op.args;
+            }
+
+            bool capture_params(CallSub op, List<Op> pos, Dictionary<string,Op> named) {
+                if (op.posonly) {
+                    foreach (var a in op.args) pos.Add(a);
+                    return true;
+                }
+
+                foreach (var a in op.args) {
+                    var asp = a as SimplePair;
+                    var acs = a as CallSub;
+                    var ail = acs == null ? null : acs.invocant as Lexical;
+                    if (asp != null) {
+                        named[asp.key] = asp.value;
+                    } else if (ail != null && ail.name == "&prefix:<|>") {
+                        return false;
+                    } else {
+                        pos.Add(a);
+                    }
+                }
+
+                return true;
+            }
+
+            static Op do_return_take(Simplifier th, string name, CallSub op) {
+                var args = th.no_named_params(op);
+                if (args == null) return op;
+                var parcel = args.Length == 1 ? args[0] : args.Length == 0 ?
+                    (Op)new Lexical(op.pos, "Nil") : new SimpleParcel(op.pos, args);
+                return name == "&take" ? (Op)new Take(op.pos, parcel) :
+                    new Control(op.pos, name == "&return" ? SubInfo.ON_RETURN :
+                            SubInfo.ON_SUCCEED, null, parcel);
+            }
+
+            static Func<Simplifier,string,CallSub,Op> do_nullary_control(int number) {
+                return (Simplifier th, string name, CallSub op) => {
+                    var args = th.no_named_params(op);
+                    return (args == null || args.Length != 0) ? (Op)op :
+                        new Control(op.pos, number, null, new Lexical(op.pos, "Nil"));
+                };
+            }
+
+            static Func<Simplifier,string,CallSub,Op> do_makejunction(int typecode) {
+                return (Simplifier th, string name, CallSub op) => {
+                    var args = th.no_named_params(op);
+                    return args == null ? (Op)op : new MakeJunction(op.pos,
+                        typecode, args);
+                };
+            }
+
+            int getflag(Dictionary<string,Op> dict, string flag) {
+                var val = dict.GetDefault(flag, null) as Lexical;
+                if (!dict.Remove(flag)) return 0;
+                if (val == null || val.name != "True") return -1;
+                return 1;
+            }
+
+            static Op do_atkey(Simplifier th, string name, CallSub op) {
+                var args = new List<Op>();
+                var named = new Dictionary<string,Op>();
+                if (!th.capture_params(op, args, named) || args.Count != 2) return op;
+                var delete = th.getflag(named, "delete");
+                var exists = th.getflag(named, "exists");
+                if (named.Count > 0 || delete < 0 || exists < 0 ||
+                        (delete == 1 && exists == 1))
+                    return op;
+
+                return new Builtin(op.pos, delete != 0 ? "delete_key" :
+                    exists != 0 ? "exists_key" : "at_key", args.ToArray());
+            }
+
+            static Op do_atpos(Simplifier th, string name, CallSub op) {
+                var args = th.no_named_params(op);
+                return (args == null || args.Length != 2) ? (Op)op :
+                    new Builtin(op.pos, "at_pos", args);
+            }
+
+            // XXX should support folding of SimplePair, SimpleParcel too
+            Op check_folding(P6any callee, CallSub op) {
+                var pos = new List<Variable>();
+                var nam = new VarHash();
+
+                foreach (var aop in op.getargs()) {
+                    string name = null;
+                    var valop = aop;
+                    if (aop is SimplePair) {
+                        name = ((SimplePair)aop).key;
+                        valop = ((SimplePair)aop).value;
+                    }
+
+                    var val = valop.const_value(body);
+                    if (val == null || val.Rw)
+                        return null;
+                    // this next one is a bit of a hack to get the right results
+                    // while compiling the setting...
+                    if (val.Fetch().mo.FindMethod("immutable") != null &&
+                            !Builtins.ToBool(Builtins.InvokeMethod("immutable", val)))
+                        return null;
+
+                    if (name == null) {
+                        pos.Add(val);
+                    } else {
+                        nam[name] = val;
+                    }
+                }
+
+                Op r = null;
+                try {
+                    var ret = Kernel.RunInferior(callee.Invoke(
+                        Kernel.GetInferiorRoot(), pos.ToArray(), nam));
+                    r = new Const(op.pos, ret);
+                } catch (Exception ex) {
+                    actions.worry(op.pos, "Operation cannot succeed (constant folding threw exception: {0})", ex.Message);
+                }
+                return r;
+            }
+
+            internal Op visit_one(Op op) {
+                var csop = op as CallSub;
+                if (csop == null)
+                    return op;
+
+                var inv = csop.invocant as Lexical;
+                if (inv == null)
+                    return op;
+
+                var inv_lex = actions.lookup_lex(body, inv.name);
+                var real_lex = inv_lex;
+                if (inv_lex == null)
+                    return op;
+
+                if (inv_lex is LIDispatch)
+                    inv_lex.owner.dylex.TryGetValue(inv.name + ":(!proto)",
+                            out inv_lex);
+
+                if (!(inv_lex is LISub))
+                    return op;
+
+                var inv_sub = ((LISub)inv_lex).def;
+
+                if (inv_sub.GetExtend0T("pure", false)) {
+                    // Note, we have to use the real dispatcher here!  Don't
+                    // look past it to the proto.
+                    var sub = real_lex is LISub ?
+                        ((LISub)real_lex).def.protosub :
+                        ((Variable)real_lex.Get(real_lex.owner.protopad)).Fetch();
+                    var fold = check_folding(sub, csop);
+                    if (fold != null) return fold;
+                }
+
+                var builtin = inv_sub.GetExtend("builtin");
+                if (builtin.Length > 0) {
+                    // check for subs with explicit open-coding annotations
+                    var args = no_named_params(csop);
+                    if (args == null || args.Length < (int)builtin[1] ||
+                            (builtin.Length >= 3 && args.Length > (int)builtin[2]))
+                        return op;
+                    return new Builtin(op.pos, (string)builtin[0], args);
+                } else {
+                    // might still have special handling
+                    if (inv_sub.unit.name != "CORE") return op;
+                    if (!funcs.ContainsKey(inv_lex.name)) return op;
+
+                    return funcs[inv_lex.name](this, inv_lex.name, csop);
+                }
+            }
+        }
+
+        public virtual Op simplify(SubInfo body) {
+            return VisitOps((new Simplifier { body = body,
+                        actions = CompJob.cur.actions }).visit_one);
+        }
     }
 
     class RawCgOp : Op {
@@ -131,8 +342,8 @@ namespace Niecza.Compiler.Op {
     }
 
     abstract class CallLike: Op {
-        protected bool posonly;
-        protected Op[] args;
+        internal bool posonly;
+        internal Op[] args;
 
         protected CallLike(Cursor c, bool p, Op[] a) :base(c) {
             posonly = p;

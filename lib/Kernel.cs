@@ -1961,6 +1961,10 @@ namespace Niecza {
             if (extend != null) extend.TryGetValue(name, out ret);
             return ret != null && ret.Length > 0 ? ret[0] : null;
         }
+        public T GetExtend0T<T>(string name, T def) {
+            object r = GetExtend0(name);
+            return (r == null) ? def : (T)r;
+        }
 
         public void SetExtend(string name, params object[] args) {
             if (extend == null)
