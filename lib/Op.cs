@@ -312,7 +312,7 @@ namespace Niecza.Compiler.Op {
     }
 
     class StatementList : Op {
-        Op[] children;
+        internal Op[] children;
         bool statement;
         public StatementList(Cursor c, Op[] children, bool stmt) : base(c) {
             this.children = children; statement = stmt;
@@ -433,7 +433,7 @@ namespace Niecza.Compiler.Op {
             pclass = pcl; meta = mt;
         }
 
-        public CallMethod(Cursor pos, string name, Op rcvr, bool po,
+        public CallMethod(Cursor pos, string name, Op rcvr, bool po = true,
                 params Op[] a) : this(pos,rcvr,name,false,null,"",po,a) {}
 
         public Op adverb(Op adv) {
@@ -562,7 +562,7 @@ namespace Niecza.Compiler.Op {
 
     class SimpleParcel : Op {
         internal Op[] items;
-        public SimpleParcel(Cursor c, Op[] its) : base(c) { items = its; }
+        public SimpleParcel(Cursor c, params Op[] its) : base(c) { items = its; }
 
         public override Op VisitOps(Func<Op,Op> post) {
             for (int i = 0; i < items.Length; i++)
@@ -632,7 +632,7 @@ namespace Niecza.Compiler.Op {
         public const int DAND = 2;
         public const int DOR  = 3;
 
-        public ShortCircuit(Cursor c, int k, Op[] a) : base(c) {
+        public ShortCircuit(Cursor c, int k, params Op[] a) : base(c) {
             kind = k; args = a;
         }
 

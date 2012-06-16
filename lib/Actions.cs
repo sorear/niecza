@@ -62,6 +62,9 @@ namespace Niecza.Compiler {
         void make(Cursor m, object val) {
             m.ast = Kernel.BoxRaw(val, Kernel.AnyMO);
         }
+        void from(Cursor m, string field) {
+            m.ast = ((Cursor)atk(m,field).Fetch()).ast;
+        }
 
         Variable[] flist(Variable list) {
             // we force the list to iterate here
@@ -209,7 +212,7 @@ namespace Niecza.Compiler {
 
         public void charspec(Cursor m) {
             if (istrue(atk(m,"charnames"))) {
-                make(m,ast<string>(atk(m,"charnames")));
+                from(m,"charnames");
             } else {
                 var str = asstr(m);
                 if (CC.Digit.Accepts(str[0])) {
@@ -220,8 +223,8 @@ namespace Niecza.Compiler {
             }
         }
 
-        public void value__number(Cursor m) { make(m,ast<Op.Op>(atk(m,"number"))); }
-        public void value__quote(Cursor m) { make(m,ast<Op.Op>(atk(m,"quote"))); }
+        public void value__number(Cursor m) { from(m,"number"); }
+        public void value__quote(Cursor m) { from(m,"quote"); }
 
         public void label(Cursor m) {
             trymop(m, () => {
@@ -445,7 +448,7 @@ dyn:
                 ret.name = n.ToString();
                 make(m,ret);
             } else {
-                make(m,ast<VarInfo>(atk(m,"desigilname")));
+                from(m,"desigilname");
             }
         }
 
@@ -454,7 +457,7 @@ dyn:
                 sorry(m, "Sigterm sublongnames NYI");
                 make(m, default(VarInfo));
             } else {
-                make(m, ast<VarInfo>(atk(m,"subshortname")));
+                from(m,"subshortname");
             }
         }
 
@@ -469,12 +472,12 @@ dyn:
             }
         }
 
-        public void quote__22_20(Cursor m) { make(m,ast<Op.Op>(atk(m,"nibble"))); }
-        public void quote__27_27(Cursor m) { make(m,ast<Op.Op>(atk(m,"nibble"))); }
-        public void quote__qq(Cursor m) { make(m,ast<Op.Op>(atk(m,"quibble")));}
-        public void quote__q(Cursor m) { make(m,ast<Op.Op>(atk(m,"quibble")));}
-        public void quote__Q(Cursor m) { make(m,ast<Op.Op>(atk(m,"quibble")));}
-        public void quote__s(Cursor m) { make(m,ast<Op.Op>(atk(m,"pat")));}
+        public void quote__22_20(Cursor m) { from(m,"nibble"); }
+        public void quote__27_27(Cursor m) { from(m,"nibble"); }
+        public void quote__qq(Cursor m) { from(m,"quibble");}
+        public void quote__q(Cursor m) { from(m,"quibble");}
+        public void quote__Q(Cursor m) { from(m,"quibble");}
+        public void quote__s(Cursor m) { from(m,"pat");}
 
         public void quote__2f_2f(Cursor m) { make(m,op_for_regex(m,ast<RxOp.RxOp>(atk(m,"nibble")))); }
         public void quote__rx(Cursor m) {
@@ -529,7 +532,7 @@ dyn:
             if (istrue(atk(m,"onlystar")))
                 make(m,new RxOp.ProtoRedis());
             else
-                make(m,ast<RxOp.RxOp>(atk(m,"nibble")));
+                from(m,"nibble");
         }
 
         public void regex_def_1(Cursor m) {
@@ -582,14 +585,14 @@ dyn:
         }
 
         public void regex_declarator__regex(Cursor m) {
-            make(m,ast<Op.Op>(atk(m,"regex_def")));
+            from(m,"regex_def");
         }
         public void regex_declarator__rule(Cursor m) { regex_declarator__regex(m); }
         public void regex_declarator__token(Cursor m) { regex_declarator__regex(m); }
 
         public void atom(Cursor m) {
             if (istrue(atk(m,"metachar"))) {
-                make(m,ast<RxOp.RxOp>(atk(m,"metachar")));
+                from(m,"metachar");
             } else {
                 make(m,new RxOp.String(asstr(m), job.rxinfo.i));
             }
@@ -747,7 +750,7 @@ dyn:
             if (((Cursor)atk(m,"mod_internal").Fetch()).ast == null)
                 make(m,rnoop);
             else
-                make(m,ast<RxOp.RxOp>(atk(m,"mod_internal")));
+                from(m,"mod_internal");
         }
 
         public void metachar__3a3a(Cursor m) { make(m,new RxOp.CutLTM()); } //::
@@ -800,7 +803,7 @@ dyn:
         }
 
         public void metachar__3c_3e(Cursor m) { // < >
-            make(m, ast<RxOp.RxOp>(atk(m,"assertion")));
+            from(m,"assertion");
         }
         public void metachar__5c(Cursor m) { // \
             var cc = ast<object>(atk(m,"backslash"));
@@ -1005,13 +1008,13 @@ dyn:
         }
 
         public void cclass_elem__5b_5d(Cursor m) { // [ ]
-            make(m, ast<CCinfo>(atk(m,"nibble")));
+            from(m,"nibble");
             if (Config.CCTrace)
                 Console.WriteLine(":[] {0}", ast<CCinfo>(m).rxop);
         }
 
         public void cclass_elem__28_29(Cursor m) { // ( )
-            make(m, ast<CCinfo>(atk(m,"cclass_expr")));
+            from(m,"cclass_expr");
         }
 
         struct Colonpair {
@@ -1064,7 +1067,7 @@ dyn:
                 lex != null && lex.def.mo.HasType(Kernel.RegexMO);
 
             if (istrue(atk(m,"assertion"))) {
-                make(m,ast<RxOp.RxOp>(atk(m,"assertion")));
+                from(m,"assertion");
             } else if (name == "sym") {
                 if (job.rxinfo.sym == null)
                     sorry(m,"<sym> is only valid in multiregexes");
@@ -1200,7 +1203,7 @@ dyn:
             }
         }
 
-        public void backslash__qq(Cursor m) { make(m,ast<Op.Op>(atk(m,"quote"))); }
+        public void backslash__qq(Cursor m) { from(m,"quote"); }
 
         void bslash(Cursor m, string ss) {
             make(m, char.IsUpper(asstr(m)[0]) ? negate_cc(string_cc(ss)) :
@@ -1209,6 +1212,9 @@ dyn:
         void bslash(Cursor m, CClass cc) {
             make(m, char.IsUpper(asstr(m)[0]) ? negate_cc(cclass_cc(cc)) :
                     cclass_cc(cc));
+        }
+        void bslash(Cursor m, CCinfo ii) {
+            make(m, char.IsUpper(asstr(m)[0]) ? negate_cc(ii) : ii);
         }
 
         public void backslash__x(Cursor m) {
@@ -1250,7 +1256,7 @@ dyn:
         public void backslash__h(Cursor m) { bslash(m,CClass.HSpace); }
 
         public void backslash__n(Cursor m) {
-            if (m.mo.FindMethod("backslash:d") != null) {
+            if (m.save_klass.FindMethod("backslash:d") != null) {
                 // HACK - only use this form when we're looking for regexy stuff
                 bslash(m, op_cc(false, new RxOp.Newline()));
             } else {
@@ -1264,17 +1270,351 @@ dyn:
         public void backslash__v(Cursor m) { bslash(m,"\v"); }
         public void backslash__w(Cursor m) { bslash(m,CClass.Word); }
 
-        public void escape__5c(Cursor m) { make(m,ast<object>(atk(m,"item"))); }
+        public void escape__5c(Cursor m) { from(m,"item"); }
         public void escape__7b_7d(Cursor m) {
             make(m, inliney_call(m, ast<SubInfo>(atk(m,"embeddedblock"))));
         }
-        public void escape__24(Cursor m) { make(m,ast<Op.Op>(atk(m,"EXPR"))); } // $
-        public void escape__40(Cursor m) { make(m,ast<Op.Op>(atk(m,"EXPR"))); } // @
-        public void escape__25(Cursor m) { make(m,ast<Op.Op>(atk(m,"EXPR"))); } // %
+        public void escape__24(Cursor m) { from(m,"EXPR"); } // $
+        public void escape__40(Cursor m) { from(m,"EXPR"); } // @
+        public void escape__25(Cursor m) { from(m,"EXPR"); } // %
         public void escape__ch(Cursor m) { make(m,asstr(atk(m,"ch"))); }
         public void escape__ws(Cursor m) { make(m,""); }
         class RangeSymbol { }
         public void escape__2e2e(Cursor m) { make(m,new RangeSymbol()); }
+
+        static CC hsp = new CC(CClass.HSpace.terms);
+        static CC sp = new CC(CClass.Space.terms);
+
+        string[] words(string str) {
+            var ret = new List<string>();
+            int pos = 0;
+            while (pos < str.Length) {
+                int pos0 = pos;
+                bool reject = sp.Accepts(str[pos++]);
+                while (pos < str.Length && reject == sp.Accepts(str[pos])) pos++;
+                if (!reject) ret.Add(str.Substring(pos0, pos - pos0));
+            }
+            return ret.ToArray();
+        }
+
+        Op.Op process_nibble(Cursor m, Variable[] bits, string prefix) {
+            var acc = new List<Op.Op>();
+
+            foreach (var n in bits) {
+                var cn = (Cursor)n.Fetch();
+                var ast_o = cn.ast == null ? asstr(n) : ast<object>(n);
+
+                if (ast_o is CCinfo || ast_o is CClass) {
+                    sorry(cn, "Cannot use a character class in a string");
+                    ast_o = "";
+                }
+
+                if (ast_o is string && prefix != "" && cn.reduced == "Str") {
+                    var sb = new StringBuilder();
+                    var orig_a = cn.global.orig_a;
+                    for (int i = cn.from; i < cn.pos; i++) {
+                        // This is the heredoc whitespace stripper: after a
+                        // literal linefeed, ignore literal whitespace up to
+                        // the amount in the trailer.
+                        if ((i == 0 || CC.VSpace.Accepts(orig_a[i-1])) &&
+                                i != orig_a.Length && hsp.Accepts(orig_a[i])) {
+                            if (orig_a.Length - i >= prefix.Length &&
+                                    cn.global.orig_s.Substring(i, prefix.Length) == prefix) {
+                                i += prefix.Length;
+                            } else {
+                                while (i != orig_a.Length && hsp.Accepts(orig_a[i]))
+                                    i++;
+                            }
+                            if (i >= cn.pos)
+                                break;
+                        }
+                        sb.Append(orig_a[i++]);
+                    }
+                    ast_o = sb.ToString();
+                }
+
+                acc.Add((ast_o as Op.Op) ?? new Op.StringLiteral(m,(string)ast_o));
+            }
+
+            var sl = Op.Helpers.mkstringycat(m, acc.ToArray());
+            var post = asstr(Builtins.InvokeMethod("postprocessor", m.UnMatch()));
+            if (post == "null") {
+                // already OK
+            } else if (post == "words" || post == "quotewords") {
+                // actually quotewords is a bit trickier than this...
+                if (sl is Op.StringLiteral) {
+                    var text = ((Op.StringLiteral)sl).text;
+                    var tok = words(text);
+                    if (tok.Length == 1 && tok[0] == text && post == "words") {
+                        // <1/2> special case
+                        if (lookup_lex(job.curlex, "&val_nospace") != null)
+                            sl = Op.Helpers.mkcall(m,"&val_nospace",sl);
+                    } else {
+                        var tokop = new Op.Op[tok.Length];
+                        var val = lookup_lex(job.curlex, "&val") != null;
+                        for (int i = 0; i < tok.Length; i++) {
+                            tokop[i] = new Op.StringLiteral(m, tok[i]);
+                            if (val) tokop[i] = Op.Helpers.mkcall(m, "&val", tokop[i]);
+                        }
+                        sl = tok.Length == 1 ? tokop[0] : new Op.Paren(m,
+                            new Op.SimpleParcel(m, tokop));
+                    }
+                } else {
+                    sl = new Op.CallMethod(m, "words-val", sl);
+                }
+            } else if (post == "path") {
+                // TODO could stand to be a lot fancier.
+                sl = new Op.CallMethod(m, "IO", sl);
+            } else {
+                sorry(m, "Unhandled postprocessor {0}", post);
+            }
+
+            return sl;
+        }
+
+        CCinfo process_tribble(Variable[] bits) {
+            var mstack = new Cursor[bits.Length];
+            var cstack = new object[bits.Length];
+            int depth = 0;
+
+            foreach (var n in bits) {
+                var cn = (Cursor)n.Fetch();
+                var ast = cn.ast == null ? asstr(n) : ast<object>(n);
+                if (ast is string && ((string)ast) == "")
+                    continue;
+
+                mstack[depth] = cn;
+                cstack[depth] = ast;
+
+                if (depth >= 2 && cstack[depth-2] is RangeSymbol) {
+                    if (depth == 2) {
+                        sorry(mstack[0], ".. requires a left endpoint");
+                        return void_cc();
+                    }
+
+                    for (int i = 1; i <= 3; i += 2) {
+                        var cas = cstack[depth-i] as string;
+                        if (cas == null || Utils.Codes(cas) != 1) {
+                            sorry(mstack[depth-i], ".. endpoint must be a single character");
+                            return void_cc();
+                        }
+                    }
+
+                    cstack[depth-3] = cclass_cc(CClass.range(
+                                Utils.Ord((string)cstack[depth-3]),
+                                Utils.Ord((string)cstack[depth-1])));
+                    depth -= 2;
+                }
+            }
+
+            if (depth > 0 && cstack[depth-1] is RangeSymbol) {
+                sorry(mstack[depth-1], ".. requires a right endpoint");
+                return void_cc();
+            }
+
+            var retcc = void_cc();
+            for (int i = 0; i < depth; i++)
+                retcc = or_cc(retcc, cstack[i] as CCinfo? ??
+                        string_cc((string) cstack[i]));
+            return retcc;
+        }
+
+        public void nibbler(Cursor m) { nibbler_(m, ""); }
+        void nibbler_(Cursor m, string prefix) {
+            if (istrue(atk(m,"EXPR"))) {
+                from(m,"EXPR");
+            } else if (istrue(atk(m,"cgexp"))) {
+                if (job.mgr.safe_mode) {
+                    sorry(m, "Q:CgOp not allowed in safe mode");
+                    make(m,new Op.StatementList(m));
+                    return;
+                }
+                make(m, new Op.RawCgOp(m, ast<object>(atk(m,"cgexp"))));
+            } else if (m.save_klass.FindMethod("ccstate") != null) {
+                make(m, process_tribble(flist(atk(m,"nibbles"))));
+            } else {
+                make(m, process_nibble(m, flist(atk(m,"nibbles")), prefix));
+            }
+        }
+
+        public void circumfix__3c_3e(Cursor m) { from(m,"nibble"); }
+        public void circumfix__3c3c_3e3e(Cursor m) { from(m,"nibble"); }
+        public void circumfix__ab_bb(Cursor m) { from(m,"nibble"); }
+
+        public void circumfix__28_29(Cursor m) { // ( )
+            var kids = ast<Op.Op[]>(atk(m,"semilist"));
+            if (kids.Length == 1 && kids[0] is Op.WhateverCode) {
+                // XXX in cases like * > (2 + *), we *don't* want the parens to
+                // disable syntactic specialization, since they're required for
+                // grouping
+                make(m, kids[0]);
+            } else if (kids.Length == 0) {
+                // an empty StatementList returns Nil, but () needs to be
+                // defined...
+                make(m, new Op.Paren(m, new Op.SimpleParcel(m)));
+            } else {
+                make(m, new Op.StatementList(m, kids));
+            }
+        }
+
+        public void circumfix__5b_5d(Cursor m) { // [ ]
+            var kids = ast<Op.Op[]>(atk(m,"semilist"));
+            make(m,Op.Helpers.mkcall(m, "&_array_constructor",
+                new Op.StatementList(m, kids)));
+        }
+
+        bool check_hash(SubInfo sub, Op.Op code) {
+            if (Builtins.sig_arity(sub.sig) != 0)
+                return false;
+            var dosl = code as Op.StatementList;
+            if (dosl == null)
+                return false;
+
+            if (dosl.children.Length == 0) return true;
+            if (dosl.children.Length > 1) return false;
+            code = dosl.children[0];
+
+            var bits = code is Op.SimpleParcel ? ((Op.SimpleParcel)code).items :
+                new [] { code };
+            if (bits.Length == 0) return false;
+
+            if (bits[0] is Op.SimplePair) return true;
+            if (bits[0] is Op.CallSub) {
+                var inv = (bits[0] as Op.CallSub).invocant as Op.Lexical;
+                if (inv != null && inv.name == "&infix:<=>>") return true;
+            }
+
+            if (bits[0] is Op.Const) {
+                var ob = bits[0].const_value(null).Fetch();
+                if (ob.Isa(Kernel.PairMO)) return true;
+                if (ob.Isa(Kernel.ParcelMO) && Kernel.UnboxAny<Variable[]>(ob)[0].Fetch().Isa(Kernel.PairMO)) return true;
+            }
+
+            if (bits[0] is Op.Lexical && (bits[0] as Op.Lexical).name[0] == '%')
+                return true;
+
+            return false;
+        }
+
+        public void circumfix__7b_7d(Cursor m) { // { }
+            var sym = job.gensym();
+            var pbl = ast<SubInfo>(atk(m,"pblock"));
+            addlex(m, job.curlex, sym, new LISub(pbl));
+
+            make(m, pbl.GetExtend0T("hashy", false) ?
+                Op.Helpers.mkcall(m, "&_hash_constructor",
+                    CompUtils.BetaCall(m, sym)) :
+                new Op.BareBlock(m, sym));
+        }
+
+        public void circumfix__sigil(Cursor m) {
+            // XXX duplicates logic in variable
+            var sigil = asstr(atk(m,"sigil"))[0];
+            if (ast<Op.Op[]>(atk(m,"semilist")).Length == 0) {
+                if (sigil == '$') {
+                    make(m, new Op.ShortCircuit(m, Op.ShortCircuit.DOR,
+                        new Op.CallMethod(m, "ast", Op.Helpers.mklex(m,"$/")),
+                        new Op.CallMethod(m, "Str", Op.Helpers.mklex(m,"$/"))));
+                } else if (sigil == '@' || sigil == '%') {
+                    make(m, docontext(m, sigil, Op.Helpers.mklex(m,"$/")));
+                } else {
+                    make(m, Op.Helpers.mklex(m,"Mu"));
+                    sorry(m, "Missing argument for contextualizer");
+                }
+                return;
+            }
+            circumfix__28_29(m);
+            make(m,docontext(m, sigil, ast<Op.Op>(m)));
+        }
+
+        public void infix_prefix_meta_operator__21(Cursor m) { // !
+            make(m, ast<Operator>(atk(m,"infixish")).meta_not());
+        }
+
+        public void infix_prefix_meta_operator__R(Cursor m) {
+            make(m, ast<Operator>(atk(m,"infixish")).meta_fun(m, "&reverseop", 2));
+        }
+        public void infix_prefix_meta_operator__S(Cursor m) {
+            make(m, ast<Operator>(atk(m,"infixish")).meta_fun(m, "&seqeop", 2));
+        }
+        public void infix_prefix_meta_operator__Z(Cursor m) {
+            make(m, istrue(atk(m,"infixish")) ?
+                    ast<Operator>(atk(m,"infixish")).meta_fun(m, "&zipop", 2) :
+                    Operator.funop(m, "&infix:<Z>", 2));
+        }
+        public void infix_prefix_meta_operator__X(Cursor m) {
+            make(m, istrue(atk(m,"infixish")) ?
+                    ast<Operator>(atk(m,"infixish")).meta_fun(m, "&crossop", 2) :
+                    Operator.funop(m, "&infix:<X>", 2));
+        }
+
+        void hyper(Cursor m, char flexl, char flexr) {
+            make(m, ast<Operator>(atk(m,"infixish")).meta_fun(m, "&hyper", 2,
+                new [] { Op.Helpers.mkbool(m, m.global.orig_a[m.from] == flexl),
+                Op.Helpers.mkbool(m, m.global.orig_a[m.pos-1] == flexr) } ));
+        }
+        public void infix_circumfix_meta_operator__ab_bb(Cursor m) { hyper(m,'«','»'); }
+        public void infix_circumfix_meta_operator__3c3c_3e3e(Cursor m) { hyper(m,'<','>'); }
+
+        public void postfix_prefix_meta_operator__bb(Cursor m) {} // in POST
+        public void prefix_postfix_meta_operator__ab(Cursor m) {} // in PRE
+
+        public void infixish(Cursor m) {
+            if (istrue(atk(m,"colonpair")) || istrue(atk(m,"regex_infix"))) {
+                return; // handled elsewhere
+            }
+
+            var ast = ast<Operator>(atk(m,"infix"));
+            if (istrue(atk(m, "assign_meta_operator"))) {
+                // TODO: there should be at least a potential for others
+                make(m, ast.meta_assign());
+            } else {
+                make(m, ast);
+            }
+        }
+
+        public void infix__2e2e2e(Cursor m) { // ...
+            // STD parses ...^ in the ... rule
+            make(m, Operator.funop(m, "&infix:<" + asstr(m) + ">", 2));
+        }
+
+        public void infix__xx(Cursor m) { make(m, new Operator.Replicate()); }
+        public void infix__ff(Cursor m) { make(m, new Operator.FlipFlop(false,false,false)); }
+        public void infix__fff(Cursor m) { make(m, new Operator.FlipFlop(false,false,true)); }
+        public void infix__ff5e(Cursor m) { make(m, new Operator.FlipFlop(false,true,false)); }
+        public void infix__fff5e(Cursor m) { make(m, new Operator.FlipFlop(false,true,true)); }
+        public void infix__5eff(Cursor m) { make(m, new Operator.FlipFlop(true,false,false)); }
+        public void infix__5efff(Cursor m) { make(m, new Operator.FlipFlop(true,false,true)); }
+        public void infix__5eff5e(Cursor m) { make(m, new Operator.FlipFlop(true,true,false)); }
+        public void infix__5efff5e(Cursor m) { make(m, new Operator.FlipFlop(true,true,true)); }
+        public void infix__7e7e(Cursor m) { make(m, new Operator.SmartMatch()); }
+        public void infix__2c(Cursor m) { make(m, new Operator.Comma()); }
+        public void infix__3a3d(Cursor m) { make(m, new Operator.Binding(false)); }
+        public void infix__3a3a3d(Cursor m) { make(m, new Operator.Binding(true)); }
+        public void infix__2626(Cursor m) { make(m, new Operator.ShortCircuit(Op.ShortCircuit.AND)); }
+        public void infix__and(Cursor m) { make(m, new Operator.ShortCircuit(Op.ShortCircuit.AND)); }
+        public void infix__7c7c(Cursor m) { make(m, new Operator.ShortCircuit(Op.ShortCircuit.OR)); }
+        public void infix__or(Cursor m) { make(m, new Operator.ShortCircuit(Op.ShortCircuit.OR)); }
+        public void infix__2f2f(Cursor m) { make(m, new Operator.ShortCircuit(Op.ShortCircuit.DOR)); }
+        public void infix__orelse(Cursor m) { make(m, new Operator.ShortCircuit(Op.ShortCircuit.DOR)); }
+        public void infix__andthen(Cursor m) { make(m, new Operator.ShortCircuit(Op.ShortCircuit.DAND)); }
+        public void infix__3f3f_2121(Cursor m) { make(m, new Operator.Ternary(ast<Op.Op>(atk(m,"EXPR")))); }
+        public void infix__2e3d(Cursor m) { make(m, new Operator.DotEq()); }
+        public void infix__does(Cursor m) {
+            make(m, new Operator.Mixin(Op.Helpers.mklex(m, "&infix:<does>")));
+        }
+        public void infix__but(Cursor m) {
+            make(m, new Operator.Mixin(Op.Helpers.mklex(m, "&infix:<but>")));
+        }
+
+        public void prefix__temp(Cursor m) { make(m, new Operator.Temp()); }
+        public void prefix__let(Cursor m) { make(m, new Operator.Let()); }
+
+        public void statement_control__TEMP(Cursor m) {
+            job.curlex.special |= SubInfo.CANNOT_INLINE;
+            make(m, new Op.Temporize(m, inliney_call(m,
+                            ast<SubInfo>(atk(m,"block"))), Builtins.T_BLOCK));
+        }
 
         // forward...
         Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
@@ -1282,6 +1622,7 @@ dyn:
         void check_variable(Variable v) { throw new NotImplementedException(); }
         string get_cp_ext(Variable c) { throw new NotImplementedException(); }
         Variable eval_ast(Cursor c, Op.Op o) { throw new NotImplementedException(); }
+        Op.Op docontext(Cursor m, char sigil, Op.Op bits) { throw new NotImplementedException(); }
 
         internal Op.Op block_expr(Cursor m, SubInfo blk) {
             var name = job.gensym();
