@@ -89,11 +89,11 @@ namespace Niecza.Compiler {
         }
 
         internal class Method : Operator {
-            object name; // Str | Op; .foo; use args, meta, private, path
-            Op.Op[] arglist;
-            string meta;
-            bool privat;
-            STable package;
+            internal object name; // Str | Op; .foo; use args, meta, private, path
+            internal Op.Op[] arglist;
+            internal string meta;
+            internal bool privat;
+            internal STable package;
 
             public Method(object na, Op.Op[] args, string mt, bool priv,
                     STable p) {

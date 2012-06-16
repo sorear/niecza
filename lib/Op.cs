@@ -350,6 +350,8 @@ namespace Niecza.Compiler.Op {
             args = a;
         }
 
+        public abstract Op adverb(Op adv);
+
         public override Op VisitOps(Func<Op,Op> post) {
             for (int i = 0; i < args.Length; i++)
                 args[i] = args[i].VisitOps(post);
@@ -399,7 +401,7 @@ namespace Niecza.Compiler.Op {
             return base.VisitOps(post);
         }
 
-        public Op adverb(Op adv) {
+        public override Op adverb(Op adv) {
             return new CallSub(pos, invocant, posonly,
                 Utils.AppendArr(getargs(), adv));
         }
@@ -436,7 +438,7 @@ namespace Niecza.Compiler.Op {
         public CallMethod(Cursor pos, string name, Op rcvr, bool po = true,
                 params Op[] a) : this(pos,rcvr,name,false,null,"",po,a) {}
 
-        public Op adverb(Op adv) {
+        public override Op adverb(Op adv) {
             return new CallMethod(pos, receiver, name, is_private, pclass,
                    meta, posonly, Utils.AppendArr(getargs(), adv));
         }
@@ -1042,8 +1044,9 @@ namespace Niecza.Compiler.Op {
     }
 
     class WhateverCode : Op {
-        string slot;
-        public WhateverCode(Cursor c, string s) : base(c) { slot = s; }
+        internal string slot;
+        internal int vars;
+        public WhateverCode(Cursor c, int v, string s) : base(c) { slot = s; vars = v; }
 
         protected override CgOp code(SubInfo body) { return CgOp.scopedlex(slot); }
     }

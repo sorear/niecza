@@ -329,8 +329,11 @@ namespace Niecza.Compiler {
         struct VarInfo {
             public STable pkg;
             public string name;
-            public Op.Op ind;
+            // ind: op which holds the *name* of a variable
+            // term: for pseudo-variable use
+            public Op.Op ind, term;
             public string capid;
+            public char sigil, twigil;
         };
 
         // This is to be the one place where names are processed
@@ -464,7 +467,7 @@ dyn:
         public void desigilname(Cursor m) {
             if (istrue(atk(m,"variable"))) {
                 var r = default(VarInfo);
-                r.ind = do_variable_reference(m, ast<VarInfo>(atk(m,"variable")));
+                r.term = do_variable_reference(m, ast<VarInfo>(atk(m,"variable")));
                 make(m,r);
                 check_variable(atk(m,"variable"));
             } else {
@@ -1017,12 +1020,8 @@ dyn:
             from(m,"cclass_expr");
         }
 
-        struct Colonpair {
-            public Op.Op term;
-        }
-
         public void cclass_elem__property(Cursor m) {
-            var body = thunk_sub(ast<Colonpair>(atk(m,"colonpair")).term,
+            var body = thunk_sub(ast<Op.Op>(atk(m,"colonpair")),
                 new string[0], asstr(atk(m,"colonpair")));
             body.outer.CreateProtopad(null);
             make(m,void_cc());
@@ -1561,6 +1560,7 @@ dyn:
 
         public void infixish(Cursor m) {
             if (istrue(atk(m,"colonpair")) || istrue(atk(m,"regex_infix"))) {
+                make(m,null);
                 return; // handled elsewhere
             }
 
@@ -1616,12 +1616,310 @@ dyn:
                             ast<SubInfo>(atk(m,"block"))), Builtins.T_BLOCK));
         }
 
+        // Now that initializer has been split out this can be a lot smaller...
+        public void INFIX(Cursor m) {
+            var fn = ast<Operator>(atk(m,"infix"));
+            var args = new[] { ast<Op.Op>(atk(m,"left")), ast<Op.Op>(atk(m,"right")) };
+            var st = whatever_precheck(m, fn, args);
+            make(m, whatever_postcheck(m, st, fn.with_args(m, args)));
+        }
+
+        public void CHAIN(Cursor m) {
+            var chain = flist(atk(m,"chain"));
+            var args = new Op.Op[chain.Length / 2];
+            var ops  = new Operator[chain.Length / 2];
+
+            for (int i = 0; ; i += 2) {
+                args[i/2] = ast<Op.Op>(chain[i]);
+                if (i+1 == chain.Length) break;
+                ops[i/2] = ast<Operator>(atk(chain[i+1],"infix"));
+            }
+
+            var st = whatever_precheck(m, ops[0], args);
+
+            int j = 0;
+            Func<Op.Op> reduce = () => {
+                var fa = args[j];
+                var fo = ops[j];
+                j++;
+                if (j != ops.Length) {
+                    return Op.Helpers.mklet(m, fa, (lhs) =>
+                        Op.Helpers.mklet(m, args[j], (rhs) => {
+                            args[j] = rhs;
+                            return new Op.ShortCircuit(m, Op.ShortCircuit.AND,
+                                fo.with_args(m, lhs, rhs), reduce());
+                        }));
+                } else {
+                    return fo.with_args(m, fa, args[j]);
+                }
+            };
+
+            make(m, whatever_postcheck(m, st, reduce()));
+        }
+
+        public void LIST(Cursor m) {
+            if (m.save_klass.FindMethod("regex_infix") != null) {
+                LISTrx(m);
+                return;
+            }
+            // STD guarantees that all elements of delims have the same sym
+            // the last item may have an ast of undef due to nulltermish
+            var fn = flist_ast<Operator>(atk(m,"delims"))[0];
+            var list = flist_ast<Op.Op>(atk(m,"list"));
+            if (list.Length != 0 && list[list.Length - 1] == null)
+                list = Utils.TrimArr(list,0,1);
+            var st = whatever_precheck(m, fn, list);
+            make(m, whatever_postcheck(m, st, fn.with_args(m, list)));
+        }
+
+        public void POSTFIX(Cursor m) {
+            // adverbs have undef ast
+            var arg = new [] { ast<Op.Op>(atk(m,"arg")) };
+            var op  = ast<Operator>(atk(m,"op"));
+            var st = whatever_precheck(m, op, arg);
+            if (istrue(atk(atk(m,"op"),"colonpair"))) {
+                var clarg = arg[0] as Op.CallLike;
+                if (clarg != null) {
+                    make(m, whatever_postcheck(m, st, clarg.adverb(
+                        ast<Op.Op>(atk(atk(m,"op"),"colonpair")))));
+                } else {
+                    sorry(m, "You can't adverb that");
+                    make(m, new Op.StatementList(m));
+                }
+            } else {
+                make(m, whatever_postcheck(m, st, op.with_args(m, arg)));
+            }
+        }
+
+        public void PREFIX(Cursor m) {
+            var arg = new [] { ast<Op.Op>(atk(m,"arg")) };
+            var op  = ast<Operator>(atk(m,"op"));
+            var st = whatever_precheck(m, op, arg);
+            make(m, whatever_postcheck(m, st, op.with_args(m, arg)));
+        }
+
+        public void postcircumfix__5b_5d(Cursor m) { // [ ]
+            make(m, Operator.funop(m, "&postcircumfix:<[ ]>", 1,
+                    ast<Op.Op[]>(atk(m,"semilist"))));
+        }
+
+        public void postcircumfix__7b_7d(Cursor m) { // { }
+            make(m, Operator.funop(m, "&postcircumfix:<{ }>", 1,
+                    ast<Op.Op[]>(atk(m,"semilist"))));
+        }
+
+        public void postcircumfix__3c_3e(Cursor m) { // < >
+            make(m, Operator.funop(m, "&postcircumfix:<{ }>", 1,
+                    ast<Op.Op>(atk(m,"nibble"))));
+        }
+
+        public void postcircumfix__28_29(Cursor m) { // ( )
+            make(m, new Operator.PostCall(ast<Op.Op[][]>(atk(m,"semiarglist"))[0]));
+        }
+
+        public void postop(Cursor m) {
+            from(m, istrue(atk(m,"postcircumfix")) ? "postcircumfix" : "postfix");
+        }
+
+        public void POST(Cursor m) {
+            if (istrue(atk(m,"dotty" ))) from(m,"dotty" );
+            if (istrue(atk(m,"privop"))) from(m,"privop");
+            if (istrue(atk(m,"postop"))) from(m,"postop");
+
+            foreach (var mo in flist(atk(m,"postfix_prefix_meta_operator")))
+                make(m,ast<Operator>(m).meta_fun(m, "&hyperunary", 1));
+        }
+
+        public void PRE(Cursor m) {
+            if (istrue(atk(m,"prefix"))) from(m,"prefix");
+            if (istrue(atk(m,"prefix_circumfix_meta_operator")))
+                from(m,"prefix_circumfix_meta_operator");
+
+            foreach (var mo in flist(atk(m,"prefix_postfix_meta_operator")))
+                make(m,ast<Operator>(m).meta_fun(m, "&hyperunary", 1));
+        }
+
+        // from now on args shall return Op.Op[]
+        public void methodop(Cursor m) {
+            var args = istrue(atk(m,"arglist")) ?
+                ast<Op.Op[]>(atk(m,"arglist")) : istrue(atk(m,"args")) ?
+                ast<Op.Op[]>(atk(m,"args")) : new Op.Op[0];
+
+            if (istrue(atk(m,"longname"))) {
+                var c = process_name(atk(m,"longname"), DEFER);
+                make(m,Operator.funop(m,"&die",1));
+                if (c.name == null && c.ind == null) {
+                    sorry(m, "Method call requires a name");
+                    return;
+                }
+                if (c.ind != null) {
+                    make(m, new Operator.Method(c.ind, args, "::(", false, null));
+                } else {
+                    make(m, new Operator.Method(c.name, args, "", false, c.pkg));
+                }
+            } else if (istrue(atk(m,"quote"))) {
+                make(m,new Operator.Method(ast<Op.Op>(atk(m,"quote")), args,
+                    "", false, null));
+            } else {
+                var v = atk(m,"variable");
+                make(m,new Operator.Function(do_variable_reference(m,
+                    ast<VarInfo>(v)), 1, null, args));
+                check_variable(v);
+            }
+        }
+
+        public void dottyopish(Cursor m) {
+            make(m, new Op.DotEqRHS(m, ast<Operator>(atk(m,"term"))));
+        }
+
+        public void dottyop(Cursor m) {
+            if (istrue(atk(m,"colonpair"))) {
+                sorry(m, ".:foo syntax NYI");
+                make(m, Operator.funop(m,"&postfix:<++>",1));
+                return;
+            }
+
+            if (istrue(atk(m,"methodop"))) from(m,"methodop");
+            if (istrue(atk(m,"postop"))) from(m,"postop");
+        }
+
+        public void privop(Cursor m) {
+            var ast = ast<Operator>(atk(m,"methodop")) as Operator.Method;
+            if (ast == null) {
+                from(m,"methodop");
+                sorry(m,"! privacy marker only affects search, and as such is meaningless with a method reference.");
+            } else {
+                make(m, new Operator.Method(ast.name, ast.arglist, ast.meta, true, ast.package));
+            }
+        }
+
+        public void dotty__2e(Cursor m) { from(m,"dottyop"); } // .
+        public void dotty__2e2a(Cursor m) { // .*
+            var sym = asstr(atk(m,"sym"));
+            var dop = ast<Operator>(atk(m,"dottyop"));
+            if (sym == ".=") {
+                make(m, dop.meta_assign());
+                return;
+            }
+            var mdop = dop as Operator.Method;
+            if (mdop == null || mdop.meta != "") {
+                sorry(m,"Modified method calls can only be used with actual methods");
+                make(m,dop);
+                return;
+            }
+            if (sym == ".^" || sym == ".?") {
+                make(m, new Operator.Method(mdop.name, mdop.arglist, sym.Substring(1), mdop.privat, mdop.package));
+            } else {
+                make(m, dop);
+                sorry(m, "NYI dottyop form {0}", sym);
+            }
+        }
+
+        public void coloncircumfix(Cursor m) { from(m,"circumfix"); }
+
+        Variable eval_ast(Cursor m, Op.Op ast, Variable def = null) {
+            ast = ast.simplify(job.curlex);
+            var kon = ast.const_value(job.curlex);
+            if (kon != null) return kon;
+            var sub = thunk_sub(ast, new string[0], "ANON_BEGIN", null, null, true);
+            job.curlex.CreateProtopad(null);
+            Variable res = def;
+            trymop(m, () => {
+                res = sub.RunBEGIN();
+            });
+            return res ?? mkstr("");
+        }
+
+        string get_cp_ext(Variable cp) {
+            var m = (Cursor)cp.Fetch();
+            var str = asstr(cp);
+            var v = atk(m,"v");
+            var k = atk(m,"k");
+            if (str == ":_" || str == ":U" || str == ":D" || str == ":T") {
+                return "";
+            } else if (!v.Fetch().Isa(Kernel.MatchMO)) {
+                return ":" + (istrue(v) ? "" : "!") + asstr(k);
+            } else {
+                var suf = ((Cursor)v.Fetch()).ast == null ? asstr(v) :
+                    asstr(eval_ast(m, ast<Op.Op>(v)));
+                return ":" + asstr(k) + "<" + suf + ">";
+            }
+        }
+
+        public void colonpair_var(Cursor m) {
+            if (asstr(m)[1] == '<') {
+                make(m, new VarInfo { term = Op.Helpers.mkcall(m,
+                    "&postcircumfix:<{ }>", new Op.Lexical(m,"$/"),
+                    new Op.StringLiteral(m, asstr(atk(m,"desigilname")))) });
+            } else {
+                make(m, new VarInfo { sigil = asstr(atk(m,"sigil"))[0],
+                    twigil = istrue(atk(m,"twigil")) ?
+                        asstr(atk(m,"twigil"))[0] : '\0',
+                    name = asstr(atk(m,"desigilname")) });
+            }
+        }
+
+        public void colonpair(Cursor m) {
+            var k = atk(m,"k"); var v = atk(m,"v");
+            var tv = v.Fetch().Isa(Kernel.MatchMO) ? ast<object>(v) :
+                Op.Helpers.mkbool(m, istrue(v));
+
+            if (tv is VarInfo) {
+                tv = do_variable_reference(m, (VarInfo) tv);
+                check_variable(v);
+            }
+
+            make(m, new Op.SimplePair(m,asstr(k), (Op.Op)tv));
+        }
+
+        public void fatarrow(Cursor m) {
+            make(m, new Op.SimplePair(m, asstr(atk(m,"key")), ast<Op.Op>(atk(m,"val"))));
+        }
+
+        string[] whatever_precheck(Cursor m, Operator op, Op.Op[] args) {
+            if (op != null && !op.whatever_curry())
+                return new string[0];
+
+            var vars = new List<string>();
+
+            for (int i = 0; i < args.Length; i++) {
+                if (args[i] == null) throw new NullReferenceException();
+                var wc = args[i] as Op.WhateverCode;
+                if (args[i] is Op.Whatever) {
+                    var slot = job.gensym();
+                    vars.Add(slot);
+                    args[i] = new Op.Lexical(m, slot);
+                } else if (wc != null) {
+                    var pass = new Op.Op[wc.vars];
+                    for (int j = 0; j < wc.vars; j++) {
+                        var slot = job.gensym();
+                        vars.Add(slot);
+                        pass[j] = new Op.Lexical(m, slot);
+                    }
+                    args[i] = CompUtils.BetaCall(m, wc.slot, pass);
+                }
+            }
+
+            return vars.ToArray();
+        }
+
+        Op.Op whatever_postcheck(Cursor m, string[] st, Op.Op term) {
+            if (st.Length == 0)
+                return term;
+
+            var slot = job.gensym();
+
+            var body = thunk_sub(term, st, null, Kernel.WhateverCodeMO);
+
+            addlex(m, job.curlex, slot, new LISub(body));
+
+            return new Op.WhateverCode(m, st.Length, slot);
+        }
+
         // forward...
         Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
         Op.Op do_variable_reference(Cursor m, VarInfo ast) { throw new NotImplementedException(); }
         void check_variable(Variable v) { throw new NotImplementedException(); }
-        string get_cp_ext(Variable c) { throw new NotImplementedException(); }
-        Variable eval_ast(Cursor c, Op.Op o) { throw new NotImplementedException(); }
         Op.Op docontext(Cursor m, char sigil, Op.Op bits) { throw new NotImplementedException(); }
 
         internal Op.Op block_expr(Cursor m, SubInfo blk) {
