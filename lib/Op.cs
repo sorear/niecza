@@ -1269,7 +1269,7 @@ namespace Niecza.Compiler.Op {
     class Builtin: Op {
         string name;
         Op[] args;
-        public Builtin(Cursor c, string n, Op[] a): base(c) { name=n;args=a; }
+        public Builtin(Cursor c, string n, params Op[] a): base(c) { name=n;args=a; }
 
         public override Op VisitOps(Func<Op,Op> post) {
             for (int i = 0; i < args.Length; i++)

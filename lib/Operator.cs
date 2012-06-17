@@ -45,7 +45,7 @@ namespace Niecza.Compiler {
 
         internal class Function : Operator {
             protected Op.Op function;
-            Op.Op[] preargs, postargs;
+            internal Op.Op[] preargs, postargs;
 
             public Function(Op.Op f, int a, Op.Op[] pr=null, Op.Op[] po=null) {
                 function = f; arity = a; preargs = pr ?? new Op.Op[0];
@@ -80,7 +80,7 @@ namespace Niecza.Compiler {
 
         internal class PostCall : Operator {
             // .(12); use args
-            Op.Op[] arglist;
+            internal Op.Op[] arglist;
             public PostCall(Op.Op[] a) { arglist = a; arity = 1; }
 
             public override Op.Op with_args(Cursor m, params Op.Op[] args) {

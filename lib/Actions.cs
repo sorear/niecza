@@ -326,7 +326,7 @@ namespace Niecza.Compiler {
             return false;
         }
 
-        struct VarInfo {
+        class VarInfo {
             public STable pkg;
             public string name;
             // ind: op which holds the *name* of a variable
@@ -334,6 +334,7 @@ namespace Niecza.Compiler {
             public Op.Op ind, term;
             public string capid;
             public char sigil, twigil;
+            public bool @checked;
         };
 
         // This is to be the one place where names are processed
@@ -447,9 +448,7 @@ dyn:
                 n.Append(asstr(atk(m,"category")));
                 foreach (var cp in flist(atk(m,"colonpair")))
                     n.Append(get_cp_ext(cp));
-                var ret = default(VarInfo);
-                ret.name = n.ToString();
-                make(m,ret);
+                make(m,new VarInfo { name = n.ToString() });
             } else {
                 from(m,"desigilname");
             }
@@ -458,7 +457,7 @@ dyn:
         public void sublongname(Cursor m) {
             if (istrue(atk(m,"sigterm"))) {
                 sorry(m, "Sigterm sublongnames NYI");
-                make(m, default(VarInfo));
+                make(m, new VarInfo {});
             } else {
                 from(m,"subshortname");
             }
@@ -466,9 +465,8 @@ dyn:
 
         public void desigilname(Cursor m) {
             if (istrue(atk(m,"variable"))) {
-                var r = default(VarInfo);
-                r.term = do_variable_reference(m, ast<VarInfo>(atk(m,"variable")));
-                make(m,r);
+                make(m, new VarInfo { term = do_variable_reference(m,
+                            ast<VarInfo>(atk(m,"variable"))) });
                 check_variable(atk(m,"variable"));
             } else {
                 make(m,process_name(atk(m,"longname"),DEFER));
@@ -1916,11 +1914,430 @@ dyn:
             return new Op.WhateverCode(m, st.Length, slot);
         }
 
+        // term :: Op.Op
+        public void term__value(Cursor m) { from(m,"value"); }
+
+        void common_name(Cursor m, SubInfo sub, STable pkg, string slot, string pname) {
+            if (!pkg.who.Isa(Kernel.StashMO)) {
+                sorry(m, "NYI usage of a nonstandard package");
+                return;
+            }
+            string who = Kernel.UnboxAny<string>(pkg.who);
+            string err = sub.unit.NsBind(who, pname, null, job.filename,
+                CompUtils.LineOf(m));
+            if (err != null) {
+                sorry(m, err);
+                return;
+            }
+            addlex(m, sub, slot, new LICommon((char)who.Length + who + pname));
+        }
+
+        Op.Op package_var(Cursor m, string slot, string name, object path) {
+            trymop(m, () => {
+                check_categorical(m, slot);
+                var pkg = (path as STable) ?? compile_get_pkg(true,
+                    (string[])path);
+                common_name(m, job.curlex, pkg, slot, name);
+                CompUtils.MarkUsed(m, slot);
+            });
+            return new Op.Lexical(m, slot);
+        }
+
+        public void term__name(Cursor m) {
+            VarInfo nast = process_name(atk(m,"longname"), DEFER);
+            var name = nast.name;
+            var ind  = nast.ind;
+
+            if (istrue(atk(m,"args"))) {
+                if (name != null) name = "&" + name;
+                if (ind != null) ind = Op.Helpers.mkstringycat(m,
+                    new Op.StringLiteral(m, "&"), ind);
+            }
+
+            Op.Op term;
+            if (ind != null) {
+                term = new Op.IndirectVar(m, ind);
+            }
+            else if (nast.pkg != null) {
+                term = package_var(m, job.gensym(), name, nast.pkg);
+            }
+            else if (is_pseudo_pkg(name)) {
+                term = new Op.IndirectVar(m, new Op.StringLiteral(m, name));
+            }
+            else {
+                term = new Op.Lexical(m, name);
+            }
+
+            var pcs = flist(atk(m,"postcircumfix"));
+            var pci = 0;
+            if (pcs.Length > 0 && asstr(pcs[0])[0] == '[') {
+                term = Op.Helpers.mkcall(m, "&_param_role_inst",
+                        Utils.PrependArr(ast<Operator.Function>(pcs[pci++]).postargs, term));
+            }
+            else if (istrue(atk(m,"args"))) {
+                term = new Op.CallSub(m, term, false,
+                        ast<Op.Op[]>(atk(m,"args")));
+            }
+
+            if (pcs.Length > pci) {
+                term = ast<Operator>(pcs[pci]).with_args(m, term);
+            }
+            make(m, term);
+        }
+
+        Op.Op check_type_args(Cursor m, Op.Op term) {
+            var pc = atk(m,"postcircumfix");
+            if (istrue(pc)) term = Op.Helpers.mkcall(m, "&_param_role_inst",
+                Utils.PrependArr(ast<Operator.Function>(pc).postargs, term));
+            return term;
+        }
+
+        public void term__identifier(Cursor m) {
+            var id = asstr(atk(m,"identifier"));
+            var sal = ast<Op.Op[]>(atk(m,"args"));
+
+            if (is_pseudo_pkg(id)) {
+                make(m, check_type_args(m, new Op.IndirectVar(m,
+                    new Op.StringLiteral(m, id))));
+                return;
+            }
+
+            var isname = is_name(m, id);
+
+            if (isname && asstr(atk(m,"args")) == "") {
+                make(m, check_type_args(m, new Op.Lexical(m, id)));
+                return;
+            }
+
+            var lex = new Op.Lexical(m, isname ? id : "&" + id);
+            make(m, new Op.CallSub(m, check_type_args(m, lex), false, sal));
+        }
+
+        public void term__self(Cursor m) { make(m, new Op.Lexical(m,"self")); }
+        public void term__circumfix(Cursor m) { from(m,"circumfix"); }
+        public void term__scope_declarator(Cursor m) { from(m, "scope_declarator"); }
+        public void term__multi_declarator(Cursor m) { from(m, "multi_declarator"); }
+        public void term__package_declarator(Cursor m) { from(m, "package_declarator"); }
+        public void term__routine_declarator(Cursor m) { from(m, "routine_declarator"); }
+        public void term__regex_declarator(Cursor m) { from(m, "regex_declarator"); }
+        public void term__type_declarator(Cursor m) { from(m, "type_declarator"); }
+        public void term__dotty(Cursor m) {
+            make(m, ast<Operator>(atk(m,"dotty")).with_args(m, new Op.Lexical(m,"$_")));
+        }
+        public void term__capterm(Cursor m) { from(m, "capterm"); }
+        public void term__sigterm(Cursor m) { from(m, "sigterm"); }
+        public void term__statement_prefix(Cursor m) { from(m, "statement_prefix"); }
+        public void term__variable(Cursor m) {
+            make(m, do_variable_reference(m, ast<VarInfo>(atk(m,"variable"))));
+        }
+        public void term__2e2e2e(Cursor m) { make(m,new Op.Yada(m,"...")); }
+        public void term__5f5f5f(Cursor m) { make(m,new Op.Yada(m,"???")); }
+        public void term__212121(Cursor m) { make(m,new Op.Yada(m,"!!!")); }
+        public void term__2a(Cursor m) { make(m,new Op.Whatever(m)); } // *
+        public void term__lambda(Cursor m) {
+            make(m, block_expr(m, ast<SubInfo>(atk(m,"pblock"))));
+        }
+
+        public void term__colonpair(Cursor m) {
+            Op.Op[] cps = flist_ast<Op.Op>(atk(m,"colonpair"));
+            if (cps.Length > 1)
+                sorry(m,"Multi colonpair syntax not yet understood"); // XXX
+            make(m,cps[0]);
+        }
+
+        public void term__fatarrow(Cursor m) { from(m,"fatarrow"); }
+
+        public void term__reduce(Cursor m) {
+            var assoc = asstr(atk(atk(atk(m,"op"),"O"),"assoc"));
+            make(m, new Op.CallSub(m, new Op.Lexical(m,"&reduceop"), false,
+                Utils.PrependArr(ast<Op.Op[]>(atk(m,"args")), 0, new [] {
+                    Op.Helpers.mkbool(m, asstr(atk(m,"triangle")) != ""),
+                    Op.Helpers.mkbool(m, assoc == "list"),
+                    Op.Helpers.mkbool(m, assoc == "right"),
+                    Op.Helpers.mkbool(m, assoc == "chain"),
+                    ast<Operator>(atk(m,"op")).as_function(m) })));
+        }
+
+        bool check_strict() {
+            for (var s = job.curlex; s != null; s = s.outer) {
+                var l = s.GetExtend0("strict");
+                if (l != null) return (bool)l;
+            }
+            return true;
+        }
+
+// check_variable($M)
+//   $M is <variable> (desigilname, method for @$foo, .$var indir), metachar:var,
+//         ...
+//   $M is anon(sigil,twigil,desigilname) or anon(sigil<desigilname>) (colonpair)
+//   $M is synthetic(<longname>::<postcircumfix>) (term:name)
+// check_variable should handle ALL of the possible sorries resulting from
+// a referential variable use.  Even term:variable is too early, since we may
+// backtrack if $*QSIGIL ne '$' and no posfix.
+//
+// I don't like the way this is factored, since do_variable_reference has to
+// redo a lot of the same scanning.
+        void check_variable(Variable variable) {
+            if (variable == null) return;
+            VarInfo vast = ast<VarInfo>(variable);
+            if (vast.term != null) return; // pseudo-var
+            string name = asstr(variable);
+
+            Cursor here = ((Cursor)variable.Fetch());
+            here = here.UnMatch().At(here.from);
+
+            if (!vast.@checked)
+                sorry(here, "do_variable_reference must always precede check_variable");
+
+            switch (vast.twigil) {
+                case '\0':
+                    if (job.in_decl || vast.name == null ||
+                            vast.name[0] < 'A' || vast.name[0] == '¢' ||
+                            is_known(here, name) || vast.pkg != null) {
+                        CompUtils.MarkUsed(here, name);
+                        return;
+                    }
+                    if (vast.sigil == '&') {
+                        add_mystery(here);
+                        return;
+                    } else if (name == "@_" || name == "%_") {
+                        add_placeholder(here, name);
+                        return;
+                    } else if (!check_strict()) {
+                        return;
+                    } else { // guaranteed fail now
+                        var scope = job.get_memo(here.pos, "declend");
+                        if (scope != null) {
+                            sorry(here, "Variable {0} is not predeclared (declarators are tighter than comma, so maybe your '{1}' signature needs pars?)", name, asstr(scope));
+                            return;
+                        } else if (is_known(here, "@"+vast.name)) {
+                            sorry(here,"Variable {0} is not predeclared (did you mean @{1}?)", name, vast.name);
+                            return;
+                        } else if (is_known(here, "%"+vast.name)) {
+                            sorry(here,"Variable {0} is not predeclared (did you mean %{1}?)", name, vast.name);
+                            return;
+                        }
+                        sorry(here,"Variable {0} is not predeclared", name);
+                        return;
+                    }
+
+                case '!':
+                    if (job.has_self == "") // XXX to be replaced by MOP queries
+                        sorry(here, "Variable {0} used where no 'self' is available", name);
+                    return;
+
+                case '.':
+                    if (job.has_self == "") // XXX to be replaced by MOP queries
+                        sorry(here, "Virtual call {0} used where no 'self' is available", name);
+                    if (job.has_self == "partial")
+                        sorry(here, "Virtual call {0} may not be used on partially constructed object", name);
+                    return;
+
+                case '^':
+                case ':':
+                    add_placeholder(here, name);
+                    return;
+
+                case '~':
+                    return;
+
+                case '?':
+                    if (name.IndexOf("::") >= 0) {
+                        // TODO: $?CALLER::x makes sense! also CONTEXT, OUTER, MY, SETTING, CORE
+                        worry(here, "Unrecognized variable: {0}", name);
+                    } else {
+                        if (name == "$?LINE" || name == "$?POSITION" || name == "&?BLOCK" || name == "&?ROUTINE")
+                            return;
+                        if (lookup_lex(job.curlex, name) != null)
+                            return;
+                        sorry(here, "Unrecognized variable: {0}", name);
+                    }
+                    return;
+            }
+        }
+
+        Op.Op do_variable_reference(Cursor m, VarInfo v) {
+            v.@checked = true;
+            if (v.term != null)
+                return v.term;
+
+            var tw = v.twigil;
+            var sl = v.sigil + (v.twigil != '\0' ? new string(v.twigil,1) : "") + v.name;
+
+            if (v.pkg != null && "*=~?^:".IndexOf(v.twigil) >= 0) {
+                sorry(m, "Twigil {0} cannot be used with qualified names", tw);
+                return new Op.StatementList(m);
+            }
+
+            if (tw == '!') {
+                STable pclass;
+                if (v.pkg != null) {
+                    pclass = v.pkg;
+                } else if (lookup_lex(job.curlex, sl) != null) {
+                    return new Op.Lexical(m, sl);
+                } else if (job.curlex.in_class != null) {
+                    pclass = job.curlex.in_class;
+                } else {
+                    sorry(m, "Cannot resolve class for private attribute");
+                    return new Op.StatementList(m);
+                }
+                if (!pclass.Trusts(job.curlex.cur_pkg)) {
+                    sorry(m, "Cannot call private method '{0}' on {1} because it does not trust {2}", v.name, pclass.name, job.curlex.cur_pkg.name);
+                    return new Op.StatementList(m);
+                }
+                return new Op.GetSlot(m, new Op.Lexical(m, "self"), sl, pclass);
+            }
+            else if (tw == '.') {
+                if (v.pkg != null)
+                    sorry(m, "$.Foo::bar syntax NYI");
+
+                return docontext(m, v.sigil, new Op.CallMethod(m, v.name,
+                    new Op.Lexical(m, "self")));
+            }
+            // no twigil in lex name for these
+            else if (tw == '^' || tw == ':') {
+                return new Op.Lexical(m, v.sigil + v.name);
+            }
+            else if (tw == '*') {
+                return new Op.ContextVar(m, sl, 0);
+            }
+            else if (tw == '\0' || tw == '?') {
+                if (v.pkg != null) {
+                    return package_var(m, job.gensym(), sl, v.pkg);
+                } else if (tw == '?' && sl == "$?POSITION") {
+                    return Op.Helpers.mkcall(m, "&infix:<..^>",
+                        new Op.Num(m, new object[] { 10, m.from.ToString() }),
+                        new Op.Num(m, new object[] { 10, m.pos.ToString() }));
+                } else if (tw == '?' && sl == "$?LINE") {
+                    return new Op.Num(m, new object[] { 10,
+                        CompUtils.LineOf(m).ToString() });
+                } else if (tw == '?' && sl == "$?FILE") {
+                    return new Op.StringLiteral(m, job.filename);
+                } else if (tw == '?' && sl == "$?ORIG") {
+                    return new Op.StringLiteral(m, job.source);
+                } else if (tw == '?' && sl == "&?BLOCK") {
+                    job.curlex.special |= SubInfo.CANNOT_INLINE;
+                    return new Op.GetBlock(m, false);
+                } else if (tw == '?' && sl == "&?ROUTINE") {
+                    job.curlex.special |= SubInfo.CANNOT_INLINE;
+                    return new Op.GetBlock(m, true);
+                } else {
+                    return new Op.Lexical(m, sl);
+                }
+            }
+            else {
+                sorry(m, "Unhandled reference twigil {0}", tw);
+                return new Op.StatementList(m);
+            }
+        }
+
+        Op.Op docontext(Cursor m, char sigil, Op.Op term) {
+            if ("$@%&".IndexOf(sigil) < 0)
+                sorry(m, "Unhandled context character {0}", sigil);
+
+            var method = (sigil == '$' || sigil == '&') ? "item" :
+                sigil == '@' ? "list" : "hash";
+
+            return new Op.Builtin(m, method, term);
+        }
+
+        Op.Op docontextif(Cursor m, char sigil, Op.Op op) {
+            return sigil == '$' ? op : docontext(m,sigil,op);
+        }
+
+        public void variable(Cursor m) {
+            char sigil = istrue(atk(m,"sigil")) ? asstr(atk(m,"sigil"))[0] :
+                asstr(m)[0];
+            char twigil = istrue(atk(m,"twigil")) ? asstr(atk(m,"twigil"))[0] :
+                '\0';
+            var twigil_s = twigil == (char)0 ? "" : new string(twigil,1);
+
+            string name = null;
+            STable pkg  = null;
+            Op.Op  term = null;
+
+            VarInfo dsosl = istrue(atk(m,"desigilname")) ?
+                ast<VarInfo>(atk(m,"desigilname")) :
+                istrue(atk(m,"sublongname")) ?
+                    ast<VarInfo>(atk(m,"sublongname")) :
+                    istrue(atk(m,"longname")) ?
+                        process_name(atk(m,"longname"), DEFER) : new VarInfo();
+
+            if (dsosl.term != null) {
+                term = docontext(m, sigil, dsosl.term);
+            }
+            else if (dsosl.ind != null) {
+                term = new Op.IndirectVar(m, Op.Helpers.mkstringycat(m,
+                    new Op.StringLiteral(m, sigil + twigil_s), dsosl.ind));
+            }
+            else if (twigil == '.' && istrue(atk(m,"postcircumfix"))) {
+                if (dsosl.pkg != null)
+                    sorry(m, "$.Foo::bar syntax NYI");
+
+                term = docontext(m, sigil, new Op.CallMethod(m, dsosl.name,
+                    new Op.Lexical(m, "self"), false,
+                    flist_ast<Operator.PostCall>(atk(m,"postcircumfix"))[0].arglist));
+            }
+            else if (dsosl.name != null) {
+                name = dsosl.name;
+                pkg = dsosl.pkg;
+            }
+            else if (istrue(atk(m,"infixish"))) {
+                term = ast<Operator>(atk(m,"infixish")).as_function(m);
+            }
+            else if (istrue(atk(m,"special_variable"))) {
+                name = asstr(atk(m, "special_variable")).Substring(1);
+            }
+            else if (istrue(atk(m,"index"))) {
+                var ix = ast<P6any>(atk(m,"index"));
+                make(m, new VarInfo { capid = asstr(ix), term = docontextif(m,
+                    sigil, Op.Helpers.mkcall(m, "&postcircumfix:<[ ]>",
+                        new Op.Lexical(m, "$/"), new Op.Const(m, ix))) });
+                return;
+            }
+            else if (istrue(atk(m,"postcircumfix")) && twigil != '.') {
+                var pc = (Cursor)flist(atk(m,"postcircumfix"))[0].Fetch();
+                if (pc.reduced == "postcircumfix:sym<< >>") { // XXX fiddly
+                    var args = ast<Operator.Function>(pc).postargs;
+                    make(m, new VarInfo { capid = asstr(eval_ast(m, args[0])),
+                        term = docontextif(m, sigil, Op.Helpers.mkcall(m,
+                            "&postcircumfix:<{ }>", Utils.PrependArr(args,
+                                new Op.Lexical(m,"$/")))) });
+                    return;
+                }
+                else {
+                    var args = ast<Operator.PostCall>(pc).arglist;
+                    if (args.Length > 0) {
+                        term = docontext(m, sigil, args[0]);
+                    } else if (sigil == '$') {
+                        term = new Op.ShortCircuit(m, Op.ShortCircuit.DOR,
+                            new Op.CallMethod(m,"ast", new Op.Lexical(m,"$/")),
+                            new Op.CallMethod(m,"Str", new Op.Lexical(m,"$/")));
+                    } else if (sigil == '@' || sigil == '%') {
+                        term = docontext(m, sigil, new Op.Lexical(m,"$/"));
+                    } else {
+                        term = new Op.Lexical(m,"Mu");
+                        sorry(m, "Missing argument for contextualizer");
+                    }
+                }
+            }
+            else {
+                name = "";
+            }
+
+            make(m, term != null ? new VarInfo { term = term } :
+                new VarInfo { sigil = sigil, twigil = twigil, name = name,
+                    pkg = pkg });
+        }
+
         // forward...
         Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
-        Op.Op do_variable_reference(Cursor m, VarInfo ast) { throw new NotImplementedException(); }
-        void check_variable(Variable v) { throw new NotImplementedException(); }
-        Op.Op docontext(Cursor m, char sigil, Op.Op bits) { throw new NotImplementedException(); }
+        void check_categorical(Cursor m, string name) { throw new NotImplementedException(); }
+        bool is_name(Cursor m, string name) { throw new NotImplementedException(); }
+        bool is_known(Cursor m, string name) { throw new NotImplementedException(); }
+        void add_placeholder(Cursor m, string name) { throw new NotImplementedException(); }
+        void add_mystery(Cursor m) { throw new NotImplementedException(); }
+
 
         internal Op.Op block_expr(Cursor m, SubInfo blk) {
             var name = job.gensym();

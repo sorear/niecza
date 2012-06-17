@@ -76,6 +76,10 @@ namespace Niecza.Compiler {
         public SubInfo     curlex;  // $*CURLEX
         public RxInfo      rxinfo;  // %*RX
         public Actions     actions; // $*ACTIONS
+        public bool        in_decl; // $*IN_DECL
+        public string      has_self; // $*HAS_SELF
+
+        public Variable get_memo(int pos, string key) { throw new NotImplementedException(); } //SSTO
 
         public Dictionary<string,string> proto_endsym =
             new Dictionary<string,string>();
