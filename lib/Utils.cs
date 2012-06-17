@@ -719,6 +719,13 @@ namespace Niecza {
             narr[arr.Length] = addit;
             return narr;
         }
+
+        public static T[] Cat<T>(T[] a, T[] b) {
+            T[] n = new T[a.Length + b.Length];
+            Array.Copy(a,0, n,0, a.Length);
+            Array.Copy(b,0, n,a.Length, b.Length);
+            return n;
+        }
     }
 
     public static class UtilsExt {

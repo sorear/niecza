@@ -2330,6 +2330,322 @@ dyn:
                     pkg = pkg });
         }
 
+        struct ParamInfo {
+            public string slot;
+            public string[] names; // shall not be null
+            public Signature subsig;
+            public int flags;
+            public string attribute;
+            public STable attribute_type;
+        }
+
+        public void named_param_term(Cursor m) {
+            if (istrue(atk(m,"named_param"))) {
+                from(m,"named_param");
+            } else if (istrue(atk(m,"param_var"))) {
+                var pi = ast<ParamInfo>(atk(m,"param_var"));
+                pi.names = new string[0]; // completely replace
+                make(m,pi);
+            } else {
+                make(m, new ParamInfo { slot = asstr(atk(m,"defterm")),
+                    names = new string[0], flags = Parameter.RWTRANS });
+            }
+        }
+
+        public void named_param(Cursor m) {
+            var rt = default(ParamInfo);
+            if (istrue(atk(m, "defterm"))) {
+                // XXX funky syntax
+                var id = asstr(atk(m,"defterm"));
+                sorry(m, "bare identifier terms NYI");
+                make(m, new ParamInfo { slot = id, names = new [] { id }, flags = Parameter.RWTRANS });
+                return;
+            }
+
+            if (istrue(atk(m,"name"))) {
+                rt = ast<ParamInfo>(atk(m,"named_param_term"));
+                var name = asstr(atk(m,"name"));
+                if (Array.IndexOf(rt.names, name) < 0)
+                    rt.names = Utils.AppendArr(rt.names, name);
+            } else {
+                rt = ast<ParamInfo>(atk(m,"param_var"));
+                if (rt.names.Length == 0)
+                    sorry(m, "Abbreviated named parameter must have a name");
+            }
+            rt.flags &= ~Parameter.POSITIONAL;
+            make(m,rt);
+        }
+
+        // :: ParamInfo
+        public void param_var(Cursor m) {
+            if (istrue(atk(m,"signature"))) {
+                make(m, new ParamInfo { names = new string[0],
+                    flags = Parameter.POSITIONAL + (asstr(m)[0] == '[' ?
+                        Parameter.IS_LIST : 0),
+                    subsig = ast<Signature>(atk(m,"signature")) });
+                return;
+            }
+
+            string twigil = istrue(atk(m,"twigil")) ? asstr(atk(m,"twigil")) : "";
+            string sigil = asstr(atk(m,"sigil"));
+            bool list = sigil == "@";
+            bool hash = sigil == "%";
+            string name = istrue(atk(m,"name")) ? asstr(atk(m,"name")) : null;
+
+            int flags = (list ? Parameter.IS_LIST : 0) +
+                (hash ? Parameter.IS_HASH : 0) +
+                (sigil == "&" ? Parameter.CALLABLE : 0) + Parameter.POSITIONAL;
+            string slot;
+
+            if (twigil == "") {
+                slot = name != null ? sigil + name : null;
+            } else if (twigil == "*") {
+                slot = sigil + "*" + name;
+            } else if (twigil == "!" || twigil == ".") {
+                make(m, new ParamInfo { flags = flags,
+                    attribute = sigil + twigil + name, names = new [] { name },
+                    attribute_type = job.curlex.cur_pkg });
+                return;
+            } else {
+                sorry(m, "Unhandled parameter twigil {0}", twigil);
+                make(m, new ParamInfo { names = new string[0] });
+                return;
+            }
+
+            if ("$@%&".IndexOf(sigil) < 0) {
+                sorry(m, "Unhandled parameter twigil {0}", twigil);
+                make(m, new ParamInfo { names = new string[0] });
+                return;
+            }
+
+            if (slot != null) trymop(m, () => {
+                check_categorical(m, slot);
+                addlex(m, job.curlex, slot, new LISimple(
+                    (list ? LISimple.LIST : 0) + (hash ? LISimple.HASH : 0) +
+                    (job.signum != 0 ? LISimple.NOINIT : 0), null));
+            });
+
+            make(m, new ParamInfo { slot = slot, flags = flags, names =
+                name == null ? new string[0] : new [] { name } });
+        }
+
+        // :: Parameter
+        public void parameter(Cursor m) {
+            string sry = null;
+            var p = atk(m,isdef(atk(m,"param_var")) ? "param_var" : "named_param");
+            ParamInfo p_ast = istrue(p) ? ast<ParamInfo>(p) :
+                istrue(atk(m,"defterm")) ?
+                    new ParamInfo { names = new string[0], flags = Parameter.POSITIONAL + Parameter.RWTRANS, slot = asstr(atk(m,"defterm")) } :
+                    new ParamInfo { names = new string[0], flags = Parameter.POSITIONAL };
+
+            int flags = p_ast.flags;
+
+            if (job.signum != 0 && job.curlex.GetExtend0T("rw_lambda",true))
+                flags |= Parameter.READWRITE;
+
+            foreach (var trait in flist(atk(m,"trait"))) {
+                var ast = ast<Prod<string,object>>(trait);
+                if (ast.v1 == "rw") { flags |= Parameter.READWRITE; }
+                else if (ast.v1 == "copy") { flags |= Parameter.IS_COPY; }
+                else if (ast.v1 == "parcel") { flags |= Parameter.RWTRANS; }
+                else if (ast.v1 == "readonly") { flags &= ~Parameter.READWRITE; }
+                else {
+                    sorry((Cursor)trait.Fetch(), "Unhandled trait {0}", ast.v1);
+                }
+            }
+
+            var defalt = istrue(atk(m,"default_value")) ?
+                ast<object>(atk(m,"default_value")) : null;
+
+            if (defalt is SubInfo) ((SubInfo)defalt).name = asstr(m) + " init";
+            if (defalt != null) flags |= Parameter.HASDEFAULT;
+
+            string tag = asstr(atk(m,"quant")) + ":" + asstr(atk(m,"kind"));
+
+            if (tag == "**:*")      sry = "Slice parameters NYI";
+            else if (tag == "*:*")  flags |= (flags & Parameter.IS_HASH) != 0 ? Parameter.SLURPY_NAM : Parameter.SLURPY_POS;
+            else if (tag == "|:!")  flags |= Parameter.SLURPY_CAP;
+            else if (tag == "\\:!") flags |= Parameter.RWTRANS;
+            else if (tag == "\\:?") flags |= (Parameter.RWTRANS | Parameter.OPTIONAL);
+            else if (tag == ":!")   {}
+            else if (tag == ":*")   flags |= Parameter.OPTIONAL;
+            else if (tag == "?:*")  flags |= Parameter.OPTIONAL;
+            else if (tag == ":?")   flags |= Parameter.OPTIONAL;
+            else if (tag == "?:?")  flags |= Parameter.OPTIONAL;
+            else if (tag == "!:!")  {}
+            else if (tag == "!:?")  flags |= Parameter.OPTIONAL;
+            else if (tag == "!:*")  {}
+            else sry = "Confusing parameters (" + tag + ")";
+
+            if (sry != null) sorry(m,sry);
+
+            if (p_ast.slot != null) {
+                // TODO: type constraint here
+            }
+
+            STable tclass = null;
+            List<object> constraints = new List<object>();
+            Signature subsig = p_ast.subsig;
+
+            foreach (var tc in flist_ast<TypeConstraint>(atk(m, "type_constraint"))) {
+                if (tc.where != null) {
+                    // Should we detect $foo where 5 here?
+                    constraints.Add(thunk_sub(tc.where));
+                } else if (tc.value != null) {
+                    tclass = tc.value.Fetch().mo;
+                    constraints.Add(tc.value);
+                } else {
+                    if (tc.type.mo.type == P6how.SUBSET)
+                        constraints.Add(tc.type.typeObj);
+                    tclass = tc.type;
+                    while (tclass.mo.type == P6how.SUBSET)
+                        tclass = tclass.mo.superclasses[0];
+                    flags |= tc.tmode;
+                }
+            }
+
+            if (tclass != null) flags |= Parameter.HASTYPE;
+
+            foreach (var pc in flist(atk(m,"post_constraint"))) {
+                // XXX this doesn't seem to be specced anywhere, but it's
+                // Rakudo-compatible and shouldn't hurt
+                if (istrue(atk(pc,"bracket"))) {
+                    flags &= ~Parameter.IS_HASH;
+                    flags |= Parameter.IS_LIST;
+                }
+
+                var ssig = atk(pc,"signature");
+                if (istrue(ssig)) {
+                    if (subsig != null) sorry((Cursor)ssig.Fetch(), "Cannot have more than one sub-signature for a parameter");
+                    subsig = ast<Signature>(ssig);
+                } else {
+                    constraints.Add(thunk_sub(ast<Op.Op>(atk(pc,"EXPR"))));
+                }
+            }
+            if (subsig != null) constraints.Insert(0, subsig);
+
+            Parameter np = new Parameter(flags, p_ast.slot == null ? -1 :
+                lookup_lex(job.curlex, p_ast.slot).SigIndex(),
+                (p_ast.slot ?? ""),
+                (p_ast.names.Length == 0 ? null : p_ast.names),
+                defalt, tclass, p_ast.attribute, p_ast.attribute_type);
+            np.post_constraints = constraints.ToArray();
+            make(m, np);
+        }
+
+        public void signature(Cursor m) {
+            if (istrue(atk(m,"type_constraint"))) {
+                // ignore for now
+            }
+
+            if (istrue(atk(m,"param_var"))) {
+                var pva = ast<ParamInfo>(atk(m,"param_var"));
+                pva.flags |= Parameter.SLURPY_PCL;
+                Parameter np = new Parameter(pva.flags, pva.slot == null ? -1 :
+                    lookup_lex(job.curlex, pva.slot).SigIndex(),
+                    pva.slot ?? "", null, null, null, pva.attribute,
+                    pva.attribute_type);
+                Signature nsig = new Signature(np);
+                if (job.signum != 0)
+                    job.curlex.sig = nsig;
+                make(m, nsig);
+                return;
+            }
+
+            Parameter[] p = flist_ast<Parameter>(atk(m,"parameter"));
+            var ps = flist(atk(m,"param_sep"));
+            bool ign = false;
+
+            for (int i = 0; i < p.Length; i++) {
+                if (ign) p[i].flags |= Parameter.MULTI_IGNORED;
+
+                string pss = i >= ps.Length ? "" : asstr(ps[i]);
+                if (pss == "") {
+                } else if (pss.IndexOf(':') >= 0) {
+                    if (i != 0)
+                        sorry(m, "Only the first parameter may be invocant");
+                    addlex(m, job.curlex, "self", new LISimple(LISimple.NOINIT, null));
+                    p[i].flags |= Parameter.INVOCANT;
+                } else if (pss.IndexOf(";;") >= 0) {
+                    ign = true;
+                } else if (pss.IndexOf(',') < 0) {
+                    sorry(m, "Parameter separator {0} NYI", pss);
+                }
+            }
+
+            if (job.signum != 0 &&
+                    (p.Length == 0 || (p[0].flags & Parameter.INVOCANT) == 0) &&
+                    (job.curlex.mo.HasType(Kernel.MethodMO) ||
+                        job.curlex.mo.HasType(Kernel.SubmethodMO))) {
+                addlex(m, job.curlex, "self", new LISimple(LISimple.NOINIT, null));
+                p = Utils.PrependArr(p, new Parameter(Parameter.INVOCANT |
+                    Parameter.POSITIONAL, -1, "self", null, null, null,
+                    null, null));
+            }
+
+            foreach (Parameter px in p) {
+                if (px.type == null && job.signum != 0) {
+                    if ((px.flags & Parameter.INVOCANT) != 0 && job.curlex.methodof != null) {
+                        px.type = job.curlex.methodof;
+                        px.flags |= Parameter.HASTYPE;
+                    } else if (!job.curlex.mo.HasType(Kernel.RoutineMO)) {
+                        px.type = Kernel.MuMO;
+                        px.flags |= Parameter.HASTYPE;
+                    }
+                }
+            }
+
+            var sig = new Signature(p);
+            if (job.signum != 0) job.curlex.sig = sig;
+            make(m,sig);
+        }
+
+        public void multisig(Cursor m) {
+            Signature[] sigs = flist_ast<Signature>(atk(m,"signature"));
+            if (sigs.Length != 1)
+                sorry(m, "Multiple signatures NYI");
+            make(m, sigs[0]);
+        }
+
+
+        public void cgexp__name(Cursor m) { make(m,asstr(atk(m,"cgopname"))); }
+        public void cgexp__p6exp(Cursor m) { from(m,"statementlist"); }
+        public void cgexp__decint(Cursor m) {
+            P6any di = ast<P6any>(atk(m,"decint"));
+            make(m,(int)Builtins.ToNum(di));
+        }
+        public void cgexp__quote(Cursor m) {
+            var qa = ast<Op.Op>(atk(m,"quote")) as Op.StringLiteral;
+            if (qa == null) {
+                sorry(m, "Strings used in CgOp code must be compile time constants");
+                make(m,"");
+            } else {
+                make(m,qa.text);
+            }
+        }
+
+        static Dictionary<string,string> opshortcut =
+            new Dictionary<string, string> {
+                { "@",   "fetch" },
+                { "l",   "letvar" },
+                { "nsw", "newrwscalar" },
+                { "s",   "str" },     { "i",   "int" },
+                { "b",   "bool" },    { "d",   "double" },
+                { "==",  "compare" }, { "!=",  "compare" },
+                { ">=",  "compare" }, { "<=",  "compare" },
+                { "<",   "compare" }, { ">",   "compare" },
+                { "+",   "arith" },   { "-",   "arith" },
+                { "*",   "arith" },   { "/",   "arith" },
+            };
+
+        public void cgexp__op(Cursor m) {
+            string l = asstr(atk(m,"cgopname"));
+            string p = opshortcut.GetDefault(l, null);
+            string[] ps = (p == "compare" || p == "arith") ? new [] { p, l } :
+                new [] { p };
+            make(m, Utils.Cat(ps, flist_ast<object>(atk(m,"cgexp"))));
+        }
+
         // forward...
         Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
         void check_categorical(Cursor m, string name) { throw new NotImplementedException(); }
@@ -2351,10 +2667,11 @@ dyn:
             return CompUtils.BetaCall(m, sym, parms);
         }
 
-        internal SubInfo thunk_sub(Op.Op code, string[] parms,
+        internal SubInfo thunk_sub(Op.Op code, string[] parms = null,
                 string name = null, STable cls = null, LAD ltm = null,
                 bool nosimpl = false) {
 
+            parms = parms ?? new string[0];
             var n = create_sub(name ?? "ANON", job.curlex, Kernel.BlockMO,
                 job.curlex.cur_pkg, job.curlex.in_class, false, null);
 
