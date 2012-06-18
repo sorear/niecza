@@ -83,6 +83,7 @@ namespace Niecza.Compiler {
         public int         signum;    // $*SIGNUM
         public object      augment_buffer;
         public Variable    oftype;
+        public object      invocant_is;
 
         public Variable get_memo(int pos, string key) { throw new NotImplementedException(); } //SSTO
 

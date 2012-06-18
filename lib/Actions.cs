@@ -349,6 +349,7 @@ namespace Niecza.Compiler {
 
         // MODES
         //
+        // REFER: pkg only ever
         // DECL:  pkg + name used. name == null means no name given.
         // DEFER: pkg + name *or* ind
 
@@ -2908,6 +2909,10 @@ dyn:
                     CompUtils.LineOf(m));
         }
 
+        void type_throw(string e) {
+            if (e != null) throw new NieczaException(e);
+        }
+
         // TODO: mop call
         void type_add_attribute(Cursor m, STable add_to, string name,
                 string sigil, bool pub, STable type) {
@@ -3079,25 +3084,283 @@ dyn:
             }
         }
 
-        // forward...
-        void init_constant(Op.ConstantDecl k, Op.Op v) { throw new NotImplementedException(); }
-        void check_categorical(Cursor m, string name) { throw new NotImplementedException(); }
-        bool is_name(Cursor m, string name) { throw new NotImplementedException(); }
-        bool is_known(Cursor m, string name) { throw new NotImplementedException(); }
-        void add_placeholder(Cursor m, string name) { throw new NotImplementedException(); }
-        void add_mystery(Cursor m) { throw new NotImplementedException(); }
 
+        public void type_declarator__subset(Cursor m) {
+            STable basetype = process_name(atk(job.oftype,"longname"),
+                    REFER).pkg ?? Kernel.AnyMO;
+            var exports = new List<string>();
 
-        internal Op.Op block_expr(Cursor m, SubInfo blk) {
-            var name = job.gensym();
-            addlex(m, job.curlex, name, new LISub(blk));
-            return Op.Helpers.mklex(m, name);
+            foreach (var t in flist_ast<Prod<string,object>>(atk(m,"trait"))) {
+                if (t.v1 == "export") {
+                    foreach (var s in (string[])t.v2) exports.Add(s);
+                } else if (t.v1 == "of") {
+                    basetype = (STable) t.v2;
+                } else {
+                    sorry(m, "Unsupported subset trait {0}", t.v1);
+                }
+            }
+
+            var body = thunk_sub(istrue(atk(m,"EXPR")) ?
+                ast<Op.Op>(atk(m,"EXPR")) : new Op.Lexical(m, "True"));
+            string lexvar = "Any";
+
+            trymop(m, () => {
+                STable obj = null;
+                do_new_package(m, ref lexvar, ref obj, job.curlex, job.scope,
+                    atk(m,"longname"), P6how.SUBSET, exports.ToArray());
+
+                job.curlex.CreateProtopad(null);
+
+                obj.mo.FillSubset(basetype);
+                obj.mo.subsetWhereThunk = body.protosub;
+            });
+
+            make(m, new Op.Lexical(m, lexvar));
         }
 
-        Op.Op inliney_call(Cursor m, SubInfo block, params Op.Op[] parms) {
-            var sym = job.gensym();
-            addlex(m, job.curlex, sym, new LISub(block));
-            return CompUtils.BetaCall(m, sym, parms);
+        Op.ConstantDecl make_constant(Cursor m, string scope, string name) {
+            // hints must be lexically scoped
+            scope = scope ?? (name.Length >= 2 && name[1] == '?' ? "my" : "our");
+            var slot = (scope == "my" || scope == "our") ? name : job.gensym();
+
+            trymop(m, () => {
+                check_categorical(m, slot);
+                if (scope == "our") {
+                    common_name(m, job.curlex, job.curlex.cur_pkg, slot, name);
+                } else {
+                    addlex(m, job.curlex, slot, new LIConstant());
+                }
+            });
+
+            return new Op.ConstantDecl(m, slot, false);
+        }
+
+        Op.Op make_constant_into(Cursor m, STable pkg, string name, Op.Op rhs) {
+            var slot = job.gensym();
+            trymop(m, () => {
+                common_name(m, job.curlex, pkg, slot, name);
+            });
+            return init_constant(new Op.ConstantDecl(m, slot, false), rhs);
+        }
+
+        Op.Op init_constant(Op.ConstantDecl con, Op.Op rhs) {
+            var body = thunk_sub(rhs, null, con.name + " init");
+            job.curlex.CreateProtopad(null);
+            Variable v = body.RunBEGIN();
+
+            var li = lookup_lex(job.curlex, con.name);
+            if (li is LIConstant) {
+                ((LIConstant)li).value = v;
+            } else if (li is LICommon) {
+                StashEnt hkey = Kernel.currentGlobals[((LICommon)li).hkey];
+                hkey.constant = true;
+                hkey.v = v;
+            } else {
+                throw new NotSupportedException("cannot bind constant value");
+            }
+
+            con.init = true;
+            return con;
+        }
+
+        public void type_declarator__constant(Cursor m) {
+            do_initialize(m);
+        }
+
+        public void install_constant(Cursor m) {
+            if (job.multiness != null)
+                sorry(m, "Multi variables NYI");
+
+            var name = isdef(atk(m,"defterm")) ? asstr(atk(m,"defterm")) :
+                isdef(atk(m,"variable")) ? asstr(atk(m,"variable")) :
+                job.gensym();
+
+            make(m,make_constant(m, job.scope, name));
+        }
+
+        // note: named and unnamed enums are quite different beasts
+        public void type_declarator__enum(Cursor m) {
+            var scope = job.scope ?? "our";
+            var exports = new List<string>();
+
+            foreach (var t in flist_ast<Prod<string,object>>(atk(m,"trait"))) {
+                if (t.v1 == "exports") {
+                    foreach (var s in (string[])t.v2) exports.Add(s);
+                } else {
+                    sorry(m, "Unsupported enum trait {0}", t.v1);
+                }
+            }
+
+            Variable map = eval_ast(m, new Op.CallMethod(m, "new",
+                new Op.Lexical(m, "EnumMap"), true, ast<Op.Op>(atk(m,"term"))),
+                Kernel.AnyP);
+            if (!isdef(map)) { make(m, new Op.StatementList(m)); return; }
+
+            string kindtype = asstr(Builtins.InvokeMethod("data-type", map));
+
+            STable basetype = process_name(atk(job.oftype,"longname"), REFER).pkg ?? compile_get_pkg(false, "CORE", kindtype);
+
+            if (istrue(atk(m,"longname")) && scope != "anon") {
+                // Longnamed enum is a kind of type definition
+                string lexvar = "Any";
+                trymop(m, () => {
+                    STable obj = null;
+                    do_new_package(m, ref lexvar, ref obj, job.curlex, scope,
+                        atk(m,"longname"), P6how.CLASS, exports.ToArray());
+
+                    obj.mo.superclasses.Add(Kernel.ToInheritable(basetype));
+                    obj.mo.local_roles.Add(compile_get_pkg(false, "CORE", kindtype + "BasedEnum"));
+
+                    var nb = thunk_sub(new Op.Const(m, map), new [] { "self" },
+                        obj.name + ".enums", Kernel.MethodMO);
+
+                    job.curlex.CreateProtopad(null);
+                    addlex(m, job.curlex, job.gensym(), new LISub(nb));
+
+                    type_add_method(m, obj, 0, "enums", nb);
+                    type_throw(obj.mo.Compose());
+
+                    foreach (string k in Builtins.UnboxLoS(Builtins.InvokeMethod("keys", map))) {
+                        make_constant_into(m, obj, k, new Op.CallSub(m,
+                            new Op.Lexical(m, lexvar), false,
+                            new Op.StringLiteral(m, k)));
+                        init_constant(make_constant(m, scope, k),
+                                new Op.CallSub(m, new Op.Lexical(m, lexvar),
+                            false,new Op.StringLiteral(m, k)));
+                    }
+                });
+
+                make(m, new Op.Lexical(m, lexvar));
+            } else {
+                make(m, init_constant(make_constant(m,
+                    istrue(atk(m,"variable")) ? scope : "anon",
+                    asstr(atk(m,"variable"))), new Op.Const(m, map)));
+            }
+        }
+
+        public void package_declarator__class(Cursor m) { from(m, "package_def"); }
+        public void package_declarator__grammar(Cursor m) { from(m, "package_def"); }
+        public void package_declarator__role(Cursor m) { from(m, "package_def"); }
+        public void package_declarator__slang(Cursor m) { from(m, "package_def"); }
+        public void package_declarator__module(Cursor m) { from(m, "package_def"); }
+        public void package_declarator__package(Cursor m) { from(m, "package_def"); }
+        public void package_declarator__knowhow(Cursor m) { from(m, "package_def"); }
+
+        public void package_declarator__also(Cursor m) {
+            process_block_traits(m, atk(m, "trait"));
+            make(m, new Op.StatementList(m));
+        }
+
+        public void package_declarator__require(Cursor m) {
+            if (istrue(atk(m,"EXPR"))) {
+                sorry(m, "Expressional forms of require NYI");
+                make(m, new Op.StatementList(m));
+                return;
+            }
+
+            make(m, new Op.Require(m, asstr(atk(m, "module_name"))));
+        }
+
+        struct ModName {
+            public string name;
+            public Op.Op[] args;
+        }
+
+        public void package_dclarator__trusts(Cursor m) {
+            if (ast<ModName>(atk(m,"module_name")).args != null)
+                sorry(m, "Cannot trust a specific role instance");
+            var trustee = process_name(atk(atk(m,"module_name"),"longname"),
+                REFER).pkg;
+            if (trustee != null)
+                job.curlex.cur_pkg.mo.trustees.Add(trustee);
+            make(m, new Op.StatementList(m));
+        }
+
+        void blockoid_trait(Cursor m, string key, object value) {
+            var sub = job.curlex;
+            if (key == "export") {
+                var exports = (string[]) value;
+                sub.outer.CreateProtopad(null);
+                add_exports(sub.outer, sub.outervar, sub.protosub, exports);
+                sub.SetExtend("exported", exports);
+                if (sub.outervar != null) CompUtils.MarkUsed(m, sub.outervar);
+            } else if (key == "nobinder") {
+                sub.sig = null;
+            } else if (key == "pure") {
+                sub.outer.CreateProtopad(null);
+                sub.SetExtend("pure", true);
+            } else if (key == "looser" || key == "tighter" || key == "equiv") {
+                Variable to = eval_ast(m, (Op.Op)value, Kernel.AnyP);
+                if (!isdef(to)) return;
+
+                // SSTO: how this translates will depend greatly on how we
+                // are going to represent precinfos
+                // ...
+            } else {
+                sorry(m, "Unsupported block trait {0}", key);
+            }
+        }
+
+        void packageoid_trait(Cursor m, string key, object value) {
+            var pack = job.curlex.body_of;
+            if (key == "name") {
+                if (job.augment_buffer != null) {
+                    sorry(m, "Superclass declared in an augment");
+                    return;
+                }
+                if (!type_fully_functional(pack)) {
+                    sorry(m, "Cannot declare a superclass in this kind of package");
+                    return;
+                }
+                pack.mo.superclasses.Add(Kernel.ToInheritable(
+                    (STable)value));
+            } else if (key == "does") {
+                if (job.augment_buffer != null) {
+                    sorry(m, "Role used in an augment");
+                    return;
+                }
+                if (!type_fully_functional(pack)) {
+                    sorry(m, "Cannot use a role in this kind of package");
+                    return;
+                }
+                pack.mo.local_roles.Add((STable)value);
+            } else if (key == "export") {
+                add_exports(job.curlex.outer, pack.name, pack.typeObj,
+                        (string[]) value);
+            } else {
+                sorry(m, "Unsupported package trait {0}", key);
+            }
+        }
+
+        void process_block_traits(Cursor m, Variable traits) {
+            var sub  = job.curlex;
+            var pack = sub.body_of;
+
+            foreach (Variable T in flist(traits)) {
+                var tr = ast<Prod<string,object>>(T);
+
+                if (pack == null) {
+                    blockoid_trait((Cursor)T.Fetch(), tr.v1, tr.v2);
+                } else {
+                    packageoid_trait((Cursor)T.Fetch(), tr.v1, tr.v2);
+                }
+            }
+        }
+
+        // normally termish's ast is not used, but it becomes the used ast
+        // under nulltermish.
+        public void termish(Cursor m) { from(m,"term"); }
+        public void EXPR(Cursor m) { from(m,"root"); }
+        public void modifier_expr(Cursor m) { from(m,"EXPR"); }
+
+        public void default_value(Cursor m) {
+            var ast = ast<Op.Op>(atk(m,"EXPR")).simplify(job.curlex);
+            var k = ast.const_value(job.curlex);
+            if (k != null) {
+                make(m, k);
+            } else {
+                make(m, thunk_sub(ast, null, null, null, null, true));
+            }
         }
 
         internal SubInfo thunk_sub(Op.Op code, string[] parms = null,
@@ -3118,6 +3381,65 @@ dyn:
             n.sig = new Signature(ps);
             finish(n, code, nosimpl);
             return n;
+        }
+
+        public void arglist(Cursor m) {
+            if (job.invocant_is != null)
+                sorry(m, "Invocant handling is NYI");
+            if (!istrue(atk(m,"EXPR"))) {
+                make(m, new Op.Op[0]);
+            } else {
+                var x = ast<Op.Op>(atk(m,"EXPR"));
+                if (x is Op.SimpleParcel) {
+                    make(m, ((Op.SimpleParcel)x).items);
+                } else {
+                    make(m, new [] { x });
+                }
+            }
+        }
+
+        public void semiarglist(Cursor m) {
+            make(m, flist_ast<Op.Op[]>(atk(m,"arglist")));
+        }
+
+        public void args(Cursor m) {
+            var sal = atk(m,"semiarglist");
+            var al  = atk(m,"arglist");
+            if (istrue(atk(m,"moreargs")) || (istrue(sal) && istrue(al))) {
+                sorry(m,"Interaction between semiargs and args is not understood");
+                make(m,new Op.Op[0]);
+                return;
+            }
+            if (istrue(sal)) {
+                var sala = ast<Op.Op[][]>(sal);
+                if (sala.Length > 1)
+                    sorry(m, "Slicel lists NYI");
+                make(m, sala.Length == 0 ? new Op.Op[0] : sala[0]);
+            } else {
+                make(m, istrue(al) ? ast<Op.Op[]>(al) : new Op.Op[0]);
+            }
+        }
+
+        // forward...
+        void add_exports(SubInfo to, string name, P6any what, string[] how) { throw new NotImplementedException(); }
+        void do_new_package(Cursor m, ref string lexvar, ref STable obj, SubInfo sub, string scope, Variable longname, int kls, string[] exports) { throw new NotImplementedException(); }
+        void check_categorical(Cursor m, string name) { throw new NotImplementedException(); }
+        bool is_name(Cursor m, string name) { throw new NotImplementedException(); }
+        bool is_known(Cursor m, string name) { throw new NotImplementedException(); }
+        void add_placeholder(Cursor m, string name) { throw new NotImplementedException(); }
+        void add_mystery(Cursor m) { throw new NotImplementedException(); }
+
+
+        internal Op.Op block_expr(Cursor m, SubInfo blk) {
+            var name = job.gensym();
+            addlex(m, job.curlex, name, new LISub(blk));
+            return Op.Helpers.mklex(m, name);
+        }
+
+        Op.Op inliney_call(Cursor m, SubInfo block, params Op.Op[] parms) {
+            var sym = job.gensym();
+            addlex(m, job.curlex, sym, new LISub(block));
+            return CompUtils.BetaCall(m, sym, parms);
         }
 
         // does NOT handle $?PERL construction
