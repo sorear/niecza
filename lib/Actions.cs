@@ -341,7 +341,7 @@ namespace Niecza.Compiler {
             // term: for pseudo-variable use
             public Op.Op ind, term;
             public string capid;
-            public char sigil, twigil;
+            public string sigil, twigil;
             public bool @checked;
         };
 
@@ -1514,13 +1514,13 @@ dyn:
 
         public void circumfix__sigil(Cursor m) {
             // XXX duplicates logic in variable
-            var sigil = asstr(atk(m,"sigil"))[0];
+            var sigil = asstr(atk(m,"sigil"));
             if (ast<Op.Op[]>(atk(m,"semilist")).Length == 0) {
-                if (sigil == '$') {
+                if (sigil == "$") {
                     make(m, new Op.ShortCircuit(m, Op.ShortCircuit.DOR,
                         new Op.CallMethod(m, "ast", Op.Helpers.mklex(m,"$/")),
                         new Op.CallMethod(m, "Str", Op.Helpers.mklex(m,"$/"))));
-                } else if (sigil == '@' || sigil == '%') {
+                } else if (sigil == "@" || sigil == "%") {
                     make(m, docontext(m, sigil, Op.Helpers.mklex(m,"$/")));
                 } else {
                     make(m, Op.Helpers.mklex(m,"Mu"));
@@ -1853,9 +1853,9 @@ dyn:
                     "&postcircumfix:<{ }>", new Op.Lexical(m,"$/"),
                     new Op.StringLiteral(m, asstr(atk(m,"desigilname")))) });
             } else {
-                make(m, new VarInfo { sigil = asstr(atk(m,"sigil"))[0],
+                make(m, new VarInfo { sigil = asstr(atk(m,"sigil")),
                     twigil = istrue(atk(m,"twigil")) ?
-                        asstr(atk(m,"twigil"))[0] : '\0',
+                        asstr(atk(m,"twigil")) : "",
                     name = asstr(atk(m,"desigilname")) });
             }
         }
@@ -2092,7 +2092,7 @@ dyn:
             if (!vast.@checked)
                 sorry(here, "do_variable_reference must always precede check_variable");
 
-            switch (vast.twigil) {
+            switch (vast.twigil == null ? '\0' : vast.twigil[0]) {
                 case '\0':
                     if (job.in_decl != "" || vast.name == null ||
                             vast.name[0] < 'A' || vast.name[0] == '¢' ||
@@ -2100,7 +2100,7 @@ dyn:
                         CompUtils.MarkUsed(here, name);
                         return;
                     }
-                    if (vast.sigil == '&') {
+                    if (vast.sigil == "&") {
                         add_mystery(here);
                         return;
                     } else if (name == "@_" || name == "%_") {
@@ -2165,14 +2165,14 @@ dyn:
                 return v.term;
 
             var tw = v.twigil;
-            var sl = v.sigil + (v.twigil != '\0' ? new string(v.twigil,1) : "") + v.name;
+            var sl = v.sigil + v.twigil + v.name;
 
-            if (v.pkg != null && "*=~?^:".IndexOf(v.twigil) >= 0) {
+            if (v.pkg != null && tw != "" && "*=~?^:".IndexOf(tw) >= 0) {
                 sorry(m, "Twigil {0} cannot be used with qualified names", tw);
                 return new Op.StatementList(m);
             }
 
-            if (tw == '!') {
+            if (tw == "!") {
                 STable pclass;
                 if (v.pkg != null) {
                     pclass = v.pkg;
@@ -2190,7 +2190,7 @@ dyn:
                 }
                 return new Op.GetSlot(m, new Op.Lexical(m, "self"), sl, pclass);
             }
-            else if (tw == '.') {
+            else if (tw == ".") {
                 if (v.pkg != null)
                     sorry(m, "$.Foo::bar syntax NYI");
 
@@ -2198,30 +2198,30 @@ dyn:
                     new Op.Lexical(m, "self")));
             }
             // no twigil in lex name for these
-            else if (tw == '^' || tw == ':') {
+            else if (tw == "^" || tw == ":") {
                 return new Op.Lexical(m, v.sigil + v.name);
             }
-            else if (tw == '*') {
+            else if (tw == "*") {
                 return new Op.ContextVar(m, sl, 0);
             }
-            else if (tw == '\0' || tw == '?') {
+            else if (tw == "" || tw == "?") {
                 if (v.pkg != null) {
                     return package_var(m, job.gensym(), sl, v.pkg);
-                } else if (tw == '?' && sl == "$?POSITION") {
+                } else if (tw == "?" && sl == "$?POSITION") {
                     return Op.Helpers.mkcall(m, "&infix:<..^>",
                         new Op.Num(m, new object[] { 10, m.from.ToString() }),
                         new Op.Num(m, new object[] { 10, m.pos.ToString() }));
-                } else if (tw == '?' && sl == "$?LINE") {
+                } else if (tw == "?" && sl == "$?LINE") {
                     return new Op.Num(m, new object[] { 10,
                         CompUtils.LineOf(m).ToString() });
-                } else if (tw == '?' && sl == "$?FILE") {
+                } else if (tw == "?" && sl == "$?FILE") {
                     return new Op.StringLiteral(m, job.filename);
-                } else if (tw == '?' && sl == "$?ORIG") {
+                } else if (tw == "?" && sl == "$?ORIG") {
                     return new Op.StringLiteral(m, job.source);
-                } else if (tw == '?' && sl == "&?BLOCK") {
+                } else if (tw == "?" && sl == "&?BLOCK") {
                     job.curlex.special |= SubInfo.CANNOT_INLINE;
                     return new Op.GetBlock(m, false);
-                } else if (tw == '?' && sl == "&?ROUTINE") {
+                } else if (tw == "?" && sl == "&?ROUTINE") {
                     job.curlex.special |= SubInfo.CANNOT_INLINE;
                     return new Op.GetBlock(m, true);
                 } else {
@@ -2234,26 +2234,25 @@ dyn:
             }
         }
 
-        Op.Op docontext(Cursor m, char sigil, Op.Op term) {
+        Op.Op docontext(Cursor m, string sigil, Op.Op term) {
             if ("$@%&".IndexOf(sigil) < 0)
                 sorry(m, "Unhandled context character {0}", sigil);
 
-            var method = (sigil == '$' || sigil == '&') ? "item" :
-                sigil == '@' ? "list" : "hash";
+            var method = (sigil == "$" || sigil == "&") ? "item" :
+                sigil == "@" ? "list" : "hash";
 
             return new Op.Builtin(m, method, term);
         }
 
-        Op.Op docontextif(Cursor m, char sigil, Op.Op op) {
-            return sigil == '$' ? op : docontext(m,sigil,op);
+        Op.Op docontextif(Cursor m, string sigil, Op.Op op) {
+            return sigil == "$" ? op : docontext(m,sigil,op);
         }
 
         public void variable(Cursor m) {
-            char sigil = istrue(atk(m,"sigil")) ? asstr(atk(m,"sigil"))[0] :
-                asstr(m)[0];
-            char twigil = istrue(atk(m,"twigil")) ? asstr(atk(m,"twigil"))[0] :
-                '\0';
-            var twigil_s = twigil == (char)0 ? "" : new string(twigil,1);
+            string sigil = istrue(atk(m,"sigil")) ? asstr(atk(m,"sigil")) :
+                asstr(m).Substring(0,1);
+            string twigil = istrue(atk(m,"twigil")) ? asstr(atk(m,"twigil")) :
+                "";
 
             string name = null;
             STable pkg  = null;
@@ -2271,9 +2270,9 @@ dyn:
             }
             else if (dsosl.ind != null) {
                 term = new Op.IndirectVar(m, Op.Helpers.mkstringycat(m,
-                    new Op.StringLiteral(m, sigil + twigil_s), dsosl.ind));
+                    new Op.StringLiteral(m, sigil + twigil), dsosl.ind));
             }
-            else if (twigil == '.' && istrue(atk(m,"postcircumfix"))) {
+            else if (twigil == "." && istrue(atk(m,"postcircumfix"))) {
                 if (dsosl.pkg != null)
                     sorry(m, "$.Foo::bar syntax NYI");
 
@@ -2298,7 +2297,7 @@ dyn:
                         new Op.Lexical(m, "$/"), new Op.Const(m, ix))) });
                 return;
             }
-            else if (istrue(atk(m,"postcircumfix")) && twigil != '.') {
+            else if (istrue(atk(m,"postcircumfix")) && twigil != ".") {
                 var pc = (Cursor)flist(atk(m,"postcircumfix"))[0].Fetch();
                 if (pc.reduced == "postcircumfix:sym<< >>") { // XXX fiddly
                     var args = ast<Operator.Function>(pc).postargs;
@@ -2312,11 +2311,11 @@ dyn:
                     var args = ast<Operator.PostCall>(pc).arglist;
                     if (args.Length > 0) {
                         term = docontext(m, sigil, args[0]);
-                    } else if (sigil == '$') {
+                    } else if (sigil == "$") {
                         term = new Op.ShortCircuit(m, Op.ShortCircuit.DOR,
                             new Op.CallMethod(m,"ast", new Op.Lexical(m,"$/")),
                             new Op.CallMethod(m,"Str", new Op.Lexical(m,"$/")));
-                    } else if (sigil == '@' || sigil == '%') {
+                    } else if (sigil == "@" || sigil == "%") {
                         term = docontext(m, sigil, new Op.Lexical(m,"$/"));
                     } else {
                         term = new Op.Lexical(m,"Mu");
@@ -2861,7 +2860,7 @@ dyn:
             }
             else if (lhs is Op.ConstantDecl && !((Op.ConstantDecl)lhs).init) {
                 var lhsc = lhs as Op.ConstantDecl;
-                var sigil = lhsc.name[0];
+                var sigil = lhsc.name.Substring(0,1);
                 if ("$@%&".IndexOf(sigil) >= 0) {
                     init_constant(lhsc, docontext(m, sigil, rhs));
                 } else {
@@ -2886,6 +2885,199 @@ dyn:
         public void multi_declarator__multi(Cursor m) { from_any(m,"declarator", "routine_def");}
         public void multi_declarator__proto(Cursor m) { from_any(m,"declarator", "routine_def");}
         public void multi_declarator__only(Cursor m) { from_any(m,"declarator", "routine_def");}
+
+        // TODO: mop call
+        bool type_fully_functional(STable st) {
+            return st.mo.type != P6how.PACKAGE && st.mo.type != P6how.MODULE;
+        }
+
+        // TODO: mop call
+        void type_add_method(Cursor m, STable add_to, int mode, string name,
+                SubInfo sub) {
+
+            if ((mode & P6how.M_MASK) == P6how.M_ONLY) {
+                foreach (P6how.MethodInfo mi in add_to.mo.lmethods) {
+                    if (mi.Name() == name &&
+                            ((mi.flags ^ mode) & P6how.V_MASK) == 0) {
+                        throw new NieczaException("Two definitions of method {0}, see {1} line {2}", name, mi.file, mi.line);
+                    }
+                }
+            }
+
+            add_to.mo.AddMethodPos(mode, name, sub.protosub, job.filename,
+                    CompUtils.LineOf(m));
+        }
+
+        // TODO: mop call
+        void type_add_attribute(Cursor m, STable add_to, string name,
+                string sigil, bool pub, STable type) {
+            foreach (P6how.AttrInfo ai in add_to.mo.local_attr)
+                if (ai.name == name)
+                    throw new NieczaException("Two definitions of attribute {0}, see {1} line {2}", name, ai.file, ai.line);
+
+            int flags = (sigil == "@") ? P6how.A_ARRAY :
+                (sigil == "%") ? P6how.A_HASH : 0;
+            if (pub) flags |= P6how.A_PUBLIC;
+
+            add_to.mo.AddAttributePos(name, flags, null, type, job.filename,
+                    CompUtils.LineOf(m));
+        }
+
+        void add_accessor(Cursor m, string name, string store_name,
+                bool lexical, bool publ) {
+            STable ns = job.curlex.body_of;
+            if (ns == null || ns.mo.type == P6how.PACKAGE || ns.mo.type == P6how.MODULE) {
+                // TODO: more properly moppy
+                sorry(m, "Cannot add accessors to a non-class");
+                return;
+            }
+
+            Op.Op code = lexical ? (Op.Op)new Op.Lexical(m, store_name) :
+                new Op.GetSlot(m, new Op.Lexical(m, "self"), store_name, ns);
+
+            SubInfo nb = thunk_sub(code, new [] { "self" }, name,
+                    Kernel.MethodMO);
+            job.curlex.CreateProtopad(null); // for protosub instance
+
+            trymop(m, () => {
+                nb.outervar = job.gensym();
+                addlex(m, job.curlex, nb.outervar, new LISub(nb));
+                type_add_method(m, ns, P6how.V_PRIVATE, name, nb);
+                if (publ) {
+                    type_add_method(m, ns, 0, name, nb);
+                }
+            });
+        }
+
+        Op.Op add_attribute(Cursor m, string barename, string sigil, bool pub,
+                STable type, bool bare) {
+            var ns = job.curlex.body_of;
+            var name = sigil + "!" + barename;
+
+            if (ns == null) {
+                sorry(m, "Attribute {0} declared outside of any class", name);
+                return new Op.StatementList(m);
+            }
+            if (job.augment_buffer != null) {
+                sorry(m, "Attribute {0} declared in an augment");
+                return new Op.StatementList(m);
+            }
+            if (!type_fully_functional(ns)) {
+                sorry(m, "A {0} cannot have attributes", ns.mo.rtype);
+                return new Op.StatementList(m);
+            }
+
+            add_accessor(m, barename, name, false, pub);
+            trymop(m, () => {
+                type_add_attribute(m, ns, name, sigil, pub, type);
+                if (bare) addlex(m, job.curlex, sigil + barename,
+                    new LIAttrAlias(ns, name));
+            });
+
+            return new Op.Attribute(m, name, ns);
+        }
+
+        public void variable_declarator(Cursor m) {
+            if (job.multiness != null)
+                sorry(m, "Multi variables NYI");
+
+            var scope = job.scope ?? "my";
+
+            SubInfo start = null;
+            foreach (var t in flist_ast<Prod<string,object>>(atk(m,"trait"))) {
+                if (t.v1 == "rw") {
+                } else if (t.v1 == "dynamic") {
+                } else if (t.v1 == "start" && scope == "state") {
+                    start = (SubInfo)t.v2;
+                } else {
+                    sorry(m, "Trait {0} not available on variables", t.v1);
+                }
+            }
+
+            if (istrue(atk(m,"post_constraint")) || istrue(atk(m,"postcircumfix")) || istrue(atk(m,"semilist")))
+                sorry(m, "Postconstraints and shapes on variable declarators NYI");
+
+            if (scope == "augment" || scope == "supersede")
+                sorry(m, "Illogical scope {0} for simple variable", scope);
+
+            STable typeconstraint = null;
+            if (job.oftype != null) {
+                var of = ast<TypeConstraint>(job.oftype);
+                if (of.type == null || of.tmode != 0)
+                    sorry((Cursor)job.oftype.Fetch(), "Only simple types may be attached to variables");
+                typeconstraint = of.type ?? Kernel.AnyMO;
+                if (scope == "our")
+                    sorry(m, "Common variables are not unique definitions and may not have types");
+            }
+
+            var v = ast<VarInfo>(atk(m,"variable"));
+
+            if (v.twigil != "" && "?=~^:".IndexOf(v.twigil) >= 0) {
+                sorry(m, "Variables with the {0} twigil cannot be declared using {1}; they are created {2}", v.twigil, scope,
+                    (v.twigil == "?" ? "using 'constant'." :
+                     v.twigil == "=" ? "by parsing POD blocks." :
+                     v.twigil == "~" ? "by 'slang' definitions." :
+                     "automatically as parameters to the current block."));
+            }
+
+            if ((v.twigil == "." || v.twigil == "!") && scope != "has" &&
+                    scope != "our" && scope != "my") {
+                sorry(m, "Twigil {0} is only valid with scopes has, our, or my.", v.twigil);
+                scope = "has";
+            }
+
+            if (v.name == null && scope != "my" && scope != "anon" &&
+                    scope != "state") {
+                sorry(m, "Scope {0} requires a name", scope);
+                v.name = "anon";
+                v.sigil = "$";
+                v.twigil = "";
+            }
+
+            if (v.pkg != null || v.ind != null)
+                sorry(m, ":: syntax is only valid when referencing variables, not when defining them.");
+
+            var name = v.name != null ? v.sigil + v.twigil + v.name : "";
+            // otherwise identical to my
+            var slot = (scope == "anon" || v.name ==null) ? job.gensym() : name;
+
+            if ((scope == "our" || scope == "my") && (v.twigil == "." || v.twigil == "!")) {
+                slot = name = v.sigil + "!" + v.name;
+                add_accessor(m, v.name, slot, true, v.twigil == ".");
+            }
+
+            int lif = v.sigil == "@" ? LISimple.LIST : v.sigil == "%" ?
+                LISimple.HASH : 0;
+            if (scope == "has") {
+                make(m, add_attribute(m, v.name, v.sigil, v.twigil == ".",
+                    typeconstraint, v.twigil == ""));
+            } else if (scope == "state") {
+                trymop(m, () => {
+                    check_categorical(m, slot);
+                    var back = job.gensym();
+                    addlex(m, job.curlex.StateOuter(), back, new LISimple(
+                        lif, typeconstraint));
+                    addlex(m, job.curlex, slot, new LIAlias(back));
+                });
+                make(m, new Op.StateDecl(m, new Op.Lexical(m, slot)));
+            } else if (scope == "our") {
+                make(m, package_var(m, slot, slot, job.curlex.cur_pkg));
+            } else {
+                trymop(m, () => {
+                    check_categorical(m, slot);
+                    addlex(m, job.curlex, slot, new LISimple(lif, typeconstraint));
+                });
+                make(m, new Op.Lexical(m, slot));
+            }
+
+            if (start != null) {
+                var cv = job.gensym();
+                addlex(m, job.curlex.StateOuter(), cv, new LISimple(0,null));
+                make(m, Op.Helpers.mklet(m, ast<Op.Op>(m), (ll) =>
+                    new Op.StatementList(m,
+                        new Op.Start(m, cv, inliney_call(m, start, ll)), ll)));
+            }
+        }
 
         // forward...
         void init_constant(Op.ConstantDecl k, Op.Op v) { throw new NotImplementedException(); }

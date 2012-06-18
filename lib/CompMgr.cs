@@ -81,6 +81,8 @@ namespace Niecza.Compiler {
         public string      multiness; // $*IN_DECL
         public string      has_self;  // $*HAS_SELF
         public int         signum;    // $*SIGNUM
+        public object      augment_buffer;
+        public Variable    oftype;
 
         public Variable get_memo(int pos, string key) { throw new NotImplementedException(); } //SSTO
 
