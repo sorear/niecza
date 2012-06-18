@@ -164,7 +164,7 @@ namespace Niecza.Compiler {
         }
 
         internal class CompoundAssign : Operator {
-            Operator basis;
+            internal Operator basis;
             public CompoundAssign(Operator basis) { this.basis = basis; arity = basis.arity; }
 
             public override Op.Op with_args(Cursor m, params Op.Op[] rest) {

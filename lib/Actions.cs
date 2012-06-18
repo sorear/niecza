@@ -65,6 +65,14 @@ namespace Niecza.Compiler {
         void from(Cursor m, string field) {
             m.ast = ((Cursor)atk(m,field).Fetch()).ast;
         }
+        void from_any(Cursor m, params string[] fields) {
+            foreach (string f in fields) {
+                if (isdef(atk(m,f))) {
+                    from(m,f);
+                    break;
+                }
+            }
+        }
 
         Variable[] flist(Variable list) {
             // we force the list to iterate here
@@ -1716,22 +1724,18 @@ dyn:
         }
 
         public void postop(Cursor m) {
-            from(m, istrue(atk(m,"postcircumfix")) ? "postcircumfix" : "postfix");
+            from_any(m, "postcircumfix", "postfix");
         }
 
         public void POST(Cursor m) {
-            if (istrue(atk(m,"dotty" ))) from(m,"dotty" );
-            if (istrue(atk(m,"privop"))) from(m,"privop");
-            if (istrue(atk(m,"postop"))) from(m,"postop");
+            from_any(m, "dotty", "privop", "postop");
 
             foreach (var mo in flist(atk(m,"postfix_prefix_meta_operator")))
                 make(m,ast<Operator>(m).meta_fun(m, "&hyperunary", 1));
         }
 
         public void PRE(Cursor m) {
-            if (istrue(atk(m,"prefix"))) from(m,"prefix");
-            if (istrue(atk(m,"prefix_circumfix_meta_operator")))
-                from(m,"prefix_circumfix_meta_operator");
+            from_any(m, "prefix", "prefix_circumfix_meta_operator");
 
             foreach (var mo in flist(atk(m,"prefix_postfix_meta_operator")))
                 make(m,ast<Operator>(m).meta_fun(m, "&hyperunary", 1));
@@ -1777,8 +1781,7 @@ dyn:
                 return;
             }
 
-            if (istrue(atk(m,"methodop"))) from(m,"methodop");
-            if (istrue(atk(m,"postop"))) from(m,"postop");
+            from_any(m, "methodop", "postop");
         }
 
         public void privop(Cursor m) {
@@ -2091,7 +2094,7 @@ dyn:
 
             switch (vast.twigil) {
                 case '\0':
-                    if (job.in_decl || vast.name == null ||
+                    if (job.in_decl != "" || vast.name == null ||
                             vast.name[0] < 'A' || vast.name[0] == '¢' ||
                             is_known(here, name) || vast.pkg != null) {
                         CompUtils.MarkUsed(here, name);
@@ -2646,8 +2649,246 @@ dyn:
             make(m, Utils.Cat(ps, flist_ast<object>(atk(m,"cgexp"))));
         }
 
+
+        public void quibble(Cursor m) {
+            // SSTO work out babble/heredoc changes
+            from(m,"nibble");
+        }
+
+        public void sibble(Cursor m) {
+            var regex = op_for_regex(m, ast<RxOp.RxOp>(atk(m,"left")));
+            var inf = atk(m,"infixish");
+            Op.Op repl = ast<Op.Op>(atk(m,"right"));
+            if (istrue(inf)) {
+                var ia = ast<Operator>(inf);
+                if (asstr(inf) == "=") {
+                } else if (ia is Operator.CompoundAssign) {
+                    repl = ((Operator.CompoundAssign)ia).basis.with_args(m,
+                        Op.Helpers.mkcall(m, "&prefix:<~>",
+                            new Op.Lexical(m,"$/")), repl);
+                } else if (ia is Operator.DotEq) {
+                    repl = ((Op.DotEqRHS)repl).wrap.with_args(m,
+                        Op.Helpers.mkcall(m, "&prefix:<~>",
+                            new Op.Lexical(m,"$/")));
+                } else {
+                    sorry(m, "Unhandled operator in substitution");
+                }
+            }
+            repl = block_expr(m, thunk_sub(repl));
+            make(m,new Op.CallMethod(m, "subst", new Op.Lexical(m, "$_"),
+                false, Utils.Cat(extract_rx_adverbs(true,true,m), new[] {
+                    new Op.SimplePair(m, "inplace", new Op.Lexical(m, "True")),
+                    regex, repl })));
+        }
+
+        public Op.Op quotepair_term(Cursor m) {
+            var vm = atk(m,"v").Fetch();
+            Op.Op vr;
+            if (vm.Isa(Kernel.MatchMO)) {
+                vr = ast<Op.Op>(vm);
+            } else if (vm.Isa(Kernel.StrMO)) {
+                vr = new Op.Num(m, new object[] { 10, asstr(vm) });
+            } else {
+                vr = Op.Helpers.mkbool(m, istrue(vm));
+            }
+            return new Op.SimplePair(m, asstr(atk(m,"k")), vr);
+        }
+
+        Op.Op[] extract_rx_adverbs(bool match, bool subst, Variable mv) {
+            Cursor m = (Cursor)mv.Fetch(); // sibble or quibble
+            var qps = flist(atk(atk(m,"babble"),"quotepair"));
+
+            var ok   = new string[0];
+            var nyi  = words("ignoreaccent a bytes codes graphs chars Perl5 P5");
+            var args = new List<Op.Op>();
+            var intr = words("sigspace s ratchet r ignorecase i");
+
+            if (subst) {
+                nyi = Utils.Cat(nyi, words("sameaccent aa samecase ii"));
+                ok  = Utils.Cat(ok,  words("g global p pos c continue x nth st nd rd th"));
+            }
+
+            if (match) {
+                nyi = Utils.Cat(nyi, words("overlap ov exhaustive ex global g rw"));
+                ok  = Utils.Cat(ok,  words("continue c pos p nth st nd rd th"));
+            }
+
+            foreach (var qp in qps) {
+                var k = asstr(atk(qp,"k"));
+                if (Array.IndexOf(intr,k) >= 0) {
+                    // handled by rx compiler
+                } else if (Array.IndexOf(ok, k) >= 0) {
+                    args.Add(quotepair_term((Cursor)qp.Fetch()));
+                } else if (Array.IndexOf(nyi, k) >= 0) {
+                    sorry((Cursor)qp.Fetch(), "Regex modifier {0} not yet implemented", k);
+                } else {
+                    sorry((Cursor)qp.Fetch(), "Regex modifier {0} not valid on {1}", k, subst ? "substitution" : match ? "match" : "regex literal");
+                }
+            }
+
+            return args.ToArray();
+        }
+
+        public void capterm(Cursor m) {
+            Op.Op[] args = new Op.Op[0];
+            if (istrue(atk(m,"capture"))) {
+                var x = ast<Op.Op>(atk(atk(m,"capture"),"EXPR"));
+                var xp = x as Op.SimpleParcel;
+                args = xp != null ? xp.items : new [] { x };
+            } else if (istrue(atk(m,"termish"))) {
+                args = new [] { ast<Op.Op>(atk(m,"termish")) };
+            }
+            make(m,new Op.CallSub(m, new Op.Lexical(m, "&_make_capture"),
+                false, args));
+        }
+
+        // We can't do much at blockoid reduce time because the context is
+        // unknown.  Roles and subs need somewhat different code gen
+        public void blockoid(Cursor m) {
+            // XXX horrible cheat, but my data structures aren't up to the task
+            // of $*UNIT being a class body &c.
+            if (asstr(m) == "{YOU_ARE_HERE}") {
+                job.unit.bottom = job.curlex;
+                job.curlex.CreateProtopad(null);
+                job.curlex.special |= SubInfo.CANNOT_INLINE;
+
+                for (SubInfo l = job.curlex; l != null; l = l.outer) {
+                    // This isn't *quite* right, as it will cause declaring
+                    // anything more in the same scope to fail.
+                    // ... and we have to be careful not to mark !anon_0 used
+                    // or installing this very block will fail!
+                    foreach (string k in l.dylex.Keys)
+                        if (!k.StartsWith("!anon"))
+                            CompUtils.MarkUsed(m, k);
+                }
+
+                make(m, new Op.YouAreHere(m, job.unitname));
+            } else {
+                from(m, "statementlist");
+            }
+        }
+
+        public void embeddedblock(Cursor m) {
+            finish(job.curlex, ast<Op.Op>(atk(m,"statementlist")));
+            job.curlex.sig = new Signature();
+            // SSTO match pruning?
+            make(m, job.curlex);
+        }
+
+        public void unitstopper(Cursor m) {
+            CompUtils.MarkUsed(m, "&MAIN");
+        }
+
+        public void scoped(Cursor m) {
+            from_any(m, "declarator", "regex_declarator", "package_declarator",
+                    "multi_declarator");
+        }
+
+        // Op.Op
+        public void declarator(Cursor m) {
+            if (istrue(atk(m,"defterm"))) {
+                make(m,asstr(atk(m,"defterm")));
+                do_initialize(m, true);
+                return;
+            }
+
+            if (istrue(atk(m,"signature"))) {
+                // SSTO: make this work after making defterm and param_var
+                // respect job.scope
+                throw new NotImplementedException();
+            } else {
+                from_any(m, "variable_declarator", "routine_declarator",
+                        "regex_declarator", "type_declarator");
+            }
+            do_initialize(m);
+        }
+
+        public void defterm(Cursor m) {
+            if (job.in_decl == "constant") return;
+            trymop(m, () => {
+                addlex(m, job.curlex, asstr(m), new LISimple(0,null));
+                check_categorical(m, asstr(m));
+            });
+        }
+
+        public void initializer__3d(Cursor m) { // =
+            make(m, Operator.funop(m, "&infix:<=>", 2));
+        }
+        public void initializer__3a3d(Cursor m) { make(m, new Operator.Binding(false)); } // :=
+        public void initializer__3a3a3d(Cursor m) { make(m, new Operator.Binding(true)); } // :=
+        public void initializer__2e3e(Cursor m) { make(m,new Operator.DotEq()); } // .=
+
+        void do_initialize(Cursor m, bool parcel = false) {
+            var i   = atk(m,"initializer");
+            if (!istrue(i)) return;
+            var fn  = ast<Operator>(i);
+            var rhs = ast<Op.Op>(atk(i, istrue(atk(i,"EXPR")) ? "EXPR" : "dottyopish"));
+
+            if (parcel) {
+                if (asstr(atk(i,"sym")) != "=")
+                    sorry(m, "Parcel variables may only be set using = for now");
+                make(m, new Op.LexicalBind(m, ast<string>(m),  false, false,
+                    null, rhs));
+                return;
+            }
+            var lhs = ast<Op.Op>(m);
+            var asn = fn.with_args(m, lhs, rhs);
+
+            // Assignments to has and state declarators are rewritten into
+            // an appropriate phaser
+            if (lhs is Op.StateDecl) {
+                var cv = job.gensym();
+                addlex(m, job.curlex.StateOuter(), cv, new LISimple(0,null));
+                make(m,Op.Helpers.mklet(m, lhs, (ll) =>
+                    new Op.StatementList(m, new Op.Start(m, cv,
+                        fn.with_args(m, ll, rhs)), ll)));
+            }
+            else if (lhs is Op.Attribute) {
+                var lhsa = lhs as Op.Attribute;
+                var init = thunk_sub(rhs, new [] { "self" },
+                    lhsa.pkg.name + "." + lhsa.name + " init");
+                init.outervar = job.gensym();
+                addlex(m, job.curlex, init.outervar, new LISub(init));
+                for (int ix = 0; ix < lhsa.pkg.mo.local_attr.Count; ix++) {
+                    var ai = lhsa.pkg.mo.local_attr[ix];
+                    if (ai.name == lhsa.name) {
+                        ai.init = init.protosub;
+                        lhsa.pkg.mo.local_attr[ix] = ai;
+                        break;
+                    }
+                }
+                make(m,new Op.StatementList(m));
+            }
+            else if (lhs is Op.ConstantDecl && !((Op.ConstantDecl)lhs).init) {
+                var lhsc = lhs as Op.ConstantDecl;
+                var sigil = lhsc.name[0];
+                if ("$@%&".IndexOf(sigil) >= 0) {
+                    init_constant(lhsc, docontext(m, sigil, rhs));
+                } else {
+                    init_constant(lhsc, rhs);
+                }
+                make(m,lhs);
+            }
+            else {
+                make(m, asn);
+            }
+        }
+
+        public void scope_declarator__my(Cursor m) { from(m,"scoped"); }
+        public void scope_declarator__our(Cursor m) { from(m,"scoped"); }
+        public void scope_declarator__augmnet(Cursor m) { from(m,"scoped"); }
+        public void scope_declarator__supersede(Cursor m) { from(m,"scoped"); }
+        public void scope_declarator__has(Cursor m) { from(m,"scoped"); }
+        public void scope_declarator__state(Cursor m) { from(m,"scoped"); }
+        public void scope_declarator__anon(Cursor m) { from(m,"scoped"); }
+
+        public void multi_declarator__null(Cursor m) { from(m,"declarator");}
+        public void multi_declarator__multi(Cursor m) { from_any(m,"declarator", "routine_def");}
+        public void multi_declarator__proto(Cursor m) { from_any(m,"declarator", "routine_def");}
+        public void multi_declarator__only(Cursor m) { from_any(m,"declarator", "routine_def");}
+
         // forward...
-        Op.Op[] extract_rx_adverbs(bool a, bool b, Variable c) { throw new NotImplementedException(); }
+        void init_constant(Op.ConstantDecl k, Op.Op v) { throw new NotImplementedException(); }
         void check_categorical(Cursor m, string name) { throw new NotImplementedException(); }
         bool is_name(Cursor m, string name) { throw new NotImplementedException(); }
         bool is_known(Cursor m, string name) { throw new NotImplementedException(); }

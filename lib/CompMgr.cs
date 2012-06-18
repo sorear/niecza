@@ -72,13 +72,15 @@ namespace Niecza.Compiler {
         };
 
         // state vars
-        public RuntimeUnit unit;    // $*unit
-        public SubInfo     curlex;  // $*CURLEX
-        public RxInfo      rxinfo;  // %*RX
-        public Actions     actions; // $*ACTIONS
-        public bool        in_decl; // $*IN_DECL
-        public string      has_self; // $*HAS_SELF
-        public int         signum;  // $*SIGNUM
+        public RuntimeUnit unit;      // $*unit
+        public SubInfo     curlex;    // $*CURLEX
+        public RxInfo      rxinfo;    // %*RX
+        public Actions     actions;   // $*ACTIONS
+        public string      in_decl;   // $*IN_DECL
+        public string      scope;     // $*IN_DECL
+        public string      multiness; // $*IN_DECL
+        public string      has_self;  // $*HAS_SELF
+        public int         signum;    // $*SIGNUM
 
         public Variable get_memo(int pos, string key) { throw new NotImplementedException(); } //SSTO
 
