@@ -21,6 +21,10 @@ namespace Niecza.Compiler {
         Variable atp(Variable v, int at) {
             return v.Fetch().mo.mro_at_pos.Get(v, mkint(at));
         }
+        Variable atks(Variable v, params string[] ats) {
+            foreach (string at in ats) v = atk(v,at);
+            return v;
+        }
 
         P6any mkint(int i) { return (P6any)Builtins.MakeInt(i); }
         P6any mkstr(string s) { return s==null ? Kernel.StrMO.typeObj : (P6any)Builtins.MakeStr(s); }
@@ -40,6 +44,9 @@ namespace Niecza.Compiler {
             throw new NotImplementedException();
         }
         STable compile_get_pkg(bool auto, params string[] path) {
+            return compile_get_pkg(job.curlex, auto, path);
+        }
+        STable compile_get_pkg(SubInfo from, bool auto, params string[] path) {
             throw new NotImplementedException();
         }
         internal void addlex(Cursor pos, SubInfo to, string name, LexInfo li) {
@@ -59,6 +66,8 @@ namespace Niecza.Compiler {
         T ast<T>(Variable v) {
             return (T)Kernel.UnboxAny<object>(((Cursor)v.Fetch()).ast);
         }
+        T ast_if<T>(Variable v) { return istrue(v) ? ast<T>(v) : default(T); }
+        T ast_ifd<T>(Variable v) { return isdef(v) ? ast<T>(v) : default(T); }
         void make(Cursor m, object val) {
             m.ast = Kernel.BoxRaw(val, Kernel.AnyMO);
         }
@@ -3420,9 +3429,335 @@ dyn:
             }
         }
 
+        public void statement(Cursor m) {
+            if (istrue(atk(m,"label"))) {
+                make(m,new Op.Labelled(m, ast<string>(atk(m,"label")),
+                    ast<Op.Op>(atk(m,"statement"))));
+                return;
+            }
+
+            if (istrue(atk(m,"statement_constrol"))) from(m,"statement_constrol");
+            else if (istrue(atk(m,"EXPR"))) from(m,"EXPR");
+            else make(m,new Op.StatementList(m));
+            var stmt = ast<Op.Op>(m);
+
+            if (istrue(atk(m,"statement_mod_cond"))) {
+                var se = ast<Prod<string,Op.Op>>(atk(m,"statement_mod_cond"));
+
+                if (se.v1 == "if") {
+                    stmt = new Op.Conditional(m, se.v2, stmt, null);
+                } else if (se.v1 == "unless") {
+                    stmt = new Op.Conditional(m, se.v2, null, stmt);
+                } else if (se.v1 == "when") {
+                    stmt = new Op.Conditional(m, new Op.CallMethod(m, "ACCEPTS",
+                        se.v2, true, new Op.Lexical(m, "$_")), stmt, null);
+                } else {
+                    sorry(m, "Unhandled statement modifier {0}", se.v1);
+                }
+            }
+
+            if (istrue(atk(m,"statement_mod_loop"))) {
+                var se = ast<Prod<string,Op.Op>>(atk(m,"statement_mod_loop"));
+
+                if (se.v1 == "while") {
+                    stmt = new Op.WhileLoop(m, se.v2, stmt, false, false);
+                } else if (se.v1 == "until") {
+                    stmt = new Op.WhileLoop(m, se.v2, stmt, false, true);
+                } else if (se.v1 == "given") {
+                    stmt = Op.Helpers.mktemptopic(m, se.v2, stmt);
+                } else if (se.v1 == "for") {
+                    string vs = job.gensym();
+                    stmt = new Op.ImmedForLoop(m, se.v2, new[] { vs },
+                        Op.Helpers.mktemptopic(m, new Op.LetVar(m,vs), stmt));
+                } else {
+                    sorry(m, "Unhandled statement modifier {0}", se.v1);
+                }
+            }
+            make(m, stmt);
+        }
+
+        void stmod(Cursor m) {
+            make(m, Prod.C(asstr(atk(m,"sym")), ast<Op.Op>(atk(m, "modifier_expr"))));
+        }
+
+        public void statement_mod_cond__if(Cursor m) { stmod(m); }
+        public void statement_mod_cond__unless(Cursor m) { stmod(m); }
+        public void statement_mod_cond__when(Cursor m) { stmod(m); }
+
+        public void statement_mod_loop__while(Cursor m) { stmod(m); }
+        public void statement_mod_loop__until(Cursor m) { stmod(m); }
+        public void statement_mod_loop__for(Cursor m) { stmod(m); }
+        public void statement_mod_loop__given(Cursor m) { stmod(m); }
+
+        public void statementlist(Cursor m) {
+            make(m, new Op.StatementList(m, map((s) => ast<Op.Op>(s).statement_level(m), flist(atk(m,"statement"))), true));
+        }
+
+        public void semilist(Cursor m) {
+            make(m, map((s) => ast<Op.Op>(s).semilist_level(m), flist(atk(m,"statement"))));
+        }
+
+        public void module_name__normal(Cursor m) {
+            // name-extension stuff is just ignored on module names for now
+            make(m, new ModName { name = asstr(atk(atk(m,"longname"),"name")),
+                args = istrue(atk(m,"arglist")) ? ast<Op.Op[]>(atk(m,"arglist")) : new Op.Op[0] });
+        }
+
+        // passes the $cond to the $block if it accepts a parameter, otherwise
+        // just runs the block.  Hack - we consider a block to have a used
+        // parameter iff it has a lambda symbol.
+        Op.Op if_block(Cursor m, Op.Op cond, Variable pb) {
+            if (isdef(atk(pb,"lambda"))) {
+                return inliney_call(m, ast<SubInfo>(pb), cond);
+            } else {
+                return inliney_call(m, ast<SubInfo>(pb));
+            }
+        }
+
+        // This handles the breanches of an if statement by induction.  At
+        // least one if must be provided, since "else -> $x { }" needs the
+        // previous value.
+        // changing xblock ast to just EXPR...
+        Op.Op if_branches(Cursor m, int i, Variable[] branches) {
+            var branch = branches[i++];
+            return Op.Helpers.mklet(m, ast<Op.Op>(branch), (cond) =>
+                new Op.Conditional(m, cond,
+                    if_block(m, cond, atk(branch,"pblock")),
+                    i < branches.Length ? if_branches(m, i, branches) :
+                        istrue(atk(m,"else")) ? if_block(m, cond, atk(m, "else")) :
+                        null));
+        }
+
+        public void statement_control__if(Cursor m) {
+            make(m, if_branches(m,0, Utils.PrependArr(flist(atk(m,"elsif")),atk(m,"xblock"))));
+        }
+
+        public void statement_control__unless(Cursor m) {
+            make(m, Op.Helpers.mklet(m, ast<Op.Op>(atk(m,"xblock")), (cond) =>
+                new Op.Conditional(m, cond, null, if_block(m, cond,
+                    atk(atk(m,"xblock"),"pblock")))));
+        }
+
+        // Hack - Op.WhileLoop binds the condition to "!cond"
+        public void statement_control__while(Cursor m) {
+            make(m, new Op.WhileLoop(m, ast<Op.Op>(atk(m,"xblock")),
+                if_block(m, new Op.LetVar(m, "!cond"),
+                    atk(atk(m,"xblock"),"pblock")), false, false,
+                isdef(atk(atk(atk(m,"xblock"),"pblock"),"lambda"))));
+        }
+        public void statement_control__until(Cursor m) {
+            make(m, new Op.WhileLoop(m, ast<Op.Op>(atk(m,"xblock")),
+                if_block(m, new Op.LetVar(m, "!cond"),
+                    atk(atk(m,"xblock"),"pblock")), false, true,
+                isdef(atk(atk(atk(m,"xblock"),"pblock"),"lambda"))));
+        }
+        public void statement_control__repeat(Cursor m) {
+            bool until = asstr(atk(m,"wu")) == "until";
+            var xb = atk(m,"xblock");
+            Op.Op check = ast<Op.Op>(istrue(xb) ? xb : atk(m,"EXPR"));
+            var pb = atk(istrue(xb) ? xb : m, "pblock");
+            var body = if_block(m, new Op.LetVar(m,"!cond"), pb);
+            make(m, new Op.WhileLoop(m, check, body, true, until,
+                isdef(atk(pb,"lambda"))));
+        }
+
+        public void statement_control__loop(Cursor m) {
+            var body = inliney_call(m, ast<SubInfo>(atk(m,"block")));
+            // XXX miscompiled grammar here?
+            var init = ast_if<Op.Op>(atk(atk(m,"0"),"e1"));
+            var cond = ast_if<Op.Op>(atk(atk(m,"0"),"e2"));
+            var step = ast_if<Op.Op>(atk(atk(m,"0"),"e3"));
+            make(m, new Op.GeneralLoop(m, init, cond, step, body));
+        }
+
+        public void statement_control__for(Cursor m) {
+            make(m, new Op.ForLoop(m, ast<Op.Op>(atk(m,"xblock")),
+                block_expr(m,ast<SubInfo>(atk(atk(m,"xblock"),"pblock"))).name));
+        }
+
+        public void statement_control__given(Cursor m) {
+            make(m, inliney_call(m, ast<SubInfo>(atk(atk(m,"xblock"),"pblock")),
+                ast<Op.Op>(atk(m,"xblock"))));
+        }
+
+        public void statement_control__default(Cursor m) {
+            make(m, new Op.When(m, new Op.Lexical(m, "True"),
+                inliney_call(m, ast<SubInfo>(atk(m,"block")))));
+        }
+        public void statement_control__when(Cursor m) {
+            make(m, new Op.When(m, ast<Op.Op>(atk(m,"xblock")),
+                inliney_call(m, ast<SubInfo>(atk(atk(m,"xblock"),"pblock")))));
+        }
+
+        public void statement_control__no(Cursor m) {
+            make(m, new Op.StatementList(m));
+            ModName mn = ast<ModName>(atk(m,"module_name"));
+            var args = ast_if<Op.Op[]>(atk(m,"arglist")) ?? new Op.Op[0];
+
+            if (mn.args != null)
+                sorry(m, "'no' of an instantiated role not understood");
+
+            if (args.Length > 0)
+                sorry(m, "'no' with arguments NYI");
+
+            if (mn.name == "strict") {
+                job.curlex.SetExtend("strict", false);
+            } else if (mn.name == "MONKEY_TYPING") {
+                job.monkey_typing = false;
+            } else {
+                sorry(m, "No 'no' handling for {0}", mn.name);
+            }
+        }
+
+        void use_from_perl5(Cursor m, string name) {
+            // SSTO make sure this works!
+            Variable sub = Builtins.eval_perl5(Builtins.eval_perl5(mkstr("Niecza::Helpers::use_module('"+name+"')")));
+            addlex(m, job.curlex, name, new LIConstant(sub));
+        }
+
+        public void statement_control__use(Cursor m) {
+            make(m, new Op.StatementList(m));
+            if (istrue(atk(m,"version"))) return; // just ignore these for now
+
+            var mn   = ast<ModName>(atk(m,"module_name"));
+            var args = ast_if<Op.Op[]>(atk(m,"arglist")) ?? new Op.Op[0];
+
+            var pairs = atks(m,"module_name","longname","colonpair");
+            if (istrue(pairs)) {
+                if (get_cp_ext(flist(pairs)[0]) == ":from<perl5>") {
+                    use_from_perl5(m, mn.name);
+                    return;
+                } else {
+                    sorry(m,"NYI");
+                }
+            }
+
+            if (mn.args != null)
+                sorry(m, "'use' of an instantiated role not understood");
+            if (args.Length > 0)
+                sorry(m, "'use' with arguments NYI");
+
+            if (mn.name == "strict") {
+                job.curlex.SetExtend("strict", true);
+                return;
+            }
+
+            if (mn.name == "MONKEY_TYPING" || mn.name == "fatal" || mn.name == "lib")
+                return; // handled in parser
+
+            var u2 = job.need_unit(mn.name);
+            var module = compile_get_pkg(u2.mainline, false, mn.name.Split(new[]{"::"}, 0));
+            STable exp = null;
+            try {
+                exp = CompUtils.rel_pkg(job.unit, false, module, "EXPORT", "DEFAULT");
+            } catch(Exception) { }
+
+            // in the :: case, module will usually be visible via GLOBAL
+            if (mn.name.IndexOf("::") < 0)
+                addlex(m, job.curlex, mn.name, new LIPackage(module));
+
+            if (exp == null) return; // no exports
+
+            string who = Kernel.UnboxAny<string>(exp.who);
+            string filter = ((char)who.Length) + who;
+
+            foreach (KeyValuePair<string,StashEnt> kv in job.unit.globals) {
+                if (!Utils.StartsWithInvariant(filter, kv.Key))
+                    continue;
+
+                string uname = kv.Key.Substring(filter.Length);
+
+                StashEnt b = kv.Value;
+
+                if (!b.v.Rw && !b.v.Fetch().IsDefined()) {
+                    addlex(m, job.curlex, uname, new LIPackage(b.v.Fetch().mo));
+                } else {
+                    addlex(m, job.curlex, uname, new LICommon(kv.Key));
+
+                    int ix = uname.IndexOf(":(");
+                    if (ix >= 0 && !job.curlex.dylex.ContainsKey(uname.Substring(0,ix))) {
+                        job.curlex.CreateProtopad(null);
+                        addlex(m, job.curlex, uname.Substring(0,ix), new LIDispatch());
+                    }
+                    check_categorical(m,uname);
+                }
+            }
+        }
+
+        void do_new_package(Cursor m, ref string lexname_, ref STable npkg_,
+                SubInfo sub, string scope, Variable longname, int kls,
+                string[] exports) {
+
+            scope = scope ?? "our";
+            if (scope != "our" && scope != "my" && scope != "anon") {
+                sorry(m, "Invalid packageoid scope {0}", scope);
+                scope = "anon";
+            }
+
+            var pn = process_name(longname, DECL+CLEAN);
+            STable pkg  = pn.pkg;
+            string head = pn.name;
+
+            if (pkg != null && scope != "our") {
+                sorry(m, "Pathed definitions require 'our' scope");
+                scope = "our";
+            }
+
+            if (head == null) {
+                scope = "anon";
+                head = "ANON";
+            }
+
+            string lexname = null;
+            STable npkg = null;
+            trymop(m, () => {
+                STable old = null;
+
+                LexInfo li;
+                if (scope != "anon" && pkg == null && sub.dylex.TryGetValue(head, out li)) {
+                    if (!(li is LIPackage))
+                        throw new NieczaException("Cannot resume definition - {0} not a packageoid", head);
+                    old = ((LIPackage)li).pkg;
+                } else if (pkg != null) {
+                    string who = Kernel.UnboxAny<string>(pkg.who);
+                    string hkey = (char)who.Length + who + head;
+                    StashEnt b;
+                    if (job.unit.globals.TryGetValue(hkey, out b) &&
+                            !b.v.Rw && !b.v.Fetch().IsDefined())
+                        old = b.v.Fetch().mo;
+                }
+
+                bool lexed_already = false;
+
+                if (old != null && !old.mo.isComposed && old.mo.type == kls) {
+                    npkg = old;
+                    lexed_already = true;
+                } else if (scope == "our") {
+                    var opkg = pkg ?? sub.cur_pkg;
+                    string owho = Kernel.UnboxAny<string>(opkg.who);
+                    npkg = CompUtils.create_type(job.unit, head,
+                        owho + "::" + head, kls);
+                    type_throw(job.unit.NsBind(owho, head, npkg.typeObj,
+                        job.filename, CompUtils.LineOf(m)));
+                } else {
+                    var id = job.unit.name + ":" + job.unit.nextid++;
+                    npkg = CompUtils.create_type(job.unit, head, "::" + id, kls);
+                    type_throw(job.unit.NsBind("", id, npkg.typeObj,
+                        job.filename, CompUtils.LineOf(m)));
+                }
+
+                lexname = (!lexed_already && scope != "anon" && pkg == null)
+                    ? head : job.gensym();
+
+                addlex(m, sub, lexname, new LIPackage(npkg));
+                if (exports.Length > 0)
+                    add_exports(sub, head, npkg.typeObj, exports);
+            });
+            lexname_ = lexname; npkg_ = npkg;
+        }
+
         // forward...
         void add_exports(SubInfo to, string name, P6any what, string[] how) { throw new NotImplementedException(); }
-        void do_new_package(Cursor m, ref string lexvar, ref STable obj, SubInfo sub, string scope, Variable longname, int kls, string[] exports) { throw new NotImplementedException(); }
         void check_categorical(Cursor m, string name) { throw new NotImplementedException(); }
         bool is_name(Cursor m, string name) { throw new NotImplementedException(); }
         bool is_known(Cursor m, string name) { throw new NotImplementedException(); }
@@ -3430,10 +3765,10 @@ dyn:
         void add_mystery(Cursor m) { throw new NotImplementedException(); }
 
 
-        internal Op.Op block_expr(Cursor m, SubInfo blk) {
+        internal Op.Lexical block_expr(Cursor m, SubInfo blk) {
             var name = job.gensym();
             addlex(m, job.curlex, name, new LISub(blk));
-            return Op.Helpers.mklex(m, name);
+            return new Op.Lexical(m, name);
         }
 
         Op.Op inliney_call(Cursor m, SubInfo block, params Op.Op[] parms) {

@@ -84,6 +84,7 @@ namespace Niecza.Compiler {
         public object      augment_buffer;
         public Variable    oftype;
         public object      invocant_is;
+        public bool        monkey_typing;
 
         public Variable get_memo(int pos, string key) { throw new NotImplementedException(); } //SSTO
 
@@ -259,6 +260,27 @@ namespace Niecza.Compiler {
             throw new NieczaException("Unable to locate module "+name+" in "+
                 Kernel.JoinS(" ", path));
         }
+
+        public RuntimeUnit need_unit(string oname) {
+            // LinkUnit state is owned by the root
+
+            RuntimeUnit tg;
+            try {
+                tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
+            } catch (Exception ex) {
+                if (Config.SerFailInfo)
+                    Console.WriteLine("Thaw {0} failed: >>>{1}<<<", oname, ex);
+                // assume stale at first
+                object r1 = Builtins.UpCall(new object[] {
+                    "compile_unit", oname });
+                if (r1 != null)
+                    return (RuntimeUnit)r1;
+                tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
+            }
+            string err = unit.owner.LinkUnit(tg);
+            if (err != null) throw new NieczaException(err);
+            return tg;
+        }
     }
 
     class CommandDriver {
@@ -414,5 +436,49 @@ output options:
             return pkg;
         }
 
+        public static STable create_type(RuntimeUnit ru, string name, string who, int kls) {
+            var mof = ru.name == "CORE" ?
+                typeof(Kernel).GetField(name + "MO") : null;
+            var pf = ru.name == "CORE" ?
+                typeof(Kernel).GetField(name + "P") : null;
+
+            STable nst = mof == null ? null : (STable)mof.GetValue(null);
+            if (nst == null) { // not all FooMO are initialized by kernel
+                nst = new STable(name);
+                if (mof != null) mof.SetValue(null, nst);
+            }
+            // Hack - we don't clear the MRO here, because we might need
+            // to call methods on the type in the process of defining the
+            // type itself.
+            nst.mo.superclasses.Clear();
+            // OTOH, it needs call structures set up to avoid internal errors
+            nst.mo.Revalidate();
+            if (nst.typeObj == null) // AnyMO.typeObj is set up early
+                nst.typeObj = new P6opaque(nst, 0);
+            ((P6opaque)nst.typeObj).slots = null;
+
+            if (ru.name == "CORE" && name == "Nil") {
+                // anomalously requires an iterable value
+                Kernel.Nil = Kernel.NewRWListVar(nst.typeObj);
+            }
+
+            if (pf != null)
+                pf.SetValue(null, nst.typeObj);
+
+            nst.initObj = nst.typeObj;
+            nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
+            nst.how        = Kernel.BoxRaw<STable>(nst, Kernel.ClassHOWMO);
+            nst.mo.type    = kls;
+            nst.mo.rtype =
+                kls == P6how.PACKAGE ? "package" :
+                kls == P6how.MODULE ? "module" :
+                kls == P6how.CLASS ? "class" :
+                kls == P6how.GRAMMAR ? "grammar" :
+                kls == P6how.ROLE ? "role" :
+                kls == P6how.PARAMETRIZED_ROLE ? "prole" :
+                kls == P6how.SUBSET ? "subset" :
+                "";
+            return nst;
+        }
     }
 }
