@@ -1976,6 +1976,20 @@ namespace Niecza {
             return (special & MAINLINE) != 0 ? this : outer;
         }
 
+        public void SetPhaser(int p) {
+            phaser = p;
+            if (p == Kernel.PHASER_CATCH)
+                outer.catch_ = this;
+            if (p == Kernel.PHASER_CONTROL)
+                outer.control = this;
+            if (p == Kernel.PHASER_INIT)
+                Compartment.Top.init.Add(this, true);
+            if (p == Kernel.PHASER_CHECK)
+                Compartment.Top.check.Add(this, true);
+            if (p == Kernel.PHASER_END)
+                Compartment.Top.end.Add(this, true);
+        }
+
         private SubInfo() { }
 
         // This is a _shallow_ clone.  The children wind up shared, as do

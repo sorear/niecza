@@ -3756,14 +3756,174 @@ dyn:
             lexname_ = lexname; npkg_ = npkg;
         }
 
-        // forward...
-        void add_exports(SubInfo to, string name, P6any what, string[] how) { throw new NotImplementedException(); }
-        void check_categorical(Cursor m, string name) { throw new NotImplementedException(); }
-        bool is_name(Cursor m, string name) { throw new NotImplementedException(); }
-        bool is_known(Cursor m, string name) { throw new NotImplementedException(); }
-        void add_placeholder(Cursor m, string name) { throw new NotImplementedException(); }
-        void add_mystery(Cursor m) { throw new NotImplementedException(); }
+        // special action method
+        public void open_package_def(Cursor m) {
+            if (job.multiness != null)
+                sorry(m, "Multi variables NYI");
 
+            if (job.scope == "augment") {
+                STable obj = process_name(atk(m,"longname"), CLEAN+REFER).pkg;
+                job.augment_buffer = new List<object>();
+
+                trymop(m, () => {
+                    if (obj == null) throw new NieczaException("Augment requires a target");
+                    if (obj.mo.type == P6how.PARAMETRIZED_ROLE)
+                        throw new NieczaException("Illegal augment of a role");
+
+                    job.curlex.body_of = job.curlex.in_class =
+                        job.curlex.cur_pkg = obj;
+                    job.curlex.name = "augment-" + obj.name;
+                });
+            } else {
+                int kls = CompUtils.rtype_to_type(job.pkgdecl);
+                if (kls == P6how.ROLE) {
+                    addlex(m, job.curlex, "$?CLASS", new LISimple(LISimple.NOINIT, null));
+                    var sig = ast_if<Signature>(atk(m,"signature")) ?? new Signature();
+                    job.curlex.sig = new Signature(Utils.PrependArr(sig.parms,
+                        Parameter.TPos("$?CLASS", job.curlex.dylex["$?CLAS"].SigIndex())));
+                    kls = P6how.PARAMETRIZED_ROLE;
+                }
+
+                string lexvar = null;
+                STable obj = null;
+
+                do_new_package(m, ref lexvar, ref obj, job.curlex.outer,
+                        job.scope, atk(m,"longname"), kls, new string[0]);
+
+                job.curlex.outervar = lexvar;
+                job.curlex.body_of = job.curlex.cur_pkg = job.curlex.in_class =
+                    obj;
+
+                process_block_traits(m, atk(m,"trait"));
+                job.curlex.name = job.pkgdecl + "-" + obj.name;
+            }
+        }
+
+        public void package_def(Cursor m) {
+            var bodyvar = job.gensym();
+            var sub = job.curlex;
+            var obj = sub.body_of;
+
+            addlex(m, sub.outer, bodyvar, new LISub(sub));
+
+            Op.Op ast = ast_if<Op.Op>(atk(m,"blockoid")) ?? ast_if<Op.Op>(atk(m,"statementlist"));
+
+            if (job.augment_buffer != null) {
+                // generate an INIT block to do the augment
+                SubInfo ph = create_sub("phaser-" + sub.name, sub,
+                    Kernel.CodeMO, sub.cur_pkg, null,
+                    (sub.special & SubInfo.RUN_ONCE) != 0);
+
+                job.augment_buffer.Insert(0, "!mo");
+                job.augment_buffer.Insert(1, CgOp.class_ref("mo", obj));
+
+                job.augment_buffer.Add(CgOp._invalidate(CgOp.letvar("!mo")));
+                job.augment_buffer.Add(CgOp.corelex("Nil"));
+
+                finish(ph, new Op.RawCgOp(m, CgOp.letn(job.augment_buffer.ToArray())));
+                sub.CreateProtopad(null);
+                ph.SetPhaser(Kernel.PHASER_INIT);
+                make(m, new Op.CallSub(m, new Op.Lexical(m,bodyvar)));
+            }
+            else {
+                if (istrue(atk(m,"stub"))) {
+                    job.unit.stubbed_stashes.Add(new KeyValuePair<int,STable>(
+                        m.from, obj));
+
+                    make(m, new Op.Lexical(m, sub.outervar));
+                }
+                else {
+                    trymop(m, () => { type_throw(obj.mo.Compose()); });
+
+                    if (obj.mo.type == P6how.PARAMETRIZED_ROLE) {
+                        // return the frame object so that role instantiation
+                        // can find the cloned methods
+                        ast = new Op.StatementList(m, ast,
+                                Op.Helpers.mkcall(m, "&callframe"));
+                        sub.CreateProtopad(null);
+                        obj.mo.roleFactory = sub.protosub;
+
+                        make(m, new Op.Lexical(m, sub.outervar));
+                    } else {
+                        make(m, new Op.StatementList(m,
+                            new Op.CallSub(m, new Op.Lexical(m, bodyvar)),
+                            new Op.Lexical(m, sub.outervar)));
+                    }
+                }
+            }
+
+            // SSTO prune_match
+            finish(sub, ast);
+        }
+
+        public void trait_mod__will(Cursor m) {
+            make(m, Prod.C(asstr(atk(m,"identifier")), ast<SubInfo>(atk(m,"pblock"))));
+        }
+
+        public void trait_mod__is(Cursor m) {
+            var trait = asstr(atk(m,"longname"));
+            string noparm = null;
+
+            string k = trait;
+            object v = null;
+
+            if (is_name(m, trait)) {
+                k = "name"; v = process_name(atk(m,"longname"), REFER).pkg;
+                noparm = "Superclasses cannot have parameters";
+            } else if (trait == "export") {
+                v = new string[] { "DEFAULT", "ALL" };
+                noparm = "Export tags NYI";
+            } else if (trait == "endsym") {
+                if (istrue(atk(m,"circumfix"))) {
+                    v = asstr(eval_ast(m, ast<Op.Op>(atk(m,"circumfix"))));
+                } else {
+                    sorry(m, "Argument to endsym must be provided");
+                }
+            } else if (trait == "rawcall") {
+                k = "nobinder";
+            } else if (trait == "return-pass") { // &return special
+                k = "return_pass";
+            } else if (trait == "parcel") {
+                k = "rwt";
+            } else if (istrue(atk(m,"circumfix"))) {
+                v = ast<Op.Op>(atk(m,"circumfix"));
+            } else {
+                v = true;
+            }
+
+            make(m, Prod.C(k,v));
+            if (noparm != null && istrue(atk(m,"circumfix")))
+                sorry(m, noparm);
+        }
+
+        public void trait_mod__does(Cursor m) {
+            var tc = ast<TypeConstraint>(atk(m,"typename"));
+            if (tc.type == null || tc.tmode != 0)
+                sorry(m, "Only simple types may be used here");
+
+            make(m,Prod.C("does", (object)tc.type ?? Kernel.AnyMO));
+        }
+
+        public void trait_mod__of(Cursor m) {
+            var tc = ast<TypeConstraint>(atk(m,"typename"));
+            if (tc.type == null || tc.tmode != 0)
+                sorry(m, "Only simple types may be used here");
+
+            make(m,Prod.C("of", (object)tc.type ?? Kernel.AnyMO));
+        }
+
+        public void trait(Cursor m) {
+            if (istrue(atk(m,"colonpair"))) {
+                sorry(m,"Colonpair traits NYI");
+                make(m,Prod.C("null", (object)null));
+            } else {
+                from(m,"trait_mod");
+            }
+        }
+
+        public void routine_declarator__sub(Cursor m) { from(m,"routine_def"); }
+        public void routine_declarator__method(Cursor m) { from(m,"routine_def"); }
+        public void routine_declarator__submethod(Cursor m) { from(m,"routine_def"); }
 
         internal Op.Lexical block_expr(Cursor m, SubInfo blk) {
             var name = job.gensym();
@@ -3777,9 +3937,227 @@ dyn:
             return CompUtils.BetaCall(m, sym, parms);
         }
 
+        // This is intended to be called after parsing the longname for a sub,
+        // but before the signature.  export, etc are handled by the sub/package
+        // trait handler.
+        // Try to make binary ordering DTRT; also, global uniqueness
+        string multi_suffix() {
+            var num = job.genid().ToString();
+            return job.unit.name.Replace("::",".") + " " +
+                (char)(65+num.Length) + num;
+        }
+
+        void install_sub(Cursor m, SubInfo sub, string multiness, string scope,
+                STable klass, Variable longname, string method_type,
+                bool contextual) {
+            multiness = multiness ?? "only";
+
+            var pn = process_name(longname, DECL);
+            var pkg = pn.pkg;
+            var name = pn.name;
+
+            if (scope == null) {
+                if (name == null) {
+                    scope = "anon";
+                } else if (pkg != null) {
+                    scope = "our";
+                } else if (method_type != null) {
+                    scope = "has";
+                } else {
+                    scope = "my";
+                }
+            }
+
+            if (klass == Kernel.RegexMO) {
+                sub.SetExtend("name", name);
+                string cleanname, sym;
+                int ix;
+                if (name == null) {
+                    cleanname = sym = null;
+                } else if ((ix = name.IndexOf(":sym<")) >= 0) {
+                    cleanname = name.Substring(0,ix);
+                    sym = name.Substring(ix+5, name.Length-(ix+5)-1);
+                } else if ((ix = name.IndexOf(':')) >= 0) {
+                    cleanname = name.Substring(0,ix);
+                    sym = name.Substring(ix+1);
+                } else {
+                    cleanname = name; sym = null;
+                }
+                job.rxinfo.sym = sym;
+                if (sym != null) multiness = "multi";
+                sub.SetExtend("sym", sym);
+                sub.SetExtend("cleanname", cleanname);
+                sub.SetExtend("multi", multiness);
+            }
+
+            if (scope != "my" && scope != "our" && scope != "anon" && scope != "has") {
+                sorry(m, "Illegal scope {0} for subroutine", scope);
+                scope = "anon";
+            }
+
+            if (scope == "has" && method_type == null) {
+                sorry(m, "'has' scope-type is only valid for methods");
+                scope = "anon";
+            }
+
+            if (scope != "anon" && name == null) {
+                sorry(m, "Scope {0} requires a name", scope);
+                scope = "anon";
+            }
+
+            if (scope != "our" && pkg != null) {
+                sorry(m, "Double-colon-qualified subs must be our");
+                scope = "our";
+            }
+
+            if (scope == "anon" && multiness != "only") {
+                sorry(m, "Multi routines must have a name");
+                multiness = "only";
+            }
+
+            if (contextual && (method_type != null || scope != "my")) {
+                sorry(m, "Context-named routines must be purely my-scoped");
+                contextual = false;
+            }
+
+            if (scope == "anon") method_type = null;
+
+            if (method_type != null && sub.outer.body_of == null) {
+                sorry(m, "Methods must be used in some kind of package");
+                method_type = null;
+            }
+
+            STable method_targ = method_type != null ? sub.outer.body_of : null;
+
+            if (method_targ != null && !type_fully_functional(method_targ)) {
+                sorry(m, "A {0} cannot have methods added", CompUtils.type_to_rtype(method_targ.mo.type));
+                method_type = null;
+                method_targ = null;
+            }
+
+            bool bindlex = scope == "my" || (scope == "our" && pkg == null);
+
+            sub.name = (method_targ != null ? method_targ.name + "." : "") +
+                (name ?? "ANON");
+            sub.mo = klass;
+            if (sub.protosub != null) sub.protosub.mo = klass;
+
+            // SSTO: precedence handling
+
+            trymop(m, delegate() {
+                string symbol = null;
+                if (bindlex && klass == Kernel.RegexMO) {
+                    symbol = "&" + name;
+                    int ix = symbol.IndexOf(':');
+                    string proto = ix >= 0 ? symbol.Substring(0,ix)  : symbol;
+                    if (multiness != "only" && !sub.outer.dylex.ContainsKey(proto))
+                        addlex(m, sub.outer, proto, new LIDispatch());
+                    if (multiness == "proto")
+                        symbol = symbol + ":(!proto)";
+                } else if (bindlex) {
+                    symbol = "&" + name;
+                    check_categorical(m, symbol);
+                    if (multiness != "only" && !sub.outer.dylex.ContainsKey(symbol))
+                        addlex(m, sub.outer, symbol, new LIDispatch());
+
+                    if (multiness == "multi")
+                        symbol = symbol + ":(" + multi_suffix() + ")";
+                    else if (multiness == "proto")
+                        symbol = symbol + ":(!proto)";
+                } else {
+                    symbol = job.gensym();
+                }
+
+                sub.outervar = symbol;
+                sub.methodof = method_targ;
+                addlex(m, sub.outer, symbol, new LISub(sub));
+
+                // make recursion easier
+                if (name != null && scope == "anon") {
+                    addlex(m, sub, "&" + name, new LIAlias(symbol));
+                    CompUtils.MarkUsed(m, "&" + name); // no real need to use alias
+                }
+
+                if (multiness != "only" || scope == "our" || method_targ != null) {
+                    CompUtils.MarkUsed(m, symbol);
+                }
+
+                if (method_targ != null || scope == "our")
+                    sub.outer.CreateProtopad(null);
+
+                if (method_targ != null) {
+                    int mode = 0;
+                    if (method_type == "sub") mode += P6how.V_SUBMETHOD;
+                    else if (method_type == "normal") mode += P6how.V_PUBLIC;
+                    else if (method_type == "private") mode += P6how.V_PRIVATE;
+                    else throw new NieczaException("Unimplemented method type "+method_type);
+
+                    if (multiness == "only") mode += P6how.M_ONLY;
+                    else if (multiness == "proto") mode += P6how.M_PROTO;
+                    else if (multiness == "multi") mode += P6how.M_MULTI;
+                    else throw new NieczaException("Unimplemented multiness " + multiness);
+
+                    if (job.augment_buffer != null) {
+                        job.augment_buffer.Add(CgOp._addmethod(
+                            CgOp.letvar("!mo"), mode, CgOp.str(name),
+                            CgOp.fetch(CgOp.scopedlex(symbol))));
+                    } else {
+                        type_add_method(m, method_targ, mode, name, sub);
+                    }
+                }
+
+                if (scope == "our") {
+                    string who = Kernel.UnboxAny<string>((pkg ?? sub.outer.cur_pkg).who);
+                    type_throw(job.unit.NsBind(who, "&"+name, sub.protosub,
+                        job.filename, CompUtils.LineOf(m)));
+                }
+
+                if (bindlex && multiness == "multi") {
+                    string pname = symbol;
+                    int ix = pname.IndexOf(":(");
+                    if (ix >= 0) pname = pname.Substring(0,ix) + ":(!proto)";
+                    LexInfo li;
+                    if (sub.outer.dylex.TryGetValue(pname, out li)) {
+                        var lis = li as LISub;
+                        if (lis != null) {
+                            object[] ex = lis.def.GetExtend("exported");
+                            string[] exs = new string[ex.Length];
+                            Array.Copy(ex, exs, ex.Length);
+                            add_exports(sub.outer, symbol, sub.protosub, exs);
+                        }
+                    }
+                }
+            });
+        }
+
+        // special action methods.
+        // always a sub, though sometimes it's an implied sub after multi/proto/only
+        public void routine_def_1(Cursor m) {
+            install_sub(m, job.curlex, job.multiness, job.scope, Kernel.SubMO,
+                    atk(m,"deflongname"), null, istrue(atk(m,"sigil")) &&
+                    asstr(atk(m,"sigil")) == "&*");
+        }
+
+        public void routine_def_2(Cursor m) {
+            var sigs = flist_ast<Signature>(atk(m,"multisig"));
+            if (sigs.Length > 1)
+                sorry(m, "You may only use *one* signature");
+            job.curlex.sig = sigs.Length == 0 ? null : sigs[0];
+            process_block_traits(m, atk(m,"trait"));
+        }
+
+        // forward...
+        void add_exports(SubInfo to, string name, P6any what, string[] how) { throw new NotImplementedException(); }
+        void check_categorical(Cursor m, string name) { throw new NotImplementedException(); }
+        bool is_name(Cursor m, string name) { throw new NotImplementedException(); }
+        bool is_known(Cursor m, string name) { throw new NotImplementedException(); }
+        void add_placeholder(Cursor m, string name) { throw new NotImplementedException(); }
+        void add_mystery(Cursor m) { throw new NotImplementedException(); }
+
+
         // does NOT handle $?PERL construction
         internal SubInfo create_sub(string name, SubInfo outer, STable cls,
-                STable pkg, STable icl, bool once, Frame outer_frame) {
+                STable pkg, STable icl, bool once, Frame outer_frame = null) {
 
             var n = new SubInfo(job.unit, name, outer, cls, pkg, once, outer_frame);
             n.in_class = icl;

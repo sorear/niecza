@@ -392,7 +392,7 @@ namespace Niecza.Compiler.Op {
     class CallSub : CallLike {
         public Op invocant;
 
-        public CallSub(Cursor c, Op i, bool po, params Op[] a) : base(c,po,a) {
+        public CallSub(Cursor c, Op i, bool po=false, params Op[] a) : base(c,po,a) {
             invocant = i;
         }
 

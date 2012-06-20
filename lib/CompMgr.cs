@@ -81,7 +81,8 @@ namespace Niecza.Compiler {
         public string      multiness; // $*IN_DECL
         public string      has_self;  // $*HAS_SELF
         public int         signum;    // $*SIGNUM
-        public object      augment_buffer;
+        public List<object> augment_buffer;
+        public string      pkgdecl;
         public Variable    oftype;
         public object      invocant_is;
         public bool        monkey_typing;
@@ -469,7 +470,12 @@ output options:
             nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
             nst.how        = Kernel.BoxRaw<STable>(nst, Kernel.ClassHOWMO);
             nst.mo.type    = kls;
-            nst.mo.rtype =
+            nst.mo.rtype   = type_to_rtype(kls);
+            return nst;
+        }
+
+        public static string type_to_rtype(int kls) {
+            return
                 kls == P6how.PACKAGE ? "package" :
                 kls == P6how.MODULE ? "module" :
                 kls == P6how.CLASS ? "class" :
@@ -478,7 +484,18 @@ output options:
                 kls == P6how.PARAMETRIZED_ROLE ? "prole" :
                 kls == P6how.SUBSET ? "subset" :
                 "";
-            return nst;
+        }
+
+        public static int rtype_to_type(string kls) {
+            return
+                kls == "package" ? P6how.PACKAGE :
+                kls == "module" ? P6how.MODULE :
+                kls == "class" ? P6how.CLASS :
+                kls == "grammar" ? P6how.GRAMMAR :
+                kls == "role" ? P6how.ROLE :
+                kls == "prole" ? P6how.PARAMETRIZED_ROLE :
+                kls == "subset" ? P6how.SUBSET :
+                -1;
         }
     }
 }
