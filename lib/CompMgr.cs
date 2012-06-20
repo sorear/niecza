@@ -86,6 +86,7 @@ namespace Niecza.Compiler {
         public Variable    oftype;
         public object      invocant_is;
         public bool        monkey_typing;
+        public bool        catchy;
 
         public Variable get_memo(int pos, string key) { throw new NotImplementedException(); } //SSTO
 

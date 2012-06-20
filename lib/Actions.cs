@@ -3152,8 +3152,7 @@ dyn:
             return init_constant(new Op.ConstantDecl(m, slot, false), rhs);
         }
 
-        Op.Op init_constant(Op.ConstantDecl con, Op.Op rhs) {
-            var body = thunk_sub(rhs, null, con.name + " init");
+        void set_constant(Op.ConstantDecl con, SubInfo body) {
             job.curlex.CreateProtopad(null);
             Variable v = body.RunBEGIN();
 
@@ -3169,6 +3168,11 @@ dyn:
             }
 
             con.init = true;
+        }
+
+        Op.Op init_constant(Op.ConstantDecl con, Op.Op rhs) {
+            var body = thunk_sub(rhs, null, con.name + " init");
+            set_constant(con, body);
             return con;
         }
 
@@ -4146,7 +4150,184 @@ dyn:
             process_block_traits(m, atk(m,"trait"));
         }
 
-        // forward...
+        public void method_def_1(Cursor m) {
+            string type = istrue(atk(m,"type")) ? asstr(atk(m,"type")) : "";
+            if (type != "" && job.has_self == "partial") {
+                type = "";
+                sorry(m, "Type symbols cannot be used with submethod");
+            }
+
+            install_sub(m, job.curlex, job.multiness, job.scope,
+                    job.has_self == "partial" ? Kernel.SubmethodMO :
+                    Kernel.MethodMO, atk(m,"longname"), type == "^" ? "meta" :
+                    type == "!" ? "private" : job.has_self == "partial" ?
+                    "sub" : "normal", false);
+        }
+
+        public void method_def_2(Cursor m) {
+            var sigs = flist_ast<Signature>(atk(m,"multisig"));
+            if (sigs.Length > 1)
+                sorry(m, "You may only use *one* signature");
+            job.curlex.sig = sigs.Length == 0 ? null : sigs[0];
+            process_block_traits(m, atk(m,"trait"));
+        }
+
+        bool is_dispatcher(Variable blockoid) {
+            string buf = asstr(blockoid);
+            int i = 0;
+            if (i == buf.Length || buf[i++] != '{') return false;
+            while (i < buf.Length && sp.Accepts(buf[i])) i++;
+            if (i == buf.Length || buf[i++] != '*') return false;
+            while (i < buf.Length && sp.Accepts(buf[i])) i++;
+            if (i == buf.Length || buf[i++] != '}') return false;
+            return true;
+        }
+
+        void finish_method_routine(Cursor m) {
+            if (is_dispatcher(atk(m,"blockoid"))) {
+                finish_dispatcher(job.curlex, "multi");
+            } else {
+                finish(job.curlex, ast<Op.Op>(atk(m,"blockoid")));
+            }
+            // SSTO prune_match
+            make(m,new Op.Lexical(m, job.curlex.outervar));
+        }
+        public void routine_def(Cursor m) { finish_method_routine(m); }
+        public void method_def(Cursor m) { finish_method_routine(m); }
+
+        public void block(Cursor m) {
+            var code = ast<Op.Op>(atk(m,"blockoid"));
+            if (job.catchy) code = new Op.CatchyWrapper(m, code);
+            finish(job.curlex, code);
+            // SSTO prune-match
+            make(m, job.curlex);
+        }
+
+        // :: Body
+        public void pblock(Cursor m) {
+            if (check_hash(job.curlex, ast<Op.Op>(atk(m,"blockoid")))) {
+                job.curlex.SetExtend("hashy", true);
+            }
+
+            finish(job.curlex, ast<Op.Op>(atk(m,"blockoid")));
+            // SSTO prune-match
+            make(m, job.curlex);
+        }
+
+        public void xblock(Cursor m) { from(m,"EXPR"); }
+
+        // returns Body of 0 args
+        public void blast(Cursor m) {
+            if (istrue(atk(m,"block"))) {
+                from(m, "block");
+            } else {
+                make(m, thunk_sub(ast<Op.Op>(atk(m,"statement")).statement_level(m)));
+            }
+        }
+
+        public void statement_prefix__do(Cursor m) {
+            make(m, new Op.DoOnceLoop(m, inliney_call(m, ast<SubInfo>(atk(m,"blast")))));
+        }
+
+        public void statement_prefix__gather(Cursor m) {
+            make(m, new Op.Gather(m, block_expr(m,
+                ast<SubInfo>(atk(m,"blast"))).name));
+        }
+
+        public void statement_prefix__try(Cursor m) {
+            make(m, new Op.Try(m, inliney_call(m, ast<SubInfo>(atk(m,"blast")))));
+        }
+
+        public void statement_prefix__START(Cursor m) {
+            var cv = job.gensym();
+            addlex(m, job.curlex.StateOuter(), cv, new LISimple(0,null));
+            make(m,new Op.Start(m, cv, inliney_call(m,
+                            ast<SubInfo>(atk(m,"blast")))));
+        }
+
+        void phaser(Cursor m, int ph, bool unique, bool topic, bool csp) {
+            SubInfo sub = ast_if<SubInfo>(atk(m,"blast")) ?? ast_if<SubInfo>(atk(m,"block"));
+
+            if (unique) {
+                bool exist = false;
+                foreach (SubInfo z in sub.outer.children)
+                    if (z.phaser == ph)
+                        exist = true;
+                if (exist)
+                    sorry(m, "Limit one phaser of this type per block.");
+            }
+
+            sub.outer.special |= SubInfo.CANNOT_INLINE;
+
+            if (topic) {
+                // convert $_ into a parameter
+                if (!sub.dylex.ContainsKey("$_"))
+                    addlex(m, sub, "$_", new LISimple(0,null));
+                ((LISimple)sub.dylex["$_"]).flags = LISimple.NOINIT;
+                sub.sig = new Signature(Parameter.TPos("$_",
+                    sub.dylex["$_"].SigIndex()));
+            }
+            if (csp) job.curlex.CreateProtopad(null);
+            sub.SetPhaser(ph);
+            make(m, new Op.StatementList(m));
+        }
+
+        public void statement_control__CATCH(Cursor m) {
+            phaser(m, Kernel.PHASER_CATCH, true, true, false);
+        }
+        public void statement_control__CONTROL(Cursor m) {
+            phaser(m, Kernel.PHASER_CONTROL, true, true, false);
+        }
+        public void statement_prefix__PRE(Cursor m) {
+            phaser(m, Kernel.PHASER_PRE, false, false, false);
+        }
+        public void statement_prefix__POST(Cursor m) {
+            phaser(m, Kernel.PHASER_POST, false, true, false);
+        }
+        public void statement_prefix__KEEP(Cursor m) {
+            phaser(m, Kernel.PHASER_KEEP, false, true, false);
+        }
+        public void statement_prefix__UNDO(Cursor m) {
+            phaser(m, Kernel.PHASER_UNDO, false, true, false);
+        }
+        public void statement_prefix__ENTER(Cursor m) {
+            phaser(m, Kernel.PHASER_ENTER, false, false, false);
+        }
+        public void statement_prefix__LEAVE(Cursor m) {
+            phaser(m, Kernel.PHASER_LEAVE, false, true, false);
+        }
+
+        public void statement_prefix__CHECK(Cursor m) {
+            phaser(m, Kernel.PHASER_CHECK, false, false, true);
+        }
+        public void statement_prefix__END(Cursor m) {
+            phaser(m, Kernel.PHASER_END, false, false, true);
+        }
+        public void statement_prefix__INIT(Cursor m) {
+            phaser(m, Kernel.PHASER_INIT, false, false, true);
+        }
+
+        public void statement_prefix__BEGIN(Cursor m) {
+            job.curlex.CreateProtopad(null);
+            var con = make_constant(m, "anon", "BEGIN");
+
+            set_constant(con, ast<SubInfo>(atk(m,"blast")));
+            make(m,con);
+        }
+
+        public void comp_unit(Cursor m) {
+            var sl = ast<Op.Op>(atk(m, "statementlist"));
+
+            if (job.curlex.dylex.ContainsKey("&MAIN") && job.unit.name == "MAIN") {
+                sl = new Op.StatementList(m, sl, Op.Helpers.mkcall(m, "&MAIN_HELPER"));
+            }
+
+            finish(job.curlex, sl);
+            // SSTO prune_match
+
+            make(m, job.unit);
+        }
+
         void add_exports(SubInfo to, string name, P6any what, string[] how) { throw new NotImplementedException(); }
         void check_categorical(Cursor m, string name) { throw new NotImplementedException(); }
         bool is_name(Cursor m, string name) { throw new NotImplementedException(); }
