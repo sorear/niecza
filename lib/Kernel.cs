@@ -1971,6 +1971,9 @@ namespace Niecza {
                 extend = new Dictionary<string,object[]>();
             extend[name] = args;
         }
+        public void DelExtend(string name) {
+            if (extend != null) extend.Remove(name);
+        }
 
         public SubInfo StateOuter() {
             return (special & MAINLINE) != 0 ? this : outer;

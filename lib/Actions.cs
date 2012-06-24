@@ -62,6 +62,7 @@ namespace Niecza.Compiler {
 
         // Little things to make writing wads of data-extraction code nicer...
         string asstr(Variable v) { return v.Fetch().mo.mro_raw_Str.Get(v); }
+        string asstr0(Variable v) { return isdef(v) ? asstr(v) : null; }
         bool istrue(Variable v) { return v.Fetch().mo.mro_raw_Bool.Get(v); }
         bool isdef(Variable v) { return v.Fetch().mo.mro_raw_defined.Get(v); }
         Variable atk(Variable v, string at) {
@@ -74,6 +75,7 @@ namespace Niecza.Compiler {
             foreach (string at in ats) v = atk(v,at);
             return v;
         }
+        Variable rx_info(string k) { return atk(job.context("%*RX"), k); }
 
         P6any mkint(int i) { return (P6any)Builtins.MakeInt(i); }
         P6any mkstr(string s) { return s==null ? Kernel.StrMO.typeObj : (P6any)Builtins.MakeStr(s); }
@@ -604,22 +606,25 @@ dyn:
         }
 
         public void regex_def_1(Cursor m) {
-            install_sub(m, job.curlex, job.multiness, job.scope, Kernel.RegexMO,
-                    atk(m, "deflongname"),
-                    (job.scope ?? "has") == "has" ? "normal" : null, false);
+            string scope = asstr0(job.context("$*SCOPE"));
+            install_sub(m, job.curlex, asstr0(job.context("$*MULTINESS")),
+                scope, Kernel.RegexMO, atk(m, "deflongname"),
+                (scope ?? "has") == "has" ?  "normal" : null, false);
         }
 
         public void regex_def_2(Cursor m) {
+            var rx = job.context("%*RX");
             if (flist(atk(m,"signature")).Length > 1)
                 sorry(m, "Too many signatures on regex");
 
+            string endsym = null;
             foreach (var tx in flist(atk(m, "trait"))) {
                 var t = ast<Prod<string,object>>(tx);
                 if (t.v1 == "unary" || t.v1 == "binary" || t.v1 == "defequiv" ||
                         t.v1 == "of") {
                     // Ignored for now
                 } else if (t.v1 == "endsym") {
-                    job.rxinfo.endsym = (string)t.v2;
+                    endsym = (string)t.v2;
                 } else {
                     sorry(m, "Unhandled regex trait {0}", t.v1);
                 }
@@ -627,13 +632,15 @@ dyn:
 
             string cn = (string)job.curlex.GetExtend0("cleanname");
             if ((string)job.curlex.GetExtend0("multi") == "proto") {
-                if (cn != null) job.proto_endsym[cn] = job.rxinfo.endsym;
+                if (cn != null) job.proto_endsym[cn] = endsym;
             } else {
-                if (cn != null && job.rxinfo.endsym == null)
-                    job.rxinfo.endsym = job.proto_endsym.GetDefault(cn, null);
+                if (cn != null && endsym == null)
+                    endsym = job.proto_endsym.GetDefault(cn, null);
             }
 
-            job.rxinfo.dba = (string)job.curlex.GetExtend0("name") ?? "anonymous regex";
+            if (endsym != null)
+                assign(atk(rx, "endsym"), mkstr(endsym));
+            assign(atk(rx,"dba"), mkstr((string)job.curlex.GetExtend0("name") ?? "anonymous regex"));
         }
 
         public void regex_def(Cursor m) {
@@ -664,7 +671,7 @@ dyn:
             if (istrue(atk(m,"metachar"))) {
                 from(m,"metachar");
             } else {
-                make(m,new RxOp.String(asstr(m), job.rxinfo.i));
+                make(m,new RxOp.String(asstr(m), istrue(rx_info("i"))));
             }
         }
 
@@ -680,7 +687,9 @@ dyn:
             var atom = ast<RxOp.RxOp>(atk(m,"atom"));
             var q    = istrue(atk(m,"quantifier")) ? ast<QuantInfo>(atk(m,"quantifier")) : default(QuantInfo);
 
-            if (job.rxinfo.r) {
+            var rx = job.context("%*RX");
+
+            if (istrue(atk(rx,"r"))) {
                 // quantifier without explicit :? / :! gets :
                 if (q.mod == null) q.mod = "";
             }
@@ -699,7 +708,7 @@ dyn:
                 // parsing quirk. x #`(1) ** #`(21) y, the 1* position is
                 // counted as $<normspace> but the 2* is parsed by the
                 // quantifier
-                if ((q.general || q.sep != null) && job.rxinfo.s &&
+                if ((q.general || q.sep != null) && istrue(atk(rx,"s")) &&
                         (q.space || istrue(atk(m,"normspace")))) {
                     if (q.sep != null) {
                         z[1] = new RxOp.Sequence(new [] {
@@ -725,7 +734,7 @@ dyn:
                 }
                 atom = new RxOp.Sequence(new [] { atom,
                     new RxOp.Tilde(q.tilde_inner, ((RxOp.String)closer).text,
-                        job.rxinfo.dba) });
+                        asstr(atk(rx,"dba"))) });
             }
 
             make(m,atom);
@@ -788,14 +797,14 @@ dyn:
         void LISTrx(Cursor m) {
             var tag = asstr(atk(atk(atk(m,"delims"),"0"),"sym"));
             var zyg = flist_ast<RxOp.RxOp>(atk(m,"list"));
-            var dba = job.rxinfo.dba;
+            var dba = asstr(rx_info("dba"));
             if (tag == "&" || tag == "&") make(m,new RxOp.Conj(zyg));
             if (tag == "||") make(m,new RxOp.SeqAlt(zyg,dba));
             if (tag == "|") make(m,new RxOp.Alt(zyg,dba));
         }
 
         public void metachar__sigwhite(Cursor m) {
-            make(m, job.rxinfo.s ? (RxOp.RxOp)new RxOp.Sigspace() : rnoop);
+            make(m, istrue(rx_info("s")) ? (RxOp.RxOp)new RxOp.Sigspace() : rnoop);
         }
 
         public void metachar__unsp(Cursor m) { make(m, rnoop); }
@@ -832,8 +841,8 @@ dyn:
         }
 
         public void metachar__28_29(Cursor m) { // ( )
-            var pnum = job.rxinfo.paren++;
-            make(m, rxcapturize(m, pnum.ToString(), encapsulate_regex(m,
+            var pnum = asstr(Builtins.postinc(rx_info("paren")));
+            make(m, rxcapturize(m, pnum, encapsulate_regex(m,
                 ast<RxOp.RxOp>(atk(m,"nibbler")), true)));
         }
 
@@ -864,12 +873,13 @@ dyn:
 
         public void metachar__qw(Cursor m) {
             var strings = new List<RxOp.RxOp>();
+            var rx = job.context("%*RX");
             trymop(m, () => {
                 var words = eval_ast(m, ast<Op.Op>(atk(m,"circumfix")));
                 foreach (var w in Builtins.UnboxLoS(words))
-                    strings.Add(new RxOp.String(w, job.rxinfo.i));
+                    strings.Add(new RxOp.String(w, istrue(atk(rx,"i"))));
             });
-            make(m, new RxOp.Alt(strings.ToArray(), job.rxinfo.dba));
+            make(m, new RxOp.Alt(strings.ToArray(), asstr(atk(rx,"dba"))));
         }
 
         public void metachar__3c_3e(Cursor m) { // < >
@@ -877,7 +887,7 @@ dyn:
         }
         public void metachar__5c(Cursor m) { // \
             var cc = ast<object>(atk(m,"backslash"));
-            make(m, (cc is string) ? new RxOp.String((string)cc, job.rxinfo.i)
+            make(m, (cc is string) ? new RxOp.String((string)cc, istrue(rx_info("i")))
                     : cc_to_rxop((CCinfo)cc));
         }
 
@@ -904,7 +914,7 @@ dyn:
                 make(m,new RxOp.VarString(rxembed(m, qa)));
             } else {
                 make(m, new RxOp.String(((Op.StringLiteral)qa).text,
-                    job.rxinfo.i));
+                    istrue(rx_info("i"))));
             }
         }
         public void metachar__22_22(Cursor m) { // " "
@@ -933,7 +943,7 @@ dyn:
                 }
 
                 if (all_digits(cid))
-                    job.rxinfo.paren = 1 + (int)Utils.S2N(cid);
+                    assign(rx_info("paren"), mkint(1 + (int)Utils.S2N(cid)));
 
                 make(m,rxcapturize(m, cid, a));
                 return;
@@ -1103,12 +1113,13 @@ dyn:
         public void cclass_elem__quote(Cursor m) {
             var qa = ast<Op.Op>(atk(m,"quote"));
             var sqa = qa as Op.StringLiteral;
+            bool ii = istrue(rx_info("i"));
             if (sqa == null) {
                 make(m,new RxOp.VarString(rxembed(m, qa)));
-            } else if (!job.rxinfo.i) {
+            } else if (!ii) {
                 make(m,string_cc(sqa.text));
             } else {
-                make(m,op_cc(false,new RxOp.String(sqa.text, job.rxinfo.i)));
+                make(m,op_cc(false,new RxOp.String(sqa.text, ii)));
             }
         }
 
@@ -1135,10 +1146,12 @@ dyn:
             if (istrue(atk(m,"assertion"))) {
                 from(m,"assertion");
             } else if (name == "sym") {
-                if (job.rxinfo.sym == null)
+                var rx = job.context("%*RX");
+                string sym = asstr0(atk(rx,"sym"));
+                if (sym == null)
                     sorry(m,"<sym> is only valid in multiregexes");
-                make(m,new RxOp.Sym(job.rxinfo.sym ?? "", job.rxinfo.endsym,
-                    job.rxinfo.i, job.rxinfo.a));
+                make(m,new RxOp.Sym(sym ?? "", asstr0(atk(rx,"endsym")) ?? "",
+                    istrue(atk(rx,"i")), istrue(atk(rx,"a"))));
             } else if (name == "before") {
                 make(m,new RxOp.Before(ast<RxOp.RxOp>(atk(m,"nibbler"))));
                 return; // no capture needed
@@ -1265,7 +1278,7 @@ dyn:
             if (ks == "lang") {
                 make(m,new RxOp.SetLang(rxembed(m, va)));
             } else if (ks == "dba") {
-                job.rxinfo.dba = asstr(eval_ast(m,va));
+                assign(rx_info("dba"), mkstr(asstr(eval_ast(m,va))));
             }
         }
 
@@ -2149,13 +2162,14 @@ dyn:
 
             Cursor here = ((Cursor)variable.Fetch());
             here = here.UnMatch().At(here.from);
+            string has_self;
 
             if (!vast.@checked)
                 sorry(here, "do_variable_reference must always precede check_variable");
 
             switch (vast.twigil == null ? '\0' : vast.twigil[0]) {
                 case '\0':
-                    if (job.in_decl != "" || vast.name == null ||
+                    if (istrue(job.context("$*IN_DECL")) || vast.name == null ||
                             vast.name[0] < 'A' || vast.name[0] == '¢' ||
                             is_known(here, name) || vast.pkg != null) {
                         CompUtils.MarkUsed(here, name);
@@ -2186,14 +2200,16 @@ dyn:
                     }
 
                 case '!':
-                    if (job.has_self == "") // XXX to be replaced by MOP queries
+                    has_self = asstr0(job.context("$*HAS_SELF"));
+                    if (has_self == "") // XXX to be replaced by MOP queries
                         sorry(here, "Variable {0} used where no 'self' is available", name);
                     return;
 
                 case '.':
-                    if (job.has_self == "") // XXX to be replaced by MOP queries
+                    has_self = asstr0(job.context("$*HAS_SELF"));
+                    if (has_self == "") // XXX to be replaced by MOP queries
                         sorry(here, "Virtual call {0} used where no 'self' is available", name);
-                    if (job.has_self == "partial")
+                    if (has_self == "partial")
                         sorry(here, "Virtual call {0} may not be used on partially constructed object", name);
                     return;
 
@@ -2439,6 +2455,8 @@ dyn:
             make(m,rt);
         }
 
+        bool inrealsig() { return istrue(job.context("$*SIGNUM")); }
+
         // :: ParamInfo
         public void param_var(Cursor m) {
             if (istrue(atk(m,"signature"))) {
@@ -2485,7 +2503,7 @@ dyn:
                 check_categorical(m, slot);
                 addlex(m, job.curlex, slot, new LISimple(
                     (list ? LISimple.LIST : 0) + (hash ? LISimple.HASH : 0) +
-                    (job.signum != 0 ? LISimple.NOINIT : 0), null));
+                    (inrealsig() ? LISimple.NOINIT : 0), null));
             });
 
             make(m, new ParamInfo { slot = slot, flags = flags, names =
@@ -2503,7 +2521,7 @@ dyn:
 
             int flags = p_ast.flags;
 
-            if (job.signum != 0 && job.curlex.GetExtend0T("rw_lambda",true))
+            if (inrealsig() && job.curlex.GetExtend0T("rw_lambda",true))
                 flags |= Parameter.READWRITE;
 
             foreach (var trait in flist(atk(m,"trait"))) {
@@ -2609,7 +2627,7 @@ dyn:
                     pva.slot ?? "", null, null, null, pva.attribute,
                     pva.attribute_type);
                 Signature nsig = new Signature(np);
-                if (job.signum != 0)
+                if (inrealsig())
                     job.curlex.sig = nsig;
                 make(m, nsig);
                 return;
@@ -2636,7 +2654,7 @@ dyn:
                 }
             }
 
-            if (job.signum != 0 &&
+            if (inrealsig() &&
                     (p.Length == 0 || (p[0].flags & Parameter.INVOCANT) == 0) &&
                     (job.curlex.mo.HasType(Kernel.MethodMO) ||
                         job.curlex.mo.HasType(Kernel.SubmethodMO))) {
@@ -2647,7 +2665,7 @@ dyn:
             }
 
             foreach (Parameter px in p) {
-                if (px.type == null && job.signum != 0) {
+                if (px.type == null && inrealsig()) {
                     if ((px.flags & Parameter.INVOCANT) != 0 && job.curlex.methodof != null) {
                         px.type = job.curlex.methodof;
                         px.flags |= Parameter.HASTYPE;
@@ -2659,7 +2677,7 @@ dyn:
             }
 
             var sig = new Signature(p);
-            if (job.signum != 0) job.curlex.sig = sig;
+            if (inrealsig()) job.curlex.sig = sig;
             make(m,sig);
         }
 
@@ -2854,7 +2872,7 @@ dyn:
 
             if (istrue(atk(m,"signature"))) {
                 // SSTO: make this work after making defterm and param_var
-                // respect job.scope
+                // respect $*SCOPE
                 throw new NotImplementedException();
             } else {
                 from_any(m, "variable_declarator", "routine_declarator",
@@ -2864,7 +2882,7 @@ dyn:
         }
 
         public void defterm(Cursor m) {
-            if (job.in_decl == "constant") return;
+            if (asstr0(job.context("$*IN_DECL")) == "constant") return;
             trymop(m, () => {
                 addlex(m, job.curlex, asstr(m), new LISimple(0,null));
                 check_categorical(m, asstr(m));
@@ -3023,7 +3041,7 @@ dyn:
                 sorry(m, "Attribute {0} declared outside of any class", name);
                 return new Op.StatementList(m);
             }
-            if (job.augment_buffer != null) {
+            if (job.curlex.GetExtend0("augment_buffer") != null) {
                 sorry(m, "Attribute {0} declared in an augment");
                 return new Op.StatementList(m);
             }
@@ -3043,10 +3061,10 @@ dyn:
         }
 
         public void variable_declarator(Cursor m) {
-            if (job.multiness != null)
+            if (istrue(job.context("$*MULTINESS")))
                 sorry(m, "Multi variables NYI");
 
-            var scope = job.scope ?? "my";
+            var scope = asstr0(job.context("$*SCOPE")) ?? "my";
 
             SubInfo start = null;
             foreach (var t in flist_ast<Prod<string,object>>(atk(m,"trait"))) {
@@ -3066,10 +3084,11 @@ dyn:
                 sorry(m, "Illogical scope {0} for simple variable", scope);
 
             STable typeconstraint = null;
-            if (job.oftype != null) {
-                var of = ast<TypeConstraint>(job.oftype);
+            var oftype = job.context("$*OFTYPE");
+            if (oftype != null) {
+                var of = ast<TypeConstraint>(oftype);
                 if (of.type == null || of.tmode != 0)
-                    sorry((Cursor)job.oftype.Fetch(), "Only simple types may be attached to variables");
+                    sorry((Cursor)oftype.Fetch(), "Only simple types may be attached to variables");
                 typeconstraint = of.type ?? Kernel.AnyMO;
                 if (scope == "our")
                     sorry(m, "Common variables are not unique definitions and may not have types");
@@ -3146,7 +3165,7 @@ dyn:
 
 
         public void type_declarator__subset(Cursor m) {
-            STable basetype = process_name(atk(job.oftype,"longname"),
+            STable basetype = process_name(atk(job.context("$*OFTYPE"),"longname"),
                     REFER).pkg ?? Kernel.AnyMO;
             var exports = new List<string>();
 
@@ -3166,8 +3185,9 @@ dyn:
 
             trymop(m, () => {
                 STable obj = null;
-                do_new_package(m, ref lexvar, ref obj, job.curlex, job.scope,
-                    atk(m,"longname"), P6how.SUBSET, exports.ToArray());
+                do_new_package(m, ref lexvar, ref obj, job.curlex,
+                    asstr0(job.context("$*SCOPE")), atk(m,"longname"),
+                    P6how.SUBSET, exports.ToArray());
 
                 job.curlex.CreateProtopad(null);
 
@@ -3232,19 +3252,19 @@ dyn:
         }
 
         public void install_constant(Cursor m) {
-            if (job.multiness != null)
+            if (istrue(job.context("$*MULTINESS")))
                 sorry(m, "Multi variables NYI");
 
             var name = isdef(atk(m,"defterm")) ? asstr(atk(m,"defterm")) :
                 isdef(atk(m,"variable")) ? asstr(atk(m,"variable")) :
                 job.gensym();
 
-            make(m,make_constant(m, job.scope, name));
+            make(m,make_constant(m, asstr0(job.context("$*SCOPE")), name));
         }
 
         // note: named and unnamed enums are quite different beasts
         public void type_declarator__enum(Cursor m) {
-            var scope = job.scope ?? "our";
+            var scope = asstr0(job.context("$*SCOPE")) ?? "our";
             var exports = new List<string>();
 
             foreach (var t in flist_ast<Prod<string,object>>(atk(m,"trait"))) {
@@ -3262,7 +3282,7 @@ dyn:
 
             string kindtype = asstr(Builtins.InvokeMethod("data-type", map));
 
-            STable basetype = process_name(atk(job.oftype,"longname"), REFER).pkg ?? compile_get_pkg(false, "CORE", kindtype);
+            STable basetype = process_name(atk(job.context("$*OFTYPE"),"longname"), REFER).pkg ?? compile_get_pkg(false, "CORE", kindtype);
 
             if (istrue(atk(m,"longname")) && scope != "anon") {
                 // Longnamed enum is a kind of type definition
@@ -3368,7 +3388,7 @@ dyn:
         void packageoid_trait(Cursor m, string key, object value) {
             var pack = job.curlex.body_of;
             if (key == "name") {
-                if (job.augment_buffer != null) {
+                if (job.curlex.GetExtend0("augment_buffer") != null) {
                     sorry(m, "Superclass declared in an augment");
                     return;
                 }
@@ -3379,7 +3399,7 @@ dyn:
                 pack.mo.superclasses.Add(Kernel.ToInheritable(
                     (STable)value));
             } else if (key == "does") {
-                if (job.augment_buffer != null) {
+                if (job.curlex.GetExtend0("augment_buffer") != null) {
                     sorry(m, "Role used in an augment");
                     return;
                 }
@@ -3448,7 +3468,7 @@ dyn:
         }
 
         public void arglist(Cursor m) {
-            if (job.invocant_is != null)
+            if (istrue(job.context("$*INVOCANT_IS")))
                 sorry(m, "Invocant handling is NYI");
             if (!istrue(atk(m,"EXPR"))) {
                 make(m, new Op.Op[0]);
@@ -3658,7 +3678,7 @@ dyn:
             if (mn.name == "strict") {
                 job.curlex.SetExtend("strict", false);
             } else if (mn.name == "MONKEY_TYPING") {
-                job.monkey_typing = false;
+                assign(job.context("$*MONKEY_TYPING"), Kernel.FalseV);
             } else {
                 sorry(m, "No 'no' handling for {0}", mn.name);
             }
@@ -3813,12 +3833,13 @@ dyn:
 
         // special action method
         public void open_package_def(Cursor m) {
-            if (job.multiness != null)
+            if (istrue(job.context("$*MULTINESS")))
                 sorry(m, "Multi variables NYI");
 
-            if (job.scope == "augment") {
+            string jscope = asstr0(job.context("$*SCOPE"));
+            if (jscope == "augment") {
                 STable obj = process_name(atk(m,"longname"), CLEAN+REFER).pkg;
-                job.augment_buffer = new List<object>();
+                job.curlex.SetExtend("augment_buffer", new List<object>());
 
                 trymop(m, () => {
                     if (obj == null) throw new NieczaException("Augment requires a target");
@@ -3830,7 +3851,7 @@ dyn:
                     job.curlex.name = "augment-" + obj.name;
                 });
             } else {
-                int kls = CompUtils.rtype_to_type(job.pkgdecl);
+                int kls = CompUtils.rtype_to_type(asstr(job.context("$*PKGDECL")));
                 if (kls == P6how.ROLE) {
                     addlex(m, job.curlex, "$?CLASS", new LISimple(LISimple.NOINIT, null));
                     var sig = ast_if<Signature>(atk(m,"signature")) ?? new Signature();
@@ -3843,14 +3864,14 @@ dyn:
                 STable obj = null;
 
                 do_new_package(m, ref lexvar, ref obj, job.curlex.outer,
-                        job.scope, atk(m,"longname"), kls, new string[0]);
+                        jscope, atk(m,"longname"), kls, new string[0]);
 
                 job.curlex.outervar = lexvar;
                 job.curlex.body_of = job.curlex.cur_pkg = job.curlex.in_class =
                     obj;
 
                 process_block_traits(m, atk(m,"trait"));
-                job.curlex.name = job.pkgdecl + "-" + obj.name;
+                job.curlex.name = obj.mo.rtype + "-" + obj.name;
             }
         }
 
@@ -3863,19 +3884,21 @@ dyn:
 
             Op.Op ast = ast_if<Op.Op>(atk(m,"blockoid")) ?? ast_if<Op.Op>(atk(m,"statementlist"));
 
-            if (job.augment_buffer != null) {
+            var augment_buffer = sub.GetExtend0("augment_buffer") as List<object>;
+            if (augment_buffer != null) {
                 // generate an INIT block to do the augment
                 SubInfo ph = create_sub("phaser-" + sub.name, sub,
                     Kernel.CodeMO, sub.cur_pkg, null,
                     (sub.special & SubInfo.RUN_ONCE) != 0);
 
-                job.augment_buffer.Insert(0, "!mo");
-                job.augment_buffer.Insert(1, CgOp.class_ref("mo", obj));
+                augment_buffer.Insert(0, "!mo");
+                augment_buffer.Insert(1, CgOp.class_ref("mo", obj));
 
-                job.augment_buffer.Add(CgOp._invalidate(CgOp.letvar("!mo")));
-                job.augment_buffer.Add(CgOp.corelex("Nil"));
+                augment_buffer.Add(CgOp._invalidate(CgOp.letvar("!mo")));
+                augment_buffer.Add(CgOp.corelex("Nil"));
 
-                finish(ph, new Op.RawCgOp(m, CgOp.letn(job.augment_buffer.ToArray())));
+                finish(ph, new Op.RawCgOp(m, CgOp.letn(augment_buffer.ToArray())));
+                sub.DelExtend("augment_buffer");
                 sub.CreateProtopad(null);
                 ph.SetPhaser(Kernel.PHASER_INIT);
                 make(m, new Op.CallSub(m, new Op.Lexical(m,bodyvar)));
@@ -4038,7 +4061,7 @@ dyn:
                 } else {
                     cleanname = name; sym = null;
                 }
-                job.rxinfo.sym = sym;
+                assign(rx_info("sym"), mkstr(sym));
                 if (sym != null) multiness = "multi";
                 sub.SetExtend("sym", sym);
                 sub.SetExtend("cleanname", cleanname);
@@ -4152,8 +4175,10 @@ dyn:
                     else if (multiness == "multi") mode += P6how.M_MULTI;
                     else throw new NieczaException("Unimplemented multiness " + multiness);
 
-                    if (job.augment_buffer != null) {
-                        job.augment_buffer.Add(CgOp._addmethod(
+                    var augment_buffer = sub.outer.GetExtend0("augment_buffer")
+                        as List<object>;
+                    if (augment_buffer != null) {
+                        augment_buffer.Add(CgOp._addmethod(
                             CgOp.letvar("!mo"), mode, CgOp.str(name),
                             CgOp.fetch(CgOp.scopedlex(symbol))));
                     } else {
@@ -4188,7 +4213,8 @@ dyn:
         // special action methods.
         // always a sub, though sometimes it's an implied sub after multi/proto/only
         public void routine_def_1(Cursor m) {
-            install_sub(m, job.curlex, job.multiness, job.scope, Kernel.SubMO,
+            install_sub(m, job.curlex, asstr0(job.context("$*MULTINESS")),
+                    asstr0(job.context("$*SCOPE")), Kernel.SubMO,
                     atk(m,"deflongname"), null, istrue(atk(m,"sigil")) &&
                     asstr(atk(m,"sigil")) == "&*");
         }
@@ -4203,16 +4229,18 @@ dyn:
 
         public void method_def_1(Cursor m) {
             string type = istrue(atk(m,"type")) ? asstr(atk(m,"type")) : "";
-            if (type != "" && job.has_self == "partial") {
+            string has_self = asstr0(job.context("$*HAS_SELF"));
+            if (type != "" && has_self == "partial") {
                 type = "";
                 sorry(m, "Type symbols cannot be used with submethod");
             }
 
-            install_sub(m, job.curlex, job.multiness, job.scope,
-                    job.has_self == "partial" ? Kernel.SubmethodMO :
-                    Kernel.MethodMO, atk(m,"longname"), type == "^" ? "meta" :
-                    type == "!" ? "private" : job.has_self == "partial" ?
-                    "sub" : "normal", false);
+            install_sub(m, job.curlex, asstr0(job.context("$*MULTINESS")),
+                    asstr0(job.context("$*SCOPE")), has_self == "partial" ?
+                        Kernel.SubmethodMO : Kernel.MethodMO,
+                    atk(m,"longname"), type == "^" ? "meta" :
+                        type == "!" ? "private" : has_self == "partial" ?
+                        "sub" : "normal", false);
         }
 
         public void method_def_2(Cursor m) {
@@ -4248,7 +4276,8 @@ dyn:
 
         public void block(Cursor m) {
             var code = ast<Op.Op>(atk(m,"blockoid"));
-            if (job.catchy) code = new Op.CatchyWrapper(m, code);
+            if (istrue(job.context("$*catchy")))
+                code = new Op.CatchyWrapper(m, code);
             finish(job.curlex, code);
             // SSTO prune-match
             make(m, job.curlex);

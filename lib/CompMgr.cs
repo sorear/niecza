@@ -65,12 +65,6 @@ namespace Niecza.Compiler {
         public string unitname;
         public bool is_main, is_eval, is_repl;
 
-        public struct RxInfo {
-            public string sym, endsym, dba;
-            public bool i, a, r, s;
-            public int paren;
-        };
-
         // state vars
         public RuntimeUnit unit;      // $*unit
 
@@ -78,19 +72,7 @@ namespace Niecza.Compiler {
         public SubInfo     curlex;    // $*CURLEX
         public Frame       topframe;
 
-        public RxInfo      rxinfo;    // %*RX
         public Actions     actions;   // $*ACTIONS
-        public string      in_decl;   // $*IN_DECL
-        public string      scope;     // $*IN_DECL
-        public string      multiness; // $*IN_DECL
-        public string      has_self;  // $*HAS_SELF
-        public int         signum;    // $*SIGNUM
-        public List<object> augment_buffer;
-        public string      pkgdecl;
-        public Variable    oftype;
-        public object      invocant_is;
-        public bool        monkey_typing;
-        public bool        catchy;
 
         public Variable context(string name) {
             return Kernel.ContextHelper(topframe, name, 0);
