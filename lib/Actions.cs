@@ -8,8 +8,57 @@ using System.Text;
 namespace Niecza.Compiler {
     class Actions {
         internal CompJob job;
+
         RxOp.RxOp rnoop = new RxOp.Sequence(new RxOp.RxOp[0]);
-        public Actions(CompJob job) { this.job = job; }
+
+        Dictionary<string,Action<Cursor>> acts;
+
+        public Actions(CompJob job) {
+            this.job = job;
+            acts = new Dictionary<string,Action<Cursor>>();
+
+            Type tt = typeof(Actions);
+            foreach (var m in tt.GetMethods()) {
+                if (m.DeclaringType != tt || !m.IsPublic)
+                    continue;
+                acts[m.Name] = (Action<Cursor>) Delegate.CreateDelegate(
+                    typeof(Action<Cursor>), this, m);
+            }
+        }
+
+        internal void CallAction(Frame th, string name, Cursor m) {
+            Action<Cursor> act;
+            string cooked_name = name;
+            int ix = name.IndexOf(':');
+            if (ix >= 0) {
+                var sb = new StringBuilder();
+                sb.Append(name.Substring(0,ix));
+                int lix = name.Length;
+                if (lix - ix >= 6 && name.Substring(ix+1,3) == "sym") {
+                    lix --; ix += 5; // :sym<
+                }
+                sb.Append("__");
+                for (int i = ix; i < lix; i++) {
+                    char c = name[i];
+                    if (c == '_' || (c >= '0' && c <= '9') ||
+                            (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+                        sb.Append(c);
+                    } else {
+                        sb.AppendFormat("{0:x2}", (int)c);
+                    }
+                }
+                cooked_name = sb.ToString();
+            }
+            acts.TryGetValue(cooked_name, out act);
+            if (Cursor.Trace)
+                Console.WriteLine("Call action {0} - {1}", cooked_name,
+                    act != null ? "found" : "not found");
+            if (act != null) {
+                job.topframe = th;
+                job.curlex   = Kernel.UnboxAny<SubInfo>(job.context("$*CURLEX").Fetch());
+                act(m);
+            }
+        }
 
         // Little things to make writing wads of data-extraction code nicer...
         string asstr(Variable v) { return v.Fetch().mo.mro_raw_Str.Get(v); }

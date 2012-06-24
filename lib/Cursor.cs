@@ -12,9 +12,15 @@ public sealed class GState {
     public int highwater;
 
     public Variable actions;
+    internal Niecza.Compiler.Actions comp;
 
     internal Frame CallAction(Frame th, string name, Cursor match) {
-        if (actions == null || name == "" || name == null)
+        if (name == "" || name == null)
+            return th;
+
+        if (comp != null)
+            comp.CallAction(th, name, match);
+        if (actions == null)
             return th;
         if (Cursor.Trace)
             Console.WriteLine("To call action {0}", name);

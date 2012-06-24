@@ -73,7 +73,11 @@ namespace Niecza.Compiler {
 
         // state vars
         public RuntimeUnit unit;      // $*unit
+
+        // this one is used SO MUCH it gets to stay :>
         public SubInfo     curlex;    // $*CURLEX
+        public Frame       topframe;
+
         public RxInfo      rxinfo;    // %*RX
         public Actions     actions;   // $*ACTIONS
         public string      in_decl;   // $*IN_DECL
@@ -87,6 +91,10 @@ namespace Niecza.Compiler {
         public object      invocant_is;
         public bool        monkey_typing;
         public bool        catchy;
+
+        public Variable context(string name) {
+            return Kernel.ContextHelper(topframe, name, 0);
+        }
 
         public Variable get_memo(int pos, string key) { throw new NotImplementedException(); } //SSTO
 
