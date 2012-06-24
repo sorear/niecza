@@ -604,7 +604,9 @@ dyn:
         }
 
         public void regex_def_1(Cursor m) {
-            throw new NotImplementedException(); // SSTO install_sub
+            install_sub(m, job.curlex, job.multiness, job.scope, Kernel.RegexMO,
+                    atk(m, "deflongname"),
+                    (job.scope ?? "has") == "has" ? "normal" : null, false);
         }
 
         public void regex_def_2(Cursor m) {
