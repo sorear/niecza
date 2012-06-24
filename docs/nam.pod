@@ -606,7 +606,7 @@ Adds the contents of a fixed list to the beginning of a variable list in order.
 
 =head3 slurp
 
-=head3 spew
+=head3 spurt
 
 =head3 treader_getc
 

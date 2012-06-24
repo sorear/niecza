@@ -78,7 +78,7 @@ sub Open($sender, $eventargs) #OK not used
 
 sub Save($sender, $eventargs) #OK not used
 {
-    if defined $filename { spew $filename, $textbox.Text; $modified=False; setformtitle(); }
+    if defined $filename { spurt $filename, $textbox.Text; $modified=False; setformtitle(); }
     else                 { SaveAs($sender, $eventargs); }
 }
 
@@ -89,7 +89,7 @@ sub SaveAs($sender, $eventargs) #OK not used
     $dialogSave.FilterIndex = 1;
     if ~ $dialogSave.ShowDialog eq 'OK' {
         $filename = $dialogSave.FileName;
-        spew $filename, $textbox.Text;
+        spurt $filename, $textbox.Text;
         $modified = False;
         setformtitle();
     }

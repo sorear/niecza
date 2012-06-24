@@ -3081,7 +3081,7 @@ dynamic:
             thandlers["say"] = Methody(null, Tokens.Console_WriteLine);
             thandlers["print"] = Methody(null, Tokens.Console_Write);
             thandlers["slurp"] = Methody(null, typeof(File).GetMethod("ReadAllText", new Type[] { Tokens.String }));
-            thandlers["spew"] = Methody(null, typeof(File).GetMethod("WriteAllText", new Type[] { Tokens.String, Tokens.String }));
+            thandlers["spurt"] = Methody(null, typeof(File).GetMethod("WriteAllText", new Type[] { Tokens.String, Tokens.String }));
             thandlers["vvarlist_to_fvarlist"] = Methody(null, Tokens.VVarList.GetMethod("CopyAsArray"));
             thandlers["vvarlist_shift"] = Methody(null, Tokens.VVarList.GetMethod("Shift"));
             thandlers["vvarlist_pop"] = Methody(null, Tokens.VVarList.GetMethod("Pop"));
