@@ -4332,7 +4332,7 @@ grammar Q is STD {
 
     method tweak(:single(:$q), :double(:$qq), :cclass(:$cc), :backslash(:$b),
             :scalar(:$s), :array(:$a), :hash(:$h), :function(:$f),
-            :closure(:$c), :path(:$p), :exec(:$x), :words(:$w),
+            :closure(:$c), :path(:$p), :exec(:$x), :words(:$w), :$CgOp,
             :quotewords(:$ww), :heredoc(:$to), :$regex, *%unknown) {
         # NIECZA ::foo syntax is broken, no role cronies, no MMD
         if    $q.defined  { self.truly($q,  ':q'); self.mixin(STD::Q::q) }
@@ -4353,6 +4353,7 @@ grammar Q is STD {
         elsif $ww.defined { self.mixin($ww ?? STD::Q::ww1 !! STD::Q::ww0) }
 
         elsif $to.defined { self.truly($to, ':to'); self.cursor_fresh(STD::Q but STD::Q::herehead[ [self, []] ]) }
+        elsif $CgOp.defined { self.truly($to, ':to'); self.cursor_fresh(STD::CgOp) }
 
         elsif $regex.defined {
             %*LANG<Regex>
@@ -5133,6 +5134,25 @@ grammar Regex is STD {
         }
     }
 
+}
+
+grammar CgOp is STD {
+    rule nibbler { <cgexp> }
+
+    token category:cgexp { <sym> }
+    proto token cgexp {*}
+
+    token cgopname { <-[ ' " ( ) { } \[ \] \s ]> + }
+
+    token cgexp:op { <[ ( \[ ]>:s {} <cgopname> [ <cgexp> ]* <[ ) \] ]> }
+    token cgexp:name { <cgopname> }
+    token cgexp:quote { <?before <[ ' " ]>> {} [ :lang(%*LANG<MAIN>) <quote> ] }
+    token cgexp:decint { <decint> }
+    token cgexp:p6exp { :lang(%*LANG<MAIN>) '{' ~ '}' <statementlist> }
+    token cgexp:bad { <!before <[ ) \] ]> > {}
+        [ <?stdstopper> <.panic: "Missing cgop"> ]
+        <.panic: "Unparsable cgop">
+    }
 }
 
 #################
