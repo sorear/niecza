@@ -1684,7 +1684,7 @@ my class List is Cool does Positional {
         if $cmp_.count == 1 {
             $cmp = sub (\x, \y) { $cmp_(x) cmp $cmp_(y) }
         }
-        my $min = self[0];
+        my $min = self[0] // return Inf;
         for @(self) {
             $min = $_ if $cmp($_, $min) < 0;
         }
@@ -1696,7 +1696,7 @@ my class List is Cool does Positional {
         if $cmp_.count == 1 {
             $cmp = sub (\x, \y) { $cmp_(x) cmp $cmp_(y) }
         }
-        my $max = self[0];
+        my $max = self[0] // return -Inf;
         for @(self) {
             $max = $_ if $cmp($_, $max) > 0;
         }
@@ -1708,7 +1708,7 @@ my class List is Cool does Positional {
         if $cmp_.count == 1 {
             $cmp = sub (\x, \y) { $cmp_(x) cmp $cmp_(y) }
         }
-        my $min = self[0];
+        my $min = self[0] // return Inf .. -Inf;
         my $max = self[0];
         for @(self) {
             $min = $_ if $cmp($_, $min) < 0;
