@@ -490,7 +490,7 @@ S32-hash/pairs.t
 S32-hash/push.t
 S32-hash/slice.t
 S32-io/chdir.t
-S32-io/dir.t
+# S32-io/dir.t # dir spec has been rewritten out from under us
 S32-io/file-tests.t
 S32-io/note.t
 S32-list/categorize.t
