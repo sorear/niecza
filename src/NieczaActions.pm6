@@ -1492,7 +1492,13 @@ method infixish($/) {
         return Nil; # handled elsewhere
     }
 
-    if $<assign_meta_operator> {
+    if $<infix>.reduced eq 'variable' { # ie $<infix> is a variable
+        my $ast = $Operator_Function.new(function =>
+            self.do_variable_reference($/, $<infix>.ast),
+            :arity(2));
+        self.check_variable($<infix>);
+        make $ast;
+    } elsif $<assign_meta_operator> {
         # TODO: there should probably be at least a potential for others
 
         make $<infix>.ast.meta_assign;
