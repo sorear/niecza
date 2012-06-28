@@ -648,7 +648,6 @@ my class Cool {
     method words-val() { map &val, self.words }
     method chars() { chars(self) }
     method codes() { codes(self) }
-    method bytes() { chars(self) * 2 }
     method chomp() {
         my $s = ~self;
         my $l = chars($s);
