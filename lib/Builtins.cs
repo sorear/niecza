@@ -1508,8 +1508,14 @@ public partial class Builtins {
     public static Variable postinc(Variable v) {
         P6any o1 = v.Fetch();
         v.AssignO(o1.mo.mro_succ.Get(v), false);
-        if (!o1.IsDefined()) // note: slightly wrong for my Bool $x; $x++
-            o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
+
+        if (!o1.IsDefined()) {
+            if (o1.Isa(Kernel.BoolMO))
+                o1 = Kernel.FalseV;
+            else
+                o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
+        }
+
         return o1;
     }
 
@@ -1521,8 +1527,14 @@ public partial class Builtins {
     public static Variable postdec(Variable v) {
         P6any o1 = v.Fetch();
         v.AssignO(o1.mo.mro_pred.Get(v), false);
-        if (!o1.IsDefined()) // note: slightly wrong for my Bool $x; $x--
-            o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
+
+        if (!o1.IsDefined()) {
+            if (o1.Isa(Kernel.BoolMO))
+                o1 = Kernel.FalseV;
+            else
+                o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
+        }
+
         return o1;
     }
 

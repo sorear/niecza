@@ -1239,6 +1239,8 @@ my class Bool is Int does IntBasedEnum {
     our constant True = Q:CgOp { (box Bool (bool 1)) };
     our constant False = Q:CgOp { (box Bool (bool 0)) };
     method ACCEPTS(\t) { defined(self) ?? self !! t.^does(self) }
+    method succ() { True }
+    method pred() { False }
 }
 # }}}
 # Fundamental scalar operators {{{
