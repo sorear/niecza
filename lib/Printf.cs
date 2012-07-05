@@ -17,17 +17,10 @@ public partial class Builtins {
         LiteralText,
         CodePoint,
         String,
-        IntDecimal,
-        UintDecimal,
-        UintOctal,
-        UintHex,
+        Int,
         FloatScientific,
         FloatFixedDecimal,
         FloatEF,
-        UintHexUpper,
-        FloatScientificUpper,
-        FloatEFUpper,
-        UintBinary,
         InvokeCode
     }
 
@@ -56,6 +49,8 @@ public partial class Builtins {
         internal int precisionIndex; // 1-indexed
         internal PrintfDirective directive;
         internal PrintfModifier modifier;
+        internal uint radix;
+        internal bool upper;
         internal string literaltext;
     }
 
@@ -81,6 +76,8 @@ public partial class Builtins {
             format.precisionIndex = 0; // 1-indexed
             format.directive = PrintfDirective.String;
             format.modifier = PrintfModifier.None;
+            format.radix = 10;
+            format.upper = false;
             format.literaltext = "";
             if (c == '%') {  // begin format specifier
                 bool continue_parsing_specifier = true;
@@ -116,7 +113,8 @@ public partial class Builtins {
                             continue_parsing_specifier = false;
                             break;
                         case 'b':  // unsigned binary integer
-                            format.directive = PrintfDirective.UintBinary;
+                            format.directive = PrintfDirective.Int;
+                            format.radix = 2;
                             continue_parsing_specifier = false;
                             break;
                         case 'C':  // Code
@@ -129,11 +127,14 @@ public partial class Builtins {
                             break;
                         case 'd':  // decimal
                         case 'i':  // integer (alias for decimal)
-                            format.directive = PrintfDirective.IntDecimal;
+                        case 'u':  // integer (alias for decimal)
+                            format.directive = PrintfDirective.Int;
+                            format.radix = 10;
                             continue_parsing_specifier = false;
                             break;
                         case 'E':  // scientific uppercase E
-                            format.directive = PrintfDirective.FloatScientificUpper;
+                            format.directive = PrintfDirective.FloatScientific;
+                            format.upper = true;
                             continue_parsing_specifier = false;
                             break;
                         case 'e':  // scientific lowercase e
@@ -146,7 +147,8 @@ public partial class Builtins {
                             continue_parsing_specifier = false;
                             break;
                         case 'G':  // e or f uppercase E
-                            format.directive = PrintfDirective.FloatEFUpper;
+                            format.directive = PrintfDirective.FloatEF;
+                            format.upper = true;
                             continue_parsing_specifier = false;
                             break;
                         case 'g':  // e or f lowercase e
@@ -154,23 +156,24 @@ public partial class Builtins {
                             continue_parsing_specifier = false;
                             break;
                         case 'o':  // unsigned octal
-                            format.directive = PrintfDirective.UintOctal;
+                            format.directive = PrintfDirective.Int;
+                            format.radix = 8;
                             continue_parsing_specifier = false;
                             break;
                         case 's':  // string
                             format.directive = PrintfDirective.String;
                             continue_parsing_specifier = false;
                             break;
-                        case 'u':  // unsigned decimal
-                            format.directive = PrintfDirective.UintDecimal;
-                            continue_parsing_specifier = false;
-                            break;
                         case 'X':  // hex uppercase
-                            format.directive = PrintfDirective.UintHexUpper;
+                            format.directive = PrintfDirective.Int;
+                            format.radix = 16;
+                            format.upper = true;
                             continue_parsing_specifier = false;
                             break;
                         case 'x':  // hex lowercase
-                            format.directive = PrintfDirective.UintHex;
+                            format.directive = PrintfDirective.Int;
+                            format.radix = 16;
+                            format.upper = false;
                             continue_parsing_specifier = false;
                             break;
                         default:
@@ -194,74 +197,110 @@ public partial class Builtins {
         return fmtlist;
     }
 
+    private static string RemoveInitialZero(String s) {
+        if (s[0] == '0') {
+            return s.Substring(1);
+        }
+        return s;
+    }
+
     private static string RenderFormat(PrintfFormat format, Variable arg) {
         int n;
-        uint u;
-        double f, log;
-        switch (format.directive) {
-            case PrintfDirective.UintBinary:
-                n = (int) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                return Convert.ToString(n, 2);
-            case PrintfDirective.CodePoint:
-                n = (int) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                return "" + (char) n;
-            case PrintfDirective.IntDecimal:
-                n = (int) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                if (n < 0 && format.rightJustifyZeroes) {
-                    return "-" + (-n).ToString().PadLeft(format.minimumWidth - 1, '0');
+
+        if (format.directive == PrintfDirective.String) {
+            return arg.Fetch().mo.mro_raw_Str.Get(arg);
+        }
+
+        if (format.directive == PrintfDirective.CodePoint) {
+            n = (int) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+            return "" + (char) n;
+        }
+
+        bool add_minus_sign = false;
+        if (format.directive == PrintfDirective.Int) {
+
+            P6any o1 = arg.Fetch();
+            int r1;
+            P6any n1 = GetNumber(arg, o1, out r1);
+            Variable arg2;
+
+            if (r1 != NR_BIGINT && r1 != NR_FIXINT) {
+                arg2 = Builtins.InvokeMethod("Int", arg);
+                o1 = arg2.Fetch();
+                n1 = GetNumber(arg2, o1, out r1);
+            }
+
+            BigInteger value = PromoteToBigInt(r1, n1);
+            if (value < 0) {
+                add_minus_sign = true;
+                value = -value;
+            }
+
+            String number;
+            if (format.radix == 16) {
+                number = RemoveInitialZero(value.ToString(format.radix, null)).ToLower();
+            } else {
+                number = value.ToString(format.radix, null);
+            }
+
+            if (format.upper) {
+                number = number.ToUpper();
+            }
+
+            if (add_minus_sign) {
+                if (format.rightJustifyZeroes) {
+                    return "-" + number.PadLeft(format.minimumWidth - 1, '0');
                 } else {
-                    return n.ToString();
+                    return "-" + number;
                 }
-            case PrintfDirective.FloatFixedDecimal:
-                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                return f.ToString("F" + format.precision);
-            case PrintfDirective.FloatScientific:
-                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                return f.ToString("e" + format.precision);
-            case PrintfDirective.FloatScientificUpper:
-                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                return f.ToString("E" + format.precision);
-            case PrintfDirective.FloatEF:
-                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                log = Math.Log(f, 10);
-                if (log < -5 || log > 5) {
-                    return f.ToString("e" + format.precision);
+            }
+
+            return number;
+
+        } else {
+
+            double f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+
+            if (f < 0.0) {
+                add_minus_sign = true;
+                f = -f;
+            }
+
+            double log;
+            String number = "??";
+            switch (format.directive) {
+                case PrintfDirective.FloatFixedDecimal:
+                    number = f.ToString("F" + format.precision);
+                    break;
+                case PrintfDirective.FloatScientific:
+                    number = f.ToString("e" + format.precision);
+                    break;
+                case PrintfDirective.FloatEF:
+                    log = Math.Log(Math.Abs(f), 10);
+                    if (log < -5 || log > 5) {
+                        number = f.ToString("e" + format.precision);
+                    } else {
+                        number = f.ToString("F" + format.precision);
+                    }
+                    break;
+            }
+
+            if (format.upper) {
+                number = number.ToUpper();
+            }
+
+            if (add_minus_sign) {
+                if (format.rightJustifyZeroes) {
+                    return "-" + number.PadLeft(format.minimumWidth - 1, '0');
                 } else {
-                    return f.ToString("F" + format.precision);
+                    return "-" + number;
                 }
-            case PrintfDirective.FloatEFUpper:
-                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                log = Math.Log(f, 10);
-                if (log < -5 || log > 5) {
-                    return f.ToString("E" + format.precision);
-                } else {
-                    return f.ToString("F" + format.precision);
-                }
-            case PrintfDirective.String:
-                return arg.Fetch().mo.mro_raw_Str.Get(arg);
-/*                    if (format.minimumWidth > s.Length && !format.leftJustify)
-                        result += new string(' ', format.minimumWidth-s.Length);
-                    result += s;
-                    if (format.minimumWidth > s.Length && format.leftJustify)
-                        result += new string(' ', format.minimumWidth-s.Length);
-*/
-            case PrintfDirective.UintDecimal:
-                u = (uint) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                return u.ToString();
-            case PrintfDirective.UintOctal:
-                u = (uint) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                return Convert.ToString(u, 8);
-            case PrintfDirective.UintHex:
-                u = (uint) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                return Convert.ToString(u, 16);
-            case PrintfDirective.UintHexUpper:
-                u = (uint) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
-                return u.ToString("X");
-            default:
-                return "??";
+            }
+
+            return number;
         }
     }
-    
+
     private static Variable RenderFormat(List<PrintfFormat> formatlist, Variable[] args) {
         string result = "";
         int argi = 0;
@@ -278,11 +317,15 @@ public partial class Builtins {
             int i = format.index > 0 ? format.index : ++argi;
             if (i < args.Length) {
                 string s = RenderFormat(format, args[i]);
-                if (format.rightJustifyZeroes) {
-                    result += s.PadLeft(format.minimumWidth, '0');
-                }
-                else {
-                    result += s.PadLeft(format.minimumWidth, ' ');
+                if (format.leftJustify) {
+                    result += s.PadRight(format.minimumWidth, ' ');
+                } else {
+                    if (format.rightJustifyZeroes) {
+                        result += s.PadLeft(format.minimumWidth, '0');
+                    }
+                    else {
+                        result += s.PadLeft(format.minimumWidth, ' ');
+                    }
                 }
             }
             else {

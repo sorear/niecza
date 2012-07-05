@@ -1389,7 +1389,7 @@ namespace Niecza {
 			return res;
 		}
 
-		string ToString (uint radix, IFormatProvider provider)
+		public string ToString (uint radix, IFormatProvider provider)
 		{
 			const string characterSet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
