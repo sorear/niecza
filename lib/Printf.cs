@@ -141,7 +141,16 @@ public partial class Builtins {
                             continue_parsing_specifier = false;
                             break;
                         case 'f':  // fixed point
+                        case 'F':  // fixed point synonym
                             format.directive = PrintfDirective.FloatFixedDecimal;
+                            continue_parsing_specifier = false;
+                            break;
+                        case 'G':  // e or f uppercase E
+                            format.directive = PrintfDirective.FloatEFUpper;
+                            continue_parsing_specifier = false;
+                            break;
+                        case 'g':  // e or f lowercase e
+                            format.directive = PrintfDirective.FloatEF;
                             continue_parsing_specifier = false;
                             break;
                         case 'o':  // unsigned octal
@@ -184,101 +193,100 @@ public partial class Builtins {
         }
         return fmtlist;
     }
+
+    private static string RenderFormat(PrintfFormat format, Variable arg) {
+        int n;
+        uint u;
+        double f, log;
+        switch (format.directive) {
+            case PrintfDirective.UintBinary:
+                n = (int) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                return Convert.ToString(n, 2);
+            case PrintfDirective.CodePoint:
+                n = (int) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                return "" + (char) n;
+            case PrintfDirective.IntDecimal:
+                n = (int) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                if (n < 0 && format.rightJustifyZeroes) {
+                    return "-" + (-n).ToString().PadLeft(format.minimumWidth - 1, '0');
+                } else {
+                    return n.ToString();
+                }
+            case PrintfDirective.FloatFixedDecimal:
+                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                return f.ToString("F" + format.precision);
+            case PrintfDirective.FloatScientific:
+                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                return f.ToString("e" + format.precision);
+            case PrintfDirective.FloatScientificUpper:
+                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                return f.ToString("E" + format.precision);
+            case PrintfDirective.FloatEF:
+                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                log = Math.Log(f, 10);
+                if (log < -5 || log > 5) {
+                    return f.ToString("e" + format.precision);
+                } else {
+                    return f.ToString("F" + format.precision);
+                }
+            case PrintfDirective.FloatEFUpper:
+                f = arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                log = Math.Log(f, 10);
+                if (log < -5 || log > 5) {
+                    return f.ToString("E" + format.precision);
+                } else {
+                    return f.ToString("F" + format.precision);
+                }
+            case PrintfDirective.String:
+                return arg.Fetch().mo.mro_raw_Str.Get(arg);
+/*                    if (format.minimumWidth > s.Length && !format.leftJustify)
+                        result += new string(' ', format.minimumWidth-s.Length);
+                    result += s;
+                    if (format.minimumWidth > s.Length && format.leftJustify)
+                        result += new string(' ', format.minimumWidth-s.Length);
+*/
+            case PrintfDirective.UintDecimal:
+                u = (uint) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                return u.ToString();
+            case PrintfDirective.UintOctal:
+                u = (uint) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                return Convert.ToString(u, 8);
+            case PrintfDirective.UintHex:
+                u = (uint) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                return Convert.ToString(u, 16);
+            case PrintfDirective.UintHexUpper:
+                u = (uint) arg.Fetch().mo.mro_raw_Numeric.Get(arg);
+                return u.ToString("X");
+            default:
+                return "??";
+        }
+    }
     
     private static Variable RenderFormat(List<PrintfFormat> formatlist, Variable[] args) {
-        string s, fmt, result = "";
-        int i, n, argi = 0;
-        uint u;
+        string result = "";
+        int argi = 0;
         foreach (PrintfFormat format in formatlist) {
-            switch (format.directive) {
-                case PrintfDirective.LiteralText:
-                    result += format.literaltext;
-                    break;
-                case PrintfDirective.InvokeCode:
-                    break;
-                case PrintfDirective.UintBinary:
-                    i = format.index>0 ? format.index : ++argi;
-                    if (i < args.Length) {
-                        n = (int) args[i].Fetch().mo.mro_raw_Numeric.Get(args[i]);
-                        if (format.rightJustifyZeroes) {
-                            result += Convert.ToString(n, 2).PadLeft(format.minimumWidth, '0');
-                        }
-                        else {
-                            result += Convert.ToString(n, 2).PadLeft(format.minimumWidth, ' ');
-                        }
-                    }
-                    break;
-                case PrintfDirective.CodePoint:
-                    i = format.index>0 ? format.index : ++argi;
-                    if (i < args.Length) {
-                        n = (int) args[i].Fetch().mo.mro_raw_Numeric.Get(args[i]);
-                        result += (char) n;
-                    }
-                    break;
-                case PrintfDirective.IntDecimal:
-                    i = format.index>0 ? format.index : ++argi;
-                    if (i < args.Length) {
-                        n = (int) args[i].Fetch().mo.mro_raw_Numeric.Get(args[i]);
-                        if (format.rightJustifyZeroes) {
-                            if (n >= 0)
-                                result += n.ToString("D"+ format.minimumWidth);
-                            else  // CLR excludes '-' from width :-(
-                                result += n.ToString("D"+ (format.minimumWidth-1));
-                        }
-                        else {
-                            fmt = "{0," + format.minimumWidth + ":G}";
-                            result += String.Format(fmt, n);
-                        }
-                    }
-                    else {
-                        throw new NieczaException("index out of range");
-                    }
-                    break;
-                case PrintfDirective.String:
-                    i = format.index>0 ? format.index : ++argi;
-                    if (i < args.Length) {
-                        s = args[i].Fetch().mo.mro_raw_Str.Get(args[i]);
-                        if (format.minimumWidth > s.Length && !format.leftJustify)
-                            result += new string(' ', format.minimumWidth-s.Length);
-                        result += s;
-                        if (format.minimumWidth > s.Length && format.leftJustify)
-                            result += new string(' ', format.minimumWidth-s.Length);
-                    }
-                    else {
-                        throw new NieczaException("index out of range");
-                    }
-                    break;
-                case PrintfDirective.UintDecimal:
-                    i = format.index>0 ? format.index : ++argi;
-                    if (i < args.Length) {
-                        u = (uint) args[i].Fetch().mo.mro_raw_Numeric.Get(args[i]);
-                        result += u.ToString().PadLeft(format.minimumWidth, '0');
-                    }
-                    break;
-                case PrintfDirective.UintOctal:
-                    i = format.index>0 ? format.index : ++argi;
-                    if (i < args.Length) {
-                        u = (uint) args[i].Fetch().mo.mro_raw_Numeric.Get(args[i]);
-                        result += Convert.ToString(u,8).PadLeft(format.minimumWidth, '0');
-                    }
-                    break;
-                case PrintfDirective.UintHex:
-                    i = format.index>0 ? format.index : ++argi;
-                    if (i < args.Length) {
-                        u = (uint) args[i].Fetch().mo.mro_raw_Numeric.Get(args[i]);
-                        result += Convert.ToString(u,16).PadLeft(format.minimumWidth, '0');
-                    }
-                    break;
-                case PrintfDirective.UintHexUpper:
-                    i = format.index>0 ? format.index : ++argi;
-                    if (i < args.Length) {
-                        u = (uint) args[i].Fetch().mo.mro_raw_Numeric.Get(args[i]);
-                        result += u.ToString("X").PadLeft(format.minimumWidth, '0');
-                    }
-                    break;
-                default:
-                    result += "??";
-                    break;
+            if (format.directive == PrintfDirective.LiteralText) {
+                result += format.literaltext;
+                continue;
+            }
+
+            if (format.directive == PrintfDirective.InvokeCode) {
+                continue; // Should this do something more?
+            }
+
+            int i = format.index > 0 ? format.index : ++argi;
+            if (i < args.Length) {
+                string s = RenderFormat(format, args[i]);
+                if (format.rightJustifyZeroes) {
+                    result += s.PadLeft(format.minimumWidth, '0');
+                }
+                else {
+                    result += s.PadLeft(format.minimumWidth, ' ');
+                }
+            }
+            else {
+                throw new NieczaException("index out of range");
             }
         }
         return Kernel.BoxAnyMO(result, Kernel.StrMO);
