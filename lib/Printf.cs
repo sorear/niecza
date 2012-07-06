@@ -276,12 +276,7 @@ public partial class Builtins {
                     number = f.ToString("e" + format.precision);
                     break;
                 case PrintfDirective.FloatEF:
-                    log = Math.Log(Math.Abs(f), 10);
-                    if (log < -5 || log > 5) {
-                        number = f.ToString("e" + format.precision);
-                    } else {
-                        number = f.ToString("F" + format.precision);
-                    }
+                    number = f.ToString("g" + format.precision);
                     break;
             }
 
