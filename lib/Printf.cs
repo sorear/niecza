@@ -198,7 +198,7 @@ public partial class Builtins {
     }
 
     private static string RemoveInitialZero(String s) {
-        if (s[0] == '0') {
+        if (s.Length > 1 && s[0] == '0') {
             return s.Substring(1);
         }
         return s;
