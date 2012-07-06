@@ -266,17 +266,18 @@ public partial class Builtins {
                 f = -f;
             }
 
-            double log;
+            int precision = format.precision > 0 ? format.precision : 6;
+
             String number = "??";
             switch (format.directive) {
                 case PrintfDirective.FloatFixedDecimal:
-                    number = f.ToString("F" + format.precision);
+                    number = f.ToString("F" + precision);
                     break;
                 case PrintfDirective.FloatScientific:
-                    number = f.ToString("e" + format.precision);
+                    number = f.ToString("e" + precision);
                     break;
                 case PrintfDirective.FloatEF:
-                    number = f.ToString("g" + format.precision);
+                    number = f.ToString("g" + precision);
                     break;
             }
 
