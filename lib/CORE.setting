@@ -1275,7 +1275,7 @@ sub print(*@items) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (print (obj_
 sub note(|c) { $PROCESS::OUTPUT_USED := True; Q:CgOp { (rnull (note   (obj_getstr {Niecza::gistcat(|c)}))) }; True }
 
 sub sprintf(\|$args) { Q:CgOp { (sprintf (unbox fvarlist (@ {$args}))) } }
-sub printf(Cool $format, *@args) { print sprintf $format, @args };
+sub printf(Cool $format, *@args) { print sprintf $format, |@args };
 
 sub exit($status = 0) { Q:CgOp {
     (rnull [exit (cast int (obj_getnum {$status}))])
