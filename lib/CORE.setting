@@ -685,6 +685,15 @@ my class Cool {
     }
     method lc()   { Q:CgOp { (box Str (str_tolower (obj_getstr {self}))) }}
     method uc()   { Q:CgOp { (box Str (str_toupper (obj_getstr {self}))) }}
+    method tc() {
+        self ~~ /^(.)(.*)$/ ?? Q:CgOp { (box Str (ucd_titlecase { $0.ord })) } ~ $1 !! "";
+    }
+    method tclc() {
+        self ~~ /^(.)(.*)$/ ?? Q:CgOp { (box Str (ucd_titlecase { $0.ord })) } ~ $1.lc !! "";
+    }
+    method tcuc() {
+        self ~~ /^(.)(.*)$/ ?? Q:CgOp { (box Str (ucd_titlecase { $0.ord })) } ~ $1.uc !! "";
+    }
     method flip() { Q:CgOp { (box Str (str_flip    (obj_getstr {self}))) }}
     method ucfirst() { ucfirst(self) }
     method lcfirst() { lcfirst(self) }
@@ -1307,6 +1316,8 @@ sub infix:<leg> is pure is Niecza::absprec<n= non> is diffy ($s1, $s2) {
 
 sub lc($string)    is pure { (~$string).lc }
 sub uc($string)    is pure { (~$string).uc }
+sub tc($string)    is pure { (~$string).tc }
+sub tclc($string)  is pure { (~$string).tclc }
 sub chop($string)  is pure { (~$string).chop }
 sub chomp($string) is pure { (~$string).chomp }
 sub capitalize($string) is pure { (~$string).capitalize }

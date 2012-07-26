@@ -682,4 +682,9 @@ public partial class Builtins {
         return MakeStr(DataSet.GetCodepoint(
             ch.Fetch().mo.mro_raw_Str.Get(ch)));
     }
+
+    public static string ucd_titlecase(Variable ch) {
+        Property p = (Property) DataSet.GetTable("tc");
+        return p.GetValue((int) ch.Fetch().mo.mro_raw_Numeric.Get(ch));
+    }
 }
