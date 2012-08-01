@@ -89,7 +89,7 @@ clean:
 mkpackage:
 	rm -rf package/
 	mkdir package/ package/run/ package/lib/ package/obj/
-	cp -a docs/ README.pod LICENSE package/
+	cp -a docs README.pod LICENSE package/
 	cp -a run/Niecza.exe run/Niecza.ser run/Kernel.dll \
 	    run/CompilerBlob.dll package/run/
 	cp lib/*.pm6 lib/*.setting package/lib/
@@ -99,8 +99,8 @@ mknext: run/Niecza.exe obj/Run.Kernel.dll obj/Kernel.dll
 	rm -rf next/
 	mkdir -p next next/boot next/obj next/run next/boot next/boot/obj/
 	touch next/FETCH_URL next/.fetch-stamp
-	cp -a src/ lib/ docs/ README.pod LICENSE Makefile test.pl next/
-	cp -a run/ lib/ next/boot/
+	cp -a src lib docs README.pod LICENSE Makefile test.pl next/
+	cp -a run lib next/boot/
 	cp obj/Run.Kernel.dll obj/Kernel.dll next/boot/obj/
 	NIECZA_KEEP_IL=1 $(RUN_CLR) next/boot/run/Niecza.exe -C $(libunits)
 
