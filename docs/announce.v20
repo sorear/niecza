@@ -1,0 +1,62 @@
+    Announce: Niecza Perl 6 v20
+
+This is the twentieth release of Niecza Perl 6, where I pretend I'm on
+the UTC-36 timezone and thank Solomon Foster for the first release where
+he did all the real work.  non-bootstrap has run into a dead end; I need
+to regroup and decide the next direction.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you still need a
+binary for bootstrapping.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+
+All of the changes below are due to Solomon Faster.
+
+
+
+[Breaking changes]
+
+Cool.bytes (with no encoding specified) is gone.  It never made much sense
+anyway.
+
+
+
+[Major features]
+
+printf and sprintf have been overhauled, in particular with support for
+floating-point values, big integers, and Rats.
+
+Added Unicode-aware case routines, uc, lc, tc, tclc, and tcuc.
+
+
+
+[Minor features]
+
+Added [&func] infix operatorization syntax.
+
+++, --, .pred and .succ now return the correct values for undefined Bool
+variables.
+
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-20.zip
+[2] https://github.com/sorear/niecza
