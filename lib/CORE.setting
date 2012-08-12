@@ -3295,7 +3295,7 @@ sub infix:<cmp> is equiv<leg> (Mu $a, Mu $b) {
     }
     return $a <=> $b;
 }
-sub infix:<eqv> is equiv<==> (Any $a, Any $b) { ($a cmp $b) == 0 }
+sub infix:<eqv> is equiv<==> (Any $a, Any $b) { ($a.WHAT.gist cmp $b.WHAT.gist) == 0 && ($a cmp $b) == 0 }
 sub infix:<before> ($a, $b) is equiv<==> { ($a cmp $b) < 0 }
 sub infix:<after> ($a, $b) is equiv<==> { ($a cmp $b) > 0 }
 sub seqop($op, \x, \y) { $op(x,y) } # TODO: Special case with hyper
