@@ -1881,7 +1881,7 @@ my class Hash does Associative {
                 self!array-push($previous.Str, $e);
                 $has_previous = 0;
             } elsif $e.^isa(Enum) {
-                self!array-push($e.key, $e.value);
+                self!array-push($e.key.Str, $e.value);
             } else {
                 $previous     = $e;
                 $has_previous = 1;
