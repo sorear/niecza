@@ -2699,9 +2699,9 @@ dynamic:
                 CpsOp typ = th.Scan(zyg[3]);
                 CpsOp rhs = th.Scan(zyg[4]);
                 int ro   = JScalar.B(zyg[1]) ? 0 : Kernel.NBV_RW;
-                int list = JScalar.B(zyg[2]) ? Kernel.NBV_LIST : 0;
+                int mode = JScalar.B(zyg[2]) ? Kernel.NBV_LIST : ro; // ignore RW if LIST
                 return CpsOp.MethodCall(Tokens.Kernel_NewBoundVar,
-                    CpsOp.IntLiteral(ro+list), typ, rhs);
+                    CpsOp.IntLiteral(mode), typ, rhs);
             };
             handlers["whileloop"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.While(FixBool(z[1]), FixBool(z[2]),
