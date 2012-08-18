@@ -885,6 +885,7 @@ my class FatRat does Real {
     method nude() { [ self.numerator, self.denominator ] }
 }
 
+my class Buf { ... }
 my class Str is Cool {
     method new() { "" }
     method immutable() { True }
@@ -980,6 +981,22 @@ my class Str is Cool {
         '"' ~ self.subst(/ <[$@%&{\b\cJ\cM\t\"\\]> /, { $esc{$/} }, :g)\
                   .subst(/ <-print> /, { ord($/).fmt('\x[%x]') }, :g) ~ '"'
     }
+    method encode(Str $enc) {
+        Q:CgOp { (box (@ {Buf}) (encode (unbox str (@ {self})) (obj_getstr {$enc}))) }
+    }
+}
+
+my class Buf {
+    method decode(Str $enc) {
+        Q:CgOp { (box Str (decode (unbox blob (@ {self})) (obj_getstr {$enc}))) }
+    }
+    method elems() {
+        Q:CgOp { (box Int (unbox blob (@ {self}))) }
+    }
+    method bytes() { self.elems }
+    method Bool() { ?self.elems }
+    method Numeric() { self.elems }
+    method Int() { self.elems }
 }
 
 # ObjAt in Niecza is the type of return values from WHICH.  It is a comparable

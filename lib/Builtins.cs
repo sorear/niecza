@@ -6,6 +6,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Text;
 
 namespace Niecza {
     // IForeignInterpreter is used for runtime loading of the Perl 5
@@ -2920,5 +2921,17 @@ again:
                         " via " + from.name);
             }
         }
+    }
+
+    public static byte[] encode(string inp, string enc) {
+        return Encoding.GetEncoding(enc).GetBytes(inp);
+    }
+
+    public static string decode(byte[] inp, string enc) {
+        return Encoding.GetEncoding(enc).GetString(inp);
+    }
+
+    public static int blob_len(byte[] inp) {
+        return inp.Length;
     }
 }
