@@ -2693,6 +2693,8 @@ dynamic:
             handlers["unbox"] = delegate(NamProcessor th, object[] zyg) {
                 Type t = namtype(zyg[1]);
                 CpsOp unboxee = th.Scan(zyg[2]);
+                if (unboxee.head.Returns == Tokens.Variable)
+                    unboxee = CpsOp.MethodCall(Tokens.Variable_Fetch, unboxee);
                 return CpsOp.MethodCall(Tokens.Kernel.GetMethod("UnboxAny").MakeGenericMethod(t), unboxee);
             };
             handlers["newboundvar"] = delegate(NamProcessor th, object[] zyg) {
