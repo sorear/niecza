@@ -2450,6 +2450,7 @@ namespace Niecza.CLRBackend {
             namtypes["treader"] = typeof(TextReader);
             namtypes["twriter"] = typeof(TextWriter);
             namtypes["blob"] = typeof(byte[]);
+            namtypes["socket"] = typeof(System.Net.Sockets.Socket);
 
             handlers = new Dictionary<string, Func<NamProcessor,object[],CpsOp>>();
             thandlers = new Dictionary<string, Func<CpsOp[], CpsOp>>();

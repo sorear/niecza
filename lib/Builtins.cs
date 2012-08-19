@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Text;
+using System.Net.Sockets;
 
 namespace Niecza {
     // IForeignInterpreter is used for runtime loading of the Perl 5
@@ -2933,5 +2934,30 @@ again:
 
     public static int blob_len(byte[] inp) {
         return inp.Length;
+    }
+
+    public static Socket socket_new(int family, int type, int proto) {
+        return new Socket( (AddressFamily)family, (SocketType)type,
+                (ProtocolType)proto );
+    }
+
+    public static byte[] socket_read(Socket from, int ct) {
+        byte[] buf = new byte[ct];
+        int rct = from.Receive(buf);
+        Array.Resize(ref buf, rct);
+        return buf;
+    }
+
+    public static void socket_write(Socket sock, byte[] data) {
+        sock.Send(data);
+    }
+
+    public static void socket_close(Socket sock) {
+        sock.Shutdown( SocketShutdown.Both ); // XXX perhaps should be separate
+        sock.Close();
+    }
+
+    public static void socket_connect(Socket sock, string host, int port) {
+        sock.Connect(host, port);
     }
 }
