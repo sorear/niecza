@@ -1,28 +1,29 @@
 
 class IO::Socket::INET {
     has $!sock;
-    #has Buf $!buf;
+    has Str $!buffer = '';
 
-    #method recv (Cool $chars = Inf) {
-    #    die('Socket not available') unless $!sock;
+    # TODO: This code is horribly broken, especially if a character gets cut by
+    # a buffer or packet boundry, or you want to switch from char to binary mode
+    # doing it right seems to require some kind of Decoder class
 
-    #    if $!buffer.chars < $chars {
-    #        my str $r = $!sock.recv;
-    #        $r = pir::trans_encoding__SSI($r,
-    #                pir::find_encoding__Is('utf8'));
-    #        $!buffer ~= nqp::p6box_s($r);
-    #    }
+    method recv (Cool $chars = Inf) {
+        die('Socket not available') unless $!sock;
 
-    #    if $!buffer.chars > $chars {
-    #        my $rec  = $!buffer.substr(0, $chars);
-    #        $!buffer = $!buffer.substr($chars);
-    #        $rec
-    #    } else {
-    #        my $rec = $!buffer;
-    #        $!buffer = '';
-    #        $rec;
-    #    }
-    #}
+        if $!buffer.chars < $chars {
+            $!buffer ~= self.read(2048).decode('UTF-8');
+        }
+
+        if $!buffer.chars > $chars {
+            my $rec  = $!buffer.substr(0, $chars);
+            $!buffer = $!buffer.substr($chars);
+            $rec
+        } else {
+            my $rec = $!buffer;
+            $!buffer = '';
+            $rec;
+        }
+    }
 
     method read(IO::Socket::INET:D: Cool $bufsize) {
         die('Socket not available') unless $!sock;
@@ -124,12 +125,11 @@ class IO::Socket::INET {
         #If Listen is defined then a listen socket is created, else if the socket type,
         #which is derived from the protocol, is SOCK_STREAM then connect() is called.
         if $.listen || $.localhost || $.localport {
-            #my $addr := $sock.sockaddr($.localhost || "0.0.0.0", $.localport || 0);
-            #$sock.bind($addr);
+            Q:CgOp { (rnull (socket_bind (unbox socket {$!sock}) (unbox str {$.localhost || "0.0.0.0"}) (unbox int {$.localport || 0}))) };
         }
 
         if $.listen {
-            #$sock.listen($.listen);
+            Q:CgOp { (rnull (socket_listen (unbox socket {$!sock}) (unbox int {20}))) };
         }
         elsif $.type == sock::SOCK_STREAM {
             Q:CgOp { (rnull (socket_connect (unbox socket {$!sock}) (unbox str {$.host}) (unbox int {$.port}))) };
@@ -138,29 +138,31 @@ class IO::Socket::INET {
         self;
     }
 
-    #method get() {
-    #    ++$!ins;
-    #    my str $line = nqp::getattr(self, $?CLASS, '$!sock').readline(nqp::unbox_s($!input-line-separator));
-    #    my str $sep = $!input-line-separator;
-    #    my int $len  = nqp::chars($line);
-    #    my int $sep-len = nqp::chars($sep);
-    #    $len >= $sep-len && nqp::substr($line, $len - $sep-len) eq nqp::unbox_s($sep)
-    #        ?? nqp::p6box_s(nqp::substr($line, 0, $len - $sep-len))
-    #        !! nqp::p6box_s($line);
-    #}
+    method get() {
+        ++$!ins;
+        my $inbuf = '';
+        my $irs = $!input-line-separator;
+        my $irslen = chars($irs);
+        until substr($inbuf, chars($inbuf)-$irslen, $irslen) eq $irs {
+            $inbuf ~= (self.recv(1) || return $inbuf);
+        }
+        substr($inbuf, 0, chars($inbuf)-$irslen);
+    }
 
-    #method lines() {
-    #    gather { take self.get() };
-    #}
+    method lines() {
+        gather { take self.get() };
+    }
 
-    #method accept() {
-    #    #my $new_sock := nqp::create($?CLASS);
-    #    ## A solution as proposed by moritz
-    #    my $new_sock := $?CLASS.bless(*, :$!family, :$!proto, :$!type);
-    #    nqp::getattr($new_sock, $?CLASS, '$!buffer') = '';
-    #    nqp::bindattr($new_sock, $?CLASS, '$!sock', nqp::getattr(self, $?CLASS, '$!sock').accept());
-    #    return $new_sock;
-    #}
+    method !setsock($ns) {
+        $!sock = $ns;
+        $!buffer = '';
+        self;
+    }
+
+    method accept() {
+        my $new_sock := self.WHAT.bless(*, :$!family, :$!proto, :$!type);
+        $new_sock!setsock( Q:CgOp { (box Any (socket_accept (unbox socket {$!sock}))) } );
+    }
 
     #method remote_address() {
     #    return nqp::p6box_s(nqp::getattr(self, $?CLASS, '$!sock').remote_address());
@@ -171,6 +173,8 @@ class IO::Socket::INET {
     #}
 }
 
-my $sock = IO::Socket::INET.new( host => 'perl6.org', port => 80 );
-$sock.send("GET / HTTP/1.0\cJ\cM\cJ\cM");
-say $sock.read(16384).decode('UTF-8');
+my $sock = IO::Socket::INET.new( localport => 9999, :listen );
+while $sock.accept -> $new {
+    say "<< $new.get() >>";
+    $new.close;
+}

@@ -2960,4 +2960,20 @@ again:
     public static void socket_connect(Socket sock, string host, int port) {
         sock.Connect(host, port);
     }
+
+    public static void socket_bind(Socket sock, string host, int port) {
+        System.Net.IPAddress addr;
+        if (host.Length == 0 || !System.Net.IPAddress.TryParse (host, out addr))
+            addr = System.Net.Dns.GetHostEntry (host).AddressList[0];
+
+        sock.Bind(new System.Net.IPEndPoint(addr, port));
+    }
+
+    public static void socket_listen(Socket sock, int log) {
+        sock.Listen(log);
+    }
+
+    public static Socket socket_accept(Socket sock) {
+        return sock.Accept();
+    }
 }
