@@ -46,6 +46,7 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/Run.%.ser,$(srcunits)) src/ni
 	NIECZA_KEEP_IL=1 $(RUN_CLR) boot/run/Niecza.exe -C $(libunits)
 	$(CP) boot/run/Kernel.dll boot/obj/
 	touch .fetch-stamp
+boot/obj/Run.CORE.ser: .fetch-stamp
 
 boot/obj/Run.CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
 	$(CSC) /target:library /out:boot/obj/Run.CompilerBlob.dll /r:Run.Kernel \
