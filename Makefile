@@ -92,12 +92,11 @@ clean:
 # uses the current niecza to set up a build area for the next stage
 mkpackage:
 	rm -rf package/
-	mkdir package/ package/run/ package/lib/ package/obj/
+	mkdir package/ package/run/ package/lib/
 	cp -a docs README.pod LICENSE package/
 	cp -a run/Niecza.exe run/Niecza.ser run/Kernel.dll \
-	    run/CompilerBlob.dll package/run/
+	    run/CompilerBlob.dll run/Run.Kernel.dll package/run/
 	cp lib/*.pm6 lib/*.setting package/lib/
-	cp obj/Run.Kernel.dll package/obj/
 
 mknext: run/Niecza.exe obj/Run.Kernel.dll obj/Kernel.dll
 	rm -rf next/
