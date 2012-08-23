@@ -5031,6 +5031,7 @@ grammar Regex is STD {
     token cclass_expr {
         ::
         <.normspace>?
+        <sign>
         <cclass_union>+ % [$<op>=[ '|' | '^' ]]
     }
 
@@ -5041,7 +5042,6 @@ grammar Regex is STD {
 
     token cclass_add {
         <.normspace>?
-        <sign>
         <cclass_elem>+ % [$<op>=[ '+' | '-' ]<.normspace>?]
     }
 

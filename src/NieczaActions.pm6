@@ -907,6 +907,7 @@ method cc_to_rxop($z) {
 method cclass_expr($/) {
     my @ops = @$<op>;
     my @zyg = map *.ast, @$<cclass_union>;
+    if $<sign> eq '-' { @zyg[0] = self.negate_cc(@zyg[0]) }
     for @ops -> $op {
         my $z1 = shift @zyg;
         my $z2 = shift @zyg;
@@ -925,7 +926,6 @@ method cclass_union($/) {
 
 method cclass_add($/) {
     my ($a, @zyg) = map *.ast, @$<cclass_elem>;
-    if $<sign> eq '-' { $a = self.negate_cc($a) }
     for @$<op> {
         $a = ($_ eq '+') ?? self.or_cc($a, shift(@zyg))
                          !! self.and_cc($a, self.negate_cc(shift(@zyg)));
