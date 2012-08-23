@@ -3811,7 +3811,7 @@ method package_def ($/) {
                 # return the frame object so that role instantiation can
                 # find the cloned methods
                 $ast = $OpStatementList.new(pos=>$/, children => [
-                    $ast, mkcall($/, '&callframe') ]);
+                    $ast, $OpCgOp.new(pos=>$/, op=>$CgOp.callframe)  ]);
                 $sub.create_static_pad;
                 $obj.set_instantiation_block($sub);
 

@@ -227,8 +227,6 @@ sub substr-rw(\str, $start, $len?, $repl?) is Niecza::builtin('substr3', 3, 3) i
 
 # not actually inlined but needed for constant i
 sub sqrt($x) is pure { Q:CgOp { (sqrt {$x}) } }
-sub caller() { Q:CgOp { (frame_caller (frame_caller (callframe))) } }
-sub callframe() { Q:CgOp { (frame_caller (callframe)) } }
 
 sub Niecza::toggle_mono_trace() { Q:CgOp { (prog (raise (s "SIGUSR2")) {0}) } }
 
@@ -1426,6 +1424,12 @@ my class CallFrame {
 
     method hints($var) { Q:CgOp { (frame_hint (cast frame (@ {self}))
         (obj_getstr {$var})) } }
+}
+sub caller() { Q:CgOp { (frame_caller (frame_caller (callframe))) } }
+sub callframe(Int $level is copy = 0) {
+    my $frame := Q:CgOp { (frame_caller (callframe)) };
+    $frame := $frame.caller while --$level;
+    $frame;
 }
 
 sub die($msg = "Died") { Q:CgOp { (die (@ {$msg})) } }
