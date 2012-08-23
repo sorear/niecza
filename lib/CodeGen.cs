@@ -4462,7 +4462,9 @@ dynamic:
                 info["name"] = Builtins.MakeStr("niecza");
                 string vers = "(unknown)\n";
                 try {
-                    vers = File.ReadAllText("VERSION");
+                    string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                            Path.Combine("..", "VERSION"));
+                    vers = File.ReadAllText(path);
                 } catch (Exception) {
                     // ignore
                 }

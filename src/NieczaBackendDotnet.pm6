@@ -67,7 +67,7 @@ class Value { ... }
 
 method new(*%_) {
     my $self = callsame;
-    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled} {Unit} {StaticSub} {Type} {Param} {Value})) };
+    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled} (@ {$self.obj_dir}) {Unit} {StaticSub} {Type} {Param} {Value})) };
     downcall("safemode") if $self.safemode;
     $self;
 }

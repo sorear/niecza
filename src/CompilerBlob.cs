@@ -63,7 +63,7 @@ namespace Niecza {
                 return null;
         }
         // Better, but still fudgy.  Relies too much on path structure.
-        public static void InitSlave(Variable cb, Variable unit,
+        public static void InitSlave(Variable cb, P6any cmd_obj_dir, Variable unit,
                 Variable staticSub, Variable type, Variable param, Variable value) {
             if (responder != null) return;
 
@@ -73,9 +73,20 @@ namespace Niecza {
             ParamP = param.Fetch();
             ValueP = value.Fetch();
 
-            obj_dir = Path.GetFullPath(Path.Combine(
-                        AppDomain.CurrentDomain.BaseDirectory,
-                        Path.Combine("..", "obj")));
+            obj_dir = Path.GetFullPath(cmd_obj_dir.IsDefined() ?
+                    cmd_obj_dir.mo.mro_raw_Str.Get(cmd_obj_dir) :
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "NieczaModuleCache"));
+
+            Directory.CreateDirectory(obj_dir); // like mkdir -p
+
+            if (!File.Exists(Path.Combine(obj_dir, "Run.Kernel.dll"))) {
+                File.Copy(
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Run.Kernel.dll"),
+                    Path.Combine(obj_dir, "Run.Kernel.dll")
+                );
+            }
+
             AppDomain.CurrentDomain.AssemblyResolve += ObjLoader;
 
             upcall_cb = cb;

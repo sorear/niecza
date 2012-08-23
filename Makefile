@@ -21,18 +21,18 @@ srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar OptRxSimple \
 	 Operator NieczaActions NieczaFrontendSTD NieczaPassSimplifier \
 	 OptBeta NieczaPathSearch NieczaBackendDotnet NieczaCompiler GetOptLong
 
-all: run/Niecza.exe obj/Run.Kernel.dll obj/Run.CORE.dll
+all: run/Niecza.exe run/Run.Kernel.dll obj/Run.CORE.dll
 
 $(patsubst %,boot/obj/Run.%.ser,$(srcunits)): boot/obj/Run.%.ser: .fetch-stamp src/%.pm6 boot/obj/Run.CORE.ser
-	cd src && NIECZA_KEEP_IL=1 $(RUN_CLR) ../boot/run/Niecza.exe -C $*
+	cd src && NIECZA_KEEP_IL=1 $(RUN_CLR) ../boot/run/Niecza.exe --obj-dir ../boot/obj -C $*
 
 # hack - put VERSION info in place so the setting build can embed it
 obj/Run.CORE.dll: run/Niecza.exe obj/Run.Kernel.dll lib/CORE.setting
 	@git describe --tags > VERSION
-	$(RUN_CLR) run/Niecza.exe -C CORE
+	$(RUN_CLR) run/Niecza.exe --obj-dir obj -C CORE
 
 run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/Run.%.ser,$(srcunits)) src/niecza
-	cd src && NIECZA_KEEP_IL=1 $(RUN_CLR) ../boot/run/Niecza.exe -c niecza
+	cd src && NIECZA_KEEP_IL=1 $(RUN_CLR) ../boot/run/Niecza.exe --obj-dir ../boot/obj -c niecza
 	$(CP) boot/obj/Kernel.dll run/
 	$(CSC) /target:library /out:run/CompilerBlob.dll /r:Kernel \
 	    /lib:run src/CompilerBlob.cs
@@ -51,13 +51,14 @@ boot/obj/Run.CORE.ser: .fetch-stamp
 boot/obj/Run.CompilerBlob.dll: .fetch-stamp src/CompilerBlob.cs
 	$(CSC) /target:library /out:boot/obj/Run.CompilerBlob.dll /r:Run.Kernel \
 	    /lib:boot/obj src/CompilerBlob.cs
-obj/Run.Kernel.dll: $(patsubst %,lib/%,$(cskernel)) lib/unidata
-	$(CSC) /target:exe /out:obj/Run.Kernel.dll /lib:obj /unsafe+ \
+run/Run.Kernel.dll: $(patsubst %,lib/%,$(cskernel)) lib/unidata
+	$(CSC) /target:exe /out:run/Run.Kernel.dll /lib:obj /unsafe+ \
 	    /res:lib/unidata $(patsubst %,lib/%,$(cskernel))
 obj/Kernel.dll: $(patsubst %,lib/%,$(cskernel)) lib/unidata
 	$(CSC) /target:exe /out:obj/Kernel.dll /lib:obj /unsafe+ \
 	    /res:lib/unidata $(patsubst %,lib/%,$(cskernel))
-
+obj/Run.Kernel.dll: run/Run.Kernel.dll
+	$(CP) $< $@
 
 .PHONY: Niecza_pm
 perl5: obj/Perl5Interpreter.dll obj/p5embed.so Niecza_pm
@@ -75,7 +76,7 @@ aot: all
 	mono --aot run/*.dll obj/Run.CORE.dll run/Niecza.exe
 
 test: all
-	$(RUN_CLR) run/Niecza.exe -c test.pl
+	$(RUN_CLR) run/Niecza.exe --obj-dir obj -c test.pl
 	prove -e "$(RUN_CLR)" obj/Run.MAIN.exe
 
 spectest: all
@@ -105,7 +106,7 @@ mknext: run/Niecza.exe obj/Run.Kernel.dll obj/Kernel.dll
 	cp -a src lib docs README.pod LICENSE Makefile test.pl next/
 	cp -a run lib next/boot/
 	cp obj/Run.Kernel.dll obj/Kernel.dll next/boot/obj/
-	NIECZA_KEEP_IL=1 $(RUN_CLR) next/boot/run/Niecza.exe -C $(libunits)
+	NIECZA_KEEP_IL=1 $(RUN_CLR) next/boot/run/Niecza.exe --obj-dir next/boot/obj -C $(libunits)
 
 realclean: clean
 	@rm .fetch-stamp

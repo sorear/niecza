@@ -83,7 +83,7 @@ my @lib  = $basedir.append("lib"), ".".IO.realpath;
 my $lang = "CORE";
 my $safe = False;
 my $bcnd = "dotnet";
-my $odir = $basedir.append("obj");
+my $odir = Str; # backend auto-detect
 my $verb = 0;
 my @eval;
 my $cmod = False;
