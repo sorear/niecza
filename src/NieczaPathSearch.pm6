@@ -20,7 +20,7 @@ method load_module($name) {
         }
     }
 
-    die "Unable to locate module $name in @path";
+    die "Unable to locate module $name in @path[]";
 }
 
 method load_file($name) {
