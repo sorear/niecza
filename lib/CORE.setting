@@ -2423,6 +2423,7 @@ my class GatherIterator is IterCursor {
         $!reify // ($!reify = (
             Q:CgOp {
                 (letn getv (cotake (cast frame (@ {$!frame})))
+                  (setslot (obj_llhow (@ {self})) $!frame (@ {self}) {Any})
                   (box Parcel (ternary (== (@ {EMPTY}) (@ (l getv)))
                     (fvarlist_new)
                     (fvarlist_new
