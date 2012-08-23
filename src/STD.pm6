@@ -5449,9 +5449,13 @@ method trymop($f) {
     state $fast = %*ENV<NIECZA_FAIL_FAST>;
     if $fast {
         $f();
+        True;
     } else {
-        unless try { $f(); True } {
-            self.sorry($!)
+        if try { $f(); True } {
+            True;
+        } else {
+            self.sorry($!);
+            False;
         }
     }
 }

@@ -22,6 +22,7 @@ method !compile(:$unitname, :$filename, :$source, :$main, :$run, :$evalmode, :$o
     my $*compiler = self;
     my $*verbose = $.verbose;
     my $*backend = $.backend;
+    my $*run_mode = $run;
 
     # tells parser not to exit when parse fails
     my $*in_repl = $repl;

@@ -3583,6 +3583,12 @@ method statement_control:use ($/) {
     my $name = $<module_name>.ast<name>;
     my $args = $<arglist> ?? $<arglist>.ast !! [];
 
+    # arguments are always evaluated immediately
+    $/.CURSOR.trymop({
+        for @$args {
+            $_  = self.eval_ast($/, $_)
+        }
+    }) or return;
 
     # support loading modules from perl5
     if $<module_name><longname><colonpair> -> $pairs {
@@ -3600,17 +3606,27 @@ method statement_control:use ($/) {
         return;
     }
 
+    if $name eq 'lib' {
+        $/.CURSOR.trymop({ for @$args { .=to_string }; }) or return;
+        unless $*run_mode {
+            $/.CURSOR.sorry("use lib not permitted in precompiled files yet");
+            return;
+        }
+        $*compiler.module_finder.path.push: @$args;
+        return;
+    }
+
     if $args {
         $/.CURSOR.sorry("'use' with arguments NYI");
         return;
     }
 
-    if ($name eq 'strict') {
+    if $name eq 'strict' {
         $*CURLEX<!sub>.set_extend('strict', True);
         return;
     }
 
-    if ($name eq 'MONKEY_TYPING' || $name eq 'fatal' || $name eq 'lib') {
+    if $name eq 'MONKEY_TYPING' || $name eq 'fatal' || $name eq 'lib' {
         return;
     }
 
