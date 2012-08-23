@@ -1428,7 +1428,7 @@ my class CallFrame {
 sub caller() { Q:CgOp { (frame_caller (frame_caller (callframe))) } }
 sub callframe(Int $level is copy = 0) {
     my $frame := Q:CgOp { (frame_caller (callframe)) };
-    $frame := $frame.caller while --$level;
+    $frame := $frame.caller while $level--;
     $frame;
 }
 
