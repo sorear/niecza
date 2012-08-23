@@ -427,11 +427,14 @@ namespace Niecza.Serialization {
 
         // This is the main routine you should call from your Freeze
         // callbacks to freeze an object
+        static int depth;
         public void ObjRef(object o) {
             int id;
             SerUnit altunit;
-            if (Config.SerTrace)
-                Console.WriteLine("Saving {0} at {1}...", o, wpointer);
+            if (Config.SerTrace) {
+                Console.WriteLine("{0}Saving {1} at {2}:", new string(' ',depth), o, wpointer);
+            }
+
             if (o == null) { // null pointers are special
                 Byte((byte)SerializationCode.Null);
                 return;
@@ -460,11 +463,13 @@ namespace Niecza.Serialization {
             } else {
                 // must take responsibility for saving the tag
                 IFreeze f = o as IFreeze;
+                if (Config.SerTrace) depth++;
                 if (f != null) {
                     f.Freeze(this);
                 } else {
                     FallbackFreeze(o);
                 }
+                if (Config.SerTrace) depth--;
             }
         }
 

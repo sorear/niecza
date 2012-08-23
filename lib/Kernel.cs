@@ -1955,6 +1955,8 @@ namespace Niecza {
 
         private SubInfo() { }
 
+        public override string ToString() { return name ?? "ANON"; }
+
         // This is a _shallow_ clone.  The children wind up shared, as do
         // a lot of immutable-ish objects that are referenced.
         internal SubInfo(SubInfo o) {
@@ -2905,6 +2907,10 @@ bound: ;
             while (f != null) { ix++; f = f.caller; }
             while (spacey.Count <= ix) { spacey.Add(new String(' ', spacey.Count * 2)); }
             return spacey[ix];
+        }
+
+        public override string ToString() {
+            return "frame:" + info + "/" + GetHashCode();
         }
 
         public Frame Return() {
