@@ -1,0 +1,77 @@
+    Announce: Niecza Perl 6 v21
+
+This is the twenty-first release of Niecza Perl 6, scheduled on the last
+Monday of the month...
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you still need a
+binary for bootstrapping.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+[Breaking changes]
+
+Conjectural [$foo] syntax has been removed. (Solomon Foster)
+
+Niecza now stores precompiled modules in a per-user directory
+(Local Application Data\NieczaModuleCache or $HOME/.local/share/
+NieczaModuleCache) instead of obj/ by default, as a first step towards
+installability.
+
+
+
+[Build system]
+
+The makefile now works with BSD cp.
+
+curl is now supported as an alternative to wget.
+
+Parallel make has been fixed.
+
+
+
+[Bug fixes]
+
+#142 4 eqv 4.0, shouldn't (Solomon Foster)
+
+#144 Hash.push too restrictive (Solomon Foster)
+
+my @foo := [] was not setting flattening on @foo properly.
+
+Allow space after sign in character classes like <- [foo]>
+
+Fixed once-lazy lists breaking serialization even after reification.
+
+
+
+[New features]
+
+Added basic Buf (encode, decode, length).
+
+Added most of Rakudo's INET::Socket::INET, except address queries.
+
+A tiny subset of "use lib" is now supported.
+
+Added callframe(N) form.
+
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.  Also check out the TODO file; whether you want to work
+on stuff on it, or have cool ideas to add to it, both are good.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-21.zip
+[2] https://github.com/sorear/niecza
