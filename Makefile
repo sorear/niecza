@@ -6,7 +6,7 @@ CSC=gmcs /debug+
 RM=rm -f
 CP=cp
 WGET_O=wget --no-check-certificate -O
-#WGET_O=curl -o
+#WGET_O=curl -L -o
 
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
 	 ObjModel.cs BigInteger.cs Printf.cs CodeGen.cs \
@@ -43,7 +43,7 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,boot/obj/Run.%.ser,$(srcunits)) src/ni
 	mkdir boot
 	$(WGET_O) boot/niecza.zip $$(cat FETCH_URL)
 	cd boot && unzip niecza.zip
-	NIECZA_KEEP_IL=1 $(RUN_CLR) boot/run/Niecza.exe -C $(libunits)
+	NIECZA_KEEP_IL=1 $(RUN_CLR) boot/run/Niecza.exe --obj-dir=boot/obj -C $(libunits)
 	$(CP) boot/run/Kernel.dll boot/obj/
 	touch .fetch-stamp
 boot/obj/Run.CORE.ser: .fetch-stamp
