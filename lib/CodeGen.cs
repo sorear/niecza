@@ -593,7 +593,7 @@ namespace Niecza.CLRBackend {
         }
         public override void CodeGen(CgContext cx) {
             if (HasCases) {
-                cx.il.Emit(OpCodes.Ldarg_0);
+                cx.il.Emit(OpCodes.Ldarg_1);
                 cx.EmitInt(cx.next_case);
                 cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
             }
@@ -625,7 +625,7 @@ namespace Niecza.CLRBackend {
             }
             // this needs to come AFTER the invocant
             if (HasCases)
-                cx.il.Emit(OpCodes.Ldarg_0);
+                cx.il.Emit(OpCodes.Ldarg_1);
 
             for (; i < Zyg.Length; i++) {
                 Zyg[i].CodeGen(cx);
@@ -854,6 +854,22 @@ namespace Niecza.CLRBackend {
         }
     }
 
+    class ClrGetConst : ClrOp {
+        public readonly FieldInfo f;
+
+        public override ClrOp Sink() { return ClrNoop.Instance; }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldfld, f);
+        }
+
+        public ClrGetConst(FieldInfo f) {
+            Returns = f.FieldType;
+            this.f = f;
+        }
+    }
+
+    // RETIREME
     class ClrGetSField : ClrOp {
         public readonly FieldInfo f;
 
@@ -891,7 +907,7 @@ namespace Niecza.CLRBackend {
 
         public override ClrOp Sink() { return ClrNoop.Instance; }
         public override void CodeGen(CgContext cx) {
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             for (int i = 0; i < up; i++)
                 cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_outer);
             cx.EmitGetlex(index + Tokens.NumInt32, Tokens.Variable);
@@ -910,7 +926,7 @@ namespace Niecza.CLRBackend {
         public readonly ClrOp zyg;
 
         public override void CodeGen(CgContext cx) {
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             for (int i = 0; i < up; i++)
                 cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_outer);
             cx.EmitPreSetlex(index + Tokens.NumInt32);
@@ -1069,7 +1085,7 @@ namespace Niecza.CLRBackend {
         }
         public override void ListCases(CgContext cx) { cx.num_cases++; }
         public override void CodeGen(CgContext cx) {
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             cx.EmitInt(cx.next_case);
             cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
             cx.il.MarkLabel(cx.cases[cx.next_case++]);
@@ -1167,7 +1183,7 @@ namespace Niecza.CLRBackend {
         }
 
         public override void CodeGen(CgContext cx) {
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             cx.EmitInt(cx.next_case);
             cx.il.Emit(OpCodes.Stfld, Tokens.Frame_ip);
 
@@ -1178,7 +1194,7 @@ namespace Niecza.CLRBackend {
                 cx.il.Emit(OpCodes.Stloc, cx.sspill);
                 cx.il.Emit(OpCodes.Callvirt, Tokens.Variable_Fetch);
             }
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             if (ismethod)
                 zyg[0].CodeGen(cx);
 
@@ -1228,7 +1244,7 @@ namespace Niecza.CLRBackend {
             while (ix < cx.let_types.Length && cx.let_types[ix] != null)
                 ix++;
 
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             cx.EmitPreSetlex(ix);
 
             // Initial must not have a net effect on cx.let_types
@@ -1263,7 +1279,7 @@ namespace Niecza.CLRBackend {
             if (ix == cx.let_names.Length)
                 throw new Exception("let " + Name + " not found");
 
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             cx.EmitPreSetlex(ix);
 
             // Initial must not have a net effect on cx.let_types
@@ -1288,7 +1304,7 @@ namespace Niecza.CLRBackend {
             if (ix == cx.let_names.Length)
                 throw new Exception("let " + Name + " not found");
 
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             cx.EmitGetlex(ix, Returns);
         }
     }
@@ -1300,7 +1316,7 @@ namespace Niecza.CLRBackend {
             this.zyg = zyg;
         }
         public override void CodeGen(CgContext cx) {
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             zyg.CodeGen(cx);
             if (zyg.Returns.IsValueType)
                 cx.il.Emit(OpCodes.Box, zyg.Returns);
@@ -1316,7 +1332,7 @@ namespace Niecza.CLRBackend {
         public override void CodeGen(CgContext cx) {
             if (Returns == Tokens.Void)
                 return;
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_resultSlot);
             if (Config.CGVerifiable || Returns.IsValueType)
                 cx.il.Emit(OpCodes.Unbox_Any, Returns);
@@ -1409,12 +1425,12 @@ namespace Niecza.CLRBackend {
         }
         public override void CodeGen(CgContext cx) {
             if (child != null) {
-                cx.il.Emit(OpCodes.Ldarg_0);
+                cx.il.Emit(OpCodes.Ldarg_1);
                 cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_caller);
                 child.CodeGen(cx);
                 cx.il.Emit(OpCodes.Stfld, Tokens.Frame_resultSlot);
             }
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             cx.il.Emit(OpCodes.Call, Tokens.Frame_Return);
             cx.il.Emit(OpCodes.Ret);
         }
@@ -1441,7 +1457,7 @@ namespace Niecza.CLRBackend {
             Constant = true;
         }
         public override void CodeGen(CgContext cx) {
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
         }
         [Immutable] public static ClrCpsFrame Instance = new ClrCpsFrame();
     }
@@ -2045,6 +2061,9 @@ namespace Niecza.CLRBackend {
         public static CpsOp GetSField(FieldInfo fi) {
             return new CpsOp(new ClrGetSField(fi));
         }
+        public static CpsOp GetConst(FieldInfo fi) {
+            return new CpsOp(new ClrGetConst(fi));
+        }
 
         public static CpsOp SetField(FieldInfo fi, CpsOp za, CpsOp zb) {
             return Primitive(new CpsOp[2] { za, zb }, delegate(ClrOp[] heads) {
@@ -2118,8 +2137,7 @@ namespace Niecza.CLRBackend {
         public CpsBuilder(EmitUnit eu, string clrname, bool pub) {
             this.eu = eu;
             this.tb = eu.type_builder;
-            mb = tb.DefineMethod(clrname, MethodAttributes.Static |
-                    (pub ? MethodAttributes.Public : 0),
+            mb = tb.DefineMethod(clrname, (pub ? MethodAttributes.Public : 0),
                     typeof(Frame), new Type[] { typeof(Frame) });
             cx = new CgContext();
             cx.tb = tb;
@@ -2152,11 +2170,11 @@ namespace Niecza.CLRBackend {
             for (int i = 0; i < cx.num_cases; i++)
                 cx.cases[i] = cx.il.DefineLabel();
 
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             cx.il.Emit(OpCodes.Ldfld, Tokens.Frame_ip);
             cx.il.Emit(OpCodes.Switch, cx.cases);
 
-            cx.il.Emit(OpCodes.Ldarg_0);
+            cx.il.Emit(OpCodes.Ldarg_1);
             cx.il.Emit(OpCodes.Ldstr, "Invalid IP");
             cx.il.Emit(OpCodes.Call, Tokens.Kernel_Die);
             cx.il.Emit(OpCodes.Ret);
@@ -3288,7 +3306,7 @@ dynamic:
             cpb.Build(Scan(WrapBody(b)));
         }
 
-        public void FillSubInfo(Type ty) {
+        public void FillSubInfo(Type ty, object constTable) {
             MethodInfo m = ty.GetMethod(cpb.mb.Name);
 
             sub.lines = cpb.cx.lineBuffer.ToArray();
@@ -3305,7 +3323,7 @@ dynamic:
             }
 
             sub.code = (DynBlockDelegate) Delegate.CreateDelegate(
-                    Tokens.DynBlockDelegate, m);
+                    Tokens.DynBlockDelegate, constTable, m);
             if (sub.protopad != null) {
                 sub.protopad.code = sub.code;
                 sub.protopad.EnsureSpills(sub.nspill);

@@ -442,8 +442,7 @@ namespace Niecza {
             asm_builder = AppDomain.CurrentDomain.DefineDynamicAssembly(
                     new AssemblyName(asm_name),
                     (dll_name == null ? AssemblyBuilderAccess.Run :
-                        Config.CGForceSave ? AssemblyBuilderAccess.RunAndSave :
-                        AssemblyBuilderAccess.Save),
+                        AssemblyBuilderAccess.RunAndSave),
                     Backend.obj_dir);
 
             mod_builder = dll_name == null ?
@@ -452,8 +451,7 @@ namespace Niecza {
 
             type_builder = mod_builder.DefineType(asm_name,
                     TypeAttributes.Public | TypeAttributes.Sealed |
-                    TypeAttributes.Abstract | TypeAttributes.Class |
-                    TypeAttributes.BeforeFieldInit);
+                    TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
 
             if (is_mainish) {
                 var mainb = type_builder.DefineMethod("Main",
@@ -496,12 +494,14 @@ namespace Niecza {
             }
         }
 
-        public Type Finish() {
+        public Type Finish(out object constTable) {
             var type = type_builder.CreateType();
+            constTable = Activator.CreateInstance(type);
+
             if (dll_name != null)
                 asm_builder.Save(dll_name);
             foreach (NamProcessor th in fill)
-                th.FillSubInfo(type);
+                th.FillSubInfo(type, constTable);
 
             var fields = new Dictionary<string,FieldInfo>();
             foreach (FieldInfo fi in type.GetFields())
@@ -533,7 +533,7 @@ namespace Niecza {
             FieldInfo fi;
             if (!constants.TryGetValue(val, out fi))
                 constants[val] = fi = NewField(n1, n2, nty ?? val.GetType());
-            return CpsOp.IsConst(CpsOp.GetSField(fi));
+            return CpsOp.IsConst(CpsOp.GetConst(fi));
         }
 
         internal CpsOp ValConstant(string key, object val) {
@@ -679,7 +679,7 @@ namespace Niecza {
             }
 
             return type_builder.DefineField(new string(buf, 0, wp),
-                    ty, FieldAttributes.Public | FieldAttributes.Static);
+                    ty, FieldAttributes.Public);
         }
 
     }
@@ -710,10 +710,9 @@ namespace Niecza {
 
         // note: type is only set to a non-null value if the type is a
         // member of a saved assembly; thus type being non-null implies
-        // a significance to freezing and thawing the type, and also
-        // implies that the type is potentially shared between compartments
-        // and globals must be reset in Compartment.Pop.
+        // a significance to freezing and thawing the type
         public Type type;
+        public object constTable;
         public Dictionary<object, FieldInfo> constants;
 
         public bool inited = false;
@@ -772,7 +771,8 @@ namespace Niecza {
             EmitUnit eu = new EmitUnit(null, "Anon." + Interlocked.Increment(
                         ref anon_id), null, false);
             eu.CgSub(sub, false);
-            SetConstants(eu.Finish(), eu.constants);
+            object jit_consts;
+            SetConstants(eu.Finish(out jit_consts), jit_consts, eu.constants);
 
             th.code = th.info.code = sub.code;
             th.info.nspill = sub.nspill;
@@ -791,7 +791,7 @@ namespace Niecza {
 
             SaveSubs(eu, !Config.KeepIL);
 
-            type = eu.Finish();
+            type = eu.Finish(out constTable);
             constants = eu.constants;
             // all co-saved units must remember that their code is here
             foreach (RuntimeUnit zu in subordinates)
@@ -800,11 +800,11 @@ namespace Niecza {
             reg.SaveUnit(name, this);
         }
 
-        internal void SetConstants() { SetConstants(type, constants); }
-        static void SetConstants(Type ty, Dictionary<object,FieldInfo> consts) {
+        internal void SetConstants() { SetConstants(type, constTable, constants); }
+        static void SetConstants(Type ty, object ctab, Dictionary<object,FieldInfo> consts) {
             if (ty != null) {
                 foreach (KeyValuePair<object, FieldInfo> kv in consts)
-                    kv.Value.SetValue(null, kv.Key);
+                    kv.Value.SetValue(ctab, kv.Key);
             }
         }
 
@@ -817,7 +817,8 @@ namespace Niecza {
                         ref anon_id) + "." + asm_name, null, false);
             SaveSubs(eu, false);
 
-            SetConstants(eu.Finish(), eu.constants);
+            object jit_consts;
+            SetConstants(eu.Finish(out jit_consts), jit_consts, eu.constants);
         }
 
         internal void RunMainline() {
@@ -1038,6 +1039,7 @@ namespace Niecza {
                 } else {
                     Assembly assembly = Assembly.Load(n.asm_name);
                     n.type = tb.type = assembly.GetType(n.asm_name, true);
+                    n.constTable = Activator.CreateInstance(n.type);
                     n.constants = new Dictionary<object,FieldInfo>();
                     var fields = new Dictionary<string,FieldInfo>();
                     foreach (FieldInfo fi in n.type.GetFields())
@@ -1047,11 +1049,12 @@ namespace Niecza {
                     foreach (MethodInfo mi in n.type.GetMethods())
                         meth[mi.Name] = mi;
                     RuntimeUnit.reg.methods[n.asm_name] = meth;
+                    RuntimeUnit.reg.instances[n.asm_name] = n.constTable;
                     while (ncon-- > 0) {
                         FieldInfo fi = fields[tb.String()];
                         object val = tb.ObjRef();
                         n.constants[val] = fi;
-                        fi.SetValue(null, val);
+                        fi.SetValue(n.constTable, val);
                     }
                 }
 
@@ -2122,6 +2125,7 @@ namespace Niecza {
             string tn = tb.String();
             if (mn != null && (kernel || !Backend.cross_level_load)) {
                 MethodInfo mi;
+                object obj = null;
                 if (kernel) {
                     mi = typeof(Kernel).Assembly.GetType(tn, true)
                         .GetMethod(mn, BindingFlags.Public |
@@ -2133,9 +2137,10 @@ namespace Niecza {
                             !t1.TryGetValue(mn, out mi)) {
                         throw new Exception("Thawed sub references nonexistant method " + tn + "::" + mn);
                     }
+                    obj = RuntimeUnit.reg.instances[tn];
                 }
                 n.code = (DynBlockDelegate) Delegate.CreateDelegate(
-                    typeof(DynBlockDelegate), mi);
+                    typeof(DynBlockDelegate), obj, mi);
             }
 
             n.nspill = tb.Int();
