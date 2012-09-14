@@ -2678,7 +2678,7 @@ dynamic:
                 return CpsOp.MethodCall(Tokens.Kernel_NewRWListVar,
                     CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.FVarList),
                         CpsOp.NewArray(Tokens.Variable, JScalar.A<CpsOp>(1, zyg, th.Scan)),
-                        CpsOp.GetSField(Tokens.Kernel_ParcelMO)));
+                        th.cpb.eu.TypeConstant(Kernel.ParcelMO)));
             };
             handlers["makejunction"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.MethodCall(
@@ -2689,20 +2689,22 @@ dynamic:
             handlers["box"] = delegate(NamProcessor th, object[] zyg) {
                 CpsOp mo;
                 if (!(zyg[1] is object[])) {
+                    STable real_mo;
                     string name = FixStr(zyg[1]);
                     // these might need to happen *early*, before user classes
                     // are set up
                     if (name == "Str") {
-                        mo = CpsOp.GetSField(Tokens.Kernel_StrMO);
+                        real_mo = Kernel.StrMO;
                     } else if (name == "Num") {
-                        mo = CpsOp.GetSField(Tokens.Kernel_NumMO);
+                        real_mo = Kernel.NumMO;
                     } else {
                         int dummy;
                         LexInfo li = th.ResolveLex(name,false,out dummy,true);
                         if (li == null)
                             throw new NieczaException("Cannot resolve package " + name);
-                        mo = th.cpb.eu.TypeConstant((li as LIPackage).pkg);
+                        real_mo = (li as LIPackage).pkg;
                     }
+                    mo = th.cpb.eu.TypeConstant(real_mo);
                 } else {
                     mo = CpsOp.GetField(Tokens.P6any_mo, th.Scan(zyg[1]));
                 }
@@ -2947,9 +2949,9 @@ dynamic:
             thandlers["grep"] = delegate(CpsOp[] z) {
                 return CpsOp.CpsCall(Tokens.Variable, Tokens.Builtins_MEGrep,
                         CpsOp.NewArray(Tokens.Variable, z)); };
-            thandlers["newrwscalar"] = delegate(CpsOp[] z) {
+            handlers["newrwscalar"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_NewRWScalar,
-                    CpsOp.GetSField(Tokens.Kernel_AnyMO), z[0]); };
+                    th.cpb.eu.TypeConstant(Kernel.AnyMO), th.Scan(z[1])); };
             thandlers["newvsubvar"] = delegate(CpsOp[] z) {
                 return CpsOp.ConstructorCall(Tokens.SV_ctor, z[0],
                     CpsOp.ConstructorCall(Tokens.SubViviHook_ctor,
