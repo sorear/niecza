@@ -869,38 +869,6 @@ namespace Niecza.CLRBackend {
         }
     }
 
-    // RETIREME
-    class ClrGetSField : ClrOp {
-        public readonly FieldInfo f;
-
-        public override ClrOp Sink() { return ClrNoop.Instance; }
-        public override void CodeGen(CgContext cx) {
-            cx.il.Emit(OpCodes.Ldsfld, f);
-        }
-
-        public ClrGetSField(FieldInfo f) {
-            Returns = f.FieldType;
-            this.f = f;
-        }
-    }
-
-    class ClrSetSField : ClrOp {
-        public readonly FieldInfo f;
-        public readonly ClrOp zyg;
-
-        public override void CodeGen(CgContext cx) {
-            zyg.CodeGen(cx);
-            cx.il.Emit(OpCodes.Stsfld, f);
-        }
-
-        public ClrSetSField(FieldInfo f, ClrOp zyg) {
-            TypeCheck(zyg.Returns, f.FieldType);
-            Returns = Tokens.Void;
-            this.f = f;
-            this.zyg = zyg;
-        }
-    }
-
     class ClrPadGet : ClrOp {
         public readonly int up;
         public readonly int index;
@@ -2058,9 +2026,6 @@ namespace Niecza.CLRBackend {
             });
         }
 
-        public static CpsOp GetSField(FieldInfo fi) {
-            return new CpsOp(new ClrGetSField(fi));
-        }
         public static CpsOp GetConst(FieldInfo fi) {
             return new CpsOp(new ClrGetConst(fi));
         }
@@ -2068,12 +2033,6 @@ namespace Niecza.CLRBackend {
         public static CpsOp SetField(FieldInfo fi, CpsOp za, CpsOp zb) {
             return Primitive(new CpsOp[2] { za, zb }, delegate(ClrOp[] heads) {
                 return new CpsOp(new ClrSetField(fi, heads[0], heads[1]));
-            });
-        }
-
-        public static CpsOp SetSField(FieldInfo fi, CpsOp zyg) {
-            return Primitive(new CpsOp[1] { zyg }, delegate(ClrOp[] heads) {
-                return new CpsOp(new ClrSetSField(fi, heads[0]));
             });
         }
 
