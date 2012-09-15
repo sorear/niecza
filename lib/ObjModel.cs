@@ -57,7 +57,7 @@ namespace Niecza {
                 Variable[] npos = new Variable[pos.Length + 1];
                 Array.Copy(pos, 1, npos, 2, pos.Length - 1);
                 npos[0] = pos[0];
-                npos[1] = Kernel.BoxAnyMO(name, Kernel.StrMO);
+                npos[1] = Kernel.BoxAnyMO(name, Compartment.Top.StrMO);
                 return m.info.SetupCall(caller, m.outer, m.ip6,
                         npos, named, false, m);
             }
@@ -106,23 +106,23 @@ namespace Niecza {
         public abstract Variable Get(Variable obj, Variable key);
 
         public virtual P6any GetWHO(P6any obj, string key) {
-            Variable r = Get(obj, Kernel.BoxAnyMO(key, Kernel.StrMO));
+            Variable r = Get(obj, Kernel.BoxAnyMO(key, Compartment.Top.StrMO));
             return r.Fetch().mo.who;
         }
 
         public static Variable ViviHash(Variable obj, Variable key) {
-            return new RWVariable(Kernel.MuMO,
+            return new RWVariable(Compartment.Top.MuMO,
                     new NewHashViviHook(obj, key.Fetch().mo.mro_raw_Str.Get(key)),
-                    Kernel.AnyP);
+                    Compartment.Top.AnyP);
         }
         public static Variable ViviArray(Variable obj, Variable key) {
-            return new RWVariable(Kernel.MuMO,
+            return new RWVariable(Compartment.Top.MuMO,
                     new NewArrayViviHook(obj, (int)key.Fetch().mo.mro_raw_Numeric.Get(key)),
-                    Kernel.AnyP);
+                    Compartment.Top.AnyP);
         }
 
         protected Variable Slice(Variable obj, Variable key) {
-            if (key.Fetch().mo.HasType(Kernel.JunctionMO)) {
+            if (key.Fetch().mo.HasType(Compartment.Top.JunctionMO)) {
                 return Builtins.AutoThread(key.Fetch(), delegate (Variable v) {
                     return Get(obj, v); });
             }
@@ -134,7 +134,7 @@ namespace Niecza {
             // TODO: 1-element slices should be deparceled.  Requires
             // LISTSTORE improvements though.
             return Kernel.NewRWListVar(Kernel.BoxRaw<Variable[]>(
-                        items.ToArray(), Kernel.ParcelMO));
+                        items.ToArray(), Compartment.Top.ParcelMO));
         }
 
         protected Variable GetAll(Variable obj) {
@@ -564,13 +564,13 @@ next_method: ;
             this.superclasses = new List<STable>(superclasses);
             local_roles = new List<STable>(cronies ?? new STable[0]);
             type = ROLE; rtype = "role";
-            SetMRO(Kernel.AnyMO.mo.mro);
+            SetMRO(Compartment.Top.AnyMO.mo.mro);
         }
 
         public void FillParametricRole(P6any factory) {
             type = PARAMETRIZED_ROLE; rtype = "prole";
             roleFactory = factory;
-            SetMRO(Kernel.AnyMO.mo.mro);
+            SetMRO(Compartment.Top.AnyMO.mo.mro);
         }
 
         string C3State(int[] pointers, List<STable> into, STable[][] from) {
@@ -674,7 +674,7 @@ next_method: ;
                 foreach (STable s2 in local_roles)
                     foreach (STable s3 in s2.mo.role_typecheck_list)
                         role_typecheck_list.Add(s3);
-                SetMRO(Kernel.AnyMO.mo.mro);
+                SetMRO(Compartment.Top.AnyMO.mo.mro);
                 Revalidate();
                 stable.SetupVTables();
                 return null;
@@ -686,9 +686,9 @@ next_method: ;
                 Kernel.ApplyRoleToClass(stable, local_roles.ToArray());
             }
 
-            if (superclasses.Count == 0 && stable != Kernel.MuMO) {
-                superclasses.Add(type == GRAMMAR ? Kernel.GrammarMO :
-                        Kernel.AnyMO);
+            if (superclasses.Count == 0 && stable != Compartment.Top.MuMO) {
+                superclasses.Add(type == GRAMMAR ? Compartment.Top.GrammarMO :
+                        Compartment.Top.AnyMO);
             }
 
             if ((err = ComputeMRO()) != null) return err;
@@ -717,7 +717,7 @@ next_method: ;
             if (pun != null) return pun;
             STable n = new STable(stable.name);
 
-            n.how = Kernel.BoxAnyMO<STable>(n, Kernel.ClassHOWMO).Fetch();
+            n.how = Kernel.BoxAnyMO<STable>(n, Compartment.Top.ClassHOWMO).Fetch();
             n.typeObj = n.initObj = new P6opaque(n);
             ((P6opaque)n.typeObj).slots = null;
 
@@ -1011,20 +1011,20 @@ next_method: ;
             mro_succ = _GetVTU("succ") as ContextHandler<P6any> ?? CallSucc;
             mro_to_clr = _GetVT("to-clr") as ContextHandler<object>;
 
-            if (Kernel.ComplexMO != null && HasType(Kernel.ComplexMO))
+            if (Compartment.Top.ComplexMO != null && HasType(Compartment.Top.ComplexMO))
                 num_rank = Builtins.NR_COMPLEX;
-            else if (Kernel.NumMO != null && HasType(Kernel.NumMO))
+            else if (Compartment.Top.NumMO != null && HasType(Compartment.Top.NumMO))
                 num_rank = Builtins.NR_FLOAT;
-            else if (Kernel.FatRatMO != null && HasType(Kernel.FatRatMO))
+            else if (Compartment.Top.FatRatMO != null && HasType(Compartment.Top.FatRatMO))
                 num_rank = Builtins.NR_FATRAT;
-            else if (Kernel.RatMO != null && HasType(Kernel.RatMO))
+            else if (Compartment.Top.RatMO != null && HasType(Compartment.Top.RatMO))
                 num_rank = Builtins.NR_FIXRAT;
-            else if (Kernel.IntMO != null && HasType(Kernel.IntMO))
+            else if (Compartment.Top.IntMO != null && HasType(Compartment.Top.IntMO))
                 num_rank = Builtins.NR_FIXINT;
             else
                 num_rank = -1;
 
-            is_any = Kernel.AnyMO != null && HasType(Kernel.AnyMO);
+            is_any = Compartment.Top.AnyMO != null && HasType(Compartment.Top.AnyMO);
         }
 
         private object _GetVT(string name) { return _GetVTi(name, 1); }
@@ -1058,7 +1058,7 @@ next_method: ;
             if (mo.type == P6how.ROLE || mo.type == P6how.CURRIED_ROLE ||
                     mo.type == P6how.PARAMETRIZED_ROLE) {
                 if (name == "ACCEPTS" || name == "defined")
-                    return Kernel.MuMO.FindMethod(name);
+                    return Compartment.Top.MuMO.FindMethod(name);
                 var pun = mo.PunRole();
                 var punfunc = Kernel.GetVar("::GLOBAL::Niecza", "&autopun").v;
                 var clone = Kernel.RunInferior(punfunc.Fetch().Invoke(

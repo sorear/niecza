@@ -487,19 +487,19 @@ namespace Niecza.CLRBackend {
         public static readonly FieldInfo DMO_how =
             STable.GetField("how");
         public static readonly FieldInfo Kernel_NumMO =
-            Kernel.GetField("NumMO");
+            Kernel.GetField("Compartment.Top.NumMO");
         public static readonly FieldInfo Kernel_IntMO =
-            Kernel.GetField("IntMO");
+            Kernel.GetField("Compartment.Top.IntMO");
         public static readonly FieldInfo Kernel_RatMO =
-            Kernel.GetField("RatMO");
+            Kernel.GetField("Compartment.Top.RatMO");
         public static readonly FieldInfo Kernel_StrMO =
-            Kernel.GetField("StrMO");
+            Kernel.GetField("Compartment.Top.StrMO");
         public static readonly FieldInfo Kernel_AnyMO =
-            Kernel.GetField("AnyMO");
+            Kernel.GetField("Compartment.Top.AnyMO");
         public static readonly FieldInfo Kernel_ParcelMO =
-            Kernel.GetField("ParcelMO");
+            Kernel.GetField("Compartment.Top.ParcelMO");
         public static readonly FieldInfo Kernel_AnyP =
-            Kernel.GetField("AnyP");
+            Kernel.GetField("Compartment.Top.AnyP");
         public static readonly FieldInfo Frame_rx =
             typeof(Frame).GetField("rx");
         public static readonly FieldInfo Frame_ip =
@@ -2637,7 +2637,7 @@ dynamic:
                 return CpsOp.MethodCall(Tokens.Kernel_NewRWListVar,
                     CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.FVarList),
                         CpsOp.NewArray(Tokens.Variable, JScalar.A<CpsOp>(1, zyg, th.Scan)),
-                        th.cpb.eu.TypeConstant(Kernel.ParcelMO)));
+                        th.cpb.eu.TypeConstant(Compartment.Top.ParcelMO)));
             };
             handlers["makejunction"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.MethodCall(
@@ -2653,9 +2653,9 @@ dynamic:
                     // these might need to happen *early*, before user classes
                     // are set up
                     if (name == "Str") {
-                        real_mo = Kernel.StrMO;
+                        real_mo = Compartment.Top.StrMO;
                     } else if (name == "Num") {
-                        real_mo = Kernel.NumMO;
+                        real_mo = Compartment.Top.NumMO;
                     } else {
                         int dummy;
                         LexInfo li = th.ResolveLex(name,false,out dummy,true);
@@ -2910,7 +2910,7 @@ dynamic:
                         CpsOp.NewArray(Tokens.Variable, z)); };
             handlers["newrwscalar"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_NewRWScalar,
-                    th.cpb.eu.TypeConstant(Kernel.AnyMO), th.Scan(z[1])); };
+                    th.cpb.eu.TypeConstant(Compartment.Top.AnyMO), th.Scan(z[1])); };
             thandlers["newvsubvar"] = delegate(CpsOp[] z) {
                 return CpsOp.ConstructorCall(Tokens.SV_ctor, z[0],
                     CpsOp.ConstructorCall(Tokens.SubViviHook_ctor,
@@ -3315,7 +3315,7 @@ dynamic:
                     object bit;
                     CpsOp tc = EmitUnit.Current.TypeConstant(ls.type);
                     if ((f & LISimple.ROINIT) != 0) {
-                        bit = a(j("class_ref"), j("typeObj"), Kernel.AnyMO);
+                        bit = a(j("class_ref"), j("typeObj"), Compartment.Top.AnyMO);
                     } else if ((f & LISimple.DEFOUTER) != 0) {
                         bit = a(j("outerlex"), j(kv.Key));
                     } else if ((f & (LISimple.HASH | LISimple.LIST)) != 0) {
@@ -3396,7 +3396,7 @@ dynamic:
                 handlers.Add(kv.Key);
                 handlers.Add("goto_" + kv.Key);
             }
-            if (sub.mo.HasType(Kernel.RoutineMO) &&
+            if (sub.mo.HasType(Compartment.Top.RoutineMO) &&
                     (sub.special & SubInfo.RETURN_PASS) == 0) {
                 handlers.Add("4");
                 handlers.Add("");
@@ -3523,14 +3523,14 @@ dynamic:
         static STable ResolveSubClass(string cls) {
             // this happens before lexicals are created, so we can't
             // use lexicals.
-            STable rcls = (cls == "Sub") ? Kernel.SubMO :
-                (cls == "Routine") ? Kernel.RoutineMO :
-                (cls == "Regex") ? Kernel.RegexMO :
-                (cls == "Method") ? Kernel.MethodMO :
-                (cls == "Submethod") ? Kernel.SubmethodMO :
-                (cls == "WhateverCode") ? Kernel.WhateverCodeMO :
-                (cls == "Block") ? Kernel.BlockMO :
-                (cls == "Code") ? Kernel.CodeMO : null;
+            STable rcls = (cls == "Sub") ? Compartment.Top.SubMO :
+                (cls == "Routine") ? Compartment.Top.RoutineMO :
+                (cls == "Regex") ? Compartment.Top.RegexMO :
+                (cls == "Method") ? Compartment.Top.MethodMO :
+                (cls == "Submethod") ? Compartment.Top.SubmethodMO :
+                (cls == "WhateverCode") ? Compartment.Top.WhateverCodeMO :
+                (cls == "Block") ? Compartment.Top.BlockMO :
+                (cls == "Code") ? Compartment.Top.CodeMO : null;
 
             return rcls;
         }
@@ -3706,7 +3706,7 @@ dynamic:
         }
         public static object unit_use_perl5_module(object[] args) {
 		string name = (string)args[2];
-		Variable code = Kernel.BoxAnyMO<string>("Niecza::Helpers::use_module('"+name+"')", Kernel.StrMO);
+		Variable code = Kernel.BoxAnyMO<string>("Niecza::Helpers::use_module('"+name+"')", Compartment.Top.StrMO);
 		string sub = Kernel.UnboxAny<string>(Builtins.eval_perl5(code).Fetch());
 		return sub;
 	}
@@ -3810,7 +3810,7 @@ dynamic:
         }
         public static object value_to_sub(object[] args) {
             var v = ((Variable)Handle.Unbox(args[1])).Fetch();
-            return Handle.Wrap(v.Isa(Kernel.CodeMO) ? Kernel.GetInfo(v) : null);
+            return Handle.Wrap(v.Isa(Compartment.Top.CodeMO) ? Kernel.GetInfo(v) : null);
         }
         public static object value_to_string(object[] args) {
             return Builtins.ToStr((Variable)Handle.Unbox(args[1]));
@@ -3828,9 +3828,9 @@ dynamic:
         }
         public static object value_starts_with_pair(object[] args) {
             var ob = ((Variable)Handle.Unbox(args[1])).Fetch();
-            if (ob.Isa(Kernel.PairMO))
+            if (ob.Isa(Compartment.Top.PairMO))
                 return true;
-            if (ob.Isa(Kernel.ParcelMO) && Kernel.UnboxAny<Variable[]>(ob)[0].Fetch().Isa(Kernel.PairMO))
+            if (ob.Isa(Compartment.Top.ParcelMO) && Kernel.UnboxAny<Variable[]>(ob)[0].Fetch().Isa(Compartment.Top.PairMO))
                 return true;
             return false;
         }
@@ -4106,11 +4106,11 @@ dynamic:
         }
         public static object sub_is_routine(object[] args) {
             SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-            return s.mo.HasType(Kernel.RoutineMO);
+            return s.mo.HasType(Compartment.Top.RoutineMO);
         }
         public static object sub_is_regex(object[] args) {
             SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-            return s.mo.HasType(Kernel.RegexMO);
+            return s.mo.HasType(Compartment.Top.RegexMO);
         }
         public static object sub_has_lexical(object[] args) {
             SubInfo s = (SubInfo)Handle.Unbox(args[1]);
@@ -4136,7 +4136,7 @@ dynamic:
                 string key = (string) args[i];
                 string who = "";
                 if (pkg != null) {
-                    if (!pkg.who.Isa(Kernel.StashMO))
+                    if (!pkg.who.Isa(Compartment.Top.StashMO))
                         return new Exception(pkg.name + " fails to name a standard package");
                     who = Kernel.UnboxAny<string>(pkg.who);
                 }
@@ -4151,7 +4151,7 @@ dynamic:
                 } else {
                     c.globals[hkey] = v = new StashEnt();
                     v.constant = true;
-                    v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, Kernel.StashMO));
+                    v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, Compartment.Top.StashMO));
                     pkg = v.v.Fetch().mo;
                 }
             }
@@ -4171,8 +4171,8 @@ dynamic:
 
                 if (!b.v.Rw && !b.v.Fetch().IsDefined()) {
                     r.Add(new Handle(b.v.Fetch().mo));
-                } else if (!b.v.Rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
-                    r.Add(new Handle(b.v.Fetch().GetSlot(Kernel.CodeMO, "$!info")));
+                } else if (!b.v.Rw && b.v.Fetch().Isa(Compartment.Top.CodeMO)) {
+                    r.Add(new Handle(b.v.Fetch().GetSlot(Compartment.Top.CodeMO, "$!info")));
                 } else {
                     r.Add(null);
                 }
@@ -4188,8 +4188,8 @@ dynamic:
             if (ru.globals.TryGetValue(hkey, out b)) {
                 if (!b.v.Rw && !b.v.Fetch().IsDefined()) {
                     return new Handle(b.v.Fetch().mo);
-                } else if (!b.v.Rw && b.v.Fetch().Isa(Kernel.CodeMO)) {
-                    return new Handle(b.v.Fetch().GetSlot(Kernel.CodeMO, "$!info"));
+                } else if (!b.v.Rw && b.v.Fetch().Isa(Compartment.Top.CodeMO)) {
+                    return new Handle(b.v.Fetch().GetSlot(Compartment.Top.CodeMO, "$!info"));
                 } else return null;
             } else {
                 return null;
@@ -4343,14 +4343,14 @@ dynamic:
             string who  = (string)args[4];
 
             FieldInfo mof = ru.name == "CORE" ?
-                typeof(Kernel).GetField(name + "MO") : null;
+                typeof(Compartment).GetField(name + "MO") : null;
             FieldInfo pf = ru.name == "CORE" ?
-                typeof(Kernel).GetField(name + "P") : null;
+                typeof(Compartment).GetField(name + "P") : null;
 
-            STable nst = mof == null ? null : (STable)mof.GetValue(null);
-            if (nst == null) { // not all FooMO are initialized by kernel
+            STable nst = mof == null ? null : (STable)mof.GetValue(Compartment.Top);
+            if (nst == null) { // not all Compartment.Top.FooMO are initialized by kernel
                 nst = new STable(name);
-                if (mof != null) mof.SetValue(null, nst);
+                if (mof != null) mof.SetValue(Compartment.Top, nst);
             }
             // Hack - we don't clear the MRO here, because we might need
             // to call methods on the type in the process of defining the
@@ -4358,21 +4358,21 @@ dynamic:
             nst.mo.superclasses.Clear();
             // OTOH, it needs call structures set up to avoid internal errors
             nst.mo.Revalidate();
-            if (nst.typeObj == null) // AnyMO.typeObj is set up early
+            if (nst.typeObj == null) // Compartment.Top.AnyMO.typeObj is set up early
                 nst.typeObj = new P6opaque(nst, 0);
             ((P6opaque)nst.typeObj).slots = null;
 
             if (ru.name == "CORE" && name == "Nil") {
                 // anomalously requires an iterable value
-                Kernel.Nil = Kernel.NewRWListVar(nst.typeObj);
+                Compartment.Top.Nil = Kernel.NewRWListVar(nst.typeObj);
             }
 
             if (pf != null)
-                pf.SetValue(null, nst.typeObj);
+                pf.SetValue(Compartment.Top, nst.typeObj);
 
             nst.initObj = nst.typeObj;
-            nst.who        = Kernel.BoxRaw(who, Kernel.StashMO);
-            nst.how        = Kernel.BoxRaw<STable>(nst, Kernel.ClassHOWMO);
+            nst.who        = Kernel.BoxRaw(who, Compartment.Top.StashMO);
+            nst.how        = Kernel.BoxRaw<STable>(nst, Compartment.Top.ClassHOWMO);
             nst.mo.rtype   = type;
             nst.mo.type =
                 type == "package" ? P6how.PACKAGE :
@@ -4451,7 +4451,7 @@ dynamic:
                         vers.Substring(0, vers.Length - 1));
                 info["build-time"] = Builtins.now();
 
-                li.value = Kernel.BoxAnyMO(info, Kernel.HashMO);
+                li.value = Kernel.BoxAnyMO(info, Compartment.Top.HashMO);
 
                 n.AddLexical("$?PERL", li);
             }
@@ -4477,7 +4477,7 @@ dynamic:
             SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
             STable  pkg   = (STable)Handle.Unbox(args[6]);
             string  pname = (string)args[7];
-            if (!pkg.who.Isa(Kernel.StashMO))
+            if (!pkg.who.Isa(Compartment.Top.StashMO))
                 return new Exception("NYI usage of a nonstandard package");
             string  who   = Kernel.UnboxAny<string>(pkg.who);
 
@@ -4550,7 +4550,7 @@ dynamic:
             return Handle.Wrap(new Parameter(flags,
                 (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
                 name, (names.Count == 0 ? null : names.ToArray()),
-                deflt, type ?? Kernel.AnyMO, attr, atype));
+                deflt, type ?? Compartment.Top.AnyMO, attr, atype));
         }
         public static object param_constraints(object[] args) {
             Parameter tgt = (Parameter)Handle.Unbox(args[1]);
@@ -4678,7 +4678,7 @@ dynamic:
             Compartment.Top.check.Run();
             Compartment.Top.init.Run();
             StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
-            b.Bind(Kernel.FalseV);
+            b.Bind(Compartment.Top.FalseV);
             Frame ir = Kernel.GetInferiorRoot();
             fret = ru.mainline.protosub.Invoke(ir, Variable.None, null);
             fret.MarkShared();

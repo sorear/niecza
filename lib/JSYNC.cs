@@ -26,15 +26,15 @@ public class JsyncWriter {
             WriteAnchor(anchor);
         } else if (!obj.IsDefined()) {
             WriteNull();
-        } else if (obj.Isa(Kernel.ListMO)) {
+        } else if (obj.Isa(Compartment.Top.ListMO)) {
             WriteArray(obj);
-        } else if (obj.Isa(Kernel.HashMO)) {
+        } else if (obj.Isa(Compartment.Top.HashMO)) {
             WriteHash(obj);
-        } else if (obj.Isa(Kernel.BoolMO)) {
+        } else if (obj.Isa(Compartment.Top.BoolMO)) {
             WriteBool(Kernel.UnboxAny<int>(obj) != 0);
-        } else if (obj.Isa(Kernel.StrMO)) {
+        } else if (obj.Isa(Compartment.Top.StrMO)) {
             WriteStr(true, Kernel.UnboxAny<string>(obj));
-        } else if (obj.Isa(Kernel.NumMO) || obj.Isa(Kernel.IntMO) || obj.Isa(Kernel.RatMO) || obj.Isa(Kernel.FatRatMO)) {
+        } else if (obj.Isa(Compartment.Top.NumMO) || obj.Isa(Compartment.Top.IntMO) || obj.Isa(Compartment.Top.RatMO) || obj.Isa(Compartment.Top.FatRatMO)) {
             WriteNum(obj.mo.mro_raw_Numeric.Get(obj));
         } else {
             WriteGeneral(obj);
@@ -68,7 +68,7 @@ public class JsyncWriter {
         o.Append('{');
         contUsed = true;
         o.AppendFormat("\"&\":\"A{0}\"", a);
-        if (obj.mo != Kernel.HashMO) {
+        if (obj.mo != Compartment.Top.HashMO) {
             if (obj.mo.nslots != 0)
                 throw new NieczaException("Cannot serialize subclasses of Hash  that add attributes");
             o.Append(",\"!\":");
@@ -265,13 +265,13 @@ public class JsyncReader {
                 return GetFromString();
             case 'n':
                 SkipToken("null");
-                return Kernel.NewMuScalar(Kernel.AnyP);
+                return Kernel.NewMuScalar(Compartment.Top.AnyP);
             case 't':
                 SkipToken("true");
-                return Kernel.NewMuScalar(Kernel.TrueV.Fetch());
+                return Kernel.NewMuScalar(Compartment.Top.TrueV.Fetch());
             case 'f':
                 SkipToken("false");
-                return Kernel.NewMuScalar(Kernel.FalseV.Fetch());
+                return Kernel.NewMuScalar(Compartment.Top.FalseV.Fetch());
             default:
                 return GetFromNumber();
         }
@@ -364,27 +364,27 @@ public class JsyncReader {
             }
             SkipWhite(true);
             SkipChar('}');
-            return BoxRW<VarHash>(q, Kernel.HashMO);
+            return BoxRW<VarHash>(q, Compartment.Top.HashMO);
         } else if (top_level) {
             Err("Top-level scalar found");
             return null;
         } else if (look == '"') {
-            return BoxRW<string>(GetJsonString(), Kernel.StrMO);
+            return BoxRW<string>(GetJsonString(), Compartment.Top.StrMO);
         } else if (look == 'n') {
             SkipToken("null");
-            return Kernel.NewMuScalar(Kernel.AnyP);
+            return Kernel.NewMuScalar(Compartment.Top.AnyP);
         } else if (look == 't') {
             SkipToken("true");
-            return Kernel.NewMuScalar(Kernel.TrueV.Fetch());
+            return Kernel.NewMuScalar(Compartment.Top.TrueV.Fetch());
         } else if (look == 'f') {
             SkipToken("false");
-            return Kernel.NewMuScalar(Kernel.FalseV.Fetch());
+            return Kernel.NewMuScalar(Compartment.Top.FalseV.Fetch());
         } else {
             double d;
             string tx = GetJsonNumber();
             if (!Utils.S2NB(tx, out d))
                 Err("Unparsable number " + tx);
-            return BoxRW<double>(d, Kernel.NumMO);
+            return BoxRW<double>(d, Compartment.Top.NumMO);
         }
     }
 
@@ -467,19 +467,19 @@ public class JsyncReader {
         List<Variable> lv;
         if (!anchorrefs.TryGetValue(name, out lv))
             anchorrefs[name] = lv = new List<Variable>();
-        Variable n = Kernel.NewMuScalar(Kernel.AnyP);
+        Variable n = Kernel.NewMuScalar(Compartment.Top.AnyP);
         lv.Add(n);
         return n;
     }
 
     Variable ParseScalar() {
         if (s_tag == null) {
-            return BoxRW<string>(s_content, Kernel.StrMO);
+            return BoxRW<string>(s_content, Compartment.Top.StrMO);
         } else if (s_tag == "Num") {
             double r;
             if (!Utils.S2NB(s_content, out r))
                 Err("Num format error");
-            return BoxRW<double>(r, Kernel.NumMO);
+            return BoxRW<double>(r, Compartment.Top.NumMO);
         } else {
             Err("Unhandled scalar tag " + s_tag);
             return null;
@@ -529,7 +529,7 @@ public class JsyncReader {
         SkipCharWS(']');
         if (a_tag != null)
             Err("Typed arrays are NYI in Niecza Perl 6");
-        return Kernel.NewRWScalar(Kernel.AnyMO, obj);
+        return Kernel.NewRWScalar(Compartment.Top.AnyMO, obj);
     }
 
     string GetSimpleStringValue() {
@@ -636,7 +636,7 @@ public class JsyncReader {
                 Err(s2.Substring(2) + " does not name a loaded global class");
             P6any p_cursor = v_cursor.Fetch();
 
-            if (p_cursor.Isa(Kernel.HashMO)) {
+            if (p_cursor.Isa(Compartment.Top.HashMO)) {
                 if (p_cursor.mo.nslots != 0)
                     Err("Cannot thaw Hash subclass " + p_cursor.mo.name + "; it has attributes");
                 obj = BoxRW<VarHash>(zyg, p_cursor.mo);
@@ -655,7 +655,7 @@ public class JsyncReader {
                 obj = Kernel.NewMuScalar(dyo);
             }
         } else {
-            obj = BoxRW<VarHash>(zyg, Kernel.HashMO);
+            obj = BoxRW<VarHash>(zyg, Compartment.Top.HashMO);
         }
         if (h_anchor != null)
             AddAnchor(h_anchor, obj.Fetch());
@@ -801,11 +801,11 @@ public class JsonWriter {
     void WriteVal(P6any obj) {
         if (!obj.IsDefined()) {
             o.Append("null");
-        } else if (obj.Isa(Kernel.BoolMO)) {
+        } else if (obj.Isa(Compartment.Top.BoolMO)) {
             o.Append(Kernel.UnboxAny<int>(obj) != 0 ? "true" : "false");
-        } else if (obj.Isa(Kernel.NumMO) || obj.Isa(Kernel.IntMO) || obj.Isa(Kernel.RatMO) || obj.Isa(Kernel.FatRatMO)) {
+        } else if (obj.Isa(Compartment.Top.NumMO) || obj.Isa(Compartment.Top.IntMO) || obj.Isa(Compartment.Top.RatMO) || obj.Isa(Compartment.Top.FatRatMO)) {
             o.Append(Utils.N2S(obj.mo.mro_raw_Numeric.Get(obj)));
-        } else if (obj.Isa(Kernel.StrMO)) {
+        } else if (obj.Isa(Compartment.Top.StrMO)) {
             o.Append('"');
             JsyncWriter.AddStringContents(o, Kernel.UnboxAny<string>(obj));
             o.Append('"');
@@ -817,7 +817,7 @@ public class JsonWriter {
     void WriteObj(P6any obj) {
         bool comma = false;
         bool def = obj.IsDefined();
-        if (def && obj.Isa(Kernel.HashMO)) {
+        if (def && obj.Isa(Compartment.Top.HashMO)) {
             VarHash vh = Kernel.UnboxAny<VarHash>(obj);
             o.Append('{');
             foreach(KeyValuePair<string,Variable> kv in vh) {
@@ -830,7 +830,7 @@ public class JsonWriter {
                 WriteVal(kv.Value.Fetch());
             }
             o.Append('}');
-        } else if (def && obj.Isa(Kernel.ListMO)) {
+        } else if (def && obj.Isa(Compartment.Top.ListMO)) {
             VarDeque iter = obj.mo.mro_raw_iterator.Get(obj);
             o.Append('[');
             while (Kernel.IterHasFlat(iter, true)) {

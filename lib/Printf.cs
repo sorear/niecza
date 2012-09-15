@@ -328,7 +328,7 @@ public partial class Builtins {
                 throw new NieczaException("index out of range");
             }
         }
-        return Kernel.BoxAnyMO(result, Kernel.StrMO);
+        return Kernel.BoxAnyMO(result, Compartment.Top.StrMO);
     }
 }
 

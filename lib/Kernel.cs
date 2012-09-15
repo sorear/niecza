@@ -79,7 +79,7 @@ namespace Niecza {
         public abstract void Store(P6any v);
 
         public virtual Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Kernel.ScalarMO);
+            return Kernel.BoxAnyMO<Variable>(this, Compartment.Top.ScalarMO);
         }
 
         public abstract void Freeze(FreezeBuffer fb);
@@ -144,7 +144,7 @@ namespace Niecza {
         public override void Do(Variable toviv) {
             VarHash rh = new VarHash();
             rh[key] = toviv;
-            hashv.Store(Kernel.BoxRaw(rh, Kernel.HashMO));
+            hashv.Store(Kernel.BoxRaw(rh, Compartment.Top.HashMO));
         }
         public override void Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.NewHashViviHook);
@@ -165,7 +165,7 @@ namespace Niecza {
         int key;
         public ArrayViviHook(P6any ary, int key) { this.ary = ary; this.key = key; }
         public override void Do(Variable toviv) {
-            VarDeque vd = (VarDeque) ary.GetSlot(Kernel.ListMO, "$!items");
+            VarDeque vd = (VarDeque) ary.GetSlot(Compartment.Top.ListMO, "$!items");
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewTypedScalar(null));
             vd[key] = toviv;
@@ -193,7 +193,7 @@ namespace Niecza {
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewTypedScalar(null));
             vd[key] = toviv;
-            P6opaque d = new P6opaque(Kernel.ArrayMO);
+            P6opaque d = new P6opaque(Compartment.Top.ArrayMO);
             d.slots[0] = vd;
             d.slots[1] = new VarDeque();
             ary.Store(d);
@@ -262,8 +262,8 @@ namespace Niecza {
             return this;
         }
         public override void Store(P6any v)  {
-            if (v == Kernel.NilP) {
-                v = type == null ? Kernel.AnyP : type.initObj;
+            if (v == Compartment.Top.NilP) {
+                v = type == null ? Compartment.Top.AnyP : type.initObj;
             }
             if (type != null && !v.Does(type)) {
                 throw new NieczaException("Nominal type check failed for scalar store; got " + v.mo.name + ", needed " + type.name + " or subtype");
@@ -315,7 +315,7 @@ namespace Niecza {
 
         public override P6any Fetch() {
             Variable vr = Kernel.RunInferior(fetch.Invoke(
-                Kernel.GetInferiorRoot(), new [] {Kernel.AnyP}, null));
+                Kernel.GetInferiorRoot(), new [] {Compartment.Top.AnyP}, null));
             return vr.Fetch();
         }
 
@@ -326,7 +326,7 @@ namespace Niecza {
                 vh.Do(this);
             }
             Kernel.RunInferior(store.Invoke(Kernel.GetInferiorRoot(),
-                new [] { Kernel.AnyP, v }, null));
+                new [] { Compartment.Top.AnyP, v }, null));
         }
 
         public override void Vivify() {
@@ -831,7 +831,7 @@ namespace Niecza {
             }
 
             Kernel.RunInferior(Kernel.GetInferiorRoot().
-                    MakeChild(null, csr.mainline, Kernel.AnyP));
+                    MakeChild(null, csr.mainline, Compartment.Top.AnyP));
         }
 
         internal string LinkUnit(RuntimeUnit other) {
@@ -868,11 +868,11 @@ namespace Niecza {
         static bool IsEmptyAggr(Variable v) {
             if (!v.List) return false;
             P6any p = v.Fetch();
-            if (p.mo == Kernel.ArrayMO) {
-                return ((VarDeque)p.GetSlot(Kernel.ListMO, "$!items")).Count() == 0 &&
-                    ((VarDeque)p.GetSlot(Kernel.ListMO, "$!rest")).Count() == 0;
+            if (p.mo == Compartment.Top.ArrayMO) {
+                return ((VarDeque)p.GetSlot(Compartment.Top.ListMO, "$!items")).Count() == 0 &&
+                    ((VarDeque)p.GetSlot(Compartment.Top.ListMO, "$!rest")).Count() == 0;
             }
-            else if (p.mo == Kernel.HashMO) {
+            else if (p.mo == Compartment.Top.HashMO) {
                 return Kernel.UnboxAny<VarHash>(p).Count == 0;
             }
             else {
@@ -911,8 +911,8 @@ namespace Niecza {
             // (mis)use
             if (ose.constant && !oseod && nse.constant && !nseod &&
                     (oseo.mo.mo.type == P6how.PACKAGE || nseo.mo.mo.type == P6how.PACKAGE) &&
-                    oseo.mo.who.Isa(Kernel.StashMO) &&
-                    nseo.mo.who.Isa(Kernel.StashMO) &&
+                    oseo.mo.who.Isa(Compartment.Top.StashMO) &&
+                    nseo.mo.who.Isa(Compartment.Top.StashMO) &&
                     Kernel.UnboxAny<string>(oseo.mo.who) ==
                         Kernel.UnboxAny<string>(nseo.mo.who)) {
                 if (nseo.mo.mo.type == P6how.PACKAGE)
@@ -989,12 +989,13 @@ namespace Niecza {
             fb.Byte((byte)(is_mainish ? 1 : 0));
 
             if (name == "CORE") {
-                FieldInfo[] kf = typeof(Kernel).GetFields();
+                FieldInfo[] kf = typeof(Compartment).GetFields();
                 Array.Sort<FieldInfo>(kf,
                         (f1, f2) => string.CompareOrdinal(f1.Name, f2.Name));
                 foreach (FieldInfo f in kf) {
                     if (f.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0) {
-                        fb.ObjRef(f.GetValue(null));
+                        //Console.WriteLine("Freeze {0} {1}", f, f.GetValue(Compartment.Top));
+                        fb.ObjRef(f.GetValue(Compartment.Top));
                     }
                 }
             }
@@ -1077,12 +1078,13 @@ namespace Niecza {
             n.is_mainish = tb.Byte() != 0;
 
             if (n.name == "CORE") {
-                FieldInfo[] kf = typeof(Kernel).GetFields();
+                FieldInfo[] kf = typeof(Compartment).GetFields();
                 Array.Sort<FieldInfo>(kf,
                         (f1, f2) => string.CompareOrdinal(f1.Name, f2.Name));
                 foreach (FieldInfo f in kf) {
                     if (f.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0) {
-                        f.SetValue(null, tb.ObjRef());
+                        f.SetValue(Compartment.Top, tb.ObjRef());
+                        //Console.WriteLine("Thaw {0} {1}", f, f.GetValue(Compartment.Top));
                     }
                 }
             }
@@ -1230,7 +1232,7 @@ namespace Niecza {
 
     public class LIConstant : LexInfo {
         public Variable value;
-        public LIConstant() { this.value = Kernel.AnyP; }
+        public LIConstant() { this.value = Compartment.Top.AnyP; }
         internal LIConstant(Variable value) { this.value = value; }
         public override void Init(Frame f) { }
         public override void BindFields() { }
@@ -1296,7 +1298,7 @@ namespace Niecza {
             if ((flags & NOINIT) != 0)
                 return;
             if ((flags & ROINIT) != 0)
-                Set(f, Kernel.AnyP);
+                Set(f, Compartment.Top.AnyP);
             else if ((flags & DEFOUTER) != 0)
                 Set(f, f.info.GetOuterTopic(f));
             else if ((flags & LIST) != 0)
@@ -1478,12 +1480,12 @@ namespace Niecza {
         public STable pkg;
         public LIPackage(STable pkg) { this.pkg = pkg; }
         public override object Get(Frame f) {
-            return pkg == Kernel.NilP.mo ? (Variable)Kernel.Nil : pkg.typeObj;
+            return pkg == Compartment.Top.NilP.mo ? (Variable)Compartment.Top.Nil : pkg.typeObj;
         }
         public override void Init(Frame f) { }
         internal override ClrOp GetCode(int up) {
-            return pkg == Kernel.NilP.mo ?
-                EmitUnit.Current.RefConstant("Nil", "L", Kernel.Nil, typeof(Variable)).head :
+            return pkg == Compartment.Top.NilP.mo ?
+                EmitUnit.Current.RefConstant("Compartment.Top.Nil", "L", Compartment.Top.Nil, typeof(Variable)).head :
                 EmitUnit.Current.TypeConstantP(pkg).head;
         }
         internal override void DoFreeze(FreezeBuffer fb) {
@@ -1519,7 +1521,7 @@ namespace Niecza {
         public Parameter(int flags, int slot, string name,
                 string[] names, object def, STable type, string attr,
                 STable atype) {
-            this.mo = Kernel.ParameterMO;
+            this.mo = Compartment.Top.ParameterMO;
             this.flags = flags;
             this.name = name;
             this.slot = slot;
@@ -1532,16 +1534,16 @@ namespace Niecza {
 
         public static Parameter TPos(string name, int slot) {
             return new Parameter(RWTRANS | POSITIONAL, slot, name,
-                    null, null, Kernel.AnyMO, null, null);
+                    null, null, Compartment.Top.AnyMO, null, null);
         }
 
         public static Parameter TNamedOpt(string name, int slot) {
             return new Parameter(RWTRANS | OPTIONAL, slot, name,
-                    new string[] { name }, null, Kernel.AnyMO, null, null);
+                    new string[] { name }, null, Compartment.Top.AnyMO, null, null);
         }
 
         // Value processing
-        public const int HASTYPE    = 1; // else Kernel.AnyMO
+        public const int HASTYPE    = 1; // else Compartment.Top.AnyMO
         public const int MULTI_IGNORED = 16384;
         public const int ANY_DEF    =  0x40000;
         public const int UNDEF_ONLY =  0x80000;
@@ -1604,7 +1606,7 @@ namespace Niecza {
             return n;
         }
 
-        void IFixup.Fixup() { mo = Kernel.ParameterMO; }
+        void IFixup.Fixup() { mo = Compartment.Top.ParameterMO; }
     }
 
     public class Signature : P6any, IFixup {
@@ -1612,7 +1614,7 @@ namespace Niecza {
 
         public override string ReprName() { return "P6sig"; }
 
-        public Signature(params Parameter[] parms) { this.mo = Kernel.SignatureMO; this.parms = parms; }
+        public Signature(params Parameter[] parms) { this.mo = Compartment.Top.SignatureMO; this.parms = parms; }
         private Signature() { }
 
         public override void Freeze(FreezeBuffer fb) {
@@ -1628,7 +1630,7 @@ namespace Niecza {
             n.parms = tb.RefsA<Parameter>();
             return n;
         }
-        void IFixup.Fixup() { mo = Kernel.SignatureMO; }
+        void IFixup.Fixup() { mo = Compartment.Top.SignatureMO; }
     }
 
     // This stores all the invariant stuff about a Sub, i.e. everything
@@ -1827,9 +1829,9 @@ namespace Niecza {
                 dst[th.lexi1 - 1] = (Variable)th.resultSlot;
 
             if (th.lexi1 == dst.Length) {
-                P6opaque nj = new P6opaque(Kernel.JunctionMO);
+                P6opaque nj = new P6opaque(Compartment.Top.JunctionMO);
                 nj.slots[0] = th.lex3;
-                nj.slots[1] = Kernel.BoxRaw(dst, Kernel.ParcelMO);
+                nj.slots[1] = Kernel.BoxRaw(dst, Compartment.Top.ParcelMO);
                 // restore, in case our caller is using this
                 if (th.lexi0 == -2)
                     th.named[(string)th.lex2] = (Variable)th.lex9;
@@ -2330,11 +2332,11 @@ namespace Niecza {
             code = info_.code;
             info = info_;
             sub = sub_;
-            mo = Kernel.CallFrameMO;
+            mo = Compartment.Top.CallFrameMO;
             lexn = (info_.nspill > 0) ? new object[info_.nspill] : null;
         }
 
-        public Frame() { mo = Kernel.CallFrameMO; }
+        public Frame() { mo = Compartment.Top.CallFrameMO; }
 
         public static readonly bool TraceCalls =
             Environment.GetEnvironmentVariable("NIECZA_TRACE_CALLS") != null;
@@ -2423,16 +2425,16 @@ namespace Niecza {
         }
 
         public Variable GetArgs() {
-            P6any nw = new P6opaque(Kernel.CaptureMO);
+            P6any nw = new P6opaque(Compartment.Top.CaptureMO);
             var poscap = pos ?? new Variable[0];
-            if (sub != null && poscap.Length > 0 && sub.Does(Kernel.MethodMO)) {
+            if (sub != null && poscap.Length > 0 && sub.Does(Compartment.Top.MethodMO)) {
                 // Hide the self value so that using |callframe.args in a
                 // nextwith call will DTRT
                 poscap = new Variable[pos.Length - 1];
                 Array.Copy(pos, 1, poscap, 0, poscap.Length);
             }
-            nw.SetSlot(Kernel.CaptureMO, "$!positionals", poscap);
-            nw.SetSlot(Kernel.CaptureMO, "$!named", named);
+            nw.SetSlot(Compartment.Top.CaptureMO, "$!positionals", poscap);
+            nw.SetSlot(Compartment.Top.CaptureMO, "$!named", named);
             return nw;
         }
 
@@ -2532,7 +2534,7 @@ namespace Niecza {
                 }
                 csr = csr.outer;
             }
-            return Kernel.AnyP;
+            return Compartment.Top.AnyP;
         }
 
         public void LexicalBind(string name, Variable to) {
@@ -2567,7 +2569,7 @@ namespace Niecza {
                 var sav_outer = th.outer;
                 var sav_sub = th.sub;
                 var sav_disp = th.curDisp;
-                Frame nth = th.Return().MakeChild(null, Kernel.AutoThreadSubSI, Kernel.AnyP);
+                Frame nth = th.Return().MakeChild(null, Kernel.AutoThreadSubSI, Compartment.Top.AnyP);
 
                 P6opaque jo  = (P6opaque) jct.Fetch();
 
@@ -2590,7 +2592,7 @@ namespace Niecza {
             }
 
             if ((th.flags & CHECK_ONLY) != 0) {
-                th.caller.resultSlot = rawc ? Kernel.TrueV : Kernel.FalseV;
+                th.caller.resultSlot = rawc ? Compartment.Top.TrueV : Compartment.Top.FalseV;
                 return th.Return();
             } else {
                 return th;
@@ -2609,13 +2611,13 @@ namespace Niecza {
                     null)).Fetch();
                 return BindSignature(th, (Signature)c,
                         NO_JUNCTION + (quiet ? CHECK_ONLY : 0), param.name,
-                        (Variable[])cap.GetSlot(Kernel.CaptureMO, "$!positionals"),
-                        (VarHash)cap.GetSlot(Kernel.CaptureMO, "$!named"),
+                        (Variable[])cap.GetSlot(Compartment.Top.CaptureMO, "$!positionals"),
+                        (VarHash)cap.GetSlot(Compartment.Top.CaptureMO, "$!named"),
                         ref jun_pivot, ref jun_pivot_n, ref jun_rank);
             }
             if (c is SubInfo) {
                 Frame thn = Kernel.GetInferiorRoot()
-                    .MakeChild(th, (SubInfo)c, Kernel.AnyP);
+                    .MakeChild(th, (SubInfo)c, Compartment.Top.AnyP);
                 var sm = Kernel.RunInferior(thn);
                 bool res = Kernel.ACCEPTS(arg, sm);
                 if (!res && !quiet)
@@ -2658,18 +2660,18 @@ namespace Niecza {
 
                 Variable src = null;
                 if ((flags & Parameter.SLURPY_PCL) != 0) {
-                    src = (slot >= 0) ? Kernel.BoxAnyMO(pos, Kernel.ParcelMO) :
-                        Kernel.AnyP;
+                    src = (slot >= 0) ? Kernel.BoxAnyMO(pos, Compartment.Top.ParcelMO) :
+                        Compartment.Top.AnyP;
                     posc  = pos.Length;
                     goto gotit;
                 }
                 if ((flags & Parameter.SLURPY_CAP) != 0) {
                     if (slot < 0) {
-                        src = Kernel.AnyP;
+                        src = Compartment.Top.AnyP;
                         named = null; namedc = null; posc = pos.Length;
                         goto gotit;
                     }
-                    P6any nw = new P6opaque(Kernel.CaptureMO);
+                    P6any nw = new P6opaque(Compartment.Top.CaptureMO);
                     Variable[] spos = new Variable[pos.Length - posc];
                     Array.Copy(pos, posc, spos, 0, spos.Length);
                     VarHash snamed = null;
@@ -2680,14 +2682,14 @@ namespace Niecza {
                                 snamed[k] = named[k];
                         }
                     }
-                    nw.SetSlot(Kernel.CaptureMO, "$!positionals", spos);
-                    nw.SetSlot(Kernel.CaptureMO, "$!named", snamed);
+                    nw.SetSlot(Compartment.Top.CaptureMO, "$!positionals", spos);
+                    nw.SetSlot(Compartment.Top.CaptureMO, "$!named", snamed);
                     src = nw;
                     named = null; namedc = null; posc = pos.Length;
                     goto gotit;
                 }
                 if ((flags & Parameter.SLURPY_POS) != 0) {
-                    P6any l = new P6opaque(Kernel.ListMO);
+                    P6any l = new P6opaque(Compartment.Top.ListMO);
                     Kernel.IterToList(l, Kernel.IterFlatten(
                                 Kernel.SlurpyHelper(pos, posc)));
                     src = Kernel.NewRWListVar(l);
@@ -2703,7 +2705,7 @@ namespace Niecza {
                         named = null;
                         namedc = null;
                     }
-                    src = Kernel.BoxAnyMO(nh, Kernel.HashMO);
+                    src = Kernel.BoxAnyMO(nh, Compartment.Top.HashMO);
                     goto gotit;
                 }
                 if (names != null && named != null) {
@@ -2729,7 +2731,7 @@ get_default:
                         src = (Variable)param.def;
                     } else {
                         Frame thn = Kernel.GetInferiorRoot()
-                            .MakeChild(th, (SubInfo)param.def, Kernel.AnyP);
+                            .MakeChild(th, (SubInfo)param.def, Compartment.Top.AnyP);
                         src = Kernel.RunInferior(thn);
                         if (src == null)
                             throw new Exception("Improper null return from sub default for '" + param.name + "' in '" + signame + "'");
@@ -2739,7 +2741,7 @@ get_default:
                 if ((flags & Parameter.DEFOUTER) != 0) {
                     Frame f = th;
                     if (th.info.outer_topic_key < 0) {
-                        src = Kernel.AnyP;
+                        src = Compartment.Top.AnyP;
                         goto gotit;
                     }
                     for (int i = 0; i < th.info.outer_topic_rank; i++) f = f.outer;
@@ -2790,22 +2792,22 @@ gotit:
                     bool rw     = ((flags & Parameter.READWRITE) != 0) && !islist;
                     P6any srco  = src.Fetch();
 
-                    // XXX: in order for calling methods on Nil to work,
+                    // XXX: in order for calling methods on Compartment.Top.Nil to work,
                     // self needs to be ignored here.
-                    if (srco == Kernel.NilP && obj_src != -1 &&
+                    if (srco == Compartment.Top.NilP && obj_src != -1 &&
                             (flags & Parameter.INVOCANT) == 0) {
                         obj_src = -1;
                         goto get_default;
                     }
                     if ((flags & Parameter.IS_LIST) != 0)
-                        type = Kernel.PositionalMO;
+                        type = Compartment.Top.PositionalMO;
                     if ((flags & Parameter.IS_HASH) != 0)
-                        type = Kernel.AssociativeMO;
+                        type = Compartment.Top.AssociativeMO;
                     if ((flags & Parameter.CALLABLE) != 0)
-                        type = Kernel.CallableMO;
+                        type = Compartment.Top.CallableMO;
                     if (!srco.Does(type)) {
                         if (quiet) return false;
-                        if (srco.mo.HasType(Kernel.JunctionMO) && obj_src != -1 && (mode & NO_JUNCTION) == 0) {
+                        if (srco.mo.HasType(Compartment.Top.JunctionMO) && obj_src != -1 && (mode & NO_JUNCTION) == 0) {
                             int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)srco).slots[0]) / 2;
                             if (jrank < jun_rank) {
                                 jun_rank = jrank;
@@ -3124,21 +3126,21 @@ bound: ;
         public override double Get(Variable obj) {
             Variable v = method == null ? obj : Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
             P6any o = v.Fetch();
-            if (o.mo.HasType(Kernel.NumMO)) {
+            if (o.mo.HasType(Compartment.Top.NumMO)) {
                 return Kernel.UnboxAny<double>(o);
-            } else if (o.mo.HasType(Kernel.IntMO)) {
+            } else if (o.mo.HasType(Compartment.Top.IntMO)) {
                 if (o is BoxObject<int>) {
                     return (double)Kernel.UnboxAny<int>(o);
                 } else {
                     return (double)Kernel.UnboxAny<BigInteger>(o);
                 }
-            } else if (o.mo.HasType(Kernel.RatMO)) {
+            } else if (o.mo.HasType(Compartment.Top.RatMO)) {
                 Rat r = Kernel.UnboxAny<Rat>(o);
                 return (double)r.num / (double)r.den;
-            } else if (o.mo.HasType(Kernel.FatRatMO)) {
+            } else if (o.mo.HasType(Compartment.Top.FatRatMO)) {
                 FatRat r = Kernel.UnboxAny<FatRat>(o);
                 return (double)r.num / (double)r.den;
-            } else if (o.mo.HasType(Kernel.ComplexMO)) {
+            } else if (o.mo.HasType(Compartment.Top.ComplexMO)) {
                 Complex r = Kernel.UnboxAny<Complex>(o);
                 if (r.im != 0)
                     throw new NieczaException("coercion would discard nonzero imaginary part");
@@ -3217,7 +3219,7 @@ bound: ;
     class CtxAnyList : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             VarDeque itr = new VarDeque(obj.List ? obj.Fetch() : obj);
-            P6any l = new P6opaque(Kernel.ListMO);
+            P6any l = new P6opaque(Compartment.Top.ListMO);
             Kernel.IterToList(l, itr);
             return Kernel.NewRWListVar(l);
         }
@@ -3236,12 +3238,12 @@ bound: ;
             for (int i = 0; i < dsts.Length; i++) {
                 Variable d = dsts[i];
                 if (d.List) {
-                    srcs[i] = new P6opaque(Kernel.ListMO);
+                    srcs[i] = new P6opaque(Compartment.Top.ListMO);
                     Kernel.IterToList(srcs[i], src);
                     src = new VarDeque();
                 } else {
                     srcs[i] = Kernel.IterHasFlat(src, true) ?
-                        src.Shift().Fetch() : Kernel.AnyP;
+                        src.Shift().Fetch() : Compartment.Top.AnyP;
                 }
             }
 
@@ -3256,7 +3258,7 @@ bound: ;
         public override Variable Get(Variable obj) {
             P6any o = obj.Fetch();
             VarDeque itr = o.IsDefined() ? new VarDeque(Kernel.UnboxAny<Variable[]>(o)) : new VarDeque();
-            P6any l = new P6opaque(Kernel.ListMO);
+            P6any l = new P6opaque(Compartment.Top.ListMO);
             Kernel.IterToList(l, itr);
             return Kernel.NewRWListVar(l);
         }
@@ -3346,8 +3348,8 @@ bound: ;
             VarDeque items = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
                 items.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
-            lhs_o.SetSlot(Kernel.ListMO, "$!items", items);
-            lhs_o.SetSlot(Kernel.ListMO, "$!rest", iter); /*now empty*/
+            lhs_o.SetSlot(Compartment.Top.ListMO, "$!items", items);
+            lhs_o.SetSlot(Compartment.Top.ListMO, "$!rest", iter); /*now empty*/
             return lhs;
         }
     }
@@ -3355,8 +3357,8 @@ bound: ;
         public override VarDeque Get(Variable obj) {
             var d = obj.Fetch();
             if (!d.IsDefined()) return new VarDeque();
-            VarDeque r = new VarDeque( (VarDeque) d.GetSlot(Kernel.ListMO, "$!items" ));
-            r.PushD((VarDeque) d.GetSlot(Kernel.ListMO, "$!rest"));
+            VarDeque r = new VarDeque( (VarDeque) d.GetSlot(Compartment.Top.ListMO, "$!items" ));
+            r.PushD((VarDeque) d.GetSlot(Compartment.Top.ListMO, "$!rest"));
             return r;
         }
     }
@@ -3364,25 +3366,25 @@ bound: ;
     class PopList : ContextHandler<Variable> {
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
-            if (!o.IsDefined()) return Kernel.AnyP;
-            VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
-            VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "$!rest");
+            if (!o.IsDefined()) return Compartment.Top.AnyP;
+            VarDeque items = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!items");
+            VarDeque rest = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!rest");
             while (Kernel.IterHasFlat(rest, false))
                 items.Push(rest.Shift());
-            return (items.Count() != 0) ? items.Pop() : Kernel.AnyP;
+            return (items.Count() != 0) ? items.Pop() : Compartment.Top.AnyP;
         }
     }
     class ShiftList : ContextHandler<Variable> {
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
-            if (!o.IsDefined()) return Kernel.AnyP;
-            VarDeque items = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
-            VarDeque rest = (VarDeque)o.GetSlot(Kernel.ListMO, "$!rest");
+            if (!o.IsDefined()) return Compartment.Top.AnyP;
+            VarDeque items = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!items");
+            VarDeque rest = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!rest");
             if (items.Count() != 0)
                 return items.Shift();
             if (Kernel.IterHasFlat(rest, false))
                 return rest.Shift();
-            return Kernel.AnyP;
+            return Compartment.Top.AnyP;
         }
     }
     class UnshiftList : PushyHandler {
@@ -3391,7 +3393,7 @@ bound: ;
             if (!o.IsDefined())
                 throw new NieczaException("Cannot push onto type object");
             VarDeque iter = new VarDeque(args);
-            VarDeque targ = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
+            VarDeque targ = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!items");
             VarDeque st = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
                 st.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
@@ -3405,8 +3407,8 @@ bound: ;
             if (!o.IsDefined())
                 throw new NieczaException("Cannot push onto type object");
             VarDeque iter = new VarDeque(args);
-            VarDeque targ = (VarDeque)o.GetSlot(Kernel.ListMO, "$!rest");
-            if (targ.Count() == 0) targ = (VarDeque)o.GetSlot(Kernel.ListMO, "$!items");
+            VarDeque targ = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!rest");
+            if (targ.Count() == 0) targ = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!items");
             while (Kernel.IterHasFlat(iter, true))
                 targ.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
             return v;
@@ -3423,14 +3425,14 @@ bound: ;
             bool first = true;
             while (Kernel.IterHasFlat(iter, true)) {
                 P6any elt = iter.Shift().Fetch();
-                if (first && elt.mo.HasType(Kernel.HashMO)) {
+                if (first && elt.mo.HasType(Compartment.Top.HashMO)) {
                     foreach(KeyValuePair<string,Variable> kv in
                             Kernel.UnboxAny<VarHash>(elt)) {
                         into[kv.Key] = kv.Value;
                     }
-                } else if (elt.mo.HasType(Kernel.PairMO)) {
-                    Variable k = (Variable) elt.GetSlot(Kernel.EnumMO, "$!key");
-                    Variable v = (Variable) elt.GetSlot(Kernel.EnumMO, "$!value");
+                } else if (elt.mo.HasType(Compartment.Top.PairMO)) {
+                    Variable k = (Variable) elt.GetSlot(Compartment.Top.EnumMO, "$!key");
+                    Variable v = (Variable) elt.GetSlot(Compartment.Top.EnumMO, "$!value");
                     into[k.Fetch().mo.mro_raw_Str.Get(k)] =
                         Kernel.NewMuScalar(v.Fetch());
                 } else {
@@ -3465,7 +3467,7 @@ bound: ;
 
     class CtxBoolNativeDefined : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            return obj.Fetch().IsDefined() ? Kernel.TrueV : Kernel.FalseV;
+            return obj.Fetch().IsDefined() ? Compartment.Top.TrueV : Compartment.Top.FalseV;
         }
     }
 
@@ -3478,7 +3480,7 @@ bound: ;
         public override P6any Get(Variable obj) {
             P6any o = obj.Fetch();
             double v = o.IsDefined() ? Kernel.UnboxAny<double>(o) : 0;
-            return Kernel.BoxRaw(v + amt, Kernel.NumMO);
+            return Kernel.BoxRaw(v + amt, Compartment.Top.NumMO);
         }
     }
     class CtxRawNativeNum2Str : ContextHandler<string> {
@@ -3506,14 +3508,14 @@ bound: ;
             if (o is BoxObject<BigInteger>) {
                 BigInteger bn = Kernel.UnboxAny<BigInteger>(o) + amt;
                 if (bn.AsInt32(out v))
-                    return Kernel.BoxRaw<int>(v, Kernel.IntMO);
+                    return Kernel.BoxRaw<int>(v, Compartment.Top.IntMO);
                 else
-                    return Kernel.BoxRaw<BigInteger>(bn, Kernel.IntMO);
+                    return Kernel.BoxRaw<BigInteger>(bn, Compartment.Top.IntMO);
             }
             v = o.IsDefined() ? Kernel.UnboxAny<int>(o) : 0;
             if (v == (amt > 0 ? int.MaxValue : int.MinValue))
-                return Kernel.BoxRaw<BigInteger>(amt + (long)v, Kernel.IntMO);
-            return Kernel.BoxRaw(v + amt, Kernel.IntMO);
+                return Kernel.BoxRaw<BigInteger>(amt + (long)v, Compartment.Top.IntMO);
+            return Kernel.BoxRaw(v + amt, Compartment.Top.IntMO);
         }
     }
     class CtxIntStr : ContextHandler<string> {
@@ -3548,7 +3550,7 @@ bound: ;
             } else {
                 rr = new Rat(up ? BigInteger.One : BigInteger.MinusOne, 1);
             }
-            return Kernel.BoxRaw<Rat>(rr, Kernel.RatMO);
+            return Kernel.BoxRaw<Rat>(rr, Compartment.Top.RatMO);
         }
     }
     class CtxRatStr : ContextHandler<string> {
@@ -3583,7 +3585,7 @@ bound: ;
             } else {
                 rr = new FatRat(up ? BigInteger.One : BigInteger.MinusOne, BigInteger.One);
             }
-            return Kernel.BoxRaw<FatRat>(rr, Kernel.FatRatMO);
+            return Kernel.BoxRaw<FatRat>(rr, Compartment.Top.FatRatMO);
         }
     }
     class CtxFatRatStr : ContextHandler<string> {
@@ -3613,7 +3615,7 @@ bound: ;
             P6any o = obj.Fetch();
             Complex c = o.IsDefined() ? Kernel.UnboxAny<Complex>(o) : null;
             c = (c == null) ? new Complex(amt, 0) : new Complex(c.re+amt, c.im);
-            return Kernel.BoxRaw(c, Kernel.ComplexMO);
+            return Kernel.BoxRaw(c, Compartment.Top.ComplexMO);
         }
     }
     class CtxComplexStr : ContextHandler<string> {
@@ -3703,12 +3705,12 @@ bound: ;
 
         public override P6any Get(Variable obj) {
             P6any obj_o = obj.Fetch();
-            if (!obj_o.IsDefined()) return Kernel.BoxRaw("WTF", Kernel.StrMO);
+            if (!obj_o.IsDefined()) return Kernel.BoxRaw("WTF", Compartment.Top.StrMO);
             string src = Kernel.UnboxAny<string>(obj_o);
             int right = src.Length;
 tryagain:
             while (right != 0 && !Digitish(src[right-1])) right--;
-            if (right == 0) return Kernel.BoxRaw("WTF", Kernel.StrMO);
+            if (right == 0) return Kernel.BoxRaw("WTF", Compartment.Top.StrMO);
             int left = right;
             while (left != 0 && Digitish(src[left-1])) left--;
             if (left != 0 && src[left-1] == '.') {
@@ -3748,7 +3750,7 @@ tryagain:
             }
             for (int i = 0; i < right; i++) nbuf[i+1-delta] = src[i];
             return Kernel.BoxRaw(new string(nbuf, 1-delta, src.Length+delta),
-                    Kernel.StrMO);
+                    Compartment.Top.StrMO);
         }
     }
 
@@ -3836,7 +3838,7 @@ tryagain:
     class CtxStrNativeNum2Str : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             P6any o = obj.Fetch();
-            return Kernel.BoxAnyMO<string>(o.IsDefined() ? Utils.N2S(Kernel.UnboxAny<double>(o)) : "Num()", Kernel.StrMO);
+            return Kernel.BoxAnyMO<string>(o.IsDefined() ? Utils.N2S(Kernel.UnboxAny<double>(o)) : "Num()", Compartment.Top.StrMO);
         }
     }
 
@@ -3855,7 +3857,7 @@ tryagain:
             this.name = name;
             if (adv != null) {
                 named = new VarHash();
-                named[adv] = Kernel.TrueV;
+                named[adv] = Compartment.Top.TrueV;
             }
         }
         public override Variable Get(Variable obj, Variable key) {
@@ -3881,9 +3883,9 @@ tryagain:
 
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Kernel.WhateverMO))
+            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
                 return GetAll(obj);
 
             switch (mode) {
@@ -3897,12 +3899,12 @@ tryagain:
     class IxAnyDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return Kernel.AnyP;
+                return Compartment.Top.AnyP;
             return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                 "delete_key", new Variable[] { obj, key }, null));
         }
@@ -3910,12 +3912,12 @@ tryagain:
     class IxAnyExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return Kernel.FalseV;
+                return Compartment.Top.FalseV;
             return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                 "exists_key", new Variable[] { obj, key }, null));
         }
@@ -3926,8 +3928,8 @@ tryagain:
             if (os.IsDefined())
                 return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                     "bind_key", new Variable[] { obj, key, to }, null));
-            obj.Store(Kernel.BoxRaw(new VarHash(), Kernel.HashMO));
-            return Kernel.HashMO.mro_bind_key.Bind(obj, key, to);
+            obj.Store(Kernel.BoxRaw(new VarHash(), Compartment.Top.HashMO));
+            return Compartment.Top.HashMO.mro_bind_key.Bind(obj, key, to);
         }
     }
     class IxAnyBindPos : BindHandler {
@@ -3937,15 +3939,15 @@ tryagain:
                 return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                     "bind_pos", new Variable[] { obj, key, to }, null));
             obj.Store(Kernel.CreateArray().Fetch());
-            return Kernel.ArrayMO.mro_bind_key.Bind(obj, key, to);
+            return Compartment.Top.ArrayMO.mro_bind_key.Bind(obj, key, to);
         }
     }
     class IxAnyAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Kernel.WhateverMO))
+            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
                 return GetAll(obj);
 
             P6any os = obj.Fetch();
@@ -3958,15 +3960,15 @@ tryagain:
     class IxAnyAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Kernel.WhateverMO))
+            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
                 return GetAll(obj);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return IndexHandler.ViviArray(obj, key);
-            if (ks.mo != Kernel.IntMO && ks.mo.HasType(Kernel.CodeMO)) {
+            if (ks.mo != Compartment.Top.IntMO && ks.mo.HasType(Compartment.Top.CodeMO)) {
                 Variable elts = Kernel.RunInferior(os.InvokeMethod(
                         Kernel.GetInferiorRoot(), "elems",
                         new Variable[] { obj }, null));
@@ -3983,13 +3985,13 @@ tryagain:
     class IxCursorAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Kernel.WhateverMO))
+            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
                 return GetAll(obj);
             P6any o = obj.Fetch();
             if (!o.IsDefined())
-                return Kernel.AnyP;
+                return Compartment.Top.AnyP;
 
             Cursor os = (Cursor)o;
             return os.GetKey(ks.mo.mro_raw_Str.Get(key));
@@ -3998,14 +4000,14 @@ tryagain:
     class IxCursorAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Kernel.WhateverMO))
+            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
                 return GetAll(obj);
 
             P6any o = obj.Fetch();
             if (!o.IsDefined())
-                return Kernel.AnyP;
+                return Compartment.Top.AnyP;
 
             Cursor os = (Cursor)o;
             return os.GetKey(Utils.N2S(ks.mo.mro_raw_Numeric.Get(key)));
@@ -4019,7 +4021,7 @@ tryagain:
             P6any ks = key.Fetch();
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                obj.Store(os = Kernel.BoxRaw(new VarHash(), Kernel.HashMO));
+                obj.Store(os = Kernel.BoxRaw(new VarHash(), Compartment.Top.HashMO));
             string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
 
@@ -4029,9 +4031,9 @@ tryagain:
     class IxHashAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Kernel.WhateverMO))
+            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
                 return GetAll(obj);
 
             P6any os = obj.Fetch();
@@ -4043,28 +4045,28 @@ tryagain:
             if (h.TryGetValue(kss, out r))
                 return r;
             return new RWVariable(null, new HashViviHook(os, kss),
-                    Kernel.AnyP);
+                    Compartment.Top.AnyP);
         }
     }
     class IxHashExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
             P6any os = obj.Fetch();
-            if (!os.IsDefined()) return Kernel.FalseV;
+            if (!os.IsDefined()) return Compartment.Top.FalseV;
             string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
-            return h.ContainsKey(kss) ? Kernel.TrueV : Kernel.FalseV;
+            return h.ContainsKey(kss) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
         }
     }
     class IxHashDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
             P6any os = obj.Fetch();
-            if (!os.IsDefined()) return Kernel.AnyP;
+            if (!os.IsDefined()) return Compartment.Top.AnyP;
             string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
             Variable r;
@@ -4072,7 +4074,7 @@ tryagain:
                 h.Remove(kss);
                 return r;
             } else {
-                return Kernel.AnyP;
+                return Compartment.Top.AnyP;
             }
         }
     }
@@ -4086,9 +4088,9 @@ tryagain:
 
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Kernel.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Kernel.WhateverMO))
+            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
                 return GetAll(obj);
 
             P6any os = obj.Fetch();
@@ -4099,7 +4101,7 @@ tryagain:
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
 
-            if (ks.mo != Kernel.IntMO && ks.mo.HasType(Kernel.CodeMO)) {
+            if (ks.mo != Compartment.Top.IntMO && ks.mo.HasType(Compartment.Top.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 return Get(obj, Kernel.RunInferior(ks.Invoke(
                     Kernel.GetInferiorRoot(),
@@ -4111,13 +4113,13 @@ tryagain:
                 items.Push(rest.Shift());
             }
             if (ix < 0)
-                return Kernel.AnyP;
+                return Compartment.Top.AnyP;
             if (items.Count() <= ix) {
                 if (extend) {
                     return new RWVariable(null, new ArrayViviHook(os, ix),
-                            Kernel.AnyP);
+                            Compartment.Top.AnyP);
                 } else {
-                    return Kernel.AnyP;
+                    return Compartment.Top.AnyP;
                 }
             }
             return items[ix];
@@ -4137,7 +4139,7 @@ tryagain:
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
 
-            if (ks.mo != Kernel.IntMO && ks.mo.HasType(Kernel.CodeMO)) {
+            if (ks.mo != Compartment.Top.IntMO && ks.mo.HasType(Compartment.Top.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 key = Kernel.RunInferior(ks.Invoke(Kernel.GetInferiorRoot(),
                     new Variable[] { nr }, null));
@@ -4181,7 +4183,7 @@ tryagain:
             st.mo.type  = P6how.PACKAGE;
             st.mo.rtype = "package";
             // XXX should be PackageHOW
-            st.how = new BoxObject<STable>(st, Kernel.ClassHOWMO, 0);
+            st.how = new BoxObject<STable>(st, Compartment.Top.ClassHOWMO, 0);
             st.mo.Revalidate();
             st.SetupVTables();
             return st.typeObj;
@@ -4303,8 +4305,8 @@ tryagain:
             StashCursor sc = default(StashCursor);
             sc.type = CLR;
             sc.p1 = name;
-            P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
-            who.SetSlot(Kernel.PseudoStashMO, "$!name", Kernel.BoxAnyMO(name, Kernel.StrMO));
+            P6any who = Kernel.BoxRaw(sc, Compartment.Top.PseudoStashMO);
+            who.SetSlot(Compartment.Top.PseudoStashMO, "$!name", Kernel.BoxAnyMO(name, Compartment.Top.StrMO));
             return who;
         }
 
@@ -4321,7 +4323,7 @@ tryagain:
                 }
                 if (bind_to != null)
                     throw new NieczaException("No slot to bind");
-                v = Kernel.AnyP;
+                v = Compartment.Top.AnyP;
                 goto have_v;
             }
             else if (type == CLR) {
@@ -4335,7 +4337,7 @@ tryagain:
             else if (type == WHO) {
                 // only special type is PARENT, maybe not even that?
                 P6any who = (P6any) p1;
-                Variable keyv = Kernel.BoxAnyMO(key, Kernel.StrMO);
+                Variable keyv = Kernel.BoxAnyMO(key, Compartment.Top.StrMO);
                 if (bind_to != null) {
                     v = who.mo.mro_bind_key.Bind(who, keyv, bind_to);
                     return;
@@ -4345,10 +4347,10 @@ tryagain:
                 if (final) return;
 
                 if (v.Rw && !v.Fetch().IsDefined()) {
-                    if (!who.Isa(Kernel.StashMO))
+                    if (!who.Isa(Compartment.Top.StashMO))
                         throw new NieczaException("Autovivification only implemented for normal-type stashes");
                     string name = Kernel.UnboxAny<string>(who);
-                    P6any new_who = Kernel.BoxRaw(name + "::" + key, Kernel.StashMO);
+                    P6any new_who = Kernel.BoxRaw(name + "::" + key, Compartment.Top.StashMO);
                     who.mo.mro_bind_key.Bind(who, keyv,
                         MakePackage(key, new_who));
                     sc.p1 = new_who;
@@ -4446,7 +4448,7 @@ tryagain:
                     }
                     if (bind_to != null)
                         throw new NieczaException("No slot to bind");
-                    v = Kernel.AnyP;
+                    v = Compartment.Top.AnyP;
                     goto have_v;
                 }
             }
@@ -4459,8 +4461,8 @@ have_sc:
             if (bind_to != null)
                 throw new NieczaException("cannot bind a pseudo package");
             {
-                P6any who = Kernel.BoxRaw(this, Kernel.PseudoStashMO);
-                who.SetSlot(Kernel.PseudoStashMO, "$!name", Kernel.BoxAnyMO(key, Kernel.StrMO));
+                P6any who = Kernel.BoxRaw(this, Compartment.Top.PseudoStashMO);
+                who.SetSlot(Compartment.Top.PseudoStashMO, "$!name", Kernel.BoxAnyMO(key, Compartment.Top.StrMO));
                 v = MakePackage(key, who);
             }
             return;
@@ -4513,14 +4515,14 @@ have_v:
                     throw new NieczaException("Cannot bind to a stash");
                 if (sc.type == WHO)
                     return (P6any) sc.p1;
-                P6any who = Kernel.BoxRaw(sc, Kernel.PseudoStashMO);
-                who.SetSlot(Kernel.PseudoStashMO, "$!name", Kernel.BoxAnyMO(last, Kernel.StrMO));
+                P6any who = Kernel.BoxRaw(sc, Compartment.Top.PseudoStashMO);
+                who.SetSlot(Compartment.Top.PseudoStashMO, "$!name", Kernel.BoxAnyMO(last, Compartment.Top.StrMO));
                 return who;
             }
             if (bind_to != null) {
                 bool list = key != "" && (key[0] == '@' || key[0] == '%');
                 bind_to = Kernel.NewBoundVar(list ? Kernel.NBV_LIST :
-                    bind_ro ? Kernel.NBV_RO : Kernel.NBV_RW, Kernel.MuMO,
+                    bind_ro ? Kernel.NBV_RO : Kernel.NBV_RW, Compartment.Top.MuMO,
                     bind_to); // XXX should use types maybe?
             }
             sc.Core(key, true, out r, out v, bind_to);
@@ -4530,6 +4532,65 @@ have_v:
 
     class Compartment {
         [Immutable] static readonly FieldInfo[] fieldsToSave;
+
+        [CORESaved] public STable PairMO;
+        [CORESaved] public STable EnumMO;
+        [CORESaved] public STable EnumMapMO;
+        [CORESaved] public STable CallFrameMO;
+        [CORESaved] public STable CaptureMO;
+        [CORESaved] public STable GatherIteratorMO;
+        [CORESaved] public STable IterCursorMO;
+        [CORESaved] public P6any NilP;
+        [CORESaved] public ListVariable Nil;
+        [CORESaved] public P6any AnyP;
+        [CORESaved] public P6any ArrayP;
+        [CORESaved] public P6any EMPTYP;
+        [CORESaved] public P6any HashP;
+        [CORESaved] public P6any IteratorP;
+        [CORESaved] public STable RealMO;
+        [CORESaved] public STable IntegralMO;
+        [CORESaved] public STable JunctionMO;
+        [CORESaved] public STable LabelMO;
+        [CORESaved] public STable AnyMO;
+        [CORESaved] public STable IteratorMO;
+        [CORESaved] public STable ScalarMO;
+        [CORESaved] public STable StashMO;
+        [CORESaved] public STable ClassHOWMO;
+        [CORESaved] public STable PseudoStashMO;
+        [CORESaved] public STable GrammarMO;
+        [CORESaved] public STable PositionalMO;
+        [CORESaved] public STable AssociativeMO;
+        [CORESaved] public STable CallableMO;
+        [CORESaved] public STable CodeMO;
+        [CORESaved] public STable WhateverMO;
+        [CORESaved] public STable WhateverCodeMO;
+        [CORESaved] public STable RoutineMO;
+        [CORESaved] public STable SubMO;
+        [CORESaved] public STable SubmethodMO;
+        [CORESaved] public STable MethodMO;
+        [CORESaved] public STable BlockMO;
+        [CORESaved] public STable RegexMO;
+        [CORESaved] public STable StrMO;
+        [CORESaved] public STable PseudoStrMO;
+        [CORESaved] public STable NumMO;
+        [CORESaved] public STable IntMO;
+        [CORESaved] public STable RatMO;
+        [CORESaved] public STable FatRatMO;
+        [CORESaved] public STable ComplexMO;
+        [CORESaved] public STable ArrayMO;
+        [CORESaved] public STable CursorMO;
+        [CORESaved] public STable MatchMO;
+        [CORESaved] public STable ParcelMO;
+        [CORESaved] public STable ListMO;
+        [CORESaved] public STable HashMO;
+        [CORESaved] public STable BoolMO;
+        [CORESaved] public STable MuMO;
+        [CORESaved] public STable ParameterMO;
+        [CORESaved] public STable SignatureMO;
+        [CORESaved] public P6any StashP;
+
+        [CORESaved] public BoxObject<int> TrueV;
+        [CORESaved] public BoxObject<int> FalseV;
 
         static Compartment() {
             var typesToCheck = new Type[] {
@@ -4661,9 +4722,9 @@ saveme:
             if (co != null) {
                 return co.value;
             } else {
-                if (typeof(T) == typeof(string) && o.Does(Kernel.PseudoStrMO)) {
+                if (typeof(T) == typeof(string) && o.Does(Compartment.Top.PseudoStrMO)) {
                     // Truly vile hack to make dualvars work.
-                    return (T)o.GetSlot(Kernel.PseudoStrMO, "$!value");
+                    return (T)o.GetSlot(Compartment.Top.PseudoStrMO, "$!value");
                 } else {
                     throw new NieczaException("Cannot unbox a {0} from an object of repr {1}", typeof(T).Name, o.ReprName());
                 }
@@ -4701,12 +4762,12 @@ saveme:
                 th.ip = 1;
                 return ((P6any)th.lex0).Invoke(th, Variable.None, null);
             } else {
-                return Take(th, Kernel.EMPTYP);
+                return Take(th, Compartment.Top.EMPTYP);
             }
         }
 
         public static Frame GatherHelper(Frame th, P6any sub) {
-            Frame n = th.MakeChild(null, dogather_SI, AnyP);
+            Frame n = th.MakeChild(null, dogather_SI, Compartment.Top.AnyP);
             n.lex0 = sub;
             n.MarkSharedChain();
             n.coro_return = n;
@@ -4718,7 +4779,7 @@ saveme:
             Variable[] post;
             post = new Variable[th.pos.Length - 1];
             Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
-            return CodeMO.mro_INVOKE.Invoke((P6opaque)th.pos[0].Fetch(),
+            return Compartment.Top.CodeMO.mro_INVOKE.Invoke((P6opaque)th.pos[0].Fetch(),
                     th.Return(), post, th.named);
         }
 
@@ -4741,9 +4802,9 @@ saveme:
                 dst[th.ip - 1] = (Variable)th.resultSlot;
 
             if (th.ip == dst.Length) {
-                P6opaque nj = new P6opaque(Kernel.JunctionMO);
+                P6opaque nj = new P6opaque(Compartment.Top.JunctionMO);
                 nj.slots[0] = th.lex2;
-                nj.slots[1] = Kernel.BoxRaw(dst, Kernel.ParcelMO);
+                nj.slots[1] = Kernel.BoxRaw(dst, Compartment.Top.ParcelMO);
                 th.caller.resultSlot = nj;
                 return th.Return();
             }
@@ -4761,13 +4822,13 @@ saveme:
                 Console.WriteLine(DescribeBacktrace(caller, null));
             }
             return SearchForHandler(caller, SubInfo.ON_DIE, null, -1, null,
-                    BoxAnyMO<string>(msg, StrMO));
+                    BoxAnyMO<string>(msg, Compartment.Top.StrMO));
         }
 
         public static P6any SigSlurpCapture(Frame caller) {
-            P6any nw = new P6opaque(CaptureMO);
-            nw.SetSlot(CaptureMO, "$!positionals", caller.pos);
-            nw.SetSlot(CaptureMO, "$!named", caller.named);
+            P6any nw = new P6opaque(Compartment.Top.CaptureMO);
+            nw.SetSlot(Compartment.Top.CaptureMO, "$!positionals", caller.pos);
+            nw.SetSlot(Compartment.Top.CaptureMO, "$!named", caller.named);
             caller.named = null;
             return nw;
         }
@@ -4832,67 +4893,8 @@ saveme:
                 }, new string[] { "" }, 0);
         }
 
-        [CORESaved] public static STable PairMO;
-        [CORESaved] public static STable EnumMO;
-        [CORESaved] public static STable EnumMapMO;
-        [CORESaved] public static STable CallFrameMO;
-        [CORESaved] public static STable CaptureMO;
-        [CORESaved] public static STable GatherIteratorMO;
-        [CORESaved] public static STable IterCursorMO;
-        [CORESaved] public static P6any NilP;
-        [CORESaved] public static ListVariable Nil;
-        [CORESaved] public static P6any AnyP;
-        [CORESaved] public static P6any ArrayP;
-        [CORESaved] public static P6any EMPTYP;
-        [CORESaved] public static P6any HashP;
-        [CORESaved] public static P6any IteratorP;
-        [CORESaved] public static STable RealMO;
-        [CORESaved] public static STable IntegralMO;
-        [CORESaved] public static STable JunctionMO;
-        [CORESaved] public static STable LabelMO;
-        [CORESaved] public static STable AnyMO;
-        [CORESaved] public static STable IteratorMO;
-        [CORESaved] public static STable ScalarMO;
-        [CORESaved] public static STable StashMO;
-        [CORESaved] public static STable ClassHOWMO;
-        [CORESaved] public static STable PseudoStashMO;
-        [CORESaved] public static STable GrammarMO;
-        [CORESaved] public static STable PositionalMO;
-        [CORESaved] public static STable AssociativeMO;
-        [CORESaved] public static STable CallableMO;
-        [CORESaved] public static STable CodeMO;
-        [CORESaved] public static STable WhateverMO;
-        [CORESaved] public static STable WhateverCodeMO;
-        [CORESaved] public static STable RoutineMO;
-        [CORESaved] public static STable SubMO;
-        [CORESaved] public static STable SubmethodMO;
-        [CORESaved] public static STable MethodMO;
-        [CORESaved] public static STable BlockMO;
-        [CORESaved] public static STable RegexMO;
-        [CORESaved] public static STable StrMO;
-        [CORESaved] public static STable PseudoStrMO;
-        [CORESaved] public static STable NumMO;
-        [CORESaved] public static STable IntMO;
-        [CORESaved] public static STable RatMO;
-        [CORESaved] public static STable FatRatMO;
-        [CORESaved] public static STable ComplexMO;
-        [CORESaved] public static STable ArrayMO;
-        [CORESaved] public static STable CursorMO;
-        [CORESaved] public static STable MatchMO;
-        [CORESaved] public static STable ParcelMO;
-        [CORESaved] public static STable ListMO;
-        [CORESaved] public static STable HashMO;
-        [CORESaved] public static STable BoolMO;
-        [CORESaved] public static STable MuMO;
-        [CORESaved] public static STable ParameterMO;
-        [CORESaved] public static STable SignatureMO;
-        [CORESaved] public static P6any StashP;
-
-        [CORESaved] public static BoxObject<int> TrueV;
-        [CORESaved] public static BoxObject<int> FalseV;
-
         public static P6any MakeSub(SubInfo info, Frame outer) {
-            P6opaque n = new P6opaque(info.mo ?? CodeMO, 2);
+            P6opaque n = new P6opaque(info.mo ?? Compartment.Top.CodeMO, 2);
             n.slots[0] = outer;
             if (outer != null) outer.MarkShared();
             n.slots[1] = info;
@@ -4900,10 +4902,10 @@ saveme:
         }
 
         public static SubInfo GetInfo(P6any sub) {
-            return (SubInfo)sub.GetSlot(CodeMO, "$!info");
+            return (SubInfo)sub.GetSlot(Compartment.Top.CodeMO, "$!info");
         }
         public static Frame GetOuter(P6any sub) {
-            return (Frame)sub.GetSlot(CodeMO, "$!outer");
+            return (Frame)sub.GetSlot(Compartment.Top.CodeMO, "$!outer");
         }
 
         public class MMDParameter {
@@ -4968,11 +4970,11 @@ saveme:
             }
 
             public override bool Admissable(Frame th, Variable[] pos, VarHash named) {
-                Frame   o = (Frame)impl.GetSlot(Kernel.CodeMO, "$!outer");
+                Frame   o = (Frame)impl.GetSlot(Compartment.Top.CodeMO, "$!outer");
                 // XXX sucks a bit to have an inf runloop here
                 var res = Kernel.RunInferior(info.SetupCall(
                     Kernel.GetInferiorRoot(), o, impl, pos, named, true, null));
-                return (res == Kernel.TrueV);
+                return (res == Compartment.Top.TrueV);
             }
 
             public override Frame Invoke(Frame th, Variable[] pos, VarHash named) {
@@ -5020,7 +5022,7 @@ saveme:
                 this.impl = impl;
                 this.group_n  = group_n;
                 this.filter_n = filter_n;
-                info = (SubInfo) impl.GetSlot(Kernel.CodeMO, "$!info");
+                info = (SubInfo) impl.GetSlot(Compartment.Top.CodeMO, "$!info");
 
                 pos = new List<MMDParameter>();
                 nam = new Dictionary<string,MMDParameter>();
@@ -5163,11 +5165,11 @@ ltm:
                 info.code = SaferTrap;
         }
         public static Variable BoxAny<T>(T v, P6any proto) {
-            if (proto == BoolMO.typeObj) {
+            if (proto == Compartment.Top.BoolMO.typeObj) {
                 if (v is bool)
-                    return ((bool) (object) v) ? TrueV : FalseV;
+                    return ((bool) (object) v) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
                 else
-                    return ((int) (object) v) != 0 ? TrueV : FalseV;
+                    return ((int) (object) v) != 0 ? Compartment.Top.TrueV : Compartment.Top.FalseV;
             }
             return new BoxObject<T>(v, ((P6opaque)proto).mo);
         }
@@ -5177,11 +5179,11 @@ ltm:
         }
 
         public static Variable BoxAnyMO<T>(T v, STable proto) {
-            if (proto == BoolMO) {
+            if (proto == Compartment.Top.BoolMO) {
                 if (v is bool)
-                    return ((bool) (object) v) ? TrueV : FalseV;
+                    return ((bool) (object) v) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
                 else
-                    return ((int) (object) v) != 0 ? TrueV : FalseV;
+                    return ((int) (object) v) != 0 ? Compartment.Top.TrueV : Compartment.Top.FalseV;
             }
             return new BoxObject<T>(v, proto);
         }
@@ -5235,7 +5237,7 @@ ltm:
 
         public static Variable NewTypedScalar(STable t) {
             if (t == null)
-                return new RWVariable(null, null, AnyMO.typeObj);
+                return new RWVariable(null, null, Compartment.Top.AnyMO.typeObj);
 
             return new RWVariable(t, null, t.initObj);
         }
@@ -5291,7 +5293,7 @@ ltm:
             } else if (currentGlobals.TryGetValue("\x9::PROCESS" + name, out v)) {
                 return v.v;
             } else {
-                return AnyP;
+                return Compartment.Top.AnyP;
             }
         }
 
@@ -5375,14 +5377,14 @@ value:      vx = (Variable) th.resultSlot;
 
         public static Frame PromoteToList(Frame th, Variable v) {
             if (!v.List) {
-                P6opaque lst = new P6opaque(Kernel.ListMO);
+                P6opaque lst = new P6opaque(Compartment.Top.ListMO);
                 lst.slots[0 /*items*/] = new VarDeque(v);
                 lst.slots[1 /*rest*/ ] = new VarDeque();
                 th.resultSlot = Kernel.NewRWListVar(lst);
                 return th;
             }
             P6any o = v.Fetch();
-            if (o.mo.HasType(Kernel.ListMO)) {
+            if (o.mo.HasType(Compartment.Top.ListMO)) {
                 th.resultSlot = v;
                 return th;
             }
@@ -5403,14 +5405,14 @@ value:      vx = (Variable) th.resultSlot;
             P6any item;
             while (iter.Count() != 0) {
                 item = iter[0].Fetch();
-                if (item.mo.HasType(IterCursorMO)) {
+                if (item.mo.HasType(Compartment.Top.IterCursorMO)) {
                     break;
                 } else {
                     items.Push(iter.Shift());
                 }
             }
-            list.SetSlot(ListMO, "$!items", items);
-            list.SetSlot(ListMO, "$!rest", iter);
+            list.SetSlot(Compartment.Top.ListMO, "$!items", items);
+            list.SetSlot(Compartment.Top.ListMO, "$!rest", iter);
         }
 
         public static VarDeque IterFlatten(VarDeque inq) {
@@ -5431,13 +5433,13 @@ again:
                 inq.UnshiftD(inq0.mo.mro_raw_iterator.Get(inq0v));
                 goto again;
             }
-            if (inq0.mo.HasType(IterCursorMO)) {
-                Frame th = new Frame(null, null, IF_SI, Kernel.AnyP);
+            if (inq0.mo.HasType(Compartment.Top.IterCursorMO)) {
+                Frame th = new Frame(null, null, IF_SI, Compartment.Top.AnyP);
                 th.lex0 = inq;
-                P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
+                P6opaque thunk = new P6opaque(Compartment.Top.GatherIteratorMO);
                 th.coro_return = th;
                 thunk.slots[0] = NewMuScalar(th);
-                thunk.slots[1] = NewMuScalar(AnyP);
+                thunk.slots[1] = NewMuScalar(Compartment.Top.AnyP);
                 outq.Push(thunk);
                 return outq;
             }
@@ -5451,7 +5453,7 @@ again:
             if (IterHasFlat(inq, true)) {
                 return Take(th, inq.Shift());
             } else {
-                return Take(th, Kernel.EMPTYP);
+                return Take(th, Compartment.Top.EMPTYP);
             }
         }
 
@@ -5469,7 +5471,7 @@ again:
                     continue;
                 }
                 P6any i0v = i0.Fetch();
-                if (i0v.mo.HasType(IterCursorMO)) {
+                if (i0v.mo.HasType(Compartment.Top.IterCursorMO)) {
                     iter[0] = null;
                     iter.Shift_UnshiftN(i0v.mo.mro_raw_reify.Get(i0));
                     continue;
@@ -5485,12 +5487,12 @@ again:
             }
             P6opaque dyl = lst.Fetch() as P6opaque;
             if (dyl == null) { goto slow; }
-            if (dyl.mo != Kernel.ListMO) { goto slow; }
-            VarDeque itemsl = (VarDeque) dyl.GetSlot(ListMO, "$!items");
+            if (dyl.mo != Compartment.Top.ListMO) { goto slow; }
+            VarDeque itemsl = (VarDeque) dyl.GetSlot(Compartment.Top.ListMO, "$!items");
             if (itemsl.Count() == 0) {
-                VarDeque restl = (VarDeque) dyl.GetSlot(ListMO, "$!rest");
+                VarDeque restl = (VarDeque) dyl.GetSlot(Compartment.Top.ListMO, "$!rest");
                 if (restl.Count() == 0) {
-                    return AnyP;
+                    return Compartment.Top.AnyP;
                 }
                 goto slow;
             }
@@ -5502,14 +5504,14 @@ slow:
         }
 
         public static Variable CreateArray() {
-            P6any v = new P6opaque(ArrayMO, 2);
-            v.SetSlot(ListMO, "$!items", new VarDeque());
-            v.SetSlot(ListMO, "$!rest", new VarDeque());
+            P6any v = new P6opaque(Compartment.Top.ArrayMO, 2);
+            v.SetSlot(Compartment.Top.ListMO, "$!items", new VarDeque());
+            v.SetSlot(Compartment.Top.ListMO, "$!rest", new VarDeque());
             return NewRWListVar(v);
         }
 
         public static Variable CreateHash() {
-            P6any v = BoxRaw(new VarHash(), HashMO);
+            P6any v = BoxRaw(new VarHash(), Compartment.Top.HashMO);
             return NewRWListVar(v);
         }
 
@@ -5702,14 +5704,14 @@ slow:
         public static STable DoInstantiateRole(STable prole, Variable alist) {
             // get argument list - TODO make this saner
             P6any argv = alist.Fetch();
-            Variable[] args = argv.mo == Kernel.ParcelMO ?
+            Variable[] args = argv.mo == Compartment.Top.ParcelMO ?
                 UnboxAny<Variable[]>(argv) : new Variable[] { alist };
 
             STable r = new STable(prole.name + "[curried]");
             r.mo.roleFactory = prole.mo.roleFactory;
             r.mo.curriedArgs = args;
             r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
-            r.how = new BoxObject<STable>(r, Kernel.ClassHOWMO, 0);
+            r.how = new BoxObject<STable>(r, Compartment.Top.ClassHOWMO, 0);
             r.mo.type  = P6how.CURRIED_ROLE;
             r.mo.rtype = "crole";
             r.useAcceptsType = true;
@@ -5747,7 +5749,7 @@ slow:
 
                 r = new STable(arg.name + "[...]");
                 r.mo.FillRole(arg.mo.superclasses.ToArray(), null);
-                r.how = new BoxObject<STable>(r, Kernel.ClassHOWMO, 0);
+                r.how = new BoxObject<STable>(r, Compartment.Top.ClassHOWMO, 0);
                 r.mo.type  = P6how.ROLE;
                 r.mo.rtype = "role";
                 r.mo.role_typecheck_list = arg.mo.role_typecheck_list;
@@ -5844,7 +5846,7 @@ slow:
             foreach (STable r in roles) {
                 foreach (P6how.MethodInfo mi in r.mo.lmethods) {
                     var name = Prod.C(mi.flags & P6how.V_MASK, mi.short_name);
-                    SubInfo info = mi.impl.Isa(CodeMO) ?
+                    SubInfo info = mi.impl.Isa(Compartment.Top.CodeMO) ?
                         GetInfo(mi.impl) : null;
                     if ((mi.flags & P6how.M_MASK) != P6how.M_ONLY) {
                         // multi methods from roles are not suppressed and
@@ -6020,11 +6022,11 @@ slow:
             rlstack = lfn.next;
             lfn.next.compartment = Compartment.Top;
             return lfn.next.cur = lfn.next.root = ((l == null ?
-                        new Frame(null, null, ExitRunloopSI, Kernel.AnyP) :
-                        l.MakeChild(null, ExitRunloopSI, AnyP)));
+                        new Frame(null, null, ExitRunloopSI, Compartment.Top.AnyP) :
+                        l.MakeChild(null, ExitRunloopSI, Compartment.Top.AnyP)));
             //lfn.next.cur = lfn.next.root = ((l == null ?
-            //            new Frame(null, null, ExitRunloopSI, Kernel.AnyP) :
-            //            l.MakeChild(null, ExitRunloopSI, AnyP)));
+            //            new Frame(null, null, ExitRunloopSI, Compartment.Top.AnyP) :
+            //            l.MakeChild(null, ExitRunloopSI, Compartment.Top.AnyP)));
             //Console.WriteLine("Created exit-runloop {0:X} caller={1:X}",
             //    lfn.next.cur.GetHashCode(), lfn.next.cur.caller == null ? 0 :
             //    lfn.next.cur.caller.GetHashCode());
@@ -6054,8 +6056,8 @@ slow:
 
         public static void AddCap(List<Variable> p,
                 VarHash n, P6any cap) {
-            Variable[] fp = cap.GetSlot(CaptureMO, "$!positionals") as Variable[];
-            VarHash fn = cap.GetSlot(CaptureMO, "$!named")
+            Variable[] fp = cap.GetSlot(Compartment.Top.CaptureMO, "$!positionals") as Variable[];
+            VarHash fn = cap.GetSlot(Compartment.Top.CaptureMO, "$!named")
                 as VarHash;
             p.AddRange(fp);
             if (fn != null) AddMany(n, fn);
@@ -6084,210 +6086,210 @@ slow:
         }
 
         internal static void CreateBasicTypes() {
-            CodeMO = new STable("Code"); // forward decl
-            MuMO = new STable("Mu");
-            AnyMO = new STable("Any");
-            ParameterMO = new STable("Parameter");
-            SignatureMO = new STable("Signature");
-            Handler_Vonly(MuMO, "defined", new CtxBoolNativeDefined(),
+            Compartment.Top.CodeMO = new STable("Code"); // forward decl
+            Compartment.Top.MuMO = new STable("Mu");
+            Compartment.Top.AnyMO = new STable("Any");
+            Compartment.Top.ParameterMO = new STable("Parameter");
+            Compartment.Top.SignatureMO = new STable("Signature");
+            Handler_Vonly(Compartment.Top.MuMO, "defined", new CtxBoolNativeDefined(),
                     new CtxRawNativeDefined());
-            Handler_Vonly(MuMO, "Bool", new CtxBoolNativeDefined(),
+            Handler_Vonly(Compartment.Top.MuMO, "Bool", new CtxBoolNativeDefined(),
                     new CtxRawNativeDefined());
-            Handler_Vonly(MuMO, "item", new CtxReturnSelfItem(), null);
+            Handler_Vonly(Compartment.Top.MuMO, "item", new CtxReturnSelfItem(), null);
 
-            MuMO.FillProtoClass(null, new string[0], new STable[0]);
-            MuMO.Invalidate();
+            Compartment.Top.MuMO.FillProtoClass(null, new string[0], new STable[0]);
+            Compartment.Top.MuMO.Invalidate();
 
-            // AnyMO.typeObj is needed very early, while setting up the
+            // Compartment.Top.AnyMO.typeObj is needed very early, while setting up the
             // root $_
-            AnyMO.typeObj = new P6opaque(AnyMO, 0);
-            Handler_Vonly(AnyMO, "list", new CtxAnyList(), null);
-            WrapIndexy(AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
+            Compartment.Top.AnyMO.typeObj = new P6opaque(Compartment.Top.AnyMO, 0);
+            Handler_Vonly(Compartment.Top.AnyMO, "list", new CtxAnyList(), null);
+            WrapIndexy(Compartment.Top.AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
                     null, null, new IxAnyBindPos());
-            WrapIndexy(AnyMO, "postcircumfix:<{ }>", new IxAnyAtKey(),
+            WrapIndexy(Compartment.Top.AnyMO, "postcircumfix:<{ }>", new IxAnyAtKey(),
                     new IxAnyExistsKey(), new IxAnyDeleteKey(),
                     new IxAnyBindKey());
-            AnyMO.FillProtoClass(MuMO);
-            AnyMO.Invalidate();
+            Compartment.Top.AnyMO.FillProtoClass(Compartment.Top.MuMO);
+            Compartment.Top.AnyMO.Invalidate();
 
-            CodeMO.FillProtoClass(AnyMO, new string[] { "$!outer", "$!info" },
-                new STable[] { CodeMO, CodeMO });
+            Compartment.Top.CodeMO.FillProtoClass(Compartment.Top.AnyMO, new string[] { "$!outer", "$!info" },
+                new STable[] { Compartment.Top.CodeMO, Compartment.Top.CodeMO });
             SubInvokeSubSI.param = new object[] { null, new InvokeSub() };
-            CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(SubInvokeSubSI, null));
-            CodeMO.Invalidate();
+            Compartment.Top.CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(SubInvokeSubSI, null));
+            Compartment.Top.CodeMO.Invalidate();
 
-            BlockMO = new STable("Block");
-            RoutineMO = new STable("Routine");
-            WhateverCodeMO = new STable("WhateverCode");
-            SubMO = new STable("Sub");
-            SubmethodMO = new STable("Submethod");
-            MethodMO = new STable("Method");
-            RegexMO = new STable("Regex");
+            Compartment.Top.BlockMO = new STable("Block");
+            Compartment.Top.RoutineMO = new STable("Routine");
+            Compartment.Top.WhateverCodeMO = new STable("WhateverCode");
+            Compartment.Top.SubMO = new STable("Sub");
+            Compartment.Top.SubmethodMO = new STable("Submethod");
+            Compartment.Top.MethodMO = new STable("Method");
+            Compartment.Top.RegexMO = new STable("Regex");
 
-            BlockMO.FillProtoClass(CodeMO);
-            RoutineMO.FillProtoClass(BlockMO);
-            WhateverCodeMO.FillProtoClass(BlockMO);
-            SubMO.FillProtoClass(RoutineMO);
-            MethodMO.FillProtoClass(RoutineMO);
-            SubmethodMO.FillProtoClass(RoutineMO);
-            RegexMO.FillProtoClass(MethodMO);
+            Compartment.Top.BlockMO.FillProtoClass(Compartment.Top.CodeMO);
+            Compartment.Top.RoutineMO.FillProtoClass(Compartment.Top.BlockMO);
+            Compartment.Top.WhateverCodeMO.FillProtoClass(Compartment.Top.BlockMO);
+            Compartment.Top.SubMO.FillProtoClass(Compartment.Top.RoutineMO);
+            Compartment.Top.MethodMO.FillProtoClass(Compartment.Top.RoutineMO);
+            Compartment.Top.SubmethodMO.FillProtoClass(Compartment.Top.RoutineMO);
+            Compartment.Top.RegexMO.FillProtoClass(Compartment.Top.MethodMO);
 
-            LabelMO = new STable("Label");
-            LabelMO.FillProtoClass(AnyMO, new string[] { "$!target", "$!name" },
-                    new STable[] { LabelMO, LabelMO });
+            Compartment.Top.LabelMO = new STable("Label");
+            Compartment.Top.LabelMO.FillProtoClass(Compartment.Top.AnyMO, new string[] { "$!target", "$!name" },
+                    new STable[] { Compartment.Top.LabelMO, Compartment.Top.LabelMO });
 
-            EnumMO = new STable("Enum");
-            EnumMO.FillProtoClass(AnyMO, new string[] { "$!key", "$!value" },
-                    new STable[] { EnumMO, EnumMO });
-            PairMO = new STable("Pair");
-            PairMO.FillProtoClass(EnumMO);
+            Compartment.Top.EnumMO = new STable("Enum");
+            Compartment.Top.EnumMO.FillProtoClass(Compartment.Top.AnyMO, new string[] { "$!key", "$!value" },
+                    new STable[] { Compartment.Top.EnumMO, Compartment.Top.EnumMO });
+            Compartment.Top.PairMO = new STable("Pair");
+            Compartment.Top.PairMO.FillProtoClass(Compartment.Top.EnumMO);
 
             // forward reference
-            StrMO = new STable("Str");
-            BoolMO = new STable("Bool");
+            Compartment.Top.StrMO = new STable("Str");
+            Compartment.Top.BoolMO = new STable("Bool");
 
-            IntMO = new STable("Int");
-            Handler_Vonly(IntMO, "Numeric", new CtxReturnSelf(),
+            Compartment.Top.IntMO = new STable("Int");
+            Handler_Vonly(Compartment.Top.IntMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_PandBox(IntMO, "Bool", new CtxIntBool(), BoolMO);
-            Handler_PandBox(IntMO, "Str", new CtxIntStr(), StrMO);
-            Handler_PandCont(IntMO, "succ", new CtxIntSuccish(+1));
-            Handler_PandCont(IntMO, "pred", new CtxIntSuccish(-1));
-            IntMO.FillProtoClass(AnyMO);
+            Handler_PandBox(Compartment.Top.IntMO, "Bool", new CtxIntBool(), Compartment.Top.BoolMO);
+            Handler_PandBox(Compartment.Top.IntMO, "Str", new CtxIntStr(), Compartment.Top.StrMO);
+            Handler_PandCont(Compartment.Top.IntMO, "succ", new CtxIntSuccish(+1));
+            Handler_PandCont(Compartment.Top.IntMO, "pred", new CtxIntSuccish(-1));
+            Compartment.Top.IntMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            Handler_Vonly(BoolMO, "Bool", new CtxReturnSelf(),
+            Handler_Vonly(Compartment.Top.BoolMO, "Bool", new CtxReturnSelf(),
                     new CtxBoolUnbox());
-            BoolMO.FillProtoClass(IntMO, new string[] { "$!index" },
-                new STable[] { BoolMO });
-            TrueV  = BoxRaw<int>(1, BoolMO);
-            FalseV = BoxRaw<int>(0, BoolMO);
-            FalseV.SetSlot(BoolMO, "$!index", BoxAnyMO(0, IntMO));
-            TrueV.SetSlot(BoolMO, "$!index", BoxAnyMO(1, IntMO));
+            Compartment.Top.BoolMO.FillProtoClass(Compartment.Top.IntMO, new string[] { "$!index" },
+                new STable[] { Compartment.Top.BoolMO });
+            Compartment.Top.TrueV  = BoxRaw<int>(1, Compartment.Top.BoolMO);
+            Compartment.Top.FalseV = BoxRaw<int>(0, Compartment.Top.BoolMO);
+            Compartment.Top.FalseV.SetSlot(Compartment.Top.BoolMO, "$!index", BoxAnyMO(0, Compartment.Top.IntMO));
+            Compartment.Top.TrueV.SetSlot(Compartment.Top.BoolMO, "$!index", BoxAnyMO(1, Compartment.Top.IntMO));
 
-            Handler_Vonly(StrMO, "Str", new CtxReturnSelf(),
+            Handler_Vonly(Compartment.Top.StrMO, "Str", new CtxReturnSelf(),
                     new CtxJustUnbox<string>(""));
-            Handler_PandBox(StrMO, "Bool", new CtxStrBool(), BoolMO);
-            Handler_PandCont(StrMO, "succ", new CtxStrSuccish(true));
-            Handler_PandCont(StrMO, "pred", new CtxStrSuccish(false));
-            StrMO.FillProtoClass(AnyMO);
+            Handler_PandBox(Compartment.Top.StrMO, "Bool", new CtxStrBool(), Compartment.Top.BoolMO);
+            Handler_PandCont(Compartment.Top.StrMO, "succ", new CtxStrSuccish(true));
+            Handler_PandCont(Compartment.Top.StrMO, "pred", new CtxStrSuccish(false));
+            Compartment.Top.StrMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            JunctionMO = new STable("Junction");
-            Handler_PandBox(JunctionMO, "Bool", new CtxJunctionBool(), BoolMO);
-            JunctionMO.AddMethod(0, "FALLBACK", MakeSub(JunctionFallbackSI, null));
-            JunctionMO.FillProtoClass(MuMO,
+            Compartment.Top.JunctionMO = new STable("Junction");
+            Handler_PandBox(Compartment.Top.JunctionMO, "Bool", new CtxJunctionBool(), Compartment.Top.BoolMO);
+            Compartment.Top.JunctionMO.AddMethod(0, "FALLBACK", MakeSub(JunctionFallbackSI, null));
+            Compartment.Top.JunctionMO.FillProtoClass(Compartment.Top.MuMO,
                     new string[] { "$!kind_", "$!eigenstates_" },
-                    new STable[] { JunctionMO, JunctionMO });
+                    new STable[] { Compartment.Top.JunctionMO, Compartment.Top.JunctionMO });
 
-            IteratorMO = new STable("Iterator");
-            IteratorMO.FillProtoClass(AnyMO);
+            Compartment.Top.IteratorMO = new STable("Iterator");
+            Compartment.Top.IteratorMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            NumMO = new STable("Num");
-            Handler_Vonly(NumMO, "Numeric", new CtxReturnSelf(),
+            Compartment.Top.NumMO = new STable("Num");
+            Handler_Vonly(Compartment.Top.NumMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_Vonly(NumMO, "Str", new CtxStrNativeNum2Str(),
+            Handler_Vonly(Compartment.Top.NumMO, "Str", new CtxStrNativeNum2Str(),
                     new CtxRawNativeNum2Str());
-            Handler_PandBox(NumMO, "Bool", new CtxNum2Bool(), BoolMO);
-            Handler_PandCont(NumMO, "succ", new CtxNumSuccish(+1));
-            Handler_PandCont(NumMO, "pred", new CtxNumSuccish(-1));
-            NumMO.FillProtoClass(AnyMO);
+            Handler_PandBox(Compartment.Top.NumMO, "Bool", new CtxNum2Bool(), Compartment.Top.BoolMO);
+            Handler_PandCont(Compartment.Top.NumMO, "succ", new CtxNumSuccish(+1));
+            Handler_PandCont(Compartment.Top.NumMO, "pred", new CtxNumSuccish(-1));
+            Compartment.Top.NumMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            RatMO = new STable("Rat");
-            Handler_Vonly(RatMO, "Numeric", new CtxReturnSelf(),
+            Compartment.Top.RatMO = new STable("Rat");
+            Handler_Vonly(Compartment.Top.RatMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_PandBox(RatMO, "Bool", new CtxRatBool(), BoolMO);
-            Handler_PandBox(RatMO, "Str", new CtxRatStr(), StrMO);
-            Handler_PandCont(RatMO, "succ", new CtxRatSuccish(true));
-            Handler_PandCont(RatMO, "pred", new CtxRatSuccish(false));
-            RatMO.FillProtoClass(AnyMO);
+            Handler_PandBox(Compartment.Top.RatMO, "Bool", new CtxRatBool(), Compartment.Top.BoolMO);
+            Handler_PandBox(Compartment.Top.RatMO, "Str", new CtxRatStr(), Compartment.Top.StrMO);
+            Handler_PandCont(Compartment.Top.RatMO, "succ", new CtxRatSuccish(true));
+            Handler_PandCont(Compartment.Top.RatMO, "pred", new CtxRatSuccish(false));
+            Compartment.Top.RatMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            FatRatMO = new STable("FatRat");
-            Handler_Vonly(FatRatMO, "Numeric", new CtxReturnSelf(),
+            Compartment.Top.FatRatMO = new STable("FatRat");
+            Handler_Vonly(Compartment.Top.FatRatMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_PandBox(FatRatMO, "Bool", new CtxFatRatBool(), BoolMO);
-            Handler_PandBox(FatRatMO, "Str", new CtxFatRatStr(), StrMO);
-            Handler_PandCont(FatRatMO, "succ", new CtxFatRatSuccish(true));
-            Handler_PandCont(FatRatMO, "pred", new CtxFatRatSuccish(false));
-            FatRatMO.FillProtoClass(AnyMO);
+            Handler_PandBox(Compartment.Top.FatRatMO, "Bool", new CtxFatRatBool(), Compartment.Top.BoolMO);
+            Handler_PandBox(Compartment.Top.FatRatMO, "Str", new CtxFatRatStr(), Compartment.Top.StrMO);
+            Handler_PandCont(Compartment.Top.FatRatMO, "succ", new CtxFatRatSuccish(true));
+            Handler_PandCont(Compartment.Top.FatRatMO, "pred", new CtxFatRatSuccish(false));
+            Compartment.Top.FatRatMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            ComplexMO = new STable("Complex");
-            Handler_Vonly(ComplexMO, "Numeric", new CtxReturnSelf(),
+            Compartment.Top.ComplexMO = new STable("Complex");
+            Handler_Vonly(Compartment.Top.ComplexMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_PandBox(ComplexMO, "Bool", new CtxComplexBool(), BoolMO);
-            Handler_PandBox(ComplexMO, "Str", new CtxComplexStr(), StrMO);
-            Handler_PandCont(ComplexMO, "succ", new CtxComplexSuccish(+1));
-            Handler_PandCont(ComplexMO, "pred", new CtxComplexSuccish(-1));
-            ComplexMO.FillProtoClass(AnyMO);
+            Handler_PandBox(Compartment.Top.ComplexMO, "Bool", new CtxComplexBool(), Compartment.Top.BoolMO);
+            Handler_PandBox(Compartment.Top.ComplexMO, "Str", new CtxComplexStr(), Compartment.Top.StrMO);
+            Handler_PandCont(Compartment.Top.ComplexMO, "succ", new CtxComplexSuccish(+1));
+            Handler_PandCont(Compartment.Top.ComplexMO, "pred", new CtxComplexSuccish(-1));
+            Compartment.Top.ComplexMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            StashMO = new STable("Stash");
-            StashMO.FillProtoClass(AnyMO);
-            StashP = new P6opaque(StashMO);
+            Compartment.Top.StashMO = new STable("Stash");
+            Compartment.Top.StashMO.FillProtoClass(Compartment.Top.AnyMO);
+            Compartment.Top.StashP = new P6opaque(Compartment.Top.StashMO);
 
-            ParameterMO.FillProtoClass(AnyMO);
+            Compartment.Top.ParameterMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            SignatureMO.FillProtoClass(AnyMO);
+            Compartment.Top.SignatureMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            ClassHOWMO = new STable("ClassHOW");
-            ClassHOWMO.FillProtoClass(AnyMO);
+            Compartment.Top.ClassHOWMO = new STable("ClassHOW");
+            Compartment.Top.ClassHOWMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            ParcelMO = new STable("Parcel");
-            Handler_PandBox(ParcelMO, "iterator", new CtxParcelIterator(),
-                    IteratorMO);
-            Handler_PandBox(ParcelMO, "Str", new CtxParcelListStr(), StrMO);
-            WrapHandler1(ParcelMO, "LISTSTORE", new IxParcelLISTSTORE());
-            Handler_Vonly(ParcelMO, "list", new CtxParcelList(), null);
-            ParcelMO.FillProtoClass(AnyMO);
+            Compartment.Top.ParcelMO = new STable("Parcel");
+            Handler_PandBox(Compartment.Top.ParcelMO, "iterator", new CtxParcelIterator(),
+                    Compartment.Top.IteratorMO);
+            Handler_PandBox(Compartment.Top.ParcelMO, "Str", new CtxParcelListStr(), Compartment.Top.StrMO);
+            WrapHandler1(Compartment.Top.ParcelMO, "LISTSTORE", new IxParcelLISTSTORE());
+            Handler_Vonly(Compartment.Top.ParcelMO, "list", new CtxParcelList(), null);
+            Compartment.Top.ParcelMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            ListMO = new STable("List");
-            WrapIndexy(ListMO, "postcircumfix:<[ ]>", new IxListAtPos(false),
+            Compartment.Top.ListMO = new STable("List");
+            WrapIndexy(Compartment.Top.ListMO, "postcircumfix:<[ ]>", new IxListAtPos(false),
                     null, null, new IxListBindPos());
-            Handler_PandBox(ListMO, "Str", new CtxParcelListStr(), StrMO);
-            Handler_Vonly(ListMO, "pop", new PopList(), null);
-            Handler_Vonly(ListMO, "shift", new ShiftList(), null);
-            WrapPushy(ListMO, "push", new PushList());
-            WrapPushy(ListMO, "unshift", new UnshiftList());
-            Handler_PandBox(ListMO, "iterator", new CtxListIterator(),
-                    IteratorMO);
-            Handler_PandBox(ListMO, "Bool", new CtxListBool(), BoolMO);
-            Handler_PandBoxInty(ListMO, "Numeric", new CtxListNum());
-            Handler_Vonly(ListMO, "list", new CtxReturnSelfList(), null);
-            ListMO.FillProtoClass(AnyMO, new string[] { "$!items", "$!rest" },
-                new STable[] { ListMO, ListMO });
+            Handler_PandBox(Compartment.Top.ListMO, "Str", new CtxParcelListStr(), Compartment.Top.StrMO);
+            Handler_Vonly(Compartment.Top.ListMO, "pop", new PopList(), null);
+            Handler_Vonly(Compartment.Top.ListMO, "shift", new ShiftList(), null);
+            WrapPushy(Compartment.Top.ListMO, "push", new PushList());
+            WrapPushy(Compartment.Top.ListMO, "unshift", new UnshiftList());
+            Handler_PandBox(Compartment.Top.ListMO, "iterator", new CtxListIterator(),
+                    Compartment.Top.IteratorMO);
+            Handler_PandBox(Compartment.Top.ListMO, "Bool", new CtxListBool(), Compartment.Top.BoolMO);
+            Handler_PandBoxInty(Compartment.Top.ListMO, "Numeric", new CtxListNum());
+            Handler_Vonly(Compartment.Top.ListMO, "list", new CtxReturnSelfList(), null);
+            Compartment.Top.ListMO.FillProtoClass(Compartment.Top.AnyMO, new string[] { "$!items", "$!rest" },
+                new STable[] { Compartment.Top.ListMO, Compartment.Top.ListMO });
 
-            ArrayMO = new STable("Array");
-            WrapHandler1(ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
-            WrapIndexy(ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
+            Compartment.Top.ArrayMO = new STable("Array");
+            WrapHandler1(Compartment.Top.ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
+            WrapIndexy(Compartment.Top.ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
                     null, null, new IxListBindPos());
-            ArrayMO.FillProtoClass(ListMO);
+            Compartment.Top.ArrayMO.FillProtoClass(Compartment.Top.ListMO);
 
-            HashMO = new STable("Hash");
-            WrapHandler1(HashMO, "LISTSTORE", new IxHashLISTSTORE());
-            WrapIndexy(HashMO, "postcircumfix:<{ }>", new IxHashAtKey(),
+            Compartment.Top.HashMO = new STable("Hash");
+            WrapHandler1(Compartment.Top.HashMO, "LISTSTORE", new IxHashLISTSTORE());
+            WrapIndexy(Compartment.Top.HashMO, "postcircumfix:<{ }>", new IxHashAtKey(),
                     new IxHashExistsKey(), new IxHashDeleteKey(),
                     new IxHashBindKey());
-            Handler_PandBox(HashMO, "iterator", new CtxHashIterator(), IteratorMO);
-            Handler_PandBox(HashMO, "Bool", new CtxHashBool(), BoolMO);
-            Handler_Vonly(HashMO, "hash", new CtxReturnSelfList(), null);
-            HashMO.FillProtoClass(AnyMO);
+            Handler_PandBox(Compartment.Top.HashMO, "iterator", new CtxHashIterator(), Compartment.Top.IteratorMO);
+            Handler_PandBox(Compartment.Top.HashMO, "Bool", new CtxHashBool(), Compartment.Top.BoolMO);
+            Handler_Vonly(Compartment.Top.HashMO, "hash", new CtxReturnSelfList(), null);
+            Compartment.Top.HashMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            CursorMO = new STable("Cursor");
-            WrapIndexy(CursorMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
-                    AnyMO.mro_exists_key, AnyMO.mro_delete_key,
-                    AnyMO.mro_bind_key);
-            WrapIndexy(CursorMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
-                    null, null, AnyMO.mro_bind_pos);
-            CursorMO.FillProtoClass(AnyMO);
+            Compartment.Top.CursorMO = new STable("Cursor");
+            WrapIndexy(Compartment.Top.CursorMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
+                    Compartment.Top.AnyMO.mro_exists_key, Compartment.Top.AnyMO.mro_delete_key,
+                    Compartment.Top.AnyMO.mro_bind_key);
+            WrapIndexy(Compartment.Top.CursorMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
+                    null, null, Compartment.Top.AnyMO.mro_bind_pos);
+            Compartment.Top.CursorMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            MatchMO = new STable("Match");
-            WrapIndexy(MatchMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
-                    AnyMO.mro_exists_key, AnyMO.mro_delete_key,
-                    AnyMO.mro_bind_key);
-            WrapIndexy(MatchMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
-                    null, null, AnyMO.mro_bind_pos);
-            Handler_PandBox(MatchMO, "Str", new CtxMatchStr(), StrMO);
-            MatchMO.FillProtoClass(AnyMO);
+            Compartment.Top.MatchMO = new STable("Match");
+            WrapIndexy(Compartment.Top.MatchMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
+                    Compartment.Top.AnyMO.mro_exists_key, Compartment.Top.AnyMO.mro_delete_key,
+                    Compartment.Top.AnyMO.mro_bind_key);
+            WrapIndexy(Compartment.Top.MatchMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
+                    null, null, Compartment.Top.AnyMO.mro_bind_pos);
+            Handler_PandBox(Compartment.Top.MatchMO, "Str", new CtxMatchStr(), Compartment.Top.StrMO);
+            Compartment.Top.MatchMO.FillProtoClass(Compartment.Top.AnyMO);
 
-            ScalarMO = new STable("Scalar");
-            ScalarMO.FillProtoClass(AnyMO);
+            Compartment.Top.ScalarMO = new STable("Scalar");
+            Compartment.Top.ScalarMO.FillProtoClass(Compartment.Top.AnyMO);
         }
 
         // This is a library function in .NET 4
@@ -6309,7 +6311,7 @@ slow:
         }
 
         public static Variable NewLabelVar(Frame fr, string name) {
-            P6opaque dob = new P6opaque(LabelMO);
+            P6opaque dob = new P6opaque(Compartment.Top.LabelMO);
             fr.MarkSharedChain();
             dob.slots[0] = fr;
             dob.slots[1] = name;
@@ -6410,8 +6412,8 @@ slow:
                         Kernel.GetInferiorRoot(), csr, sub,
                         new Variable[] {
                             Builtins.MakeParcel(Builtins.MakeInt(type),
-                                Kernel.BoxAnyMO(name, Kernel.StrMO),
-                                tgt == null ? Kernel.AnyP : tgt)
+                                Kernel.BoxAnyMO(name, Compartment.Top.StrMO),
+                                tgt == null ? Compartment.Top.AnyP : tgt)
                         }, null, false, null);
                     Variable np = Kernel.RunInferior(nfr);
                     if (np.Fetch().mo.mro_raw_Bool.Get(np)) {
@@ -6489,7 +6491,7 @@ slow:
                 } else {
                     if (csr.caller == null) Panic(csr.info.name + " has no caller?");
                     // TODO: catch generated exceptions and add to @!
-                    csr.caller.resultSlot = Kernel.Nil;
+                    csr.caller.resultSlot = Compartment.Top.Nil;
                     Kernel.SetTopFrame(csr);
                     csr = csr.Return();
                 }
@@ -6515,7 +6517,7 @@ slow:
                     return de.info.SetupCall(tf.caller, de.outer, de.ip6, p, n,
                             false, de);
                 } else {
-                    tf.caller.resultSlot = AnyP;
+                    tf.caller.resultSlot = Compartment.Top.AnyP;
                     return tf.caller;
                 }
             } else if (type == SubInfo.ON_DIE) {
@@ -6523,14 +6525,14 @@ slow:
                 if (exn.Fetch().mo.mro_raw_Numeric.Get(exn) == 1)
                     exn = exn.Fetch().mo.mro_at_pos.Get(exn, Builtins.MakeInt(0));
                 tf.LexicalBind("$!", (Variable)exn);
-                td = AnyP;
+                td = Compartment.Top.AnyP;
             }
             tf.ip = tip;
             tf.resultSlot = td;
             if (tip < 0) {
                 // catch IP of -1 means to force an immediate return, as
                 // when a CATCH phaser is triggered.
-                tf.caller.resultSlot = Kernel.Nil;
+                tf.caller.resultSlot = Compartment.Top.Nil;
                 return tf.Return();
             } else {
                 return tf;

@@ -25,7 +25,7 @@ public sealed class GState {
             pos = new Variable[] { actions, match };
         } else if (actions_p.mo.mro_methods.TryGetValue("FALLBACK", out m)) {
             pos = new Variable[] { actions,
-                Kernel.BoxAnyMO<string>(name, Kernel.StrMO), match };
+                Kernel.BoxAnyMO<string>(name, Compartment.Top.StrMO), match };
         } else {
             return th;
         }
@@ -34,7 +34,7 @@ public sealed class GState {
     }
 
     public GState(string orig, P6any actions) {
-        this.actions = (actions == Kernel.AnyP) ? null : actions;
+        this.actions = (actions == Compartment.Top.AnyP) ? null : actions;
         orig_s = orig;
         orig_a = orig.ToCharArray();
         highwater = (orig_a.Length < 100 || !Cursor.HwTrace) ?
@@ -217,13 +217,13 @@ public sealed class RxFrame: IFreeze {
                 if (Cursor.Trace)
                     Console.WriteLine("Failing {0}@{1} after no matches",
                             name, from);
-                return Kernel.Take(th, Kernel.EMPTYP);
+                return Kernel.Take(th, Compartment.Top.EMPTYP);
             } else {
                 if (Cursor.Trace)
                     Console.WriteLine("Failing {0}@{1} after some matches",
                             name, from);
                 if (EmptyList == null) {
-                    P6opaque lst = new P6opaque(Kernel.ListMO);
+                    P6opaque lst = new P6opaque(Compartment.Top.ListMO);
                     lst.slots[0 /*items*/] = new VarDeque();
                     lst.slots[1 /*rest*/ ] = new VarDeque();
                     EmptyList = Kernel.NewRWListVar(lst);
@@ -536,7 +536,7 @@ public sealed class RxFrame: IFreeze {
 
     Frame scalar_common(bool eval, Frame th, Variable var) {
         P6any o = var.Fetch();
-        if (o.Isa(Kernel.RegexMO)) {
+        if (o.Isa(Compartment.Top.RegexMO)) {
             return o.Invoke(th, new Variable[] { MakeCursorV() }, null);
         } else if (eval) {
             P6any rx = Builtins.compile_bind_regex(th,
@@ -546,7 +546,7 @@ public sealed class RxFrame: IFreeze {
             if (Exact(o.mo.mro_raw_Str.Get(var))) {
                 th.resultSlot = MakeCursorV();
             } else {
-                th.resultSlot = Kernel.Nil;
+                th.resultSlot = Compartment.Top.Nil;
             }
             return th;
         }
@@ -566,7 +566,7 @@ public sealed class RxFrame: IFreeze {
             P6any sobj = iter.Shift().Fetch();
 
 retry:
-            if (sobj.Isa(Kernel.RegexMO)) {
+            if (sobj.Isa(Compartment.Top.RegexMO)) {
                 toks.Add(sobj);
 
                 pad.outer_stack.Add(Kernel.GetOuter(sobj));
@@ -588,7 +588,7 @@ retry:
         int[] cases = (new Lexer(pad, "array_var", lads.ToArray())).
             Run(global.orig_s, st.pos);
 
-        Frame nth = th.MakeChild(null, ArrayHelperSI, Kernel.AnyP);
+        Frame nth = th.MakeChild(null, ArrayHelperSI, Compartment.Top.AnyP);
         nth.lex0 = MakeCursor();
         nth.lex1 = toks;
         nth.lex2 = cases;
@@ -597,7 +597,7 @@ retry:
     }
 
     public Frame proto_dispatch(Frame th, Variable unused) {
-        Frame nth = th.MakeChild(null, Lexer.StandardProtoSI, Kernel.AnyP);
+        Frame nth = th.MakeChild(null, Lexer.StandardProtoSI, Compartment.Top.AnyP);
         nth.pos = new Variable[] { MakeCursorV() };
         return nth;
     }
@@ -752,12 +752,12 @@ retry:
             VarDeque ks = new VarDeque();
             ks.Push(m);
             th.coro_return = th;
-            P6opaque it  = new P6opaque(Kernel.GatherIteratorMO);
+            P6opaque it  = new P6opaque(Compartment.Top.GatherIteratorMO);
             it.slots[0 /*frame*/] = Kernel.NewMuScalar(th);
-            it.slots[1 /*reify*/] = Kernel.NewMuScalar(Kernel.AnyP);
+            it.slots[1 /*reify*/] = Kernel.NewMuScalar(Compartment.Top.AnyP);
             VarDeque iss = new VarDeque();
             iss.Push(it);
-            P6opaque lst = new P6opaque(Kernel.ListMO);
+            P6opaque lst = new P6opaque(Compartment.Top.ListMO);
             lst.slots[0 /*items*/] = ks;
             lst.slots[1 /*rest*/ ] = iss;
             th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -806,7 +806,7 @@ public class Cursor : P6any {
         this.pos = pos;
         this.ast = ast;
         this.from = from;
-        this.mo = Kernel.MatchMO;
+        this.mo = Compartment.Top.MatchMO;
         this.save_klass = klass;
         this.reduced = reduced;
     }
@@ -827,8 +827,8 @@ public class Cursor : P6any {
         CapInfo ci = null;
         while (Kernel.IterHasFlat(iter, true)) {
             P6any pair = iter.Shift().Fetch();
-            Variable k = (Variable)pair.GetSlot(Kernel.EnumMO, "$!key");
-            Variable v = (Variable)pair.GetSlot(Kernel.EnumMO, "$!value");
+            Variable k = (Variable)pair.GetSlot(Compartment.Top.EnumMO, "$!key");
+            Variable v = (Variable)pair.GetSlot(Compartment.Top.EnumMO, "$!value");
             ci = new CapInfo(ci, new string[] {
                     k.Fetch().mo.mro_raw_Str.Get(k) }, v);
         }
@@ -865,12 +865,12 @@ public class Cursor : P6any {
     private Variable FixupList(VarDeque caps) {
         if (caps.Count() != 0 && caps[0] == null) {
             caps.Shift();
-            P6opaque l = new P6opaque(Kernel.ListMO);
+            P6opaque l = new P6opaque(Compartment.Top.ListMO);
             l.slots[0 /*items*/] = caps;
             l.slots[1 /*rest*/ ] = new VarDeque();
             return l;
         } else {
-            return caps.Count() != 0 ? caps[0] : Kernel.AnyP;
+            return caps.Count() != 0 ? caps[0] : Compartment.Top.AnyP;
         }
     }
 
@@ -884,7 +884,7 @@ public class Cursor : P6any {
     public string Reduced() { return reduced; }
     public P6any AST() {
         P6any a = (feedback != null) ? feedback.ast : ast;
-        return a ?? Kernel.AnyMO.typeObj;
+        return a ?? Compartment.Top.AnyMO.typeObj;
     }
 
     // TODO: cache generated lists
@@ -936,8 +936,8 @@ public class Cursor : P6any {
         for (int i = 0; i < pos.Length; i++)
             pos[i] = FixupList(posr[i]);
 
-        into.SetSlot(Kernel.CaptureMO, "$!positionals", pos);
-        into.SetSlot(Kernel.CaptureMO, "$!named", nam);
+        into.SetSlot(Compartment.Top.CaptureMO, "$!positionals", pos);
+        into.SetSlot(Compartment.Top.CaptureMO, "$!named", nam);
     }
 
     public Variable O(VarHash caps) {
@@ -959,7 +959,7 @@ public class Cursor : P6any {
                 CC.Word.Accepts(backing[p-1])) {
             if (Trace)
                 Console.WriteLine("! no match <ws> at {0}", pos);
-            return Kernel.Nil;
+            return Compartment.Top.Nil;
         } else {
             while (p != l && Char.IsWhiteSpace(backing, p)) { p++; }
             if (Trace)
@@ -977,13 +977,13 @@ public partial class Builtins {
         for (CapInfo it = c.captures; it != null; it = it.prev) {
             if (it.names[0] == null || it.cap == null)
                 continue; // special node
-            if (!it.cap.Fetch().Isa(Kernel.MatchMO))
+            if (!it.cap.Fetch().Isa(Compartment.Top.MatchMO))
                 continue;
             foreach (string name in it.names)
                 dq.Unshift(pair(MakeStr(name), it.cap));
         }
 
-        P6opaque lst = new P6opaque(Kernel.ListMO);
+        P6opaque lst = new P6opaque(Compartment.Top.ListMO);
         lst.slots[0 /*items*/] = dq;
         lst.slots[1 /*rest*/ ] = new VarDeque();
         return Kernel.NewRWListVar(lst);
@@ -1632,12 +1632,12 @@ public class LADParam : LAD {
         // alternatively, we could generalize to any variable, and add rechecks
         Frame outer = pad.outer_stack[pad.outer_stack.Count - 1];
 
-        Variable vr = outer == null ? Kernel.AnyP :
+        Variable vr = outer == null ? Compartment.Top.AnyP :
             outer.LexicalFind(name);
 
         P6any ob = vr.Fetch();
 
-        if (!vr.Rw && ob.IsDefined() && ob.mo == Kernel.StrMO) {
+        if (!vr.Rw && ob.IsDefined() && ob.mo == Compartment.Top.StrMO) {
             if (Lexer.LtmTrace)
                 Console.WriteLine("Resolved {0} to \"{1}\"", name,
                         Kernel.UnboxAny<string>(ob));

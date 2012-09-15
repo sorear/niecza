@@ -143,8 +143,8 @@ namespace Niecza {
         public override P6any Fetch() {
             string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
             string sub = Builtins.LaxSubstring2(str, from, length);
-            return sub == null ? Kernel.StrMO.typeObj :
-                Kernel.BoxRaw(sub,Kernel.StrMO);
+            return sub == null ? Compartment.Top.StrMO.typeObj :
+                Kernel.BoxRaw(sub,Compartment.Top.StrMO);
         }
 
         public override void Store(P6any v) {
@@ -155,7 +155,7 @@ namespace Niecza {
             string lfr = str.Substring(0, left);
             string mfr = v.mo.mro_raw_Str.Get(v);
             string rfr = str.Substring(right);
-            backing.Store(Kernel.BoxRaw<string>(lfr + mfr + rfr, Kernel.StrMO));
+            backing.Store(Kernel.BoxRaw<string>(lfr + mfr + rfr, Compartment.Top.StrMO));
         }
 
         public override void Freeze(Niecza.Serialization.FreezeBuffer fb) {
@@ -199,7 +199,7 @@ public partial class Builtins {
             P6any val) {
         if (val.mo.is_any) {
             // fine as is
-        } else if (val.mo.HasType(Kernel.JunctionMO)) {
+        } else if (val.mo.HasType(Compartment.Top.JunctionMO)) {
             int jtype = Kernel.UnboxAny<int>((P6any)(val as P6opaque).slots[0]) / 2;
             if ((uint)jtype < rank) {
                 rank = (uint)jtype;
@@ -220,8 +220,8 @@ public partial class Builtins {
         for (int i = 0; i < list.Length; i++) {
             nlist[i] = dgt(list[i]);
         }
-        P6any newList = Kernel.BoxRaw(nlist, Kernel.ParcelMO);
-        P6opaque newJunc = new P6opaque(Kernel.JunctionMO);
+        P6any newList = Kernel.BoxRaw(nlist, Compartment.Top.ParcelMO);
+        P6opaque newJunc = new P6opaque(Compartment.Top.JunctionMO);
         newJunc.slots[0] = j_.slots[0];
         newJunc.slots[1] = newList;
         return newJunc;
@@ -302,7 +302,7 @@ public partial class Builtins {
         if (o.mo.num_rank >= 0) {
             rank = o.mo.num_rank;
         } else {
-            if (o.Does(Kernel.RealMO)) {
+            if (o.Does(Compartment.Top.RealMO)) {
                 rank = NR_FLOAT;
                 o = Kernel.RunInferior(o.InvokeMethod(Kernel.GetInferiorRoot(), "Bridge", new Variable[] { v }, null)).Fetch();
                 return o;
@@ -419,19 +419,19 @@ public partial class Builtins {
 
     // Produce a number from an int
     public static Variable MakeInt(int v) {
-        return Kernel.BoxAnyMO<int>(v, Kernel.IntMO);
+        return Kernel.BoxAnyMO<int>(v, Compartment.Top.IntMO);
     }
 
     public static Variable MakeInt(BigInteger v) {
         int vs;
-        if (v.AsInt32(out vs)) return Kernel.BoxAnyMO<int>(vs, Kernel.IntMO);
-        else return Kernel.BoxAnyMO<BigInteger>(v, Kernel.IntMO);
+        if (v.AsInt32(out vs)) return Kernel.BoxAnyMO<int>(vs, Compartment.Top.IntMO);
+        else return Kernel.BoxAnyMO<BigInteger>(v, Compartment.Top.IntMO);
     }
 
     public static Variable MakeInt(long v) {
         if (v <= (long)int.MaxValue && v >= (long)int.MinValue)
-            return Kernel.BoxAnyMO<int>((int)v, Kernel.IntMO);
-        else return Kernel.BoxAnyMO<BigInteger>(v, Kernel.IntMO);
+            return Kernel.BoxAnyMO<int>((int)v, Compartment.Top.IntMO);
+        else return Kernel.BoxAnyMO<BigInteger>(v, Compartment.Top.IntMO);
     }
 
     // Coerce a number to a real rational value - note that this loses
@@ -543,35 +543,35 @@ public partial class Builtins {
         ulong sden;
         SimplifyFrac(ref num, ref den);
         if (den.AsUInt64(out sden) && sden != 0)
-            return Kernel.BoxAnyMO<Rat>(new Rat(num, sden), Kernel.RatMO);
+            return Kernel.BoxAnyMO<Rat>(new Rat(num, sden), Compartment.Top.RatMO);
         return MakeFloat(RatToFloat(num, den));
     }
 
     public static Variable MakeFatRat(BigInteger num, BigInteger den) {
         SimplifyFrac(ref num, ref den);
         if (den.Sign != 0)
-            return Kernel.BoxAnyMO<FatRat>(new FatRat(num, den), Kernel.FatRatMO);
+            return Kernel.BoxAnyMO<FatRat>(new FatRat(num, den), Compartment.Top.FatRatMO);
         return MakeFloat(den.Sign * double.PositiveInfinity);
     }
 
     public static Variable MakeFloat(double val) {
-        return Kernel.BoxAnyMO<double>(val, Kernel.NumMO);
+        return Kernel.BoxAnyMO<double>(val, Compartment.Top.NumMO);
     }
 
     public static Variable MakeComplex(double re, double im) {
-        return Kernel.BoxAnyMO<Complex>(new Complex(re, im), Kernel.ComplexMO);
+        return Kernel.BoxAnyMO<Complex>(new Complex(re, im), Compartment.Top.ComplexMO);
     }
 
     public static Variable MakeStr(string str) {
-        return Kernel.BoxAnyMO(str, Kernel.StrMO);
+        return Kernel.BoxAnyMO(str, Compartment.Top.StrMO);
     }
 
     public static Variable MakeComplex(Complex z) {
-        return Kernel.BoxAnyMO<Complex>(z, Kernel.ComplexMO);
+        return Kernel.BoxAnyMO<Complex>(z, Compartment.Top.ComplexMO);
     }
 
     public static Variable MakeParcel(params Variable[] bits) {
-        return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Kernel.ParcelMO));
+        return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Compartment.Top.ParcelMO));
     }
 
     public static Variable InvokeSub(P6any obj, params Variable[] pos) {
@@ -634,15 +634,15 @@ public partial class Builtins {
             Variable jr = HandleSpecial2(v1, v2, o1, o2, d);
             // treat $x != $y as !($x == $y)
             if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD))
-                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Kernel.FalseV :
-                    Kernel.TrueV;
+                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Compartment.Top.FalseV :
+                    Compartment.Top.TrueV;
             return jr;
         }
         int diff = string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
                 o2.mo.mro_raw_Str.Get(v2));
         int mcom = (diff < 0) ? O_IS_LESS : (diff > 0) ? O_IS_GREATER :
             O_IS_EQUAL;
-        return ((mask & mcom) != 0) ? Kernel.TrueV : Kernel.FalseV;
+        return ((mask & mcom) != 0) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
     }
 
     static readonly Func<Variable,Variable,Variable> streq_d = streq;
@@ -677,7 +677,7 @@ public partial class Builtins {
     private static int substr_pos(Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(), o2 = v2.Fetch();
         int r2;
-        if (o2.Does(Kernel.CodeMO)) {
+        if (o2.Does(Compartment.Top.CodeMO)) {
             string s1 = o1.mo.mro_raw_Str.Get(v1);
             Variable no2 = Kernel.RunInferior(o2.Invoke(
                 Kernel.GetInferiorRoot(), new Variable[] {
@@ -692,7 +692,7 @@ public partial class Builtins {
     private static int substr_len(Variable v1, int pos, Variable v3) {
         P6any o1 = v1.Fetch(), o3 = v3.Fetch();
         int r3;
-        if (o3.Does(Kernel.CodeMO)) {
+        if (o3.Does(Compartment.Top.CodeMO)) {
             string s1 = o1.mo.mro_raw_Str.Get(v1);
             Variable no3 = Kernel.RunInferior(o3.Invoke(
                 Kernel.GetInferiorRoot(), new Variable[] {
@@ -725,7 +725,7 @@ public partial class Builtins {
         int len = substr_len(v1, pos, v3);
         string str = v1.Fetch().mo.mro_raw_Str.Get(v1);
         string sub = Builtins.LaxSubstring2(str, pos, len);
-        return sub == null ? Kernel.StrMO.typeObj : MakeStr(sub);
+        return sub == null ? Compartment.Top.StrMO.typeObj : MakeStr(sub);
     }
 
     static readonly Func<Variable,Variable,Variable> plus_d = plus;
@@ -1127,8 +1127,8 @@ public partial class Builtins {
             Variable jr = HandleSpecial2(a1, a2, o1, o2, dl);
             // treat $x != $y as !($x == $y)
             if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD | O_COMPLEX_OK))
-                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Kernel.FalseV :
-                    Kernel.TrueV;
+                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Compartment.Top.FalseV :
+                    Compartment.Top.TrueV;
             return jr;
         }
         P6any n1 = GetNumber(a1, o1, out r1);
@@ -1175,7 +1175,7 @@ public partial class Builtins {
         if (res == 0)
             res = (r1 > 0) ? O_IS_GREATER : (r1 < 0) ? O_IS_LESS : O_IS_EQUAL;
 
-        return ((mask & res) != 0) ? Kernel.TrueV : Kernel.FalseV;
+        return ((mask & res) != 0) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
     }
 
     static readonly Func<Variable,Variable,Variable> mul_d = mul;
@@ -1482,8 +1482,8 @@ public partial class Builtins {
 
     // only called from .Rat
     public static Variable rat_approx(Variable v1, Variable v2) {
-        NominalCheck("$x", Kernel.AnyMO, v1);
-        NominalCheck("$y", Kernel.AnyMO, v2);
+        NominalCheck("$x", Compartment.Top.AnyMO, v1);
+        NominalCheck("$y", Compartment.Top.AnyMO, v2);
 
         BigInteger nc, dc, ne, de, na, da;
         GetAsRational(v1, out nc, out dc);
@@ -1512,10 +1512,10 @@ public partial class Builtins {
         v.AssignO(o1.mo.mro_succ.Get(v), false);
 
         if (!o1.IsDefined()) {
-            if (o1.Isa(Kernel.BoolMO))
-                o1 = Kernel.FalseV;
+            if (o1.Isa(Compartment.Top.BoolMO))
+                o1 = Compartment.Top.FalseV;
             else
-                o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
+                o1 = Kernel.BoxRaw<int>(0, Compartment.Top.IntMO);
         }
 
         return o1;
@@ -1531,10 +1531,10 @@ public partial class Builtins {
         v.AssignO(o1.mo.mro_pred.Get(v), false);
 
         if (!o1.IsDefined()) {
-            if (o1.Isa(Kernel.BoolMO))
-                o1 = Kernel.FalseV;
+            if (o1.Isa(Compartment.Top.BoolMO))
+                o1 = Compartment.Top.FalseV;
             else
-                o1 = Kernel.BoxRaw<int>(0, Kernel.IntMO);
+                o1 = Kernel.BoxRaw<int>(0, Compartment.Top.IntMO);
         }
 
         return o1;
@@ -1548,7 +1548,7 @@ public partial class Builtins {
     public static Variable not(Variable v) {
         P6any o1 = v.Fetch();
         bool r = o1.mo.mro_raw_Bool.Get(v);
-        return r ? Kernel.FalseV : Kernel.TrueV;
+        return r ? Compartment.Top.FalseV : Compartment.Top.TrueV;
     }
 
     static readonly Func<Variable,Variable> chars_d = chars;
@@ -1585,7 +1585,7 @@ public partial class Builtins {
 
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
-        if (r.Length == 0) return Kernel.AnyP;
+        if (r.Length == 0) return Compartment.Top.AnyP;
         else if (r.Length >= 2 &&
                 r[0] >= (char)0xD800 && r[0] <= (char)0xDBFF &&
                 r[1] >= (char)0xDC00 && r[1] <= (char)0xDFFF)
@@ -1602,12 +1602,12 @@ public partial class Builtins {
 
         int r = (int)o1.mo.mro_raw_Numeric.Get(v);
         if (r >= 0x110000)
-            return Kernel.AnyP; // XXX failure
-        return Kernel.BoxAnyMO(Utils.Chr(r), Kernel.StrMO);
+            return Compartment.Top.AnyP; // XXX failure
+        return Kernel.BoxAnyMO(Utils.Chr(r), Compartment.Top.StrMO);
     }
 
     public static Variable UniCat(Variable v) {
-        P6any o1 = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o1 = NominalCheck("$x", Compartment.Top.AnyMO, v);
         char c = (char) o1.mo.mro_raw_Numeric.Get(v);
         int ix = (int) char.GetUnicodeCategory(c);
         return MakeInt(ix);
@@ -1627,9 +1627,9 @@ need_flatten:;
             elems = into.CopyAsArray();
 flat_enough:;
         }
-        P6opaque nj = new P6opaque(Kernel.JunctionMO);
-        nj.slots[0] = Kernel.BoxRaw(type, Kernel.IntMO);
-        nj.slots[1] = Kernel.BoxRaw(elems, Kernel.ParcelMO);
+        P6opaque nj = new P6opaque(Compartment.Top.JunctionMO);
+        nj.slots[0] = Kernel.BoxRaw(type, Compartment.Top.IntMO);
+        nj.slots[1] = Kernel.BoxRaw(elems, Compartment.Top.ParcelMO);
         return nj;
     }
 
@@ -1642,7 +1642,7 @@ flat_enough:;
     }
 
     public static VarDeque HashIterRaw(int mode, Variable v) {
-        P6any o = NominalCheck("$x", Kernel.AnyMO, v);
+        P6any o = NominalCheck("$x", Compartment.Top.AnyMO, v);
         VarHash d = Kernel.UnboxAny<VarHash>(o);
 
         VarDeque lv = new VarDeque();
@@ -1650,18 +1650,18 @@ flat_enough:;
         foreach (KeyValuePair<string,Variable> kv in d) {
             switch (mode) {
                 case 0:
-                    lv.Push(Kernel.BoxAnyMO<string>(kv.Key, Kernel.StrMO));
+                    lv.Push(Kernel.BoxAnyMO<string>(kv.Key, Compartment.Top.StrMO));
                     break;
                 case 1:
                     lv.Push(kv.Value);
                     break;
                 case 2:
-                    lv.Push(Kernel.BoxAnyMO<string>(kv.Key, Kernel.StrMO));
+                    lv.Push(Kernel.BoxAnyMO<string>(kv.Key, Compartment.Top.StrMO));
                     lv.Push(kv.Value);
                     break;
                 case 3:
-                    P6opaque p = new P6opaque(Kernel.PairMO);
-                    p.slots[0] = Kernel.BoxAnyMO<string>(kv.Key, Kernel.StrMO);
+                    P6opaque p = new P6opaque(Compartment.Top.PairMO);
+                    p.slots[0] = Kernel.BoxAnyMO<string>(kv.Key, Compartment.Top.StrMO);
                     p.slots[1] = kv.Value;
                     lv.Push(p);
                     break;
@@ -1671,7 +1671,7 @@ flat_enough:;
     }
     public static Variable HashIter(int mode, Variable v) {
         VarDeque lv = HashIterRaw(mode, v);
-        P6opaque l = new P6opaque(Kernel.ListMO);
+        P6opaque l = new P6opaque(Compartment.Top.ListMO);
         l.slots[0] = lv;
         l.slots[1] = new VarDeque();
         return Kernel.NewRWListVar(l);
@@ -1853,23 +1853,23 @@ flat_enough:;
     }
 
     public static P6any MakeList(VarDeque items, VarDeque rest) {
-        P6any l = new P6opaque(Kernel.ListMO);
-        l.SetSlot(Kernel.ListMO, "$!rest", rest);
-        l.SetSlot(Kernel.ListMO, "$!items", items);
+        P6any l = new P6opaque(Compartment.Top.ListMO);
+        l.SetSlot(Compartment.Top.ListMO, "$!rest", rest);
+        l.SetSlot(Compartment.Top.ListMO, "$!items", items);
         return l;
     }
 
     public static P6any MakeArray(VarDeque items, VarDeque rest) {
-        P6any l = new P6opaque(Kernel.ArrayMO);
-        l.SetSlot(Kernel.ListMO, "$!rest", rest);
-        l.SetSlot(Kernel.ListMO, "$!items", items);
+        P6any l = new P6opaque(Compartment.Top.ArrayMO);
+        l.SetSlot(Compartment.Top.ListMO, "$!rest", rest);
+        l.SetSlot(Compartment.Top.ListMO, "$!items", items);
         return l;
     }
 
     public static Variable BoxLoS(string[] los) {
         VarDeque items = new VarDeque();
         foreach (string i in los)
-            items.Push(Kernel.BoxAnyMO(i, Kernel.StrMO));
+            items.Push(Kernel.BoxAnyMO(i, Compartment.Top.StrMO));
         return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
     }
 
@@ -1937,9 +1937,9 @@ flat_enough:;
     }
 
     public static P6any MakePair(Variable key, Variable value) {
-        P6any l = new P6opaque(Kernel.PairMO);
-        l.SetSlot(Kernel.EnumMO, "$!key", key);
-        l.SetSlot(Kernel.EnumMO, "$!value", value);
+        P6any l = new P6opaque(Compartment.Top.PairMO);
+        l.SetSlot(Compartment.Top.EnumMO, "$!key", key);
+        l.SetSlot(Compartment.Top.EnumMO, "$!value", value);
         return l;
     }
 
@@ -1972,7 +1972,7 @@ flat_enough:;
             MakeInt(i);
     }
     public static int get_count(P6any fcni) {
-        if (!fcni.Isa(Kernel.CodeMO))
+        if (!fcni.Isa(Compartment.Top.CodeMO))
             return 1; // can't introspect fake subs (?)
         return sig_count(Kernel.GetInfo(fcni).sig);
     }
@@ -2007,7 +2007,7 @@ flat_enough:;
         return arity;
     }
     public static Variable arity(P6any fcni) {
-        if (!fcni.Isa(Kernel.CodeMO))
+        if (!fcni.Isa(Compartment.Top.CodeMO))
             return MakeInt(1); // can't introspect fake subs (?)
         SubInfo si = (SubInfo) Kernel.GetInfo(fcni);
         if (si.sig == null)
@@ -2033,7 +2033,7 @@ again:
                 if (items.Count() == 0) return -1;
                 Variable v = items[0];
                 P6any i = v.Fetch();
-                if (i.mo.HasType(Kernel.IterCursorMO))
+                if (i.mo.HasType(Compartment.Top.IterCursorMO))
                     return 0;
                 if (v.List) {
                     items.Shift();
@@ -2172,12 +2172,12 @@ again:
             case 0:
                 Variable[] pen;
                 if (!src.TryGet(out pen, tailmode != 0)) {
-                    P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
+                    P6opaque thunk = new P6opaque(Compartment.Top.GatherIteratorMO);
                     th.coro_return = th;
                     th.MarkSharedChain();
                     thunk.slots[0] = Kernel.NewMuScalar(th);
-                    thunk.slots[1] = Kernel.NewMuScalar(Kernel.AnyP);
-                    P6opaque lst = new P6opaque(Kernel.ListMO);
+                    thunk.slots[1] = Kernel.NewMuScalar(Compartment.Top.AnyP);
+                    P6opaque lst = new P6opaque(Compartment.Top.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque(thunk);
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -2186,8 +2186,8 @@ again:
                 }
                 if (pen == null) {
                     if (tailmode != 0)
-                        return Kernel.Take(th, Kernel.EMPTYP);
-                    P6opaque lst = new P6opaque(Kernel.ListMO);
+                        return Kernel.Take(th, Compartment.Top.EMPTYP);
+                    P6opaque lst = new P6opaque(Compartment.Top.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -2232,7 +2232,7 @@ again:
         P6any fcni = fcn.Fetch();
         int arity = get_count(fcni);
 
-        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Compartment.Top.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = new BatchSource(arity, iter);
         fr.lex1 = new VarDeque();
@@ -2244,7 +2244,7 @@ again:
             Func<Variable,Variable> fcn) {
         VarDeque iter = new VarDeque(Kernel.NewRWListVar(lst));
 
-        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Compartment.Top.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = new BatchSource(1, iter);
         fr.lex1 = new VarDeque();
@@ -2262,7 +2262,7 @@ again:
     }
 
     public static Frame MEZip(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Compartment.Top.AnyP);
         Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
@@ -2272,7 +2272,7 @@ again:
     }
 
     public static Frame MECross(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Compartment.Top.AnyP);
         Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
@@ -2295,13 +2295,13 @@ again:
                         if (!Kernel.IterHasFlat(src, false)) break;
                     } else {
                         if (src.Count() == 0) break;
-                        if (src[0].Fetch().mo.HasType(Kernel.IterCursorMO)) {
-                            P6opaque thunk = new P6opaque(Kernel.GatherIteratorMO);
+                        if (src[0].Fetch().mo.HasType(Compartment.Top.IterCursorMO)) {
+                            P6opaque thunk = new P6opaque(Compartment.Top.GatherIteratorMO);
                             th.coro_return = th;
                             th.MarkSharedChain();
                             thunk.slots[0] = Kernel.NewMuScalar(th);
-                            thunk.slots[1] = Kernel.NewMuScalar(Kernel.AnyP);
-                            P6opaque lst = new P6opaque(Kernel.ListMO);
+                            thunk.slots[1] = Kernel.NewMuScalar(Compartment.Top.AnyP);
+                            P6opaque lst = new P6opaque(Compartment.Top.ListMO);
                             lst.slots[0] = outq;
                             lst.slots[1] = new VarDeque(thunk);
                             th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -2313,8 +2313,8 @@ again:
                 }
                 if (pen == null) {
                     if (tailmode != 0)
-                        return Kernel.Take(th, Kernel.EMPTYP);
-                    P6opaque lst = new P6opaque(Kernel.ListMO);
+                        return Kernel.Take(th, Compartment.Top.EMPTYP);
+                    P6opaque lst = new P6opaque(Compartment.Top.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -2354,7 +2354,7 @@ again:
         Variable fcn = iter.Shift();
         iter = Kernel.IterFlatten(iter);
 
-        Frame fr = th.MakeChild(null, Kernel.CommonGrep_I, Kernel.AnyP);
+        Frame fr = th.MakeChild(null, Kernel.CommonGrep_I, Compartment.Top.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = iter;
         fr.lex1 = new VarDeque();
@@ -2391,7 +2391,7 @@ again:
     [TrueGlobal] public static string execName;
 
     public static Variable getenv(string str) {
-        return Kernel.BoxAnyMO(Environment.GetEnvironmentVariable(str), Kernel.StrMO);
+        return Kernel.BoxAnyMO(Environment.GetEnvironmentVariable(str), Compartment.Top.StrMO);
     }
 
     public static void setenv(string key, string val) {
@@ -2407,9 +2407,9 @@ again:
             case 4: {
                 VarHash ret = new VarHash();
                 foreach (System.Collections.DictionaryEntry de in Environment.GetEnvironmentVariables()) {
-                    ret[(string) de.Key] = Kernel.BoxAnyMO((string)de.Value, Kernel.StrMO);
+                    ret[(string) de.Key] = Kernel.BoxAnyMO((string)de.Value, Compartment.Top.StrMO);
                 }
-                return Kernel.BoxAnyMO(ret, Kernel.HashMO);
+                return Kernel.BoxAnyMO(ret, Compartment.Top.HashMO);
             }
             case 5: return MakeStr(Environment.OSVersion.Platform.ToString());
             case 6: return MakeStr(Environment.OSVersion.Version.ToString());
@@ -2422,7 +2422,7 @@ again:
     public static Variable stash_exists_key(P6any st, string key) {
         string lkey = Kernel.UnboxAny<string>(st);
         lkey = (char)lkey.Length + lkey + key;
-        return Kernel.currentGlobals.ContainsKey(lkey) ? Kernel.TrueV : Kernel.FalseV;
+        return Kernel.currentGlobals.ContainsKey(lkey) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
     }
 
     public static Variable stash_at_key(P6any st, string key) {
@@ -2439,7 +2439,7 @@ again:
         lkey = (char)lkey.Length + lkey + key;
         StashEnt r;
         if (!Kernel.currentGlobals.TryGetValue(lkey, out r))
-            return Kernel.AnyP;
+            return Compartment.Top.AnyP;
         Kernel.currentGlobals.Remove(key);
         return r.v;
     }
@@ -2656,7 +2656,7 @@ again:
         newtype.Store(n.typeObj);
 
         string aname = null;
-        if (init != Kernel.AnyP) {
+        if (init != Compartment.Top.AnyP) {
             if (!obj.IsDefined())
                 throw new NieczaException("Cannot initialize a slot when mixing into a type object");
             if (n.mo.local_attr.Count != 1 || (n.mo.local_attr[0].flags & P6how.A_PUBLIC) == 0)
@@ -2679,7 +2679,7 @@ again:
     public static Variable dualvar(Variable obj, Variable type, Variable str) {
         P6any nobj = obj.Fetch().ReprClone();
         nobj.ChangeType(type.Fetch().mo);
-        nobj.SetSlot(Kernel.PseudoStrMO, "$!value",
+        nobj.SetSlot(Compartment.Top.PseudoStrMO, "$!value",
                 Kernel.UnboxAny<string>(str.Fetch()));
         return nobj;
     }
@@ -2690,7 +2690,7 @@ again:
         if ((ai.flags & P6how.A_TYPE) == P6how.A_SCALAR) {
             if (ai.type == null)
                 obj = Kernel.NewMuScalar(
-                    vx != null ? vx.Fetch() : Kernel.AnyMO.typeObj);
+                    vx != null ? vx.Fetch() : Compartment.Top.AnyMO.typeObj);
             else
                 obj = Kernel.NewRWScalar(ai.type,
                     vx != null ? vx.Fetch() : ai.type.initObj);
@@ -2773,7 +2773,7 @@ again:
 
     public static Variable is_role(Variable o) {
         int rty = o.Fetch().mo.mo.type;
-        return (rty == P6how.ROLE || rty == P6how.CURRIED_ROLE || rty == P6how.PARAMETRIZED_ROLE) ? Kernel.TrueV : Kernel.FalseV;
+        return (rty == P6how.ROLE || rty == P6how.CURRIED_ROLE || rty == P6how.PARAMETRIZED_ROLE) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
     }
 
     public class Blackhole : Variable {
@@ -2812,7 +2812,7 @@ again:
     }
 
     public static P6any code_signature(P6any obj) {
-        return Kernel.GetInfo(obj).sig ?? Kernel.AnyMO.typeObj;
+        return Kernel.GetInfo(obj).sig ?? Compartment.Top.AnyMO.typeObj;
     }
 
     public static Variable code_candidates(P6any sub) {
@@ -2838,7 +2838,7 @@ again:
     }
 
     public static Variable param_type(P6any param) {
-        return (((Parameter)param).type ?? Kernel.AnyMO).typeObj;
+        return (((Parameter)param).type ?? Compartment.Top.AnyMO).typeObj;
     }
 
     public static P6any param_subsig(P6any param) {
@@ -2849,7 +2849,7 @@ again:
                     return (P6any)o;
             }
         }
-        return Kernel.AnyMO.typeObj;
+        return Compartment.Top.AnyMO.typeObj;
     }
 
     public static Variable param_value_constraints(P6any param) {
@@ -2870,8 +2870,8 @@ again:
 
     public static Frame code_accepts_capture(Frame th, P6any code, P6any cap) {
         return Kernel.GetInfo(code).SetupCall(th, Kernel.GetOuter(code), code,
-            (Variable[])cap.GetSlot(Kernel.CaptureMO, "$!positionals"),
-            (VarHash)cap.GetSlot(Kernel.CaptureMO, "$!named"),
+            (Variable[])cap.GetSlot(Compartment.Top.CaptureMO, "$!positionals"),
+            (VarHash)cap.GetSlot(Compartment.Top.CaptureMO, "$!named"),
             true, null);
     }
 
@@ -2896,8 +2896,8 @@ again:
     public static Frame ind_method_call(Frame th, StashCursor root,
             string nm, P6any cap) {
         int cut = nm.LastIndexOf("::");
-        var pos = (Variable[]) cap.GetSlot(Kernel.CaptureMO, "$!positionals");
-        var nam = (VarHash)    cap.GetSlot(Kernel.CaptureMO, "$!named");
+        var pos = (Variable[]) cap.GetSlot(Compartment.Top.CaptureMO, "$!positionals");
+        var nam = (VarHash)    cap.GetSlot(Compartment.Top.CaptureMO, "$!named");
 
         if (cut < 0) {
             return pos[0].Fetch().InvokeMethod(th, nm, pos, nam);

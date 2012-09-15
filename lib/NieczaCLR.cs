@@ -85,7 +85,7 @@ namespace Niecza {
         static void CheckJunctionArg(Variable v, ref int jun_pivot,
                 ref string jun_pivot_n, ref int jun_rank, int num, string nam) {
             P6any obj = v.Fetch();
-            if (!obj.mo.HasType(Kernel.JunctionMO))
+            if (!obj.mo.HasType(Compartment.Top.JunctionMO))
                 return;
             int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)obj).slots[0]) / 2;
             if (jrank < jun_rank) {
@@ -113,7 +113,7 @@ namespace Niecza {
 
             Variable jct = (jun_pivot == -2 ? named[jun_pivot_n] :
                     pos[jun_pivot]);
-            Frame nth = th.MakeChild(null, Kernel.AutoThreadSubSI, Kernel.AnyP);
+            Frame nth = th.MakeChild(null, Kernel.AutoThreadSubSI, Compartment.Top.AnyP);
 
             P6opaque jo  = (P6opaque) jct.Fetch();
 
@@ -631,7 +631,7 @@ for $args (0..9) {
             if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             object o = Kernel.UnboxAny<object>(((Variable)th.lex0).Fetch());
             ((IDisposable)o).Dispose();
-            th.caller.resultSlot = Kernel.Nil;
+            th.caller.resultSlot = Compartment.Top.Nil;
             return th.caller;
         }
 
@@ -639,7 +639,7 @@ for $args (0..9) {
             if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             P6any ro = ((Variable)th.lex0).Fetch();
             object o = Kernel.UnboxAny<object>(ro);
-            th.caller.resultSlot = Kernel.BoxAnyMO(o == null ? ro.mo.name : o.ToString(), Kernel.StrMO);
+            th.caller.resultSlot = Kernel.BoxAnyMO(o == null ? ro.mo.name : o.ToString(), Compartment.Top.StrMO);
             return th.caller;
         }
 
@@ -648,8 +648,8 @@ for $args (0..9) {
                 Console.WriteLine("Setting up wrapper for {0}", t.FullName);
             STable m = new STable("CLR::" + t.FullName.Replace(".","::"));
             m.who = StashCursor.MakeCLR_WHO("." + t.FullName);
-            m.how = Kernel.BoxRaw(m, Kernel.ClassHOWMO);
-            STable pm = t.BaseType == null ? Kernel.AnyMO :
+            m.how = Kernel.BoxRaw(m, Compartment.Top.ClassHOWMO);
+            STable pm = t.BaseType == null ? Compartment.Top.AnyMO :
                 GetWrapper(t.BaseType);
             STable[] mro = new STable[pm.mo.mro.Length + 1];
             Array.Copy(pm.mo.mro, 0, mro, 1, pm.mo.mro.Length);
@@ -764,7 +764,7 @@ for $args (0..9) {
 
         public static Variable BoxResult(Type cty, object ret) {
             if (cty == typeof(void))
-                return Kernel.Nil;
+                return Compartment.Top.Nil;
             if (cty == typeof(sbyte))
                 return Builtins.MakeInt((sbyte)ret);
             if (cty == typeof(byte))
@@ -786,16 +786,16 @@ for $args (0..9) {
             if (cty == typeof(double))
                 return Builtins.MakeFloat((double)ret);
             if (cty == typeof(bool))
-                return Kernel.BoxAnyMO((bool)ret, Kernel.BoolMO);
+                return Kernel.BoxAnyMO((bool)ret, Compartment.Top.BoolMO);
             if (cty == typeof(string))
-                return ret == null ? Kernel.StrMO.typeObj : Kernel.BoxAnyMO((string)ret, Kernel.StrMO);
+                return ret == null ? Compartment.Top.StrMO.typeObj : Kernel.BoxAnyMO((string)ret, Compartment.Top.StrMO);
             if (cty == typeof(Variable))
                 return (Variable)ret;
             if (cty == typeof(P6any))
                 return ((P6any)ret);
 
             if (ret == null)
-                return Kernel.AnyP;
+                return Compartment.Top.AnyP;
             return Kernel.BoxAnyMO<object>(ret, GetWrapper(ret.GetType()));
         }
 
@@ -810,7 +810,7 @@ for $args (0..9) {
                     // is this enough?
                     return (ty.IsAssignableFrom(t) && !ty.IsValueType &&
                             ty != typeof(void));
-                } else if (obj.mo == Kernel.MuMO || obj.mo == Kernel.AnyMO) {
+                } else if (obj.mo == Compartment.Top.MuMO || obj.mo == Compartment.Top.AnyMO) {
                     // untyped-ish null
                     return !ty.IsValueType && ty != typeof(void);
                 } else {
@@ -822,11 +822,11 @@ for $args (0..9) {
             // in all other cases we're definitely passing a non-null value
 
             // Boolean values marshal to bool
-            if (obj.Does(Kernel.BoolMO)) {
+            if (obj.Does(Compartment.Top.BoolMO)) {
                 clr = Kernel.UnboxAny<int>(obj) != 0;
             }
             // note, Bool ~~ Int ~~ Integral
-            else if (obj.Does(Kernel.IntegralMO)) {
+            else if (obj.Does(Compartment.Top.IntegralMO)) {
                 // important type directed case!
                 int small;
                 BigInteger big;
@@ -864,7 +864,7 @@ for $args (0..9) {
                         clr = obj;
                 }
             }
-            else if (obj.Does(Kernel.RealMO)) {
+            else if (obj.Does(Compartment.Top.RealMO)) {
                 // fractional value
 
                 if (ty == typeof(decimal)) {
@@ -926,7 +926,7 @@ for $args (0..9) {
                         clr = (object)val;
                 }
             }
-            else if (obj.Does(Kernel.StrMO)) {
+            else if (obj.Does(Compartment.Top.StrMO)) {
                 string s = Kernel.UnboxAny<string>(obj);
                 if (ty == typeof(char) && s.Length == 1)
                     clr = s[0];

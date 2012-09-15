@@ -83,10 +83,10 @@ public class Perl5Interpreter : IForeignInterpreter {
     public static Variable SVToVariable(IntPtr sv) {
         if (sv == IntPtr.Zero) {
             //TODO: check - cargo culted
-            return Kernel.Nil;
+            return Compartment.Top.Nil;
         }
         if (SvOK(sv) == 0) {
-            return Kernel.Nil;
+            return Compartment.Top.Nil;
         }
 
         if (SvIOKp(sv) != 0) {
@@ -95,7 +95,7 @@ public class Perl5Interpreter : IForeignInterpreter {
             return Builtins.MakeFloat(SvNV(sv));
         } else if (SvPOKp(sv) != 0) {
             string s = UnmarshalString(sv); //SvPV_nolen(sv);
-            return Kernel.BoxAnyMO(s, Kernel.StrMO);
+            return Kernel.BoxAnyMO(s, Compartment.Top.StrMO);
         } else if (sv_isa(sv,"Niecza::Object") != 0) {
             return ExportedObjects[SvIV(SvRV(sv))];
         } else {
@@ -193,7 +193,7 @@ public class SVany : P6any {
             P6any obj = var.Fetch();
             if (obj is SVany) {
                 return ((SVany)obj).sv;
-            } else if (obj.Does(Kernel.StrMO)) {
+            } else if (obj.Does(Compartment.Top.StrMO)) {
                 string s = Kernel.UnboxAny<string>(obj);
                 return MarshalString(s);
             } else {
@@ -250,7 +250,7 @@ public class SVany : P6any {
         public override string ReprName() { return "P6opaque"; }
 
         public SVany(IntPtr _sv) {
-            mo = Kernel.AnyMO;
+            mo = Compartment.Top.AnyMO;
             sv = _sv;
         }
 }
