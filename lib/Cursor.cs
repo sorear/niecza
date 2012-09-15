@@ -222,13 +222,14 @@ public sealed class RxFrame: IFreeze {
                 if (Cursor.Trace)
                     Console.WriteLine("Failing {0}@{1} after some matches",
                             name, from);
-                if (EmptyList == null) {
+                var c = Compartment.Top;
+                if (c.EmptyList == null) {
                     P6opaque lst = new P6opaque(Compartment.Top.ListMO);
                     lst.slots[0 /*items*/] = new VarDeque();
                     lst.slots[1 /*rest*/ ] = new VarDeque();
-                    EmptyList = Kernel.NewRWListVar(lst);
+                    c.EmptyList = Kernel.NewRWListVar(lst);
                 }
-                th.caller.resultSlot = EmptyList;
+                th.caller.resultSlot = c.EmptyList;
             }
 
             return th.Return();
@@ -727,9 +728,6 @@ retry:
                 st.captures, ast, name);
         return global.CallAction(th, name, _matchObj);
     }
-
-    [CompartmentGlobal]
-    public static Variable EmptyList;
 
     public Frame FinalEnd(Frame th) {
         if (st.pos > global.highwater)

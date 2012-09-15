@@ -488,17 +488,16 @@ namespace Niecza {
 
     public class CLRWrapperProvider {
         [TrueGlobal] static object wrapper_cache_lock = new object();
-        [CompartmentGlobal] static Dictionary<Type, STable> wrapper_cache;
-        [CompartmentGlobal] static Dictionary<string, STable> named_wrapper_cache;
 
         public static STable GetWrapper(Type t) {
+            var c = Compartment.Top;
             lock (wrapper_cache_lock) {
-                if (wrapper_cache == null)
-                    wrapper_cache = new Dictionary<Type, STable>();
+                if (c.wrapper_cache == null)
+                    c.wrapper_cache = new Dictionary<Type, STable>();
                 STable r;
-                if (wrapper_cache.TryGetValue(t, out r))
+                if (c.wrapper_cache.TryGetValue(t, out r))
                     return r;
-                wrapper_cache[t] = r = NewWrapper(t);
+                c.wrapper_cache[t] = r = NewWrapper(t);
                 return r;
             }
         }
@@ -508,19 +507,20 @@ namespace Niecza {
         }
 
         public static STable GetNamedWrapper(string nm) {
+            var c = Compartment.Top;
             lock (wrapper_cache_lock) {
-                if (named_wrapper_cache == null)
-                    named_wrapper_cache = new Dictionary<string, STable>();
+                if (c.named_wrapper_cache == null)
+                    c.named_wrapper_cache = new Dictionary<string, STable>();
                 STable r;
-                if (named_wrapper_cache.TryGetValue(nm, out r))
+                if (c.named_wrapper_cache.TryGetValue(nm, out r))
                     return r;
                 Type ty = Type.GetType(nm.Substring(1));
                 if (CLROpts.Debug)
                     Console.WriteLine("Loading type {0} ... {1}", nm.Substring(1), ty == null ? "failed" : "succeeded");
                 if (ty != null) {
-                    named_wrapper_cache[nm] = r = GetWrapper(ty);
+                    c.named_wrapper_cache[nm] = r = GetWrapper(ty);
                 } else {
-                    named_wrapper_cache[nm] = r = StashCursor.MakePackage(
+                    c.named_wrapper_cache[nm] = r = StashCursor.MakePackage(
                         "CLR" + nm.Replace(".","::"),
                         StashCursor.MakeCLR_WHO(nm)).Fetch().mo;
                 }

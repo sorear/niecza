@@ -398,19 +398,11 @@ namespace Niecza {
     // changed under the direct control of Perl 6 code.  They may leak some
     // information such as random number seeds.  They may NOT point at Perl 6
     // level objects.
-    //
-    // [CompartmentGlobal] fields are unrestricted in usage, but are always
-    // automatically saved and restored when manipulating the container stack.
-    //
-    // [CORESaved] fields are the same as CompartmentGlobal but are additionally
-    // saved in CORE.ser.
 
     [AttributeUsage(AttributeTargets.Field)]
     class CORESavedAttribute : Attribute { }
     [AttributeUsage(AttributeTargets.Field)]
     class ImmutableAttribute : Attribute { }
-    [AttributeUsage(AttributeTargets.Field)]
-    class CompartmentGlobalAttribute : Attribute { }
     [AttributeUsage(AttributeTargets.Field)]
     class TrueGlobalAttribute : Attribute { }
 
@@ -820,10 +812,10 @@ namespace Niecza {
 
         internal void RunMainline() {
             RuntimeUnit csr = this;
-            Builtins.setting_path = new Dictionary<string,SubInfo>();
+            Compartment.Top.setting_path = new Dictionary<string,SubInfo>();
             while (csr.mainline.outer != null) {
                 RuntimeUnit o = csr.mainline.outer.unit;
-                Builtins.setting_path[o.name] = csr.mainline;
+                Compartment.Top.setting_path[o.name] = csr.mainline;
                 csr = o;
             }
 
@@ -4528,8 +4520,6 @@ have_v:
     }
 
     class Compartment {
-        [Immutable] static readonly FieldInfo[] fieldsToSave;
-
         [CORESaved] public STable PairMO;
         [CORESaved] public STable EnumMO;
         [CORESaved] public STable EnumMapMO;
@@ -4609,28 +4599,13 @@ have_v:
         // an eval or such.
         internal RuntimeUnit containerRootUnit;
 
+
+        internal Dictionary<string,SubInfo> setting_path;
+        internal Variable EmptyList;
+        internal Dictionary<Type, STable> wrapper_cache;
+        internal Dictionary<string, STable> named_wrapper_cache;
+
         static Compartment() {
-            var typesToCheck = new Type[] {
-                typeof(Kernel), typeof(RuntimeUnit), typeof(CLRWrapperProvider),
-                typeof(RxFrame), typeof(Builtins)
-            };
-
-            List<FieldInfo> fields = new List<FieldInfo>();
-            foreach (Type ty in typesToCheck) {
-                foreach (FieldInfo fi in ty.GetFields(BindingFlags.NonPublic |
-                            BindingFlags.Public | BindingFlags.Static)) {
-                    foreach (object o in fi.GetCustomAttributes(true)) {
-                        if (o is CORESavedAttribute) goto saveme;
-                        if (o is CompartmentGlobalAttribute) goto saveme;
-                    }
-                    continue;
-saveme:
-                    fields.Add(fi);
-                }
-            }
-
-            fieldsToSave = fields.ToArray();
-
             AppDomain.CurrentDomain.ProcessExit += BeforeExit;
         }
 
@@ -4646,7 +4621,6 @@ saveme:
         }
 
         Compartment prev;
-        object[] saved_values;
         private Compartment() { }
 
         [TrueGlobal]
@@ -4659,12 +4633,6 @@ saveme:
         internal static void Push() {
             Compartment n = new Compartment();
             n.prev = Top;
-            n.saved_values = new object[fieldsToSave.Length];
-
-            for (int i = 0; i < fieldsToSave.Length; i++) {
-                n.saved_values[i] = fieldsToSave[i].GetValue(null);
-                fieldsToSave[i].SetValue(null, null);
-            }
 
             Top = n;
             Kernel.InitCompartment();
@@ -4672,15 +4640,6 @@ saveme:
 
         internal static void Pop() {
             Top.end.Run();
-
-            for (int i = 0; i < fieldsToSave.Length; i++) {
-                fieldsToSave[i].SetValue(null, Top.saved_values[i]);
-            }
-
-            if (Compartment.Top.containerRootUnit != null) {
-                foreach (RuntimeUnit ru in Compartment.Top.containerRootUnit.depended_units)
-                    ru.SetConstants();
-            }
             Top = Top.prev;
         }
     }
@@ -6589,10 +6548,6 @@ slow:
                             continue;
                         // already classified
                         if (fi.GetCustomAttributes(typeof(ImmutableAttribute), true).Length != 0)
-                            continue;
-                        if (fi.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0)
-                            continue;
-                        if (fi.GetCustomAttributes(typeof(CompartmentGlobalAttribute), true).Length != 0)
                             continue;
                         if (fi.GetCustomAttributes(typeof(TrueGlobalAttribute), true).Length != 0)
                             continue;

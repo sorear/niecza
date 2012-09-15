@@ -1883,10 +1883,8 @@ flat_enough:;
         return la.ToArray();
     }
 
-    [CompartmentGlobal]
-    internal static Dictionary<string,SubInfo> setting_path;
     public static Frame you_are_here(Frame th, string sname) {
-        P6any to_call = Kernel.MakeSub(setting_path[sname], th);
+        P6any to_call = Kernel.MakeSub(Compartment.Top.setting_path[sname], th);
         return to_call.Invoke(th, Variable.None, null);
     }
 
