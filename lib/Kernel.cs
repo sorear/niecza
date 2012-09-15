@@ -1474,7 +1474,7 @@ namespace Niecza {
         public override void Init(Frame f) { }
         internal override ClrOp GetCode(int up) {
             return pkg == Compartment.Top.NilP.mo ?
-                EmitUnit.Current.RefConstant("Compartment.Top.Nil", "L", Compartment.Top.Nil, typeof(Variable)).head :
+                EmitUnit.Current.RefConstant("Nil", "L", Compartment.Top.Nil, typeof(Variable)).head :
                 EmitUnit.Current.TypeConstantP(pkg).head;
         }
         internal override void DoFreeze(FreezeBuffer fb) {

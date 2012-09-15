@@ -486,20 +486,6 @@ namespace Niecza.CLRBackend {
             STable.GetField("initObj");
         public static readonly FieldInfo DMO_how =
             STable.GetField("how");
-        public static readonly FieldInfo Kernel_NumMO =
-            Kernel.GetField("Compartment.Top.NumMO");
-        public static readonly FieldInfo Kernel_IntMO =
-            Kernel.GetField("Compartment.Top.IntMO");
-        public static readonly FieldInfo Kernel_RatMO =
-            Kernel.GetField("Compartment.Top.RatMO");
-        public static readonly FieldInfo Kernel_StrMO =
-            Kernel.GetField("Compartment.Top.StrMO");
-        public static readonly FieldInfo Kernel_AnyMO =
-            Kernel.GetField("Compartment.Top.AnyMO");
-        public static readonly FieldInfo Kernel_ParcelMO =
-            Kernel.GetField("Compartment.Top.ParcelMO");
-        public static readonly FieldInfo Kernel_AnyP =
-            Kernel.GetField("Compartment.Top.AnyP");
         public static readonly FieldInfo Frame_rx =
             typeof(Frame).GetField("rx");
         public static readonly FieldInfo Frame_ip =
