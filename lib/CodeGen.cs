@@ -3681,26 +3681,26 @@ dynamic:
                     (string)args[2], (string)args[3],
                     (bool)args[4], (bool)args[5]);
 
-            if (Kernel.containerRootUnit == null) {
+            if (Compartment.Top.containerRootUnit == null) {
                 // this is a module unit
                 Kernel.InitCompartment();
-                Kernel.containerRootUnit = ru;
+                Compartment.Top.containerRootUnit = ru;
                 ru.depended_units.Add(ru);
                 ru.owner = ru;
-                ru.globals = Kernel.currentGlobals =
+                ru.globals = Compartment.Top.currentGlobals =
                     new Dictionary<string,StashEnt>();
             } else {
                 // needs to use the same globals as the other units in
                 // this serialization unit
-                ru.globals = Kernel.currentGlobals;
-                ru.owner = Kernel.containerRootUnit;
+                ru.globals = Compartment.Top.currentGlobals;
+                ru.owner = Compartment.Top.containerRootUnit;
                 ru.owner.subordinates.Add(ru);
             }
             return new Handle(ru);
         }
         public static object unit_get_incs(object[] args) {
             StashEnt bv;
-            if (!Kernel.currentGlobals.TryGetValue("\u0008::GLOBAL@INC", out bv))
+            if (!Compartment.Top.currentGlobals.TryGetValue("\u0008::GLOBAL@INC", out bv))
                 return new string[0];
             return Builtins.UnboxLoS(bv.v);
         }
@@ -3717,7 +3717,7 @@ dynamic:
 
             RuntimeUnit tg;
             try {
-                tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
+                tg = (RuntimeUnit) Compartment.Top.reg.LoadUnit(oname).root;
             } catch (Exception ex) {
                 if (Config.SerFailInfo)
                     Console.WriteLine("Thaw {0} failed: >>>{1}<<<", oname, ex);
@@ -3726,7 +3726,7 @@ dynamic:
                     "compile_unit", oname });
                 if (r1 != null)
                     return r1;
-                tg = (RuntimeUnit) RuntimeUnit.reg.LoadUnit(oname).root;
+                tg = (RuntimeUnit) Compartment.Top.reg.LoadUnit(oname).root;
             }
             string err = ru.owner.LinkUnit(tg);
             return err == null ? (object)new Handle(tg) : new Exception(err);
@@ -3898,7 +3898,7 @@ dynamic:
             if (li is LIConstant) {
                 ((LIConstant)li).value = v;
             } else if (li is LICommon) {
-                StashEnt hkey = Kernel.currentGlobals[((LICommon)li).hkey];
+                StashEnt hkey = Compartment.Top.currentGlobals[((LICommon)li).hkey];
                 hkey.constant = true;
                 hkey.v = v;
             } else {
@@ -4049,7 +4049,7 @@ dynamic:
             var lcomm  = li as LICommon;
             if (lcomm != null) {
                 StashEnt se;
-                Kernel.currentGlobals.TryGetValue(lcomm.hkey, out se);
+                Compartment.Top.currentGlobals.TryGetValue(lcomm.hkey, out se);
                 r = new object[] { "common",null,null,null, lcomm.Stash(), lcomm.VarName(), (se.constant ? Handle.Wrap(se.v) : null) };
             }
 
@@ -4659,7 +4659,7 @@ dynamic:
             bool evalmode = (bool)args[2];
             Kernel.commandArgs = new string[args.Length - 3];
             Array.Copy(args, 3, Kernel.commandArgs, 0, args.Length - 3);
-            Kernel.currentGlobals = ru.globals;
+            Compartment.Top.currentGlobals = ru.globals;
             ru.PrepareEval();
             Compartment.Top.check.Run();
             Compartment.Top.init.Run();

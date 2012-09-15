@@ -113,7 +113,7 @@ namespace Niecza {
 
             Variable jct = (jun_pivot == -2 ? named[jun_pivot_n] :
                     pos[jun_pivot]);
-            Frame nth = th.MakeChild(null, Kernel.AutoThreadSubSI, Compartment.Top.AnyP);
+            Frame nth = th.MakeChild(null, Compartment.Top.AutoThreadSubSI, Compartment.Top.AnyP);
 
             P6opaque jo  = (P6opaque) jct.Fetch();
 
@@ -757,7 +757,7 @@ for $args (0..9) {
                     Console.WriteLine("type {0}", o.name);
             }
 
-            RuntimeUnit.reg.InstallFakeUnit("CLR," + t.AssemblyQualifiedName,
+            Compartment.Top.reg.InstallFakeUnit("CLR," + t.AssemblyQualifiedName,
                 m, m.who, m.how, m.mo, m.typeObj);
             return m;
         }

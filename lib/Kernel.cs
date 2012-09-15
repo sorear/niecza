@@ -781,9 +781,6 @@ namespace Niecza {
             return th;
         }
 
-        [CompartmentGlobal]
-        internal static ObjectRegistry reg;
-
         // note that after Save the unit is _not_ run; the compartment
         // is immediately discarded!
         public void Save() {
@@ -797,7 +794,7 @@ namespace Niecza {
             foreach (RuntimeUnit zu in subordinates)
                 zu.type = type;
 
-            reg.SaveUnit(name, this);
+            Compartment.Top.reg.SaveUnit(name, this);
         }
 
         internal void SetConstants() { SetConstants(type, constTable, constants); }
@@ -1049,8 +1046,8 @@ namespace Niecza {
 
                     foreach (MethodInfo mi in n.type.GetMethods())
                         meth[mi.Name] = mi;
-                    RuntimeUnit.reg.methods[n.asm_name] = meth;
-                    RuntimeUnit.reg.instances[n.asm_name] = n.constTable;
+                    Compartment.Top.reg.methods[n.asm_name] = meth;
+                    Compartment.Top.reg.instances[n.asm_name] = n.constTable;
                     while (ncon-- > 0) {
                         FieldInfo fi = fields[tb.String()];
                         object val = tb.ObjRef();
@@ -2135,11 +2132,11 @@ namespace Niecza {
                 } else {
                     Dictionary<string,MethodInfo> t1;
 
-                    if (!RuntimeUnit.reg.methods.TryGetValue(tn, out t1) ||
+                    if (!Compartment.Top.reg.methods.TryGetValue(tn, out t1) ||
                             !t1.TryGetValue(mn, out mi)) {
                         throw new Exception("Thawed sub references nonexistant method " + tn + "::" + mn);
                     }
-                    obj = RuntimeUnit.reg.instances[tn];
+                    obj = Compartment.Top.reg.instances[tn];
                 }
                 n.code = (DynBlockDelegate) Delegate.CreateDelegate(
                     typeof(DynBlockDelegate), obj, mi);
@@ -2569,7 +2566,7 @@ namespace Niecza {
                 var sav_outer = th.outer;
                 var sav_sub = th.sub;
                 var sav_disp = th.curDisp;
-                Frame nth = th.Return().MakeChild(null, Kernel.AutoThreadSubSI, Compartment.Top.AnyP);
+                Frame nth = th.Return().MakeChild(null, Compartment.Top.AutoThreadSubSI, Compartment.Top.AnyP);
 
                 P6opaque jo  = (P6opaque) jct.Fetch();
 
@@ -4193,7 +4190,7 @@ tryagain:
             Frame f = (Frame)p1;
             if (p2 == 0) {
                 f = f.caller;
-                if (f != null && f.info == Kernel.ExitRunloopSI) f = f.caller;
+                if (f != null && f.info == Compartment.Top.ExitRunloopSI) f = f.caller;
                 if (f == null) return false;
             }
             return true;
@@ -4273,8 +4270,8 @@ tryagain:
                 key = key.Remove(1,1);
                 StashEnt bv;
 
-                if (Kernel.currentGlobals.TryGetValue("\x8::GLOBAL" + key, out bv) ||
-                        Kernel.currentGlobals.TryGetValue("\x9::PROCESS" + key, out bv)) {
+                if (Compartment.Top.currentGlobals.TryGetValue("\x8::GLOBAL" + key, out bv) ||
+                        Compartment.Top.currentGlobals.TryGetValue("\x9::PROCESS" + key, out bv)) {
                     if (rbar_w) { bv.Bind(o); } else { o = bv.v; }
                     return true;
                 }
@@ -4592,6 +4589,26 @@ have_v:
         [CORESaved] public BoxObject<int> TrueV;
         [CORESaved] public BoxObject<int> FalseV;
 
+        internal ObjectRegistry reg;
+
+        // SubInfo objects can be mutated at runtime by .wrap so they
+        // must be containerized
+        internal SubInfo dogather_SI;
+        internal SubInfo AutoThreadSubSI;
+        internal SubInfo IF_SI;
+        internal SubInfo ExitRunloopSI;
+        internal SubInfo JunctionFallbackSI;
+        internal SubInfo SubInvokeSubSI;
+        internal SubInfo RunCATCH_I;
+        internal SubInfo CommonMEMap_I;
+        internal SubInfo CommonGrep_I;
+        internal SubInfo TEMP_SI;
+
+        public Dictionary<string, StashEnt> currentGlobals;
+        // The root unit of this isolation container; will not point to
+        // an eval or such.
+        internal RuntimeUnit containerRootUnit;
+
         static Compartment() {
             var typesToCheck = new Type[] {
                 typeof(Kernel), typeof(RuntimeUnit), typeof(CLRWrapperProvider),
@@ -4649,8 +4666,8 @@ saveme:
                 fieldsToSave[i].SetValue(null, null);
             }
 
-            Kernel.InitCompartment();
             Top = n;
+            Kernel.InitCompartment();
         }
 
         internal static void Pop() {
@@ -4660,8 +4677,8 @@ saveme:
                 fieldsToSave[i].SetValue(null, Top.saved_values[i]);
             }
 
-            if (Kernel.containerRootUnit != null) {
-                foreach (RuntimeUnit ru in Kernel.containerRootUnit.depended_units)
+            if (Compartment.Top.containerRootUnit != null) {
+                foreach (RuntimeUnit ru in Compartment.Top.containerRootUnit.depended_units)
                     ru.SetConstants();
             }
             Top = Top.prev;
@@ -4767,7 +4784,7 @@ saveme:
         }
 
         public static Frame GatherHelper(Frame th, P6any sub) {
-            Frame n = th.MakeChild(null, dogather_SI, Compartment.Top.AnyP);
+            Frame n = th.MakeChild(null, Compartment.Top.dogather_SI, Compartment.Top.AnyP);
             n.lex0 = sub;
             n.MarkSharedChain();
             n.coro_return = n;
@@ -4833,19 +4850,6 @@ saveme:
             return nw;
         }
 
-        // SubInfo objects can be mutated at runtime by .wrap so they
-        // must be containerized
-        [CompartmentGlobal] internal static SubInfo dogather_SI;
-        [CompartmentGlobal] internal static SubInfo AutoThreadSubSI;
-        [CompartmentGlobal] internal static SubInfo IF_SI;
-        [CompartmentGlobal] internal static SubInfo ExitRunloopSI;
-        [CompartmentGlobal] internal static SubInfo JunctionFallbackSI;
-        [CompartmentGlobal] internal static SubInfo SubInvokeSubSI;
-        [CompartmentGlobal] internal static SubInfo RunCATCH_I;
-        [CompartmentGlobal] internal static SubInfo CommonMEMap_I;
-        [CompartmentGlobal] internal static SubInfo CommonGrep_I;
-        [CompartmentGlobal] internal static SubInfo TEMP_SI;
-
         internal static void InitGlobal() {
             Random r = new Random();
             VarHash.string_hash_argument =
@@ -4856,21 +4860,22 @@ saveme:
         }
 
         internal static void InitCompartment() {
-            RuntimeUnit.reg = new ObjectRegistry();
+            var c = Compartment.Top;
+            c.reg = new ObjectRegistry();
 
-            AutoThreadSubSI = new SubInfo("KERNEL AutoThreadSub",
+            c.AutoThreadSubSI = new SubInfo("KERNEL AutoThreadSub",
                     SubInfo.AutoThreadSubC);
-            dogather_SI   = new SubInfo("KERNEL dogather", dogather);
-            ExitRunloopSI = new SubInfo("ExitRunloop", ExitRunloopC);
-            ExitRunloopSI.special = SubInfo.TRANSPARENT;
-            IF_SI         = new SubInfo("iter_flatten", IF_C);
-            JunctionFallbackSI = new SubInfo("Junction.FALLBACK",
+            c.dogather_SI   = new SubInfo("KERNEL dogather", dogather);
+            c.ExitRunloopSI = new SubInfo("ExitRunloop", ExitRunloopC);
+            c.ExitRunloopSI.special = SubInfo.TRANSPARENT;
+            c.IF_SI         = new SubInfo("iter_flatten", IF_C);
+            c.JunctionFallbackSI = new SubInfo("Junction.FALLBACK",
                     JunctionFallbackC);
-            SubInvokeSubSI = new SubInfo("Sub.postcircumfix:<( )>",
+            c.SubInvokeSubSI = new SubInfo("Sub.postcircumfix:<( )>",
                     SubInvokeSubC);
-            TEMP_SI       = new SubInfo("KERNEL Scalar.TEMP", Builtins.TEMP_C);
+            c.TEMP_SI       = new SubInfo("KERNEL Scalar.TEMP", Builtins.TEMP_C);
 
-            RunCATCH_I = new SubInfo("KERNEL run_CATCH", null,
+            c.RunCATCH_I = new SubInfo("KERNEL run_CATCH", null,
                 Builtins.RunCATCH_C, null, null, new int[] {
                     0, 5, SubInfo.ON_NEXT, 1, 0,
                     0, 5, SubInfo.ON_REDO, 2, 0,
@@ -4878,14 +4883,14 @@ saveme:
                     0, 5, SubInfo.ON_DIE,  1, 0,
                 }, new string[] { "" }, 0);
 
-            CommonMEMap_I = new SubInfo("KERNEL map", null,
+            c.CommonMEMap_I = new SubInfo("KERNEL map", null,
                 Builtins.CommonMEMap_C, null, null, new int[] {
                     2, 3, SubInfo.ON_NEXT, 0, 0,
                     2, 3, SubInfo.ON_REDO, 1, 0,
                     2, 3, SubInfo.ON_LAST, 3, 0,
                 }, new string[] { "" }, 0);
 
-            CommonGrep_I = new SubInfo("KERNEL grep", null,
+            c.CommonGrep_I = new SubInfo("KERNEL grep", null,
                 Builtins.CommonGrep_C, null, null, new int[] {
                     2, 3, SubInfo.ON_NEXT, 0, 0,
                     2, 3, SubInfo.ON_REDO, 1, 0,
@@ -5288,9 +5293,9 @@ ltm:
             name = name.Remove(1,1);
             StashEnt v;
 
-            if (currentGlobals.TryGetValue("\x8::GLOBAL" + name, out v)) {
+            if (Compartment.Top.currentGlobals.TryGetValue("\x8::GLOBAL" + name, out v)) {
                 return v.v;
-            } else if (currentGlobals.TryGetValue("\x9::PROCESS" + name, out v)) {
+            } else if (Compartment.Top.currentGlobals.TryGetValue("\x9::PROCESS" + name, out v)) {
                 return v.v;
             } else {
                 return Compartment.Top.AnyP;
@@ -5434,7 +5439,7 @@ again:
                 goto again;
             }
             if (inq0.mo.HasType(Compartment.Top.IterCursorMO)) {
-                Frame th = new Frame(null, null, IF_SI, Compartment.Top.AnyP);
+                Frame th = new Frame(null, null, Compartment.Top.IF_SI, Compartment.Top.AnyP);
                 th.lex0 = inq;
                 P6opaque thunk = new P6opaque(Compartment.Top.GatherIteratorMO);
                 th.coro_return = th;
@@ -5536,10 +5541,10 @@ slow:
             StashEnt v;
             string key = (char)who.Length + who + name;
 
-            if (currentGlobals.TryGetValue(key, out v))
+            if (Compartment.Top.currentGlobals.TryGetValue(key, out v))
                 return v;
             else
-                v = currentGlobals[key] = new StashEnt();
+                v = Compartment.Top.currentGlobals[key] = new StashEnt();
 
             if (name.StartsWith("@")) {
                 v.v = CreateArray();
@@ -6022,8 +6027,8 @@ slow:
             rlstack = lfn.next;
             lfn.next.compartment = Compartment.Top;
             return lfn.next.cur = lfn.next.root = ((l == null ?
-                        new Frame(null, null, ExitRunloopSI, Compartment.Top.AnyP) :
-                        l.MakeChild(null, ExitRunloopSI, Compartment.Top.AnyP)));
+                        new Frame(null, null, Compartment.Top.ExitRunloopSI, Compartment.Top.AnyP) :
+                        l.MakeChild(null, Compartment.Top.ExitRunloopSI, Compartment.Top.AnyP)));
             //lfn.next.cur = lfn.next.root = ((l == null ?
             //            new Frame(null, null, ExitRunloopSI, Compartment.Top.AnyP) :
             //            l.MakeChild(null, ExitRunloopSI, Compartment.Top.AnyP)));
@@ -6070,19 +6075,12 @@ slow:
             }
         }
 
-        [CompartmentGlobal]
-        public static Dictionary<string, StashEnt> currentGlobals;
-        // The root unit of this isolation container; will not point to
-        // an eval or such.
-        [CompartmentGlobal]
-        internal static RuntimeUnit containerRootUnit;
-
         public static Variable GetGlobal(string key) {
-            return currentGlobals[key].v;
+            return Compartment.Top.currentGlobals[key].v;
         }
 
         public static void BindGlobal(string key, Variable to) {
-            currentGlobals[key].Bind(to);
+            Compartment.Top.currentGlobals[key].Bind(to);
         }
 
         internal static void CreateBasicTypes() {
@@ -6114,8 +6112,8 @@ slow:
 
             Compartment.Top.CodeMO.FillProtoClass(Compartment.Top.AnyMO, new string[] { "$!outer", "$!info" },
                 new STable[] { Compartment.Top.CodeMO, Compartment.Top.CodeMO });
-            SubInvokeSubSI.param = new object[] { null, new InvokeSub() };
-            Compartment.Top.CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(SubInvokeSubSI, null));
+            Compartment.Top.SubInvokeSubSI.param = new object[] { null, new InvokeSub() };
+            Compartment.Top.CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(Compartment.Top.SubInvokeSubSI, null));
             Compartment.Top.CodeMO.Invalidate();
 
             Compartment.Top.BlockMO = new STable("Block");
@@ -6175,7 +6173,7 @@ slow:
 
             Compartment.Top.JunctionMO = new STable("Junction");
             Handler_PandBox(Compartment.Top.JunctionMO, "Bool", new CtxJunctionBool(), Compartment.Top.BoolMO);
-            Compartment.Top.JunctionMO.AddMethod(0, "FALLBACK", MakeSub(JunctionFallbackSI, null));
+            Compartment.Top.JunctionMO.AddMethod(0, "FALLBACK", MakeSub(Compartment.Top.JunctionFallbackSI, null));
             Compartment.Top.JunctionMO.FillProtoClass(Compartment.Top.MuMO,
                     new string[] { "$!kind_", "$!eigenstates_" },
                     new STable[] { Compartment.Top.JunctionMO, Compartment.Top.JunctionMO });
@@ -6374,7 +6372,7 @@ slow:
                     continue;
                 unip = csr.info.FindControlEnt(csr.ip, type, name);
                 if (unip >= 0) {
-                    if (csr.info == Kernel.RunCATCH_I && type == SubInfo.ON_DIE) {
+                    if (csr.info == Compartment.Top.RunCATCH_I && type == SubInfo.ON_DIE) {
                         // Fudgy implementation of SIMPLECATCH
                         // A non-control exception has been thrown from handler
                         // Unwind will DTRT with control flow, but we need
@@ -6390,7 +6388,7 @@ slow:
                 }
 
                 if (type == SubInfo.ON_DIE && csr.info.catch_ != null) {
-                    Frame nfr = Kernel.RunCATCH_I.SetupCall(
+                    Frame nfr = Compartment.Top.RunCATCH_I.SetupCall(
                         Kernel.GetInferiorRoot(), null, null, null, null,
                         false, null);
                     nfr.lex0 = Kernel.MakeSub(csr.info.catch_, csr);
@@ -6475,7 +6473,7 @@ slow:
             while (csr != tf) {
                 if (csr == null) Panic("Unwinding into null frame");
                 if (csr.info == null) Panic("Null SubInfo?");
-                if (csr.info == ExitRunloopSI) {
+                if (csr.info == Compartment.Top.ExitRunloopSI) {
                     // when this exception reaches the outer runloop,
                     // more frames will be added
                     if (bt == null)
@@ -6545,10 +6543,10 @@ slow:
             commandArgs = args;
 
             RuntimeUnit ru = (RuntimeUnit)
-                RuntimeUnit.reg.LoadUnit(uname).root;
+                Compartment.Top.reg.LoadUnit(uname).root;
 
-            Kernel.containerRootUnit = ru;
-            Kernel.currentGlobals = ru.globals;
+            Compartment.Top.containerRootUnit = ru;
+            Compartment.Top.currentGlobals = ru.globals;
 
             RunMain(ru);
         }
@@ -6645,7 +6643,7 @@ slow:
                 Backend.cross_level_load = true;
 
                 RuntimeUnit root = (RuntimeUnit)
-                    RuntimeUnit.reg.LoadUnit("MAIN").root;
+                    Compartment.Top.reg.LoadUnit("MAIN").root;
 
                 // reset for writing
                 Backend.obj_dir = AppDomain.CurrentDomain.BaseDirectory;
@@ -6654,7 +6652,7 @@ slow:
                 RewriteUnits(root, root, new HashSet<RuntimeUnit>());
 
                 // reset for writability
-                RuntimeUnit.reg = new ObjectRegistry();
+                Compartment.Top.reg = new ObjectRegistry();
 
                 root.dll_name = exename + ".exe";
                 root.asm_name = exename;

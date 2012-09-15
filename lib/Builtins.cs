@@ -2232,7 +2232,7 @@ again:
         P6any fcni = fcn.Fetch();
         int arity = get_count(fcni);
 
-        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Compartment.Top.AnyP);
+        Frame fr = th.MakeChild(null, Compartment.Top.CommonMEMap_I, Compartment.Top.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = new BatchSource(arity, iter);
         fr.lex1 = new VarDeque();
@@ -2244,7 +2244,7 @@ again:
             Func<Variable,Variable> fcn) {
         VarDeque iter = new VarDeque(Kernel.NewRWListVar(lst));
 
-        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Compartment.Top.AnyP);
+        Frame fr = th.MakeChild(null, Compartment.Top.CommonMEMap_I, Compartment.Top.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = new BatchSource(1, iter);
         fr.lex1 = new VarDeque();
@@ -2262,7 +2262,7 @@ again:
     }
 
     public static Frame MEZip(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Compartment.Top.AnyP);
+        Frame fr = th.MakeChild(null, Compartment.Top.CommonMEMap_I, Compartment.Top.AnyP);
         Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
@@ -2272,7 +2272,7 @@ again:
     }
 
     public static Frame MECross(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, Kernel.CommonMEMap_I, Compartment.Top.AnyP);
+        Frame fr = th.MakeChild(null, Compartment.Top.CommonMEMap_I, Compartment.Top.AnyP);
         Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
@@ -2354,7 +2354,7 @@ again:
         Variable fcn = iter.Shift();
         iter = Kernel.IterFlatten(iter);
 
-        Frame fr = th.MakeChild(null, Kernel.CommonGrep_I, Compartment.Top.AnyP);
+        Frame fr = th.MakeChild(null, Compartment.Top.CommonGrep_I, Compartment.Top.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = iter;
         fr.lex1 = new VarDeque();
@@ -2422,7 +2422,7 @@ again:
     public static Variable stash_exists_key(P6any st, string key) {
         string lkey = Kernel.UnboxAny<string>(st);
         lkey = (char)lkey.Length + lkey + key;
-        return Kernel.currentGlobals.ContainsKey(lkey) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+        return Compartment.Top.currentGlobals.ContainsKey(lkey) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
     }
 
     public static Variable stash_at_key(P6any st, string key) {
@@ -2438,9 +2438,9 @@ again:
         string lkey = Kernel.UnboxAny<string>(st);
         lkey = (char)lkey.Length + lkey + key;
         StashEnt r;
-        if (!Kernel.currentGlobals.TryGetValue(lkey, out r))
+        if (!Compartment.Top.currentGlobals.TryGetValue(lkey, out r))
             return Compartment.Top.AnyP;
-        Kernel.currentGlobals.Remove(key);
+        Compartment.Top.currentGlobals.Remove(key);
         return r.v;
     }
 
@@ -2471,7 +2471,7 @@ again:
             Frame o = new Frame();
             o.lex0 = v;
             o.lex1 = v.Fetch();
-            fr.PushLeave(type, Kernel.MakeSub(Kernel.TEMP_SI, o));
+            fr.PushLeave(type, Kernel.MakeSub(Compartment.Top.TEMP_SI, o));
         }
 
         return v;
