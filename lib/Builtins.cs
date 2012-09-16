@@ -202,11 +202,11 @@ public partial class Builtins {
 
     // Type-check val against any, tracking state appropriately for
     // junctions.
-    static void CheckSpecialArg(int ix, ref int pivot, ref uint rank,
-            P6any val) {
+    static void CheckSpecialArg(Compartment s, int ix, ref int pivot,
+            ref uint rank, P6any val) {
         if (val.mo.is_any) {
             // fine as is
-        } else if (val.mo.HasType(Compartment.Top.JunctionMO)) {
+        } else if (val.mo.HasType(s.JunctionMO)) {
             int jtype = Kernel.UnboxAny<int>((P6any)(val as P6opaque).slots[0]) / 2;
             if ((uint)jtype < rank) {
                 rank = (uint)jtype;
@@ -219,7 +219,8 @@ public partial class Builtins {
     }
 
     // This function implements the actual looping part of autothreading
-    public static Variable AutoThread(P6any j, Func<Variable,Variable> dgt) {
+    internal static Variable AutoThread(Compartment c, P6any j,
+            Func<Variable,Variable> dgt) {
         P6opaque j_ = (P6opaque)j;
         P6any listObj = (P6any) j_.slots[1];
         Variable[] list = Kernel.UnboxAny<Variable[]>(listObj);
@@ -227,8 +228,8 @@ public partial class Builtins {
         for (int i = 0; i < list.Length; i++) {
             nlist[i] = dgt(list[i]);
         }
-        P6any newList = Kernel.BoxRaw(nlist, Compartment.Top.ParcelMO);
-        P6opaque newJunc = new P6opaque(Compartment.Top.JunctionMO);
+        P6any newList = Kernel.BoxRaw(nlist, c.ParcelMO);
+        P6opaque newJunc = new P6opaque(c.JunctionMO);
         newJunc.slots[0] = j_.slots[0];
         newJunc.slots[1] = newList;
         return newJunc;
@@ -239,46 +240,47 @@ public partial class Builtins {
     //
     // You need to pass a reference to the function in so that these may
     // call it for autothreading.
-    public static Variable HandleSpecial1(Variable av0, P6any ao0,
-            Func<Variable,Variable> dgt) {
+    public static Variable HandleSpecial1(Constants c, Variable av0, P6any ao0,
+            Func<Constants,Variable,Variable> dgt) {
         uint jrank = uint.MaxValue;
         int jpivot = -1;
 
-        CheckSpecialArg(0, ref jpivot, ref jrank, ao0);
+        CheckSpecialArg(c.setting, 0, ref jpivot, ref jrank, ao0);
 
-        if (jpivot < 0) return dgt(av0);
+        if (jpivot < 0) return dgt(c, av0);
 
-        return AutoThread(ao0, dgt);
+        return AutoThread(c.setting, ao0, (n) => dgt(c,n));
     }
-    public static Variable HandleSpecial2(Variable av0, Variable av1,
-            P6any ao0, P6any ao1, Func<Variable,Variable,Variable> dgt) {
+    public static Variable HandleSpecial2(Constants c, Variable av0, Variable av1,
+            P6any ao0, P6any ao1, Func<Constants,Variable,Variable,Variable> dgt) {
         uint jrank = uint.MaxValue;
         int jpivot = -1;
 
-        CheckSpecialArg(0, ref jpivot, ref jrank, ao0);
-        CheckSpecialArg(1, ref jpivot, ref jrank, ao1);
+        CheckSpecialArg(c.setting, 0, ref jpivot, ref jrank, ao0);
+        CheckSpecialArg(c.setting, 1, ref jpivot, ref jrank, ao1);
 
-        if (jpivot < 0) return dgt(av0, av1);
+        if (jpivot < 0) return dgt(c, av0, av1);
 
         Variable[] avs = new Variable[] { av0, av1 };
-        return AutoThread(avs[jpivot].Fetch(), delegate(Variable n) {
-            avs[jpivot] = n; return dgt(avs[0], avs[1]); });
+        return AutoThread(c.setting, avs[jpivot].Fetch(), delegate(Variable n) {
+            avs[jpivot] = n; return dgt(c, avs[0], avs[1]); });
     }
-    public static Variable HandleSpecial3(Variable av0, Variable av1,
+    public static Variable HandleSpecial3(Constants c, Variable av0, Variable av1,
             Variable av2, P6any ao0, P6any ao1, P6any ao2,
-            Func<Variable,Variable,Variable,Variable> dgt) {
+            Func<Constants,Variable,Variable,Variable,Variable> dgt) {
         uint jrank = uint.MaxValue;
         int jpivot = -1;
+        var s = c.setting;
 
-        CheckSpecialArg(0, ref jpivot, ref jrank, ao0);
-        CheckSpecialArg(1, ref jpivot, ref jrank, ao1);
-        CheckSpecialArg(2, ref jpivot, ref jrank, ao2);
+        CheckSpecialArg(s, 0, ref jpivot, ref jrank, ao0);
+        CheckSpecialArg(s, 1, ref jpivot, ref jrank, ao1);
+        CheckSpecialArg(s, 2, ref jpivot, ref jrank, ao2);
 
-        if (jpivot < 0) return dgt(av0, av1, av2);
+        if (jpivot < 0) return dgt(c, av0, av1, av2);
 
         Variable[] avs = new Variable[] { av0, av1, av2 };
-        return AutoThread(avs[jpivot].Fetch(), delegate(Variable n) {
-            avs[jpivot] = n; return dgt(avs[0], avs[1], avs[2]); });
+        return AutoThread(s, avs[jpivot].Fetch(), delegate(Variable n) {
+            avs[jpivot] = n; return dgt(c, avs[0], avs[1], avs[2]); });
     }
 
     // Truncating substrings useful in some places
@@ -603,82 +605,82 @@ public partial class Builtins {
 
     // Most of the following functions get used for inline calls, so they
     // must use HandleSpecialX
-    static readonly Func<Variable,Variable,Variable> numeq_d = numeq;
-    public static Variable numeq(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_EQUAL | O_COMPLEX_OK, numeq_d);
+    static readonly Func<Constants,Variable,Variable,Variable> numeq_d = numeq;
+    [ImplicitConsts] public static Variable numeq(Constants c, Variable v1, Variable v2) {
+        return numcompare(c, v1, v2, O_IS_EQUAL | O_COMPLEX_OK, numeq_d);
     }
 
-    public static Variable numne(Variable v1, Variable v2) {
+    [ImplicitConsts] public static Variable numne(Constants c, Variable v1, Variable v2) {
         // NOTE that junctionalization uses == !  See check in numcompare
-        return numcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD |
+        return numcompare(c, v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD |
                 O_COMPLEX_OK, numeq_d);
     }
 
-    static readonly Func<Variable,Variable,Variable> numlt_d = numlt;
-    public static Variable numlt(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_LESS, numlt_d);
+    static readonly Func<Constants,Variable,Variable,Variable> numlt_d = numlt;
+    [ImplicitConsts] public static Variable numlt(Constants c, Variable v1, Variable v2) {
+        return numcompare(c, v1, v2, O_IS_LESS, numlt_d);
     }
 
-    static readonly Func<Variable,Variable,Variable> numle_d = numle;
-    public static Variable numle(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, numle_d);
+    static readonly Func<Constants,Variable,Variable,Variable> numle_d = numle;
+    [ImplicitConsts] public static Variable numle(Constants c, Variable v1, Variable v2) {
+        return numcompare(c, v1, v2, O_IS_EQUAL | O_IS_LESS, numle_d);
     }
 
-    static readonly Func<Variable,Variable,Variable> numgt_d = numgt;
-    public static Variable numgt(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_GREATER, numgt_d);
+    static readonly Func<Constants,Variable,Variable,Variable> numgt_d = numgt;
+    [ImplicitConsts] public static Variable numgt(Constants c, Variable v1, Variable v2) {
+        return numcompare(c, v1, v2, O_IS_GREATER, numgt_d);
     }
 
-    static readonly Func<Variable,Variable,Variable> numge_d = numge;
-    public static Variable numge(Variable v1, Variable v2) {
-        return numcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, numge_d);
+    static readonly Func<Constants,Variable,Variable,Variable> numge_d = numge;
+    [ImplicitConsts] public static Variable numge(Constants c, Variable v1, Variable v2) {
+        return numcompare(c, v1, v2, O_IS_GREATER | O_IS_EQUAL, numge_d);
     }
 
-    public static Variable strcompare(Variable v1, Variable v2,
-            int mask, Func<Variable,Variable,Variable> d) {
+    internal static Variable strcompare(Constants c, Variable v1, Variable v2,
+            int mask, Func<Constants,Variable,Variable,Variable> d) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
+        var s = c.setting;
         if (!(o1.mo.is_any && o2.mo.is_any)) {
-            Variable jr = HandleSpecial2(v1, v2, o1, o2, d);
+            Variable jr = HandleSpecial2(c, v1, v2, o1, o2, d);
             // treat $x != $y as !($x == $y)
             if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD))
-                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Compartment.Top.FalseV :
-                    Compartment.Top.TrueV;
+                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? s.FalseV : s.TrueV;
             return jr;
         }
         int diff = string.CompareOrdinal(o1.mo.mro_raw_Str.Get(v1),
                 o2.mo.mro_raw_Str.Get(v2));
         int mcom = (diff < 0) ? O_IS_LESS : (diff > 0) ? O_IS_GREATER :
             O_IS_EQUAL;
-        return ((mask & mcom) != 0) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+        return ((mask & mcom) != 0) ? s.TrueV : s.FalseV;
     }
 
-    static readonly Func<Variable,Variable,Variable> streq_d = streq;
-    public static Variable streq(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_EQUAL, streq_d);
+    static readonly Func<Constants,Variable,Variable,Variable> streq_d = streq;
+    [ImplicitConsts] public static Variable streq(Constants c, Variable v1, Variable v2) {
+        return strcompare(c, v1, v2, O_IS_EQUAL, streq_d);
     }
 
-    public static Variable strne(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD, streq_d);
+    [ImplicitConsts] public static Variable strne(Constants c, Variable v1, Variable v2) {
+        return strcompare(c, v1, v2, O_IS_LESS | O_IS_GREATER | O_IS_UNORD, streq_d);
     }
 
-    static readonly Func<Variable,Variable,Variable> strlt_d = strlt;
-    public static Variable strlt(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_LESS, strlt_d);
+    static readonly Func<Constants,Variable,Variable,Variable> strlt_d = strlt;
+    [ImplicitConsts] public static Variable strlt(Constants c, Variable v1, Variable v2) {
+        return strcompare(c, v1, v2, O_IS_LESS, strlt_d);
     }
 
-    static readonly Func<Variable,Variable,Variable> strle_d = strle;
-    public static Variable strle(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_EQUAL | O_IS_LESS, strle_d);
+    static readonly Func<Constants,Variable,Variable,Variable> strle_d = strle;
+    [ImplicitConsts] public static Variable strle(Constants c, Variable v1, Variable v2) {
+        return strcompare(c, v1, v2, O_IS_EQUAL | O_IS_LESS, strle_d);
     }
 
-    static readonly Func<Variable,Variable,Variable> strgt_d = strgt;
-    public static Variable strgt(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_GREATER, strgt_d);
+    static readonly Func<Constants,Variable,Variable,Variable> strgt_d = strgt;
+    [ImplicitConsts] public static Variable strgt(Constants c, Variable v1, Variable v2) {
+        return strcompare(c, v1, v2, O_IS_GREATER, strgt_d);
     }
 
-    static readonly Func<Variable,Variable,Variable> strge_d = strge;
-    public static Variable strge(Variable v1, Variable v2) {
-        return strcompare(v1, v2, O_IS_GREATER | O_IS_EQUAL, strge_d);
+    static readonly Func<Constants,Variable,Variable,Variable> strge_d = strge;
+    [ImplicitConsts] public static Variable strge(Constants c, Variable v1, Variable v2) {
+        return strcompare(c, v1, v2, O_IS_GREATER | O_IS_EQUAL, strge_d);
     }
 
     private static int substr_pos(Variable v1, Variable v2) {
@@ -711,22 +713,22 @@ public partial class Builtins {
         return r3;
     }
 
-    static readonly Func<Variable,Variable,Variable,Variable> substr3_d = substr3;
-    public static Variable substr3(Variable v1, Variable v2, Variable v3) {
+    static readonly Func<Constants,Variable,Variable,Variable,Variable> substr3_d = substr3;
+    [ImplicitConsts] public static Variable substr3(Constants c, Variable v1, Variable v2, Variable v3) {
         P6any o1 = v1.Fetch(), o2 = v2.Fetch(), o3 = v3.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
-            return HandleSpecial3(v1,v2,v3, o1,o2,o3, substr3_d);
+            return HandleSpecial3(c, v1,v2,v3, o1,o2,o3, substr3_d);
 
         int pos = substr_pos(v1, v2);
         int len = substr_len(v1, pos, v3);
         return new SubstrLValue(v1, pos, len);
     }
 
-    static readonly Func<Variable,Variable,Variable,Variable> substr_ro3_d = substr_ro3;
-    public static Variable substr_ro3(Variable v1, Variable v2, Variable v3) {
+    static readonly Func<Constants,Variable,Variable,Variable,Variable> substr_ro3_d = substr_ro3;
+    [ImplicitConsts] public static Variable substr_ro3(Constants c, Variable v1, Variable v2, Variable v3) {
         P6any o1 = v1.Fetch(), o2 = v2.Fetch(), o3 = v3.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
-            return HandleSpecial3(v1,v2,v3, o1,o2,o3, substr_ro3_d);
+            return HandleSpecial3(c, v1,v2,v3, o1,o2,o3, substr_ro3_d);
 
         int pos = substr_pos(v1, v2);
         int len = substr_len(v1, pos, v3);
@@ -735,12 +737,12 @@ public partial class Builtins {
         return sub == null ? Compartment.Top.StrMO.typeObj : MakeStr(sub);
     }
 
-    static readonly Func<Variable,Variable,Variable> plus_d = plus;
-    public static Variable plus(Variable a1, Variable a2) {
+    static readonly Func<Constants,Variable,Variable,Variable> plus_d = plus;
+    [ImplicitConsts] public static Variable plus(Constants c, Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1, a2, o1, o2, plus_d);
+            return HandleSpecial2(c, a1, a2, o1, o2, plus_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -771,12 +773,12 @@ public partial class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    static readonly Func<Variable,Variable,Variable> minus_d = minus;
-    public static Variable minus(Variable a1, Variable a2) {
+    static readonly Func<Constants,Variable,Variable,Variable> minus_d = minus;
+    [ImplicitConsts] public static Variable minus(Constants c, Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, minus_d);
+            return HandleSpecial2(c, a1,a2, o1,o2, minus_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -844,12 +846,12 @@ public partial class Builtins {
         return MakeFixRat(big_pow(num, pow), big_pow(den, pow));
     }
 
-    static readonly Func<Variable,Variable,Variable> pow_d = pow;
-    public static Variable pow(Variable a1, Variable a2) {
+    static readonly Func<Constants,Variable,Variable,Variable> pow_d = pow;
+    [ImplicitConsts] public static Variable pow(Constants c, Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1, a2, o1, o2, pow_d);
+            return HandleSpecial2(c, a1, a2, o1, o2, pow_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -903,12 +905,12 @@ public partial class Builtins {
         return MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
     }
 
-    static readonly Func<Variable,Variable> negate_d = negate;
-    public static Variable negate(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> negate_d = negate;
+    [ImplicitConsts] public static Variable negate(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, negate_d);
+            return HandleSpecial1(c, a1,o1, negate_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -932,12 +934,12 @@ public partial class Builtins {
         return MakeInt(-(long)PromoteToFixInt(r1, n1));
     }
 
-    static readonly Func<Variable,Variable> abs_d = abs;
-    public static Variable abs(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> abs_d = abs;
+    [ImplicitConsts] public static Variable abs(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, abs_d);
+            return HandleSpecial1(c, a1,o1, abs_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -966,12 +968,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> ln_d = ln;
-    public static Variable ln(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> ln_d = ln;
+    [ImplicitConsts] public static Variable ln(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, ln_d);
+            return HandleSpecial1(c, a1,o1, ln_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -986,12 +988,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> exp_d = exp;
-    public static Variable exp(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> exp_d = exp;
+    [ImplicitConsts] public static Variable exp(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, exp_d);
+            return HandleSpecial1(c, a1,o1, exp_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -1005,12 +1007,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable,Variable> atan2_d = atan2;
-    public static Variable atan2(Variable a1, Variable a2) {
+    static readonly Func<Constants,Variable,Variable,Variable> atan2_d = atan2;
+    [ImplicitConsts] public static Variable atan2(Constants c, Variable a1, Variable a2) {
         P6any o1 = a1.Fetch();
         P6any o2 = a2.Fetch();
         if (!o1.mo.is_any || !o2.mo.is_any)
-            return HandleSpecial2(a1,a2,o1,o2, atan2_d);
+            return HandleSpecial2(c, a1,a2,o1,o2, atan2_d);
         int r1;
         P6any n1 = GetNumber(a1, o1, out r1);
         int r2;
@@ -1023,12 +1025,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> floor_d = floor;
-    public static Variable floor(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> floor_d = floor;
+    [ImplicitConsts] public static Variable floor(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, floor_d);
+            return HandleSpecial1(c, a1,o1, floor_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -1069,12 +1071,12 @@ public partial class Builtins {
         return n1;
     }
 
-    static readonly Func<Variable,Variable,Variable> gcd_d = gcd;
-    public static Variable gcd(Variable a1, Variable a2) {
+    static readonly Func<Constants,Variable,Variable,Variable> gcd_d = gcd;
+    [ImplicitConsts] public static Variable gcd(Constants c, Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, gcd_d);
+            return HandleSpecial2(c, a1,a2, o1,o2, gcd_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -1126,16 +1128,16 @@ public partial class Builtins {
     const int O_IS_EQUAL   = 4;
     const int O_IS_UNORD   = 8;
     const int O_COMPLEX_OK = 16;
-    public static Variable numcompare(Variable a1, Variable a2, int mask,
-            Func<Variable,Variable,Variable> dl) {
+    public static Variable numcompare(Constants c, Variable a1, Variable a2, int mask,
+            Func<Constants,Variable,Variable,Variable> dl) {
         int r1, r2, res=0;
+        var s = c.setting;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any)) {
-            Variable jr = HandleSpecial2(a1, a2, o1, o2, dl);
+            Variable jr = HandleSpecial2(c, a1, a2, o1, o2, dl);
             // treat $x != $y as !($x == $y)
             if (mask == (O_IS_GREATER | O_IS_LESS | O_IS_UNORD | O_COMPLEX_OK))
-                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? Compartment.Top.FalseV :
-                    Compartment.Top.TrueV;
+                return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? s.FalseV : s.TrueV;
             return jr;
         }
         P6any n1 = GetNumber(a1, o1, out r1);
@@ -1182,15 +1184,15 @@ public partial class Builtins {
         if (res == 0)
             res = (r1 > 0) ? O_IS_GREATER : (r1 < 0) ? O_IS_LESS : O_IS_EQUAL;
 
-        return ((mask & res) != 0) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+        return ((mask & res) != 0) ? s.TrueV : s.FalseV;
     }
 
-    static readonly Func<Variable,Variable,Variable> mul_d = mul;
-    public static Variable mul(Variable a1, Variable a2) {
+    static readonly Func<Constants,Variable,Variable,Variable> mul_d = mul;
+    [ImplicitConsts] public static Variable mul(Constants c, Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, mul_d);
+            return HandleSpecial2(c, a1,a2, o1,o2, mul_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -1221,12 +1223,12 @@ public partial class Builtins {
                 (long)PromoteToFixInt(r2, n2));
     }
 
-    static readonly Func<Variable,Variable,Variable> divide_d = divide;
-    public static Variable divide(Variable a1, Variable a2) {
+    static readonly Func<Constants,Variable,Variable,Variable> divide_d = divide;
+    [ImplicitConsts] public static Variable divide(Constants c, Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, divide_d);
+            return HandleSpecial2(c, a1,a2, o1,o2, divide_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -1258,12 +1260,12 @@ public partial class Builtins {
         return MakeFixRat(PromoteToFixInt(r1, n1), PromoteToFixInt(r2, n2));
     }
 
-    static readonly Func<Variable,Variable,Variable> mod_d = mod;
-    public static Variable mod(Variable a1, Variable a2) {
+    static readonly Func<Constants,Variable,Variable,Variable> mod_d = mod;
+    [ImplicitConsts] public static Variable mod(Constants c, Variable a1, Variable a2) {
         int r1, r2;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(a1,a2, o1,o2, mod_d);
+            return HandleSpecial2(c, a1,a2, o1,o2, mod_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
@@ -1403,12 +1405,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> sqrt_d = sqrt;
-    public static Variable sqrt(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> sqrt_d = sqrt;
+    [ImplicitConsts] public static Variable sqrt(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, sqrt_d);
+            return HandleSpecial1(c, a1,o1, sqrt_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -1422,73 +1424,73 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable,Variable> numand_d = numand;
-    public static Variable numand(Variable v1, Variable v2) {
+    static readonly Func<Constants,Variable,Variable,Variable> numand_d = numand;
+    [ImplicitConsts] public static Variable numand(Constants c, Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, numand_d);
+            return HandleSpecial2(c, v1,v2, o1,o2, numand_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 & r2);
     }
 
-    static readonly Func<Variable,Variable,Variable> numor_d = numor;
-    public static Variable numor(Variable v1, Variable v2) {
+    static readonly Func<Constants,Variable,Variable,Variable> numor_d = numor;
+    [ImplicitConsts] public static Variable numor(Constants c, Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, numor_d);
+            return HandleSpecial2(c, v1,v2, o1,o2, numor_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 | r2);
     }
 
-    static readonly Func<Variable,Variable,Variable> numxor_d = numxor;
-    public static Variable numxor(Variable v1, Variable v2) {
+    static readonly Func<Constants,Variable,Variable,Variable> numxor_d = numxor;
+    [ImplicitConsts] public static Variable numxor(Constants c, Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, numxor_d);
+            return HandleSpecial2(c, v1,v2, o1,o2, numxor_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 ^ r2);
     }
 
-    static readonly Func<Variable,Variable,Variable> numlshift_d = numlshift;
-    public static Variable numlshift(Variable v1, Variable v2) {
+    static readonly Func<Constants,Variable,Variable,Variable> numlshift_d = numlshift;
+    [ImplicitConsts] public static Variable numlshift(Constants c, Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, numlshift_d);
+            return HandleSpecial2(c, v1,v2, o1,o2, numlshift_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 << r2);
     }
 
-    static readonly Func<Variable,Variable,Variable> numrshift_d = numrshift;
-    public static Variable numrshift(Variable v1, Variable v2) {
+    static readonly Func<Constants,Variable,Variable,Variable> numrshift_d = numrshift;
+    [ImplicitConsts] public static Variable numrshift(Constants c, Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(); P6any o2 = v2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
-            return HandleSpecial2(v1,v2, o1,o2, numrshift_d);
+            return HandleSpecial2(c, v1,v2, o1,o2, numrshift_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
         return MakeInt(r1 >> r2);
     }
 
-    static readonly Func<Variable,Variable> numcompl_d = numcompl;
-    public static Variable numcompl(Variable v1) {
+    static readonly Func<Constants,Variable,Variable> numcompl_d = numcompl;
+    [ImplicitConsts] public static Variable numcompl(Constants c, Variable v1) {
         P6any o1 = v1.Fetch();
         if (!o1.mo.is_any)
-            return HandleSpecial1(v1,o1, numcompl_d);
+            return HandleSpecial1(c, v1,o1, numcompl_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         return MakeInt(~r1);
     }
 
     // only called from .Rat
-    public static Variable rat_approx(Variable v1, Variable v2) {
+    [ImplicitConsts] public static Variable rat_approx(Constants c, Variable v1, Variable v2) {
         NominalCheck("$x", Compartment.Top.AnyMO, v1);
         NominalCheck("$y", Compartment.Top.AnyMO, v2);
 
@@ -1558,21 +1560,21 @@ public partial class Builtins {
         return r ? Compartment.Top.FalseV : Compartment.Top.TrueV;
     }
 
-    static readonly Func<Variable,Variable> chars_d = chars;
-    public static Variable chars(Variable v) {
+    static readonly Func<Constants,Variable,Variable> chars_d = chars;
+    [ImplicitConsts] public static Variable chars(Constants c, Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
-            return HandleSpecial1(v,o1, chars_d);
+            return HandleSpecial1(c, v,o1, chars_d);
 
         string r = o1.mo.mro_raw_Str.Get(v);
         return MakeInt(r.Length);
     }
 
-    static readonly Func<Variable,Variable> codes_d = codes;
-    public static Variable codes(Variable v) {
+    static readonly Func<Constants,Variable,Variable> codes_d = codes;
+    [ImplicitConsts] public static Variable codes(Constants c, Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
-            return HandleSpecial1(v,o1, codes_d);
+            return HandleSpecial1(c, v,o1, codes_d);
 
         string r = o1.mo.mro_raw_Str.Get(v);
 
@@ -1584,11 +1586,11 @@ public partial class Builtins {
         return MakeInt(i);
     }
 
-    static readonly Func<Variable,Variable> ord_d = ord;
-    public static Variable ord(Variable v) {
+    static readonly Func<Constants,Variable,Variable> ord_d = ord;
+    [ImplicitConsts] public static Variable ord(Constants c, Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
-            return HandleSpecial1(v,o1, ord_d);
+            return HandleSpecial1(c, v,o1, ord_d);
 
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
@@ -1601,11 +1603,11 @@ public partial class Builtins {
         return MakeInt((int)r[0]);
     }
 
-    static readonly Func<Variable,Variable> chr_d = chr;
-    public static Variable chr(Variable v) {
+    static readonly Func<Constants,Variable,Variable> chr_d = chr;
+    [ImplicitConsts] public static Variable chr(Constants c, Variable v) {
         P6any o1 = v.Fetch();
         if (!o1.mo.is_any)
-            return HandleSpecial1(v,o1, chr_d);
+            return HandleSpecial1(c, v,o1, chr_d);
 
         int r = (int)o1.mo.mro_raw_Numeric.Get(v);
         if (r >= 0x110000)

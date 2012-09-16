@@ -123,8 +123,8 @@ namespace Niecza {
 
         protected Variable Slice(Variable obj, Variable key) {
             if (key.Fetch().mo.HasType(Compartment.Top.JunctionMO)) {
-                return Builtins.AutoThread(key.Fetch(), delegate (Variable v) {
-                    return Get(obj, v); });
+                return Builtins.AutoThread(Compartment.Top, key.Fetch(),
+                    delegate (Variable v) { return Get(obj, v); });
             }
 
             VarDeque iter = Builtins.start_iter(key);

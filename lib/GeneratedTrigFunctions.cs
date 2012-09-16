@@ -4,12 +4,12 @@ using System;
 
 public partial class Builtins {
 
-    static readonly Func<Variable,Variable> sin_d = sin;
-    public static Variable sin(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> sin_d = sin;
+    [ImplicitConsts] public static Variable sin(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, sin_d);
+            return HandleSpecial1(c, a1,o1, sin_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -22,12 +22,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> asin_d = asin;
-    public static Variable asin(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> asin_d = asin;
+    [ImplicitConsts] public static Variable asin(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, asin_d);
+            return HandleSpecial1(c, a1,o1, asin_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -40,12 +40,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> cos_d = cos;
-    public static Variable cos(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> cos_d = cos;
+    [ImplicitConsts] public static Variable cos(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, cos_d);
+            return HandleSpecial1(c, a1,o1, cos_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -58,12 +58,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> acos_d = acos;
-    public static Variable acos(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> acos_d = acos;
+    [ImplicitConsts] public static Variable acos(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, acos_d);
+            return HandleSpecial1(c, a1,o1, acos_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -76,12 +76,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> tan_d = tan;
-    public static Variable tan(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> tan_d = tan;
+    [ImplicitConsts] public static Variable tan(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, tan_d);
+            return HandleSpecial1(c, a1,o1, tan_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -94,12 +94,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> atan_d = atan;
-    public static Variable atan(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> atan_d = atan;
+    [ImplicitConsts] public static Variable atan(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, atan_d);
+            return HandleSpecial1(c, a1,o1, atan_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -112,12 +112,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> sinh_d = sinh;
-    public static Variable sinh(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> sinh_d = sinh;
+    [ImplicitConsts] public static Variable sinh(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, sinh_d);
+            return HandleSpecial1(c, a1,o1, sinh_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -135,12 +135,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> asinh_d = asinh;
-    public static Variable asinh(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> asinh_d = asinh;
+    [ImplicitConsts] public static Variable asinh(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, asinh_d);
+            return HandleSpecial1(c, a1,o1, asinh_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -158,12 +158,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> cosh_d = cosh;
-    public static Variable cosh(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> cosh_d = cosh;
+    [ImplicitConsts] public static Variable cosh(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, cosh_d);
+            return HandleSpecial1(c, a1,o1, cosh_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -181,12 +181,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> acosh_d = acosh;
-    public static Variable acosh(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> acosh_d = acosh;
+    [ImplicitConsts] public static Variable acosh(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, acosh_d);
+            return HandleSpecial1(c, a1,o1, acosh_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -204,12 +204,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> tanh_d = tanh;
-    public static Variable tanh(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> tanh_d = tanh;
+    [ImplicitConsts] public static Variable tanh(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, tanh_d);
+            return HandleSpecial1(c, a1,o1, tanh_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -227,12 +227,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> atanh_d = atanh;
-    public static Variable atanh(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> atanh_d = atanh;
+    [ImplicitConsts] public static Variable atanh(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, atanh_d);
+            return HandleSpecial1(c, a1,o1, atanh_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -250,12 +250,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> acotanh_d = acotanh;
-    public static Variable acotanh(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> acotanh_d = acotanh;
+    [ImplicitConsts] public static Variable acotanh(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, acotanh_d);
+            return HandleSpecial1(c, a1,o1, acotanh_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -273,12 +273,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> asec_d = asec;
-    public static Variable asec(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> asec_d = asec;
+    [ImplicitConsts] public static Variable asec(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, asec_d);
+            return HandleSpecial1(c, a1,o1, asec_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -291,12 +291,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> cosech_d = cosech;
-    public static Variable cosech(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> cosech_d = cosech;
+    [ImplicitConsts] public static Variable cosech(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, cosech_d);
+            return HandleSpecial1(c, a1,o1, cosech_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -314,12 +314,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> acosech_d = acosech;
-    public static Variable acosech(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> acosech_d = acosech;
+    [ImplicitConsts] public static Variable acosech(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, acosech_d);
+            return HandleSpecial1(c, a1,o1, acosech_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -337,12 +337,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> sec_d = sec;
-    public static Variable sec(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> sec_d = sec;
+    [ImplicitConsts] public static Variable sec(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, sec_d);
+            return HandleSpecial1(c, a1,o1, sec_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -355,12 +355,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> acosec_d = acosec;
-    public static Variable acosec(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> acosec_d = acosec;
+    [ImplicitConsts] public static Variable acosec(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, acosec_d);
+            return HandleSpecial1(c, a1,o1, acosec_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -373,12 +373,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> cotanh_d = cotanh;
-    public static Variable cotanh(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> cotanh_d = cotanh;
+    [ImplicitConsts] public static Variable cotanh(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, cotanh_d);
+            return HandleSpecial1(c, a1,o1, cotanh_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -396,12 +396,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> sech_d = sech;
-    public static Variable sech(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> sech_d = sech;
+    [ImplicitConsts] public static Variable sech(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, sech_d);
+            return HandleSpecial1(c, a1,o1, sech_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -419,12 +419,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> cotan_d = cotan;
-    public static Variable cotan(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> cotan_d = cotan;
+    [ImplicitConsts] public static Variable cotan(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, cotan_d);
+            return HandleSpecial1(c, a1,o1, cotan_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -437,12 +437,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> acotan_d = acotan;
-    public static Variable acotan(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> acotan_d = acotan;
+    [ImplicitConsts] public static Variable acotan(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, acotan_d);
+            return HandleSpecial1(c, a1,o1, acotan_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -455,12 +455,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> cosec_d = cosec;
-    public static Variable cosec(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> cosec_d = cosec;
+    [ImplicitConsts] public static Variable cosec(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, cosec_d);
+            return HandleSpecial1(c, a1,o1, cosec_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -473,12 +473,12 @@ public partial class Builtins {
         }
     }
 
-    static readonly Func<Variable,Variable> asech_d = asech;
-    public static Variable asech(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> asech_d = asech;
+    [ImplicitConsts] public static Variable asech(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, asech_d);
+            return HandleSpecial1(c, a1,o1, asech_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {

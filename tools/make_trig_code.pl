@@ -28,12 +28,12 @@ foreach my $function (@normal_functions) {
 
         print <<"Function";
 
-    static readonly Func<Variable,Variable> ${function}_d = ${function};
-    public static Variable ${function}(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> ${function}_d = ${function};
+    [ImplicitConsts] public static Variable ${function}(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, ${function}_d);
+            return HandleSpecial1(c, a1,o1, ${function}_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -56,12 +56,12 @@ Function
 
         print <<"Function";
 
-    static readonly Func<Variable,Variable> ${function}_d = ${function};
-    public static Variable ${function}(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> ${function}_d = ${function};
+    [ImplicitConsts] public static Variable ${function}(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, ${function}_d);
+            return HandleSpecial1(c, a1,o1, ${function}_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -90,12 +90,12 @@ foreach my $function (keys %inverted_functions) {
 
         print <<"Function";
 
-    static readonly Func<Variable,Variable> ${function}_d = ${function};
-    public static Variable ${function}(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> ${function}_d = ${function};
+    [ImplicitConsts] public static Variable ${function}(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, ${function}_d);
+            return HandleSpecial1(c, a1,o1, ${function}_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
@@ -118,12 +118,12 @@ Function
 
         print <<"Function";
 
-    static readonly Func<Variable,Variable> ${function}_d = ${function};
-    public static Variable ${function}(Variable a1) {
+    static readonly Func<Constants,Variable,Variable> ${function}_d = ${function};
+    [ImplicitConsts] public static Variable ${function}(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();
         int r1;
         if (!o1.mo.is_any)
-            return HandleSpecial1(a1,o1, ${function}_d);
+            return HandleSpecial1(c, a1,o1, ${function}_d);
         P6any n1 = GetNumber(a1, o1, out r1);
 
         if (r1 == NR_COMPLEX) {
