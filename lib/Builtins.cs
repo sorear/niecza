@@ -683,10 +683,10 @@ public partial class Builtins {
         return strcompare(c, v1, v2, O_IS_GREATER | O_IS_EQUAL, strge_d);
     }
 
-    private static int substr_pos(Variable v1, Variable v2) {
+    private static int substr_pos(Compartment s, Variable v1, Variable v2) {
         P6any o1 = v1.Fetch(), o2 = v2.Fetch();
         int r2;
-        if (o2.Does(Compartment.Top.CodeMO)) {
+        if (o2.Does(s.CodeMO)) {
             string s1 = o1.mo.mro_raw_Str.Get(v1);
             Variable no2 = Kernel.RunInferior(o2.Invoke(
                 Kernel.GetInferiorRoot(), new Variable[] {
@@ -698,10 +698,10 @@ public partial class Builtins {
         return r2;
     }
 
-    private static int substr_len(Variable v1, int pos, Variable v3) {
+    private static int substr_len(Compartment s, Variable v1, int pos, Variable v3) {
         P6any o1 = v1.Fetch(), o3 = v3.Fetch();
         int r3;
-        if (o3.Does(Compartment.Top.CodeMO)) {
+        if (o3.Does(s.CodeMO)) {
             string s1 = o1.mo.mro_raw_Str.Get(v1);
             Variable no3 = Kernel.RunInferior(o3.Invoke(
                 Kernel.GetInferiorRoot(), new Variable[] {
@@ -719,8 +719,8 @@ public partial class Builtins {
         if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
             return HandleSpecial3(c, v1,v2,v3, o1,o2,o3, substr3_d);
 
-        int pos = substr_pos(v1, v2);
-        int len = substr_len(v1, pos, v3);
+        int pos = substr_pos(c.setting, v1, v2);
+        int len = substr_len(c.setting, v1, pos, v3);
         return new SubstrLValue(v1, pos, len);
     }
 
@@ -730,11 +730,11 @@ public partial class Builtins {
         if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
             return HandleSpecial3(c, v1,v2,v3, o1,o2,o3, substr_ro3_d);
 
-        int pos = substr_pos(v1, v2);
-        int len = substr_len(v1, pos, v3);
+        int pos = substr_pos(c.setting, v1, v2);
+        int len = substr_len(c.setting, v1, pos, v3);
         string str = v1.Fetch().mo.mro_raw_Str.Get(v1);
         string sub = Builtins.LaxSubstring2(str, pos, len);
-        return sub == null ? Compartment.Top.StrMO.typeObj : MakeStr(sub);
+        return sub == null ? c.setting.StrMO.typeObj : MakeStr(sub);
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> plus_d = plus;
@@ -1491,8 +1491,8 @@ public partial class Builtins {
 
     // only called from .Rat
     [ImplicitConsts] public static Variable rat_approx(Constants c, Variable v1, Variable v2) {
-        NominalCheck("$x", Compartment.Top.AnyMO, v1);
-        NominalCheck("$y", Compartment.Top.AnyMO, v2);
+        NominalCheck("$x", c.setting.AnyMO, v1);
+        NominalCheck("$y", c.setting.AnyMO, v2);
 
         BigInteger nc, dc, ne, de, na, da;
         GetAsRational(v1, out nc, out dc);
@@ -1516,15 +1516,15 @@ public partial class Builtins {
         }
     }
 
-    public static Variable postinc(Variable v) {
+    [ImplicitConsts] public static Variable postinc(Constants c, Variable v) {
         P6any o1 = v.Fetch();
         v.AssignO(o1.mo.mro_succ.Get(v), false);
 
         if (!o1.IsDefined()) {
-            if (o1.Isa(Compartment.Top.BoolMO))
-                o1 = Compartment.Top.FalseV;
+            if (o1.Isa(c.setting.BoolMO))
+                o1 = c.setting.FalseV;
             else
-                o1 = Kernel.BoxRaw<int>(0, Compartment.Top.IntMO);
+                o1 = Kernel.BoxRaw<int>(0, c.setting.IntMO);
         }
 
         return o1;
@@ -1535,15 +1535,15 @@ public partial class Builtins {
         return v;
     }
 
-    public static Variable postdec(Variable v) {
+    [ImplicitConsts] public static Variable postdec(Constants c, Variable v) {
         P6any o1 = v.Fetch();
         v.AssignO(o1.mo.mro_pred.Get(v), false);
 
         if (!o1.IsDefined()) {
-            if (o1.Isa(Compartment.Top.BoolMO))
-                o1 = Compartment.Top.FalseV;
+            if (o1.Isa(c.setting.BoolMO))
+                o1 = c.setting.FalseV;
             else
-                o1 = Kernel.BoxRaw<int>(0, Compartment.Top.IntMO);
+                o1 = Kernel.BoxRaw<int>(0, c.setting.IntMO);
         }
 
         return o1;
@@ -1554,10 +1554,10 @@ public partial class Builtins {
         return v;
     }
 
-    public static Variable not(Variable v) {
+    [ImplicitConsts] public static Variable not(Constants c, Variable v) {
         P6any o1 = v.Fetch();
         bool r = o1.mo.mro_raw_Bool.Get(v);
-        return r ? Compartment.Top.FalseV : Compartment.Top.TrueV;
+        return r ? c.setting.FalseV : c.setting.TrueV;
     }
 
     static readonly Func<Constants,Variable,Variable> chars_d = chars;
@@ -1594,7 +1594,7 @@ public partial class Builtins {
 
         string r = o1.mo.mro_raw_Str.Get(v);
         // XXX Failure
-        if (r.Length == 0) return Compartment.Top.AnyP;
+        if (r.Length == 0) return c.setting.AnyP;
         else if (r.Length >= 2 &&
                 r[0] >= (char)0xD800 && r[0] <= (char)0xDBFF &&
                 r[1] >= (char)0xDC00 && r[1] <= (char)0xDFFF)
@@ -1611,14 +1611,14 @@ public partial class Builtins {
 
         int r = (int)o1.mo.mro_raw_Numeric.Get(v);
         if (r >= 0x110000)
-            return Compartment.Top.AnyP; // XXX failure
-        return Kernel.BoxAnyMO(Utils.Chr(r), Compartment.Top.StrMO);
+            return c.setting.AnyP; // XXX failure
+        return Kernel.BoxAnyMO(Utils.Chr(r), c.setting.StrMO);
     }
 
-    public static Variable UniCat(Variable v) {
-        P6any o1 = NominalCheck("$x", Compartment.Top.AnyMO, v);
-        char c = (char) o1.mo.mro_raw_Numeric.Get(v);
-        int ix = (int) char.GetUnicodeCategory(c);
+    [ImplicitConsts] public static Variable UniCat(Constants c, Variable v) {
+        P6any o1 = NominalCheck("$x", c.setting.AnyMO, v);
+        char ch = (char) o1.mo.mro_raw_Numeric.Get(v);
+        int ix = (int) char.GetUnicodeCategory(ch);
         return MakeInt(ix);
     }
 
@@ -1973,7 +1973,7 @@ flat_enough:;
         return fr.info.name.Substring(fr.info.name.IndexOf(" ")+1);
     }
 
-    public static Variable count(P6any fcni) {
+    [ImplicitConsts] public static Variable count(Constants c, P6any fcni) {
         int i = get_count(fcni);
         return (i == int.MaxValue) ? MakeFloat(double.PositiveInfinity) :
             MakeInt(i);
@@ -2013,8 +2013,8 @@ flat_enough:;
         }
         return arity;
     }
-    public static Variable arity(P6any fcni) {
-        if (!fcni.Isa(Compartment.Top.CodeMO))
+    [ImplicitConsts] public static Variable arity(Constants c, P6any fcni) {
+        if (!fcni.Isa(c.setting.CodeMO))
             return MakeInt(1); // can't introspect fake subs (?)
         SubInfo si = (SubInfo) Kernel.GetInfo(fcni);
         if (si.sig == null)
@@ -2397,15 +2397,15 @@ again:
     [TrueGlobal] public static string programName;
     [TrueGlobal] public static string execName;
 
-    public static Variable getenv(string str) {
-        return Kernel.BoxAnyMO(Environment.GetEnvironmentVariable(str), Compartment.Top.StrMO);
+    [ImplicitConsts] public static Variable getenv(Constants c, string str) {
+        return Kernel.BoxAnyMO(Environment.GetEnvironmentVariable(str), c.setting.StrMO);
     }
 
     public static void setenv(string key, string val) {
         Environment.SetEnvironmentVariable(key, val);
     }
 
-    public static Variable sysquery(int ix) {
+    [ImplicitConsts] public static Variable sysquery(Constants c, int ix) {
         switch (ix) {
             case 0: return BoxLoS(Kernel.commandArgs);
             case 1: return MakeStr(programName ?? AppDomain.CurrentDomain.FriendlyName);
@@ -2414,9 +2414,9 @@ again:
             case 4: {
                 VarHash ret = new VarHash();
                 foreach (System.Collections.DictionaryEntry de in Environment.GetEnvironmentVariables()) {
-                    ret[(string) de.Key] = Kernel.BoxAnyMO((string)de.Value, Compartment.Top.StrMO);
+                    ret[(string) de.Key] = Kernel.BoxAnyMO((string)de.Value, c.setting.StrMO);
                 }
-                return Kernel.BoxAnyMO(ret, Compartment.Top.HashMO);
+                return Kernel.BoxAnyMO(ret, c.setting.HashMO);
             }
             case 5: return MakeStr(Environment.OSVersion.Platform.ToString());
             case 6: return MakeStr(Environment.OSVersion.Version.ToString());
@@ -2426,10 +2426,10 @@ again:
 
     public static P6any who(P6any obj) { return obj.mo.who; }
 
-    public static Variable stash_exists_key(P6any st, string key) {
+    [ImplicitConsts] public static Variable stash_exists_key(Constants c, P6any st, string key) {
         string lkey = Kernel.UnboxAny<string>(st);
         lkey = (char)lkey.Length + lkey + key;
-        return Compartment.Top.currentGlobals.ContainsKey(lkey) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+        return c.setting.currentGlobals.ContainsKey(lkey) ? c.setting.TrueV : c.setting.FalseV;
     }
 
     public static Variable stash_at_key(P6any st, string key) {
@@ -2441,13 +2441,13 @@ again:
         return to;
     }
 
-    public static Variable stash_delete_key(P6any st, string key) {
+    [ImplicitConsts] public static Variable stash_delete_key(Constants c, P6any st, string key) {
         string lkey = Kernel.UnboxAny<string>(st);
         lkey = (char)lkey.Length + lkey + key;
         StashEnt r;
-        if (!Compartment.Top.currentGlobals.TryGetValue(lkey, out r))
-            return Compartment.Top.AnyP;
-        Compartment.Top.currentGlobals.Remove(key);
+        if (!c.setting.currentGlobals.TryGetValue(lkey, out r))
+            return c.setting.AnyP;
+        c.setting.currentGlobals.Remove(key);
         return r.v;
     }
 
@@ -2464,7 +2464,7 @@ again:
         return th.Return();
     }
 
-    public static Variable temporize(Variable v, Frame fr, int mode) {
+    [ImplicitConsts] public static Variable temporize(Constants c, Variable v, Frame fr, int mode) {
         int type = (mode & 1) != 0 ? LeaveHook.UNDO : LeaveHook.UNDO + LeaveHook.KEEP;
         if ((mode & 2) != 0) {
             fr.PushLeave(type, v.Fetch());
@@ -2478,7 +2478,7 @@ again:
             Frame o = new Frame();
             o.lex0 = v;
             o.lex1 = v.Fetch();
-            fr.PushLeave(type, Kernel.MakeSub(Compartment.Top.TEMP_SI, o));
+            fr.PushLeave(type, Kernel.MakeSub(c.setting.TEMP_SI, o));
         }
 
         return v;
@@ -2644,7 +2644,7 @@ again:
         return obj;
     }
 
-    public static Variable mixin(P6any obj, Variable role_list, Variable init,
+    [ImplicitConsts] public static Variable mixin(Constants c, P6any obj, Variable role_list, Variable init,
             Variable newtype) {
         VarDeque iter = start_iter(role_list);
         List<STable> roles = new List<STable>();
@@ -2663,7 +2663,7 @@ again:
         newtype.Store(n.typeObj);
 
         string aname = null;
-        if (init != Compartment.Top.AnyP) {
+        if (init != c.setting.AnyP) {
             if (!obj.IsDefined())
                 throw new NieczaException("Cannot initialize a slot when mixing into a type object");
             if (n.mo.local_attr.Count != 1 || (n.mo.local_attr[0].flags & P6how.A_PUBLIC) == 0)
@@ -2683,10 +2683,10 @@ again:
         }
     }
 
-    public static Variable dualvar(Variable obj, Variable type, Variable str) {
+    [ImplicitConsts] public static Variable dualvar(Constants c, Variable obj, Variable type, Variable str) {
         P6any nobj = obj.Fetch().ReprClone();
         nobj.ChangeType(type.Fetch().mo);
-        nobj.SetSlot(Compartment.Top.PseudoStrMO, "$!value",
+        nobj.SetSlot(c.setting.PseudoStrMO, "$!value",
                 Kernel.UnboxAny<string>(str.Fetch()));
         return nobj;
     }
@@ -2778,9 +2778,9 @@ again:
         return (Variable)obj.Fetch().GetSlot(ty.Fetch().mo, sname);
     }
 
-    public static Variable is_role(Variable o) {
+    [ImplicitConsts] public static Variable is_role(Constants c, Variable o) {
         int rty = o.Fetch().mo.mo.type;
-        return (rty == P6how.ROLE || rty == P6how.CURRIED_ROLE || rty == P6how.PARAMETRIZED_ROLE) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+        return (rty == P6how.ROLE || rty == P6how.CURRIED_ROLE || rty == P6how.PARAMETRIZED_ROLE) ? c.setting.TrueV : c.setting.FalseV;
     }
 
     public class Blackhole : Variable {
@@ -2818,8 +2818,8 @@ again:
         return Kernel.GetInfo(obj).name;
     }
 
-    public static P6any code_signature(P6any obj) {
-        return Kernel.GetInfo(obj).sig ?? Compartment.Top.AnyMO.typeObj;
+    [ImplicitConsts] public static P6any code_signature(Constants c, P6any obj) {
+        return Kernel.GetInfo(obj).sig ?? c.setting.AnyMO.typeObj;
     }
 
     public static Variable code_candidates(P6any sub) {
@@ -2844,11 +2844,11 @@ again:
         return BoxLoS(((Parameter)param).names ?? new string[0]);
     }
 
-    public static Variable param_type(P6any param) {
-        return (((Parameter)param).type ?? Compartment.Top.AnyMO).typeObj;
+    [ImplicitConsts] public static Variable param_type(Constants c, P6any param) {
+        return (((Parameter)param).type ?? c.setting.AnyMO).typeObj;
     }
 
-    public static P6any param_subsig(P6any param) {
+    [ImplicitConsts] public static P6any param_subsig(Constants c, P6any param) {
         var p = param as Parameter;
         if (p.post_constraints != null) {
             foreach (object o in p.post_constraints) {
@@ -2856,7 +2856,7 @@ again:
                     return (P6any)o;
             }
         }
-        return Compartment.Top.AnyMO.typeObj;
+        return c.setting.AnyMO.typeObj;
     }
 
     public static Variable param_value_constraints(P6any param) {
