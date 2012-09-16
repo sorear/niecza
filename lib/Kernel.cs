@@ -443,7 +443,8 @@ namespace Niecza {
 
             type_builder = mod_builder.DefineType(asm_name,
                     TypeAttributes.Public | TypeAttributes.Sealed |
-                    TypeAttributes.Class | TypeAttributes.BeforeFieldInit);
+                    TypeAttributes.Class | TypeAttributes.BeforeFieldInit,
+                    typeof(Constants));
 
             if (is_mainish) {
                 var mainb = type_builder.DefineMethod("Main",
@@ -486,9 +487,9 @@ namespace Niecza {
             }
         }
 
-        public Type Finish(out object constTable) {
+        public Type Finish(out Constants constTable) {
             var type = type_builder.CreateType();
-            constTable = Activator.CreateInstance(type);
+            constTable = (Constants)Activator.CreateInstance(type);
 
             if (dll_name != null)
                 asm_builder.Save(dll_name);
@@ -685,6 +686,10 @@ namespace Niecza {
         }
     }
 
+    public class Constants {
+        internal Compartment setting = Compartment.Top;
+    }
+
     // There are two kinds of units.  Primary units have their own hash of
     // globals, assembly (if saved), and save file; subordinate units share
     // those of the master.
@@ -704,7 +709,7 @@ namespace Niecza {
         // member of a saved assembly; thus type being non-null implies
         // a significance to freezing and thawing the type
         public Type type;
-        public object constTable;
+        public Constants constTable;
         public Dictionary<object, FieldInfo> constants;
 
         public bool inited = false;
@@ -763,7 +768,7 @@ namespace Niecza {
             EmitUnit eu = new EmitUnit(null, "Anon." + Interlocked.Increment(
                         ref anon_id), null, false);
             eu.CgSub(sub, false);
-            object jit_consts;
+            Constants jit_consts;
             SetConstants(eu.Finish(out jit_consts), jit_consts, eu.constants);
 
             th.code = th.info.code = sub.code;
@@ -806,7 +811,7 @@ namespace Niecza {
                         ref anon_id) + "." + asm_name, null, false);
             SaveSubs(eu, false);
 
-            object jit_consts;
+            Constants jit_consts;
             SetConstants(eu.Finish(out jit_consts), jit_consts, eu.constants);
         }
 
@@ -1029,7 +1034,7 @@ namespace Niecza {
                 } else {
                     Assembly assembly = Assembly.Load(n.asm_name);
                     n.type = tb.type = assembly.GetType(n.asm_name, true);
-                    n.constTable = Activator.CreateInstance(n.type);
+                    n.constTable = (Constants)Activator.CreateInstance(n.type);
                     n.constants = new Dictionary<object,FieldInfo>();
                     var fields = new Dictionary<string,FieldInfo>();
                     foreach (FieldInfo fi in n.type.GetFields())

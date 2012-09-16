@@ -1416,6 +1416,18 @@ namespace Niecza.CLRBackend {
         [Immutable] public static ClrCpsFrame Instance = new ClrCpsFrame();
     }
 
+    class ClrCpsConsts : ClrOp {
+        public override ClrOp Sink() { return ClrNoop.Instance; }
+        private ClrCpsConsts() {
+            Returns = typeof(Constants);
+            Constant = true;
+        }
+        public override void CodeGen(CgContext cx) {
+            cx.il.Emit(OpCodes.Ldarg_0);
+        }
+        [Immutable] public static ClrCpsConsts Instance = new ClrCpsConsts();
+    }
+
     class ClrNullLiteral : ClrOp {
         public override ClrOp Sink() { return ClrNoop.Instance; }
         public ClrNullLiteral(Type ty) {
@@ -2038,6 +2050,9 @@ namespace Niecza.CLRBackend {
 
         public static CpsOp CallFrame() {
             return new CpsOp(ClrCpsFrame.Instance);
+        }
+        public static CpsOp Constants() {
+            return new CpsOp(ClrCpsConsts.Instance);
         }
 
         public static CpsOp RxFrame() {
@@ -3195,8 +3210,14 @@ dynamic:
 
         static Func<CpsOp[], CpsOp> Methody(Type cps, MethodInfo mi) {
             if (mi == null) throw new ArgumentException();
+            bool implicit_frame = Attribute.IsDefined(mi, typeof(ImplicitFrameAttribute));
+            bool implicit_consts = Attribute.IsDefined(mi, typeof(ImplicitConstsAttribute));
+            bool force_cps = Attribute.IsDefined(mi, typeof(CpsAttribute));
             return delegate(CpsOp[] cpses) {
-                return CpsOp.CpsCall(cps, mi, cpses); };
+                if (implicit_consts) cpses = Utils.PrependArr(CpsOp.Constants(), cpses);
+                if (implicit_frame) cpses = Utils.PrependArr(CpsOp.CallFrame(), cpses);
+                return CpsOp.CpsCall(force_cps ? Tokens.Variable : cps, mi, cpses);
+            };
         }
 
         static Func<CpsOp[], CpsOp> RxCall(Type cps, string name) {

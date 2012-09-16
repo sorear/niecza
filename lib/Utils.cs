@@ -670,6 +670,13 @@ namespace Niecza {
             Array.Reverse(tempCharArray);
             return new string(tempCharArray);
         }
+
+        public static T[] PrependArr<T>(T thing, T[] to) {
+            T[] nto = new T[to.Length+1];
+            Array.Copy(to, 0, nto, 1, to.Length);
+            nto[0] = thing;
+            return nto;
+        }
     }
 
     public sealed class Complex : IFreeze {

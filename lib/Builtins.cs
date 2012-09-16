@@ -173,6 +173,13 @@ namespace Niecza {
             return n;
         }
     }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    class CpsAttribute : Attribute { }
+    [AttributeUsage(AttributeTargets.Method)]
+    class ImplicitFrameAttribute : Attribute { }
+    [AttributeUsage(AttributeTargets.Method)]
+    class ImplicitConstsAttribute : Attribute { }
 }
 
 // The special feature of this class is that Q:CgOp operations which are not
