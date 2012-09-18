@@ -106,24 +106,24 @@ namespace Niecza {
         public abstract Variable Get(Variable obj, Variable key);
 
         public virtual P6any GetWHO(P6any obj, string key) {
-            Variable r = Get(obj, Kernel.BoxAnyMO(key, Compartment.Top.StrMO));
+            Variable r = Get(obj, Kernel.BoxAnyMO(key, setting.StrMO));
             return r.Fetch().mo.who;
         }
 
-        public static Variable ViviHash(Variable obj, Variable key) {
-            return new RWVariable(Compartment.Top.MuMO,
+        public Variable ViviHash(Variable obj, Variable key) {
+            return new RWVariable(setting.MuMO,
                     new NewHashViviHook(obj, key.Fetch().mo.mro_raw_Str.Get(key)),
-                    Compartment.Top.AnyP);
+                    setting.AnyP);
         }
-        public static Variable ViviArray(Variable obj, Variable key) {
-            return new RWVariable(Compartment.Top.MuMO,
+        public Variable ViviArray(Variable obj, Variable key) {
+            return new RWVariable(setting.MuMO,
                     new NewArrayViviHook(obj, (int)key.Fetch().mo.mro_raw_Numeric.Get(key)),
-                    Compartment.Top.AnyP);
+                    setting.AnyP);
         }
 
         protected Variable Slice(Variable obj, Variable key) {
-            if (key.Fetch().mo.HasType(Compartment.Top.JunctionMO)) {
-                return Builtins.AutoThread(Compartment.Top, key.Fetch(),
+            if (key.Fetch().mo.HasType(setting.JunctionMO)) {
+                return Builtins.AutoThread(setting, key.Fetch(),
                     delegate (Variable v) { return Get(obj, v); });
             }
 
@@ -134,7 +134,7 @@ namespace Niecza {
             // TODO: 1-element slices should be deparceled.  Requires
             // LISTSTORE improvements though.
             return Kernel.NewRWListVar(Kernel.BoxRaw<Variable[]>(
-                        items.ToArray(), Compartment.Top.ParcelMO));
+                        items.ToArray(), setting.ParcelMO));
         }
 
         protected Variable GetAll(Variable obj) {

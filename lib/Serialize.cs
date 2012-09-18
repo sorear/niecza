@@ -872,6 +872,7 @@ badhash:
     }
 
     public class ReflectObj : IFreeze {
+        internal Compartment setting = Compartment.Top;
         protected virtual object[] GetData() { return new object[0]; }
         protected virtual void SetData(object[] a) { }
         void IFreeze.Freeze(FreezeBuffer fb) {

@@ -3125,21 +3125,21 @@ bound: ;
         public override double Get(Variable obj) {
             Variable v = method == null ? obj : Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
             P6any o = v.Fetch();
-            if (o.mo.HasType(Compartment.Top.NumMO)) {
+            if (o.mo.HasType(setting.NumMO)) {
                 return Kernel.UnboxAny<double>(o);
-            } else if (o.mo.HasType(Compartment.Top.IntMO)) {
+            } else if (o.mo.HasType(setting.IntMO)) {
                 if (o is BoxObject<int>) {
                     return (double)Kernel.UnboxAny<int>(o);
                 } else {
                     return (double)Kernel.UnboxAny<BigInteger>(o);
                 }
-            } else if (o.mo.HasType(Compartment.Top.RatMO)) {
+            } else if (o.mo.HasType(setting.RatMO)) {
                 Rat r = Kernel.UnboxAny<Rat>(o);
                 return (double)r.num / (double)r.den;
-            } else if (o.mo.HasType(Compartment.Top.FatRatMO)) {
+            } else if (o.mo.HasType(setting.FatRatMO)) {
                 FatRat r = Kernel.UnboxAny<FatRat>(o);
                 return (double)r.num / (double)r.den;
-            } else if (o.mo.HasType(Compartment.Top.ComplexMO)) {
+            } else if (o.mo.HasType(setting.ComplexMO)) {
                 Complex r = Kernel.UnboxAny<Complex>(o);
                 if (r.im != 0)
                     throw new NieczaException("coercion would discard nonzero imaginary part");
@@ -3218,7 +3218,7 @@ bound: ;
     class CtxAnyList : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             VarDeque itr = new VarDeque(obj.List ? obj.Fetch() : obj);
-            P6any l = new P6opaque(Compartment.Top.ListMO);
+            P6any l = new P6opaque(setting.ListMO);
             Kernel.IterToList(l, itr);
             return Kernel.NewRWListVar(l);
         }
@@ -3237,12 +3237,12 @@ bound: ;
             for (int i = 0; i < dsts.Length; i++) {
                 Variable d = dsts[i];
                 if (d.List) {
-                    srcs[i] = new P6opaque(Compartment.Top.ListMO);
+                    srcs[i] = new P6opaque(setting.ListMO);
                     Kernel.IterToList(srcs[i], src);
                     src = new VarDeque();
                 } else {
                     srcs[i] = Kernel.IterHasFlat(src, true) ?
-                        src.Shift().Fetch() : Compartment.Top.AnyP;
+                        src.Shift().Fetch() : setting.AnyP;
                 }
             }
 
@@ -3257,7 +3257,7 @@ bound: ;
         public override Variable Get(Variable obj) {
             P6any o = obj.Fetch();
             VarDeque itr = o.IsDefined() ? new VarDeque(Kernel.UnboxAny<Variable[]>(o)) : new VarDeque();
-            P6any l = new P6opaque(Compartment.Top.ListMO);
+            P6any l = new P6opaque(setting.ListMO);
             Kernel.IterToList(l, itr);
             return Kernel.NewRWListVar(l);
         }
@@ -3347,8 +3347,8 @@ bound: ;
             VarDeque items = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
                 items.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
-            lhs_o.SetSlot(Compartment.Top.ListMO, "$!items", items);
-            lhs_o.SetSlot(Compartment.Top.ListMO, "$!rest", iter); /*now empty*/
+            lhs_o.SetSlot(setting.ListMO, "$!items", items);
+            lhs_o.SetSlot(setting.ListMO, "$!rest", iter); /*now empty*/
             return lhs;
         }
     }
@@ -3356,8 +3356,8 @@ bound: ;
         public override VarDeque Get(Variable obj) {
             var d = obj.Fetch();
             if (!d.IsDefined()) return new VarDeque();
-            VarDeque r = new VarDeque( (VarDeque) d.GetSlot(Compartment.Top.ListMO, "$!items" ));
-            r.PushD((VarDeque) d.GetSlot(Compartment.Top.ListMO, "$!rest"));
+            VarDeque r = new VarDeque( (VarDeque) d.GetSlot(setting.ListMO, "$!items" ));
+            r.PushD((VarDeque) d.GetSlot(setting.ListMO, "$!rest"));
             return r;
         }
     }
@@ -3365,25 +3365,25 @@ bound: ;
     class PopList : ContextHandler<Variable> {
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
-            if (!o.IsDefined()) return Compartment.Top.AnyP;
-            VarDeque items = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!items");
-            VarDeque rest = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!rest");
+            if (!o.IsDefined()) return setting.AnyP;
+            VarDeque items = (VarDeque)o.GetSlot(setting.ListMO, "$!items");
+            VarDeque rest = (VarDeque)o.GetSlot(setting.ListMO, "$!rest");
             while (Kernel.IterHasFlat(rest, false))
                 items.Push(rest.Shift());
-            return (items.Count() != 0) ? items.Pop() : Compartment.Top.AnyP;
+            return (items.Count() != 0) ? items.Pop() : setting.AnyP;
         }
     }
     class ShiftList : ContextHandler<Variable> {
         public override Variable Get(Variable v) {
             P6any o = v.Fetch();
-            if (!o.IsDefined()) return Compartment.Top.AnyP;
-            VarDeque items = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!items");
-            VarDeque rest = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!rest");
+            if (!o.IsDefined()) return setting.AnyP;
+            VarDeque items = (VarDeque)o.GetSlot(setting.ListMO, "$!items");
+            VarDeque rest = (VarDeque)o.GetSlot(setting.ListMO, "$!rest");
             if (items.Count() != 0)
                 return items.Shift();
             if (Kernel.IterHasFlat(rest, false))
                 return rest.Shift();
-            return Compartment.Top.AnyP;
+            return setting.AnyP;
         }
     }
     class UnshiftList : PushyHandler {
@@ -3392,7 +3392,7 @@ bound: ;
             if (!o.IsDefined())
                 throw new NieczaException("Cannot push onto type object");
             VarDeque iter = new VarDeque(args);
-            VarDeque targ = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!items");
+            VarDeque targ = (VarDeque)o.GetSlot(setting.ListMO, "$!items");
             VarDeque st = new VarDeque();
             while (Kernel.IterHasFlat(iter, true))
                 st.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
@@ -3406,8 +3406,8 @@ bound: ;
             if (!o.IsDefined())
                 throw new NieczaException("Cannot push onto type object");
             VarDeque iter = new VarDeque(args);
-            VarDeque targ = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!rest");
-            if (targ.Count() == 0) targ = (VarDeque)o.GetSlot(Compartment.Top.ListMO, "$!items");
+            VarDeque targ = (VarDeque)o.GetSlot(setting.ListMO, "$!rest");
+            if (targ.Count() == 0) targ = (VarDeque)o.GetSlot(setting.ListMO, "$!items");
             while (Kernel.IterHasFlat(iter, true))
                 targ.Push(Kernel.NewMuScalar(iter.Shift().Fetch()));
             return v;
@@ -3424,14 +3424,14 @@ bound: ;
             bool first = true;
             while (Kernel.IterHasFlat(iter, true)) {
                 P6any elt = iter.Shift().Fetch();
-                if (first && elt.mo.HasType(Compartment.Top.HashMO)) {
+                if (first && elt.mo.HasType(setting.HashMO)) {
                     foreach(KeyValuePair<string,Variable> kv in
                             Kernel.UnboxAny<VarHash>(elt)) {
                         into[kv.Key] = kv.Value;
                     }
-                } else if (elt.mo.HasType(Compartment.Top.PairMO)) {
-                    Variable k = (Variable) elt.GetSlot(Compartment.Top.EnumMO, "$!key");
-                    Variable v = (Variable) elt.GetSlot(Compartment.Top.EnumMO, "$!value");
+                } else if (elt.mo.HasType(setting.PairMO)) {
+                    Variable k = (Variable) elt.GetSlot(setting.EnumMO, "$!key");
+                    Variable v = (Variable) elt.GetSlot(setting.EnumMO, "$!value");
                     into[k.Fetch().mo.mro_raw_Str.Get(k)] =
                         Kernel.NewMuScalar(v.Fetch());
                 } else {
@@ -3466,7 +3466,7 @@ bound: ;
 
     class CtxBoolNativeDefined : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
-            return obj.Fetch().IsDefined() ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+            return obj.Fetch().IsDefined() ? setting.TrueV : setting.FalseV;
         }
     }
 
@@ -3479,7 +3479,7 @@ bound: ;
         public override P6any Get(Variable obj) {
             P6any o = obj.Fetch();
             double v = o.IsDefined() ? Kernel.UnboxAny<double>(o) : 0;
-            return Kernel.BoxRaw(v + amt, Compartment.Top.NumMO);
+            return Kernel.BoxRaw(v + amt, setting.NumMO);
         }
     }
     class CtxRawNativeNum2Str : ContextHandler<string> {
@@ -3507,14 +3507,14 @@ bound: ;
             if (o is BoxObject<BigInteger>) {
                 BigInteger bn = Kernel.UnboxAny<BigInteger>(o) + amt;
                 if (bn.AsInt32(out v))
-                    return Kernel.BoxRaw<int>(v, Compartment.Top.IntMO);
+                    return Kernel.BoxRaw<int>(v, setting.IntMO);
                 else
-                    return Kernel.BoxRaw<BigInteger>(bn, Compartment.Top.IntMO);
+                    return Kernel.BoxRaw<BigInteger>(bn, setting.IntMO);
             }
             v = o.IsDefined() ? Kernel.UnboxAny<int>(o) : 0;
             if (v == (amt > 0 ? int.MaxValue : int.MinValue))
-                return Kernel.BoxRaw<BigInteger>(amt + (long)v, Compartment.Top.IntMO);
-            return Kernel.BoxRaw(v + amt, Compartment.Top.IntMO);
+                return Kernel.BoxRaw<BigInteger>(amt + (long)v, setting.IntMO);
+            return Kernel.BoxRaw(v + amt, setting.IntMO);
         }
     }
     class CtxIntStr : ContextHandler<string> {
@@ -3549,7 +3549,7 @@ bound: ;
             } else {
                 rr = new Rat(up ? BigInteger.One : BigInteger.MinusOne, 1);
             }
-            return Kernel.BoxRaw<Rat>(rr, Compartment.Top.RatMO);
+            return Kernel.BoxRaw<Rat>(rr, setting.RatMO);
         }
     }
     class CtxRatStr : ContextHandler<string> {
@@ -3584,7 +3584,7 @@ bound: ;
             } else {
                 rr = new FatRat(up ? BigInteger.One : BigInteger.MinusOne, BigInteger.One);
             }
-            return Kernel.BoxRaw<FatRat>(rr, Compartment.Top.FatRatMO);
+            return Kernel.BoxRaw<FatRat>(rr, setting.FatRatMO);
         }
     }
     class CtxFatRatStr : ContextHandler<string> {
@@ -3614,7 +3614,7 @@ bound: ;
             P6any o = obj.Fetch();
             Complex c = o.IsDefined() ? Kernel.UnboxAny<Complex>(o) : null;
             c = (c == null) ? new Complex(amt, 0) : new Complex(c.re+amt, c.im);
-            return Kernel.BoxRaw(c, Compartment.Top.ComplexMO);
+            return Kernel.BoxRaw(c, setting.ComplexMO);
         }
     }
     class CtxComplexStr : ContextHandler<string> {
@@ -3704,12 +3704,12 @@ bound: ;
 
         public override P6any Get(Variable obj) {
             P6any obj_o = obj.Fetch();
-            if (!obj_o.IsDefined()) return Kernel.BoxRaw("WTF", Compartment.Top.StrMO);
+            if (!obj_o.IsDefined()) return Kernel.BoxRaw("WTF", setting.StrMO);
             string src = Kernel.UnboxAny<string>(obj_o);
             int right = src.Length;
 tryagain:
             while (right != 0 && !Digitish(src[right-1])) right--;
-            if (right == 0) return Kernel.BoxRaw("WTF", Compartment.Top.StrMO);
+            if (right == 0) return Kernel.BoxRaw("WTF", setting.StrMO);
             int left = right;
             while (left != 0 && Digitish(src[left-1])) left--;
             if (left != 0 && src[left-1] == '.') {
@@ -3749,7 +3749,7 @@ tryagain:
             }
             for (int i = 0; i < right; i++) nbuf[i+1-delta] = src[i];
             return Kernel.BoxRaw(new string(nbuf, 1-delta, src.Length+delta),
-                    Compartment.Top.StrMO);
+                    setting.StrMO);
         }
     }
 
@@ -3837,7 +3837,7 @@ tryagain:
     class CtxStrNativeNum2Str : ContextHandler<Variable> {
         public override Variable Get(Variable obj) {
             P6any o = obj.Fetch();
-            return Kernel.BoxAnyMO<string>(o.IsDefined() ? Utils.N2S(Kernel.UnboxAny<double>(o)) : "Num()", Compartment.Top.StrMO);
+            return Kernel.BoxAnyMO<string>(o.IsDefined() ? Utils.N2S(Kernel.UnboxAny<double>(o)) : "Num()", setting.StrMO);
         }
     }
 
@@ -3856,7 +3856,7 @@ tryagain:
             this.name = name;
             if (adv != null) {
                 named = new VarHash();
-                named[adv] = Compartment.Top.TrueV;
+                named[adv] = setting.TrueV;
             }
         }
         public override Variable Get(Variable obj, Variable key) {
@@ -3882,9 +3882,9 @@ tryagain:
 
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
+            else if (ks.mo.HasType(setting.WhateverMO))
                 return GetAll(obj);
 
             switch (mode) {
@@ -3898,12 +3898,12 @@ tryagain:
     class IxAnyDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return Compartment.Top.AnyP;
+                return setting.AnyP;
             return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                 "delete_key", new Variable[] { obj, key }, null));
         }
@@ -3911,12 +3911,12 @@ tryagain:
     class IxAnyExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return Compartment.Top.FalseV;
+                return setting.FalseV;
             return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                 "exists_key", new Variable[] { obj, key }, null));
         }
@@ -3927,8 +3927,8 @@ tryagain:
             if (os.IsDefined())
                 return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                     "bind_key", new Variable[] { obj, key, to }, null));
-            obj.Store(Kernel.BoxRaw(new VarHash(), Compartment.Top.HashMO));
-            return Compartment.Top.HashMO.mro_bind_key.Bind(obj, key, to);
+            obj.Store(Kernel.BoxRaw(new VarHash(), setting.HashMO));
+            return setting.HashMO.mro_bind_key.Bind(obj, key, to);
         }
     }
     class IxAnyBindPos : BindHandler {
@@ -3938,20 +3938,20 @@ tryagain:
                 return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                     "bind_pos", new Variable[] { obj, key, to }, null));
             obj.Store(Kernel.CreateArray().Fetch());
-            return Compartment.Top.ArrayMO.mro_bind_key.Bind(obj, key, to);
+            return setting.ArrayMO.mro_bind_key.Bind(obj, key, to);
         }
     }
     class IxAnyAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
+            else if (ks.mo.HasType(setting.WhateverMO))
                 return GetAll(obj);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return IndexHandler.ViviHash(obj, key);
+                return ViviHash(obj, key);
             return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                 "at_key", new Variable[] { obj, key }, null));
         }
@@ -3959,15 +3959,15 @@ tryagain:
     class IxAnyAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
+            else if (ks.mo.HasType(setting.WhateverMO))
                 return GetAll(obj);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return IndexHandler.ViviArray(obj, key);
-            if (ks.mo != Compartment.Top.IntMO && ks.mo.HasType(Compartment.Top.CodeMO)) {
+                return ViviArray(obj, key);
+            if (ks.mo != setting.IntMO && ks.mo.HasType(setting.CodeMO)) {
                 Variable elts = Kernel.RunInferior(os.InvokeMethod(
                         Kernel.GetInferiorRoot(), "elems",
                         new Variable[] { obj }, null));
@@ -3984,13 +3984,13 @@ tryagain:
     class IxCursorAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
+            else if (ks.mo.HasType(setting.WhateverMO))
                 return GetAll(obj);
             P6any o = obj.Fetch();
             if (!o.IsDefined())
-                return Compartment.Top.AnyP;
+                return setting.AnyP;
 
             Cursor os = (Cursor)o;
             return os.GetKey(ks.mo.mro_raw_Str.Get(key));
@@ -3999,14 +3999,14 @@ tryagain:
     class IxCursorAtPos : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
+            else if (ks.mo.HasType(setting.WhateverMO))
                 return GetAll(obj);
 
             P6any o = obj.Fetch();
             if (!o.IsDefined())
-                return Compartment.Top.AnyP;
+                return setting.AnyP;
 
             Cursor os = (Cursor)o;
             return os.GetKey(Utils.N2S(ks.mo.mro_raw_Numeric.Get(key)));
@@ -4020,7 +4020,7 @@ tryagain:
             P6any ks = key.Fetch();
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                obj.Store(os = Kernel.BoxRaw(new VarHash(), Compartment.Top.HashMO));
+                obj.Store(os = Kernel.BoxRaw(new VarHash(), setting.HashMO));
             string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
 
@@ -4030,42 +4030,42 @@ tryagain:
     class IxHashAtKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
+            else if (ks.mo.HasType(setting.WhateverMO))
                 return GetAll(obj);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return IndexHandler.ViviHash(obj, key);
+                return ViviHash(obj, key);
             string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
             Variable r;
             if (h.TryGetValue(kss, out r))
                 return r;
             return new RWVariable(null, new HashViviHook(os, kss),
-                    Compartment.Top.AnyP);
+                    setting.AnyP);
         }
     }
     class IxHashExistsKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
             P6any os = obj.Fetch();
-            if (!os.IsDefined()) return Compartment.Top.FalseV;
+            if (!os.IsDefined()) return setting.FalseV;
             string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
-            return h.ContainsKey(kss) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+            return h.ContainsKey(kss) ? setting.TrueV : setting.FalseV;
         }
     }
     class IxHashDeleteKey : IndexHandler {
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
             P6any os = obj.Fetch();
-            if (!os.IsDefined()) return Compartment.Top.AnyP;
+            if (!os.IsDefined()) return setting.AnyP;
             string kss = ks.mo.mro_raw_Str.Get(key);
             VarHash h = Kernel.UnboxAny<VarHash>(os);
             Variable r;
@@ -4073,7 +4073,7 @@ tryagain:
                 h.Remove(kss);
                 return r;
             } else {
-                return Compartment.Top.AnyP;
+                return setting.AnyP;
             }
         }
     }
@@ -4087,20 +4087,20 @@ tryagain:
 
         public override Variable Get(Variable obj, Variable key) {
             P6any ks = key.Fetch();
-            if (key.List || !ks.mo.is_any && ks.mo.HasType(Compartment.Top.JunctionMO))
+            if (key.List || !ks.mo.is_any && ks.mo.HasType(setting.JunctionMO))
                 return Slice(obj, key);
-            else if (ks.mo.HasType(Compartment.Top.WhateverMO))
+            else if (ks.mo.HasType(setting.WhateverMO))
                 return GetAll(obj);
 
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                return IndexHandler.ViviArray(obj, key);
+                return ViviArray(obj, key);
 
             P6opaque dos = (P6opaque) os;
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
 
-            if (ks.mo != Compartment.Top.IntMO && ks.mo.HasType(Compartment.Top.CodeMO)) {
+            if (ks.mo != setting.IntMO && ks.mo.HasType(setting.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 return Get(obj, Kernel.RunInferior(ks.Invoke(
                     Kernel.GetInferiorRoot(),
@@ -4112,13 +4112,13 @@ tryagain:
                 items.Push(rest.Shift());
             }
             if (ix < 0)
-                return Compartment.Top.AnyP;
+                return setting.AnyP;
             if (items.Count() <= ix) {
                 if (extend) {
                     return new RWVariable(null, new ArrayViviHook(os, ix),
-                            Compartment.Top.AnyP);
+                            setting.AnyP);
                 } else {
-                    return Compartment.Top.AnyP;
+                    return setting.AnyP;
                 }
             }
             return items[ix];
@@ -4138,7 +4138,7 @@ tryagain:
             VarDeque items = (VarDeque) dos.slots[0];
             VarDeque rest  = (VarDeque) dos.slots[1];
 
-            if (ks.mo != Compartment.Top.IntMO && ks.mo.HasType(Compartment.Top.CodeMO)) {
+            if (ks.mo != setting.IntMO && ks.mo.HasType(setting.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
                 key = Kernel.RunInferior(ks.Invoke(Kernel.GetInferiorRoot(),
                     new Variable[] { nr }, null));
