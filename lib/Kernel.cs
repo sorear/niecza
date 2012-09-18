@@ -1653,6 +1653,7 @@ namespace Niecza {
         public string outervar;
 
         // References to related objects
+        internal Compartment setting = Compartment.Top;
         public RuntimeUnit unit;
         public SubInfo outer;
         public P6any protosub;
@@ -1823,9 +1824,10 @@ namespace Niecza {
                 dst[th.lexi1 - 1] = (Variable)th.resultSlot;
 
             if (th.lexi1 == dst.Length) {
-                P6opaque nj = new P6opaque(Compartment.Top.JunctionMO);
+                var setting = th.info.setting;
+                P6opaque nj = new P6opaque(setting.JunctionMO);
                 nj.slots[0] = th.lex3;
-                nj.slots[1] = Kernel.BoxRaw(dst, Compartment.Top.ParcelMO);
+                nj.slots[1] = Kernel.BoxRaw(dst, setting.ParcelMO);
                 // restore, in case our caller is using this
                 if (th.lexi0 == -2)
                     th.named[(string)th.lex2] = (Variable)th.lex9;
@@ -2326,7 +2328,7 @@ namespace Niecza {
             code = info_.code;
             info = info_;
             sub = sub_;
-            mo = Compartment.Top.CallFrameMO;
+            mo = info_.setting.CallFrameMO;
             lexn = (info_.nspill > 0) ? new object[info_.nspill] : null;
         }
 
@@ -2549,6 +2551,7 @@ namespace Niecza {
             int jun_pivot = -1;
             int jun_rank = int.MaxValue;
             string jun_pivot_n = null;
+            var setting = th.info.setting;
 
             bool rawc = BindSignature(th, th.info.sig, th.flags, th.info.name,
                     th.pos, th.named, ref jun_pivot, ref jun_pivot_n,
@@ -2563,7 +2566,7 @@ namespace Niecza {
                 var sav_outer = th.outer;
                 var sav_sub = th.sub;
                 var sav_disp = th.curDisp;
-                Frame nth = th.Return().MakeChild(null, Compartment.Top.AutoThreadSubSI, Compartment.Top.AnyP);
+                Frame nth = th.Return().MakeChild(null, setting.AutoThreadSubSI, setting.AnyP);
 
                 P6opaque jo  = (P6opaque) jct.Fetch();
 
@@ -2586,7 +2589,7 @@ namespace Niecza {
             }
 
             if ((th.flags & CHECK_ONLY) != 0) {
-                th.caller.resultSlot = rawc ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+                th.caller.resultSlot = rawc ? setting.TrueV : setting.FalseV;
                 return th.Return();
             } else {
                 return th;
@@ -2595,6 +2598,7 @@ namespace Niecza {
 
         static bool RunConstraint(Frame th, string signame, Parameter param,
                 bool quiet, Variable arg, object c) {
+            var setting = th.info.setting;
             if (c is Signature) {
                 // Sub-signature
                 // dummy values; no junctional operation in subsigs
@@ -2605,13 +2609,13 @@ namespace Niecza {
                     null)).Fetch();
                 return BindSignature(th, (Signature)c,
                         NO_JUNCTION + (quiet ? CHECK_ONLY : 0), param.name,
-                        (Variable[])cap.GetSlot(Compartment.Top.CaptureMO, "$!positionals"),
-                        (VarHash)cap.GetSlot(Compartment.Top.CaptureMO, "$!named"),
+                        (Variable[])cap.GetSlot(setting.CaptureMO, "$!positionals"),
+                        (VarHash)cap.GetSlot(setting.CaptureMO, "$!named"),
                         ref jun_pivot, ref jun_pivot_n, ref jun_rank);
             }
             if (c is SubInfo) {
                 Frame thn = Kernel.GetInferiorRoot()
-                    .MakeChild(th, (SubInfo)c, Compartment.Top.AnyP);
+                    .MakeChild(th, (SubInfo)c, setting.AnyP);
                 var sm = Kernel.RunInferior(thn);
                 bool res = Kernel.ACCEPTS(arg, sm);
                 if (!res && !quiet)
@@ -2631,6 +2635,7 @@ namespace Niecza {
                 string signame, Variable[] pos, VarHash named,
                 ref int jun_pivot, ref string jun_pivot_n, ref int jun_rank) {
 
+            var setting = th.info.setting;
             Parameter[] pbuf = sig.parms;
             int posc = 0;
             HashSet<string> namedc = null;
@@ -2654,18 +2659,18 @@ namespace Niecza {
 
                 Variable src = null;
                 if ((flags & Parameter.SLURPY_PCL) != 0) {
-                    src = (slot >= 0) ? Kernel.BoxAnyMO(pos, Compartment.Top.ParcelMO) :
-                        Compartment.Top.AnyP;
+                    src = (slot >= 0) ? Kernel.BoxAnyMO(pos, setting.ParcelMO) :
+                        setting.AnyP;
                     posc  = pos.Length;
                     goto gotit;
                 }
                 if ((flags & Parameter.SLURPY_CAP) != 0) {
                     if (slot < 0) {
-                        src = Compartment.Top.AnyP;
+                        src = setting.AnyP;
                         named = null; namedc = null; posc = pos.Length;
                         goto gotit;
                     }
-                    P6any nw = new P6opaque(Compartment.Top.CaptureMO);
+                    P6any nw = new P6opaque(setting.CaptureMO);
                     Variable[] spos = new Variable[pos.Length - posc];
                     Array.Copy(pos, posc, spos, 0, spos.Length);
                     VarHash snamed = null;
@@ -2676,14 +2681,14 @@ namespace Niecza {
                                 snamed[k] = named[k];
                         }
                     }
-                    nw.SetSlot(Compartment.Top.CaptureMO, "$!positionals", spos);
-                    nw.SetSlot(Compartment.Top.CaptureMO, "$!named", snamed);
+                    nw.SetSlot(setting.CaptureMO, "$!positionals", spos);
+                    nw.SetSlot(setting.CaptureMO, "$!named", snamed);
                     src = nw;
                     named = null; namedc = null; posc = pos.Length;
                     goto gotit;
                 }
                 if ((flags & Parameter.SLURPY_POS) != 0) {
-                    P6any l = new P6opaque(Compartment.Top.ListMO);
+                    P6any l = new P6opaque(setting.ListMO);
                     Kernel.IterToList(l, Kernel.IterFlatten(
                                 Kernel.SlurpyHelper(pos, posc)));
                     src = Kernel.NewRWListVar(l);
@@ -2699,7 +2704,7 @@ namespace Niecza {
                         named = null;
                         namedc = null;
                     }
-                    src = Kernel.BoxAnyMO(nh, Compartment.Top.HashMO);
+                    src = Kernel.BoxAnyMO(nh, setting.HashMO);
                     goto gotit;
                 }
                 if (names != null && named != null) {
@@ -2725,7 +2730,7 @@ get_default:
                         src = (Variable)param.def;
                     } else {
                         Frame thn = Kernel.GetInferiorRoot()
-                            .MakeChild(th, (SubInfo)param.def, Compartment.Top.AnyP);
+                            .MakeChild(th, (SubInfo)param.def, setting.AnyP);
                         src = Kernel.RunInferior(thn);
                         if (src == null)
                             throw new Exception("Improper null return from sub default for '" + param.name + "' in '" + signame + "'");
@@ -2735,7 +2740,7 @@ get_default:
                 if ((flags & Parameter.DEFOUTER) != 0) {
                     Frame f = th;
                     if (th.info.outer_topic_key < 0) {
-                        src = Compartment.Top.AnyP;
+                        src = setting.AnyP;
                         goto gotit;
                     }
                     for (int i = 0; i < th.info.outer_topic_rank; i++) f = f.outer;
@@ -2788,20 +2793,20 @@ gotit:
 
                     // XXX: in order for calling methods on Compartment.Top.Nil to work,
                     // self needs to be ignored here.
-                    if (srco == Compartment.Top.NilP && obj_src != -1 &&
+                    if (srco == setting.NilP && obj_src != -1 &&
                             (flags & Parameter.INVOCANT) == 0) {
                         obj_src = -1;
                         goto get_default;
                     }
                     if ((flags & Parameter.IS_LIST) != 0)
-                        type = Compartment.Top.PositionalMO;
+                        type = setting.PositionalMO;
                     if ((flags & Parameter.IS_HASH) != 0)
-                        type = Compartment.Top.AssociativeMO;
+                        type = setting.AssociativeMO;
                     if ((flags & Parameter.CALLABLE) != 0)
-                        type = Compartment.Top.CallableMO;
+                        type = setting.CallableMO;
                     if (!srco.Does(type)) {
                         if (quiet) return false;
-                        if (srco.mo.HasType(Compartment.Top.JunctionMO) && obj_src != -1 && (mode & NO_JUNCTION) == 0) {
+                        if (srco.mo.HasType(setting.JunctionMO) && obj_src != -1 && (mode & NO_JUNCTION) == 0) {
                             int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)srco).slots[0]) / 2;
                             if (jrank < jun_rank) {
                                 jun_rank = jrank;
