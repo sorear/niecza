@@ -729,7 +729,7 @@ namespace Niecza {
             this.stubbed_stashes = new List<KeyValuePair<int,STable>>();
             this.is_mainish = main;
             if (name == "CORE")
-                Kernel.CreateBasicTypes();
+                Kernel.CreateBasicTypes(Compartment.Top);
 
             this.asm_name = Backend.prefix + name.Replace("::", ".");
             this.dll_name = asm_name + (main ? ".exe" : ".dll");
@@ -6052,211 +6052,211 @@ slow:
             Compartment.Top.currentGlobals[key].Bind(to);
         }
 
-        internal static void CreateBasicTypes() {
-            Compartment.Top.CodeMO = new STable("Code"); // forward decl
-            Compartment.Top.MuMO = new STable("Mu");
-            Compartment.Top.AnyMO = new STable("Any");
-            Compartment.Top.ParameterMO = new STable("Parameter");
-            Compartment.Top.SignatureMO = new STable("Signature");
-            Handler_Vonly(Compartment.Top.MuMO, "defined", new CtxBoolNativeDefined(),
+        internal static void CreateBasicTypes(Compartment s) {
+            s.CodeMO = new STable("Code"); // forward decl
+            s.MuMO = new STable("Mu");
+            s.AnyMO = new STable("Any");
+            s.ParameterMO = new STable("Parameter");
+            s.SignatureMO = new STable("Signature");
+            Handler_Vonly(s.MuMO, "defined", new CtxBoolNativeDefined(),
                     new CtxRawNativeDefined());
-            Handler_Vonly(Compartment.Top.MuMO, "Bool", new CtxBoolNativeDefined(),
+            Handler_Vonly(s.MuMO, "Bool", new CtxBoolNativeDefined(),
                     new CtxRawNativeDefined());
-            Handler_Vonly(Compartment.Top.MuMO, "item", new CtxReturnSelfItem(), null);
+            Handler_Vonly(s.MuMO, "item", new CtxReturnSelfItem(), null);
 
-            Compartment.Top.MuMO.FillProtoClass(null, new string[0], new STable[0]);
-            Compartment.Top.MuMO.Invalidate();
+            s.MuMO.FillProtoClass(null, new string[0], new STable[0]);
+            s.MuMO.Invalidate();
 
-            // Compartment.Top.AnyMO.typeObj is needed very early, while setting up the
+            // s.AnyMO.typeObj is needed very early, while setting up the
             // root $_
-            Compartment.Top.AnyMO.typeObj = new P6opaque(Compartment.Top.AnyMO, 0);
-            Handler_Vonly(Compartment.Top.AnyMO, "list", new CtxAnyList(), null);
-            WrapIndexy(Compartment.Top.AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
+            s.AnyMO.typeObj = new P6opaque(s.AnyMO, 0);
+            Handler_Vonly(s.AnyMO, "list", new CtxAnyList(), null);
+            WrapIndexy(s.AnyMO, "postcircumfix:<[ ]>", new IxAnyAtPos(),
                     null, null, new IxAnyBindPos());
-            WrapIndexy(Compartment.Top.AnyMO, "postcircumfix:<{ }>", new IxAnyAtKey(),
+            WrapIndexy(s.AnyMO, "postcircumfix:<{ }>", new IxAnyAtKey(),
                     new IxAnyExistsKey(), new IxAnyDeleteKey(),
                     new IxAnyBindKey());
-            Compartment.Top.AnyMO.FillProtoClass(Compartment.Top.MuMO);
-            Compartment.Top.AnyMO.Invalidate();
+            s.AnyMO.FillProtoClass(s.MuMO);
+            s.AnyMO.Invalidate();
 
-            Compartment.Top.CodeMO.FillProtoClass(Compartment.Top.AnyMO, new string[] { "$!outer", "$!info" },
-                new STable[] { Compartment.Top.CodeMO, Compartment.Top.CodeMO });
-            Compartment.Top.SubInvokeSubSI.param = new object[] { null, new InvokeSub() };
-            Compartment.Top.CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(Compartment.Top.SubInvokeSubSI, null));
-            Compartment.Top.CodeMO.Invalidate();
+            s.CodeMO.FillProtoClass(s.AnyMO, new string[] { "$!outer", "$!info" },
+                new STable[] { s.CodeMO, s.CodeMO });
+            s.SubInvokeSubSI.param = new object[] { null, new InvokeSub() };
+            s.CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(s.SubInvokeSubSI, null));
+            s.CodeMO.Invalidate();
 
-            Compartment.Top.BlockMO = new STable("Block");
-            Compartment.Top.RoutineMO = new STable("Routine");
-            Compartment.Top.WhateverCodeMO = new STable("WhateverCode");
-            Compartment.Top.SubMO = new STable("Sub");
-            Compartment.Top.SubmethodMO = new STable("Submethod");
-            Compartment.Top.MethodMO = new STable("Method");
-            Compartment.Top.RegexMO = new STable("Regex");
+            s.BlockMO = new STable("Block");
+            s.RoutineMO = new STable("Routine");
+            s.WhateverCodeMO = new STable("WhateverCode");
+            s.SubMO = new STable("Sub");
+            s.SubmethodMO = new STable("Submethod");
+            s.MethodMO = new STable("Method");
+            s.RegexMO = new STable("Regex");
 
-            Compartment.Top.BlockMO.FillProtoClass(Compartment.Top.CodeMO);
-            Compartment.Top.RoutineMO.FillProtoClass(Compartment.Top.BlockMO);
-            Compartment.Top.WhateverCodeMO.FillProtoClass(Compartment.Top.BlockMO);
-            Compartment.Top.SubMO.FillProtoClass(Compartment.Top.RoutineMO);
-            Compartment.Top.MethodMO.FillProtoClass(Compartment.Top.RoutineMO);
-            Compartment.Top.SubmethodMO.FillProtoClass(Compartment.Top.RoutineMO);
-            Compartment.Top.RegexMO.FillProtoClass(Compartment.Top.MethodMO);
+            s.BlockMO.FillProtoClass(s.CodeMO);
+            s.RoutineMO.FillProtoClass(s.BlockMO);
+            s.WhateverCodeMO.FillProtoClass(s.BlockMO);
+            s.SubMO.FillProtoClass(s.RoutineMO);
+            s.MethodMO.FillProtoClass(s.RoutineMO);
+            s.SubmethodMO.FillProtoClass(s.RoutineMO);
+            s.RegexMO.FillProtoClass(s.MethodMO);
 
-            Compartment.Top.LabelMO = new STable("Label");
-            Compartment.Top.LabelMO.FillProtoClass(Compartment.Top.AnyMO, new string[] { "$!target", "$!name" },
-                    new STable[] { Compartment.Top.LabelMO, Compartment.Top.LabelMO });
+            s.LabelMO = new STable("Label");
+            s.LabelMO.FillProtoClass(s.AnyMO, new string[] { "$!target", "$!name" },
+                    new STable[] { s.LabelMO, s.LabelMO });
 
-            Compartment.Top.EnumMO = new STable("Enum");
-            Compartment.Top.EnumMO.FillProtoClass(Compartment.Top.AnyMO, new string[] { "$!key", "$!value" },
-                    new STable[] { Compartment.Top.EnumMO, Compartment.Top.EnumMO });
-            Compartment.Top.PairMO = new STable("Pair");
-            Compartment.Top.PairMO.FillProtoClass(Compartment.Top.EnumMO);
+            s.EnumMO = new STable("Enum");
+            s.EnumMO.FillProtoClass(s.AnyMO, new string[] { "$!key", "$!value" },
+                    new STable[] { s.EnumMO, s.EnumMO });
+            s.PairMO = new STable("Pair");
+            s.PairMO.FillProtoClass(s.EnumMO);
 
             // forward reference
-            Compartment.Top.StrMO = new STable("Str");
-            Compartment.Top.BoolMO = new STable("Bool");
+            s.StrMO = new STable("Str");
+            s.BoolMO = new STable("Bool");
 
-            Compartment.Top.IntMO = new STable("Int");
-            Handler_Vonly(Compartment.Top.IntMO, "Numeric", new CtxReturnSelf(),
+            s.IntMO = new STable("Int");
+            Handler_Vonly(s.IntMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_PandBox(Compartment.Top.IntMO, "Bool", new CtxIntBool(), Compartment.Top.BoolMO);
-            Handler_PandBox(Compartment.Top.IntMO, "Str", new CtxIntStr(), Compartment.Top.StrMO);
-            Handler_PandCont(Compartment.Top.IntMO, "succ", new CtxIntSuccish(+1));
-            Handler_PandCont(Compartment.Top.IntMO, "pred", new CtxIntSuccish(-1));
-            Compartment.Top.IntMO.FillProtoClass(Compartment.Top.AnyMO);
+            Handler_PandBox(s.IntMO, "Bool", new CtxIntBool(), s.BoolMO);
+            Handler_PandBox(s.IntMO, "Str", new CtxIntStr(), s.StrMO);
+            Handler_PandCont(s.IntMO, "succ", new CtxIntSuccish(+1));
+            Handler_PandCont(s.IntMO, "pred", new CtxIntSuccish(-1));
+            s.IntMO.FillProtoClass(s.AnyMO);
 
-            Handler_Vonly(Compartment.Top.BoolMO, "Bool", new CtxReturnSelf(),
+            Handler_Vonly(s.BoolMO, "Bool", new CtxReturnSelf(),
                     new CtxBoolUnbox());
-            Compartment.Top.BoolMO.FillProtoClass(Compartment.Top.IntMO, new string[] { "$!index" },
-                new STable[] { Compartment.Top.BoolMO });
-            Compartment.Top.TrueV  = BoxRaw<int>(1, Compartment.Top.BoolMO);
-            Compartment.Top.FalseV = BoxRaw<int>(0, Compartment.Top.BoolMO);
-            Compartment.Top.FalseV.SetSlot(Compartment.Top.BoolMO, "$!index", BoxAnyMO(0, Compartment.Top.IntMO));
-            Compartment.Top.TrueV.SetSlot(Compartment.Top.BoolMO, "$!index", BoxAnyMO(1, Compartment.Top.IntMO));
+            s.BoolMO.FillProtoClass(s.IntMO, new string[] { "$!index" },
+                new STable[] { s.BoolMO });
+            s.TrueV  = BoxRaw<int>(1, s.BoolMO);
+            s.FalseV = BoxRaw<int>(0, s.BoolMO);
+            s.FalseV.SetSlot(s.BoolMO, "$!index", BoxAnyMO(0, s.IntMO));
+            s.TrueV.SetSlot(s.BoolMO, "$!index", BoxAnyMO(1, s.IntMO));
 
-            Handler_Vonly(Compartment.Top.StrMO, "Str", new CtxReturnSelf(),
+            Handler_Vonly(s.StrMO, "Str", new CtxReturnSelf(),
                     new CtxJustUnbox<string>(""));
-            Handler_PandBox(Compartment.Top.StrMO, "Bool", new CtxStrBool(), Compartment.Top.BoolMO);
-            Handler_PandCont(Compartment.Top.StrMO, "succ", new CtxStrSuccish(true));
-            Handler_PandCont(Compartment.Top.StrMO, "pred", new CtxStrSuccish(false));
-            Compartment.Top.StrMO.FillProtoClass(Compartment.Top.AnyMO);
+            Handler_PandBox(s.StrMO, "Bool", new CtxStrBool(), s.BoolMO);
+            Handler_PandCont(s.StrMO, "succ", new CtxStrSuccish(true));
+            Handler_PandCont(s.StrMO, "pred", new CtxStrSuccish(false));
+            s.StrMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.JunctionMO = new STable("Junction");
-            Handler_PandBox(Compartment.Top.JunctionMO, "Bool", new CtxJunctionBool(), Compartment.Top.BoolMO);
-            Compartment.Top.JunctionMO.AddMethod(0, "FALLBACK", MakeSub(Compartment.Top.JunctionFallbackSI, null));
-            Compartment.Top.JunctionMO.FillProtoClass(Compartment.Top.MuMO,
+            s.JunctionMO = new STable("Junction");
+            Handler_PandBox(s.JunctionMO, "Bool", new CtxJunctionBool(), s.BoolMO);
+            s.JunctionMO.AddMethod(0, "FALLBACK", MakeSub(s.JunctionFallbackSI, null));
+            s.JunctionMO.FillProtoClass(s.MuMO,
                     new string[] { "$!kind_", "$!eigenstates_" },
-                    new STable[] { Compartment.Top.JunctionMO, Compartment.Top.JunctionMO });
+                    new STable[] { s.JunctionMO, s.JunctionMO });
 
-            Compartment.Top.IteratorMO = new STable("Iterator");
-            Compartment.Top.IteratorMO.FillProtoClass(Compartment.Top.AnyMO);
+            s.IteratorMO = new STable("Iterator");
+            s.IteratorMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.NumMO = new STable("Num");
-            Handler_Vonly(Compartment.Top.NumMO, "Numeric", new CtxReturnSelf(),
+            s.NumMO = new STable("Num");
+            Handler_Vonly(s.NumMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_Vonly(Compartment.Top.NumMO, "Str", new CtxStrNativeNum2Str(),
+            Handler_Vonly(s.NumMO, "Str", new CtxStrNativeNum2Str(),
                     new CtxRawNativeNum2Str());
-            Handler_PandBox(Compartment.Top.NumMO, "Bool", new CtxNum2Bool(), Compartment.Top.BoolMO);
-            Handler_PandCont(Compartment.Top.NumMO, "succ", new CtxNumSuccish(+1));
-            Handler_PandCont(Compartment.Top.NumMO, "pred", new CtxNumSuccish(-1));
-            Compartment.Top.NumMO.FillProtoClass(Compartment.Top.AnyMO);
+            Handler_PandBox(s.NumMO, "Bool", new CtxNum2Bool(), s.BoolMO);
+            Handler_PandCont(s.NumMO, "succ", new CtxNumSuccish(+1));
+            Handler_PandCont(s.NumMO, "pred", new CtxNumSuccish(-1));
+            s.NumMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.RatMO = new STable("Rat");
-            Handler_Vonly(Compartment.Top.RatMO, "Numeric", new CtxReturnSelf(),
+            s.RatMO = new STable("Rat");
+            Handler_Vonly(s.RatMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_PandBox(Compartment.Top.RatMO, "Bool", new CtxRatBool(), Compartment.Top.BoolMO);
-            Handler_PandBox(Compartment.Top.RatMO, "Str", new CtxRatStr(), Compartment.Top.StrMO);
-            Handler_PandCont(Compartment.Top.RatMO, "succ", new CtxRatSuccish(true));
-            Handler_PandCont(Compartment.Top.RatMO, "pred", new CtxRatSuccish(false));
-            Compartment.Top.RatMO.FillProtoClass(Compartment.Top.AnyMO);
+            Handler_PandBox(s.RatMO, "Bool", new CtxRatBool(), s.BoolMO);
+            Handler_PandBox(s.RatMO, "Str", new CtxRatStr(), s.StrMO);
+            Handler_PandCont(s.RatMO, "succ", new CtxRatSuccish(true));
+            Handler_PandCont(s.RatMO, "pred", new CtxRatSuccish(false));
+            s.RatMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.FatRatMO = new STable("FatRat");
-            Handler_Vonly(Compartment.Top.FatRatMO, "Numeric", new CtxReturnSelf(),
+            s.FatRatMO = new STable("FatRat");
+            Handler_Vonly(s.FatRatMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_PandBox(Compartment.Top.FatRatMO, "Bool", new CtxFatRatBool(), Compartment.Top.BoolMO);
-            Handler_PandBox(Compartment.Top.FatRatMO, "Str", new CtxFatRatStr(), Compartment.Top.StrMO);
-            Handler_PandCont(Compartment.Top.FatRatMO, "succ", new CtxFatRatSuccish(true));
-            Handler_PandCont(Compartment.Top.FatRatMO, "pred", new CtxFatRatSuccish(false));
-            Compartment.Top.FatRatMO.FillProtoClass(Compartment.Top.AnyMO);
+            Handler_PandBox(s.FatRatMO, "Bool", new CtxFatRatBool(), s.BoolMO);
+            Handler_PandBox(s.FatRatMO, "Str", new CtxFatRatStr(), s.StrMO);
+            Handler_PandCont(s.FatRatMO, "succ", new CtxFatRatSuccish(true));
+            Handler_PandCont(s.FatRatMO, "pred", new CtxFatRatSuccish(false));
+            s.FatRatMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.ComplexMO = new STable("Complex");
-            Handler_Vonly(Compartment.Top.ComplexMO, "Numeric", new CtxReturnSelf(),
+            s.ComplexMO = new STable("Complex");
+            Handler_Vonly(s.ComplexMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
-            Handler_PandBox(Compartment.Top.ComplexMO, "Bool", new CtxComplexBool(), Compartment.Top.BoolMO);
-            Handler_PandBox(Compartment.Top.ComplexMO, "Str", new CtxComplexStr(), Compartment.Top.StrMO);
-            Handler_PandCont(Compartment.Top.ComplexMO, "succ", new CtxComplexSuccish(+1));
-            Handler_PandCont(Compartment.Top.ComplexMO, "pred", new CtxComplexSuccish(-1));
-            Compartment.Top.ComplexMO.FillProtoClass(Compartment.Top.AnyMO);
+            Handler_PandBox(s.ComplexMO, "Bool", new CtxComplexBool(), s.BoolMO);
+            Handler_PandBox(s.ComplexMO, "Str", new CtxComplexStr(), s.StrMO);
+            Handler_PandCont(s.ComplexMO, "succ", new CtxComplexSuccish(+1));
+            Handler_PandCont(s.ComplexMO, "pred", new CtxComplexSuccish(-1));
+            s.ComplexMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.StashMO = new STable("Stash");
-            Compartment.Top.StashMO.FillProtoClass(Compartment.Top.AnyMO);
-            Compartment.Top.StashP = new P6opaque(Compartment.Top.StashMO);
+            s.StashMO = new STable("Stash");
+            s.StashMO.FillProtoClass(s.AnyMO);
+            s.StashP = new P6opaque(s.StashMO);
 
-            Compartment.Top.ParameterMO.FillProtoClass(Compartment.Top.AnyMO);
+            s.ParameterMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.SignatureMO.FillProtoClass(Compartment.Top.AnyMO);
+            s.SignatureMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.ClassHOWMO = new STable("ClassHOW");
-            Compartment.Top.ClassHOWMO.FillProtoClass(Compartment.Top.AnyMO);
+            s.ClassHOWMO = new STable("ClassHOW");
+            s.ClassHOWMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.ParcelMO = new STable("Parcel");
-            Handler_PandBox(Compartment.Top.ParcelMO, "iterator", new CtxParcelIterator(),
-                    Compartment.Top.IteratorMO);
-            Handler_PandBox(Compartment.Top.ParcelMO, "Str", new CtxParcelListStr(), Compartment.Top.StrMO);
-            WrapHandler1(Compartment.Top.ParcelMO, "LISTSTORE", new IxParcelLISTSTORE());
-            Handler_Vonly(Compartment.Top.ParcelMO, "list", new CtxParcelList(), null);
-            Compartment.Top.ParcelMO.FillProtoClass(Compartment.Top.AnyMO);
+            s.ParcelMO = new STable("Parcel");
+            Handler_PandBox(s.ParcelMO, "iterator", new CtxParcelIterator(),
+                    s.IteratorMO);
+            Handler_PandBox(s.ParcelMO, "Str", new CtxParcelListStr(), s.StrMO);
+            WrapHandler1(s.ParcelMO, "LISTSTORE", new IxParcelLISTSTORE());
+            Handler_Vonly(s.ParcelMO, "list", new CtxParcelList(), null);
+            s.ParcelMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.ListMO = new STable("List");
-            WrapIndexy(Compartment.Top.ListMO, "postcircumfix:<[ ]>", new IxListAtPos(false),
+            s.ListMO = new STable("List");
+            WrapIndexy(s.ListMO, "postcircumfix:<[ ]>", new IxListAtPos(false),
                     null, null, new IxListBindPos());
-            Handler_PandBox(Compartment.Top.ListMO, "Str", new CtxParcelListStr(), Compartment.Top.StrMO);
-            Handler_Vonly(Compartment.Top.ListMO, "pop", new PopList(), null);
-            Handler_Vonly(Compartment.Top.ListMO, "shift", new ShiftList(), null);
-            WrapPushy(Compartment.Top.ListMO, "push", new PushList());
-            WrapPushy(Compartment.Top.ListMO, "unshift", new UnshiftList());
-            Handler_PandBox(Compartment.Top.ListMO, "iterator", new CtxListIterator(),
-                    Compartment.Top.IteratorMO);
-            Handler_PandBox(Compartment.Top.ListMO, "Bool", new CtxListBool(), Compartment.Top.BoolMO);
-            Handler_PandBoxInty(Compartment.Top.ListMO, "Numeric", new CtxListNum());
-            Handler_Vonly(Compartment.Top.ListMO, "list", new CtxReturnSelfList(), null);
-            Compartment.Top.ListMO.FillProtoClass(Compartment.Top.AnyMO, new string[] { "$!items", "$!rest" },
-                new STable[] { Compartment.Top.ListMO, Compartment.Top.ListMO });
+            Handler_PandBox(s.ListMO, "Str", new CtxParcelListStr(), s.StrMO);
+            Handler_Vonly(s.ListMO, "pop", new PopList(), null);
+            Handler_Vonly(s.ListMO, "shift", new ShiftList(), null);
+            WrapPushy(s.ListMO, "push", new PushList());
+            WrapPushy(s.ListMO, "unshift", new UnshiftList());
+            Handler_PandBox(s.ListMO, "iterator", new CtxListIterator(),
+                    s.IteratorMO);
+            Handler_PandBox(s.ListMO, "Bool", new CtxListBool(), s.BoolMO);
+            Handler_PandBoxInty(s.ListMO, "Numeric", new CtxListNum());
+            Handler_Vonly(s.ListMO, "list", new CtxReturnSelfList(), null);
+            s.ListMO.FillProtoClass(s.AnyMO, new string[] { "$!items", "$!rest" },
+                new STable[] { s.ListMO, s.ListMO });
 
-            Compartment.Top.ArrayMO = new STable("Array");
-            WrapHandler1(Compartment.Top.ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
-            WrapIndexy(Compartment.Top.ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
+            s.ArrayMO = new STable("Array");
+            WrapHandler1(s.ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
+            WrapIndexy(s.ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
                     null, null, new IxListBindPos());
-            Compartment.Top.ArrayMO.FillProtoClass(Compartment.Top.ListMO);
+            s.ArrayMO.FillProtoClass(s.ListMO);
 
-            Compartment.Top.HashMO = new STable("Hash");
-            WrapHandler1(Compartment.Top.HashMO, "LISTSTORE", new IxHashLISTSTORE());
-            WrapIndexy(Compartment.Top.HashMO, "postcircumfix:<{ }>", new IxHashAtKey(),
+            s.HashMO = new STable("Hash");
+            WrapHandler1(s.HashMO, "LISTSTORE", new IxHashLISTSTORE());
+            WrapIndexy(s.HashMO, "postcircumfix:<{ }>", new IxHashAtKey(),
                     new IxHashExistsKey(), new IxHashDeleteKey(),
                     new IxHashBindKey());
-            Handler_PandBox(Compartment.Top.HashMO, "iterator", new CtxHashIterator(), Compartment.Top.IteratorMO);
-            Handler_PandBox(Compartment.Top.HashMO, "Bool", new CtxHashBool(), Compartment.Top.BoolMO);
-            Handler_Vonly(Compartment.Top.HashMO, "hash", new CtxReturnSelfList(), null);
-            Compartment.Top.HashMO.FillProtoClass(Compartment.Top.AnyMO);
+            Handler_PandBox(s.HashMO, "iterator", new CtxHashIterator(), s.IteratorMO);
+            Handler_PandBox(s.HashMO, "Bool", new CtxHashBool(), s.BoolMO);
+            Handler_Vonly(s.HashMO, "hash", new CtxReturnSelfList(), null);
+            s.HashMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.CursorMO = new STable("Cursor");
-            WrapIndexy(Compartment.Top.CursorMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
-                    Compartment.Top.AnyMO.mro_exists_key, Compartment.Top.AnyMO.mro_delete_key,
-                    Compartment.Top.AnyMO.mro_bind_key);
-            WrapIndexy(Compartment.Top.CursorMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
-                    null, null, Compartment.Top.AnyMO.mro_bind_pos);
-            Compartment.Top.CursorMO.FillProtoClass(Compartment.Top.AnyMO);
+            s.CursorMO = new STable("Cursor");
+            WrapIndexy(s.CursorMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
+                    s.AnyMO.mro_exists_key, s.AnyMO.mro_delete_key,
+                    s.AnyMO.mro_bind_key);
+            WrapIndexy(s.CursorMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
+                    null, null, s.AnyMO.mro_bind_pos);
+            s.CursorMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.MatchMO = new STable("Match");
-            WrapIndexy(Compartment.Top.MatchMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
-                    Compartment.Top.AnyMO.mro_exists_key, Compartment.Top.AnyMO.mro_delete_key,
-                    Compartment.Top.AnyMO.mro_bind_key);
-            WrapIndexy(Compartment.Top.MatchMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
-                    null, null, Compartment.Top.AnyMO.mro_bind_pos);
-            Handler_PandBox(Compartment.Top.MatchMO, "Str", new CtxMatchStr(), Compartment.Top.StrMO);
-            Compartment.Top.MatchMO.FillProtoClass(Compartment.Top.AnyMO);
+            s.MatchMO = new STable("Match");
+            WrapIndexy(s.MatchMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
+                    s.AnyMO.mro_exists_key, s.AnyMO.mro_delete_key,
+                    s.AnyMO.mro_bind_key);
+            WrapIndexy(s.MatchMO, "postcircumfix:<[ ]>", new IxCursorAtPos(),
+                    null, null, s.AnyMO.mro_bind_pos);
+            Handler_PandBox(s.MatchMO, "Str", new CtxMatchStr(), s.StrMO);
+            s.MatchMO.FillProtoClass(s.AnyMO);
 
-            Compartment.Top.ScalarMO = new STable("Scalar");
-            Compartment.Top.ScalarMO.FillProtoClass(Compartment.Top.AnyMO);
+            s.ScalarMO = new STable("Scalar");
+            s.ScalarMO.FillProtoClass(s.AnyMO);
         }
 
         // This is a library function in .NET 4
