@@ -3841,6 +3841,12 @@ sub acosech($x) is pure { $x.acosech }
 sub cotanh($x) is pure { $x.cotanh }
 sub acotanh($x) is pure { $x.acotanh }
 sub atan2($y, $x = 1) is pure { $y.atan2($x) }
+sub hypot($a, $b) is pure {
+    my $max = $a.abs max $b.abs;
+    my $min = $a.abs min $b.abs;
+    my $r = $min / $max;
+    $max * sqrt(1 + $r * $r);
+}
 
 sub pick($num, *@values) { @values.pick($num) }
 sub roll($num, *@values) { @values.roll($num) }
