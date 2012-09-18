@@ -1043,8 +1043,8 @@ namespace Niecza {
 
                     foreach (MethodInfo mi in n.type.GetMethods())
                         meth[mi.Name] = mi;
-                    Compartment.Top.reg.methods[n.asm_name] = meth;
-                    Compartment.Top.reg.instances[n.asm_name] = n.constTable;
+                    tb.reg.methods[n.asm_name] = meth;
+                    tb.reg.instances[n.asm_name] = n.constTable;
                     while (ncon-- > 0) {
                         FieldInfo fi = fields[tb.String()];
                         object val = tb.ObjRef();
@@ -1077,7 +1077,7 @@ namespace Niecza {
                         (f1, f2) => string.CompareOrdinal(f1.Name, f2.Name));
                 foreach (FieldInfo f in kf) {
                     if (f.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0) {
-                        f.SetValue(Compartment.Top, tb.ObjRef());
+                        f.SetValue(tb.setting, tb.ObjRef());
                         //Console.WriteLine("Thaw {0} {1}", f, f.GetValue(Compartment.Top));
                     }
                 }
@@ -2131,11 +2131,11 @@ namespace Niecza {
                 } else {
                     Dictionary<string,MethodInfo> t1;
 
-                    if (!Compartment.Top.reg.methods.TryGetValue(tn, out t1) ||
+                    if (!tb.reg.methods.TryGetValue(tn, out t1) ||
                             !t1.TryGetValue(mn, out mi)) {
                         throw new Exception("Thawed sub references nonexistant method " + tn + "::" + mn);
                     }
-                    obj = Compartment.Top.reg.instances[tn];
+                    obj = tb.reg.instances[tn];
                 }
                 n.code = (DynBlockDelegate) Delegate.CreateDelegate(
                     typeof(DynBlockDelegate), obj, mi);
@@ -2251,11 +2251,11 @@ namespace Niecza {
             }
 
             if (phaser == Kernel.PHASER_CHECK)
-                Compartment.Top.check.Add(this, false);
+                setting.check.Add(this, false);
             if (phaser == Kernel.PHASER_INIT)
-                Compartment.Top.init.Add(this, false);
+                setting.init.Add(this, false);
             if (phaser == Kernel.PHASER_END)
-                Compartment.Top.end.Add(this, false);
+                setting.end.Add(this, false);
 
             if ((special & UNSAFE) != 0)
                 Kernel.CheckUnsafe(this);

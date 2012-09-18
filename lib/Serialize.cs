@@ -156,7 +156,7 @@ namespace Niecza.Serialization {
             su.name = name;
             su.hash = NewHash().ComputeHash(bytes);
 
-            ThawBuffer tb = new ThawBuffer(this, su, bytes);
+            ThawBuffer tb = new ThawBuffer(Compartment.Top, this, su, bytes);
 
             units[name] = su;
             bool success = false;
@@ -551,7 +551,8 @@ namespace Niecza.Serialization {
     class ThawBuffer {
         byte[] data;
         int rpointer;
-        ObjectRegistry reg;
+        internal readonly ObjectRegistry reg;
+        internal readonly Compartment setting;
 
         SerUnit[] unit_map = new SerUnit[8];
         int refed_units;
@@ -562,10 +563,11 @@ namespace Niecza.Serialization {
 
         public Type type;
 
-        internal ThawBuffer(ObjectRegistry reg, SerUnit unit, byte[] data) {
-            this.data = data;
-            this.reg  = reg;
-            this.unit = unit;
+        internal ThawBuffer(Compartment setting, ObjectRegistry reg, SerUnit unit, byte[] data) {
+            this.data    = data;
+            this.setting = setting;
+            this.reg     = reg;
+            this.unit    = unit;
         }
 
         internal void RunFixups() {
