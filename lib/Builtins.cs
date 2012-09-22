@@ -982,6 +982,10 @@ public partial class Builtins {
             return MakeComplex(Math.Log(Math.Sqrt(v1.re * v1.re + v1.im * v1.im)),
                                Math.Atan2(v1.im, v1.re));
         }
+        if (r1 == NR_BIGINT) {
+            BigInteger v1 = PromoteToBigInt(r1, n1);
+            return MakeFloat(BigInteger.Log(v1));
+        }
         {
             double v1 = PromoteToFloat(r1, n1);
             return MakeFloat(Math.Log(v1));
