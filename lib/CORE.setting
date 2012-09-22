@@ -846,8 +846,7 @@ my class Int does Integral {
         join '', @res.reverse;
     }
     method expmod($power, $mod) {
-        # Routine by TimToady; should probably be replaced with
-        # C# version at some point.
+        # Routine by TimToady; should be replaced with BigInteger.ModPow.
         my $x = self;
         my $y = $power.Int;
         my $z = $mod.Int;
@@ -859,6 +858,7 @@ my class Int does Integral {
         }
         $result;
     }
+    method is-prime($tries = 100) { is-prime(self, $tries) }
 }
 my class Rat does Real {
     method new($n,$d) { $n / $d }
@@ -3862,6 +3862,41 @@ sub hypot($a, $b) is pure {
     $max * sqrt(1 + $r * $r);
 }
 sub expmod($exp, $base, $mod) { $exp.Int.expmod($base, $mod) }
+sub is-prime($candidate, $tries = 100) {
+    # Miller-Rabin via TimToady
+    my Int $n = $candidate.Int;
+    my Int $k = $tries.Int;
+    my @a;
+    given $n {
+        when 2 | 3 | 5 | 7 | 11 { return True; }
+        when * < 2 { return False; }
+        when * %% 2 { return False; }
+        @a = (2 ..^ $n).pick($k);
+    }
+
+    my Int $d = $n - 1;
+    my Int $s = 0;
+
+    while $d %% 2 {
+        $d div= 2;
+        $s++;
+    }
+
+    for @a -> $a {
+        my $x = expmod($a, $d, $n);
+        next if $x == 1 | $n - 1;
+
+        for 1 ..^ $s {
+            $x = $x ** 2 mod $n;
+            return False if $x == 1;
+            last if $x == $n - 1;
+        }
+        return False if $x !== $n - 1;
+    }
+
+    return True;
+}
+
 
 sub pick($num, *@values) { @values.pick($num) }
 sub roll($num, *@values) { @values.roll($num) }
