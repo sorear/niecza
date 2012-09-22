@@ -845,6 +845,17 @@ my class Int does Integral {
         push @res, '-' if self < 0;
         join '', @res.reverse;
     }
+    method expmod(Int $y is copy, Int $mod) {
+        # Routine by TimToady; should probably be replaced with
+        # C# version at some point.
+        my $x = self;
+        my $result = 1;
+        repeat while $y div= 2 {
+            ($result *= $x) %= $mod if $y % 2;
+            ($x *= $x) %= $mod;
+        }
+        $result;
+    }
 }
 my class Rat does Real {
     method new($n,$d) { $n / $d }
