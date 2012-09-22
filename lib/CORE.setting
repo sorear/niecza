@@ -3871,7 +3871,13 @@ sub is-prime($candidate, $tries = 100) {
         when 2 | 3 | 5 | 7 | 11 { return True; }
         when * < 2 { return False; }
         when * %% 2 { return False; }
-        @a = (2 ..^ $n).pick($k);
+        when * < 1_373_653           { @a = 2, 3; }
+        when * < 9_080_191           { @a = 31, 73; }
+        when * < 4_759_123_141       { @a = 2, 7, 61; }
+        when * < 2_152_302_898_747   { @a = 2, 3, 5, 7, 11; }
+        when * < 3_474_749_660_383   { @a = 2, 3, 5, 7, 11, 13; }
+        when * < 341_550_071_728_321 { @a = 2, 3, 5, 7, 11, 13, 17; }
+        default                      { @a = (2 ..^ $n).pick($k); }
     }
 
     my Int $d = $n - 1;
