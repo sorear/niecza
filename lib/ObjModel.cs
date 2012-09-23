@@ -834,61 +834,6 @@ next_method: ;
     // (Although due to quirks of the C# implementation, Cursor and
     // BoxObject can share the P6opaque STable)
     public class STable: IFreeze {
-        /// well-known context handlers {{{
-        public static readonly ContextHandler<Variable> CallStr
-            = new CtxCallMethod("Str");
-        public static readonly ContextHandler<Variable> CallBool
-            = new CtxCallMethod("Bool");
-        public static readonly ContextHandler<Variable> CallNumeric
-            = new CtxCallMethod("Numeric");
-        public static readonly ContextHandler<Variable> CallDefined
-            = new CtxCallMethod("defined");
-        public static readonly ContextHandler<Variable> CallIterator
-            = new CtxCallMethod("iterator");
-        public static readonly ContextHandler<Variable> CallItem
-            = new CtxCallMethod("item");
-        public static readonly ContextHandler<Variable> CallList
-            = new CtxCallMethod("list");
-        public static readonly ContextHandler<Variable> CallHash
-            = new CtxCallMethod("hash");
-        public static readonly ContextHandler<Variable> CallShift
-            = new CtxCallMethod("shift");
-        public static readonly ContextHandler<Variable> CallPop
-            = new CtxCallMethod("pop");
-        public static readonly ContextHandler<P6any> CallPred
-            = new CtxCallMethodFetch("pred");
-        public static readonly ContextHandler<P6any> CallSucc
-            = new CtxCallMethodFetch("succ");
-        public static readonly ContextHandler<string> RawCallStr
-            = new CtxCallMethodUnbox<string>("Str");
-        public static readonly ContextHandler<bool> RawCallBool
-            = new CtxCallMethodUnboxBool("Bool");
-        public static readonly ContextHandler<double> RawCallNumeric
-            = new CtxCallMethodUnboxNumeric("Numeric");
-        public static readonly ContextHandler<bool> RawCallDefined
-            = new CtxCallMethodUnboxBool("defined");
-        public static readonly ContextHandler<VarDeque> RawCallIterator
-            = new CtxCallMethodUnbox<VarDeque>("iterator");
-        public static readonly ContextHandler<Variable[]> RawCallReify
-            = new CtxCallMethodUnbox<Variable[]>("reify");
-        public static readonly IndexHandler CallAtPos
-            = new IxCallMethod("postcircumfix:<[ ]>", null);
-        public static readonly IndexHandler CallAtKey
-            = new IxCallMethod("postcircumfix:<{ }>", null);
-        public static readonly IndexHandler CallExistsKey
-            = new IxCallMethod("postcircumfix:<{ }>", "exists");
-        public static readonly IndexHandler CallDeleteKey
-            = new IxCallMethod("postcircumfix:<{ }>", "delete");
-        public static readonly IndexHandler CallLISTSTORE
-            = new IxCallMethod("LISTSTORE", null);
-        public static readonly InvokeHandler CallINVOKE
-            = new InvokeCallMethod();
-        public static readonly PushyHandler CallPush
-            = new PushyCallMethod("push");
-        public static readonly PushyHandler CallUnshift
-            = new PushyCallMethod("unshift");
-        /// }}}
-
         /// "true" state {{{
         public P6how mo;
 
@@ -981,34 +926,35 @@ next_method: ;
         }
 
         internal void SetupVTables() {
-            mro_push = _GetVT("push") as PushyHandler ?? CallPush;
-            mro_unshift = _GetVT("unshift") as PushyHandler ?? CallUnshift;
-            mro_shift = _GetVT("shift") as ContextHandler<Variable> ?? CallShift;
-            mro_pop = _GetVT("pop") as ContextHandler<Variable> ?? CallPop;
-            mro_at_key = _GetVTi("postcircumfix:<{ }>", 0) as IndexHandler ?? CallAtKey;
-            mro_at_pos = _GetVTi("postcircumfix:<[ ]>", 0) as IndexHandler ?? CallAtPos;
+            var s = Compartment.Top;
+            mro_push = _GetVT("push") as PushyHandler ?? s.CallPush;
+            mro_unshift = _GetVT("unshift") as PushyHandler ?? s.CallUnshift;
+            mro_shift = _GetVT("shift") as ContextHandler<Variable> ?? s.CallShift;
+            mro_pop = _GetVT("pop") as ContextHandler<Variable> ?? s.CallPop;
+            mro_at_key = _GetVTi("postcircumfix:<{ }>", 0) as IndexHandler ?? s.CallAtKey;
+            mro_at_pos = _GetVTi("postcircumfix:<[ ]>", 0) as IndexHandler ?? s.CallAtPos;
             mro_bind_key = _GetVTi("postcircumfix:<{ }>", 3) as BindHandler;
             mro_bind_pos = _GetVTi("postcircumfix:<[ ]>", 3) as BindHandler;
-            mro_LISTSTORE = _GetVT("LISTSTORE") as IndexHandler ?? CallLISTSTORE;
-            mro_Bool = _GetVT("Bool") as ContextHandler<Variable> ?? CallBool;
-            mro_defined = _GetVT("defined") as ContextHandler<Variable> ?? CallDefined;
-            mro_delete_key = _GetVTi("postcircumfix:<{ }>", 2) as IndexHandler ?? CallDeleteKey;
-            mro_exists_key = _GetVTi("postcircumfix:<{ }>", 1) as IndexHandler ?? CallExistsKey;
-            mro_hash = _GetVT("hash") as ContextHandler<Variable> ?? CallHash;
-            mro_INVOKE = _GetVT("postcircumfix:<( )>") as InvokeHandler ?? CallINVOKE;
-            mro_item = _GetVT("item") as ContextHandler<Variable> ?? CallItem;
-            mro_iterator = _GetVT("iterator") as ContextHandler<Variable> ?? CallIterator;
-            mro_list = _GetVT("list") as ContextHandler<Variable> ?? CallList;
-            mro_Numeric = _GetVT("Numeric") as ContextHandler<Variable> ?? CallNumeric;
-            mro_pred = _GetVTU("pred") as ContextHandler<P6any> ?? CallPred;
-            mro_raw_Bool = _GetVTU("Bool") as ContextHandler<bool> ?? RawCallBool;
-            mro_raw_defined = _GetVTU("defined") as ContextHandler<bool> ?? RawCallDefined;
-            mro_raw_iterator = _GetVTU("iterator") as ContextHandler<VarDeque> ?? RawCallIterator;
-            mro_raw_Numeric = _GetVTU("Numeric") as ContextHandler<double> ?? RawCallNumeric;
-            mro_raw_reify = _GetVT("reify") as ContextHandler<Variable[]> ?? RawCallReify;
-            mro_raw_Str = _GetVTU("Str") as ContextHandler<string> ?? RawCallStr;
-            mro_Str = _GetVT("Str") as ContextHandler<Variable> ?? CallStr;
-            mro_succ = _GetVTU("succ") as ContextHandler<P6any> ?? CallSucc;
+            mro_LISTSTORE = _GetVT("LISTSTORE") as IndexHandler ?? s.CallLISTSTORE;
+            mro_Bool = _GetVT("Bool") as ContextHandler<Variable> ?? s.CallBool;
+            mro_defined = _GetVT("defined") as ContextHandler<Variable> ?? s.CallDefined;
+            mro_delete_key = _GetVTi("postcircumfix:<{ }>", 2) as IndexHandler ?? s.CallDeleteKey;
+            mro_exists_key = _GetVTi("postcircumfix:<{ }>", 1) as IndexHandler ?? s.CallExistsKey;
+            mro_hash = _GetVT("hash") as ContextHandler<Variable> ?? s.CallHash;
+            mro_INVOKE = _GetVT("postcircumfix:<( )>") as InvokeHandler ?? s.CallINVOKE;
+            mro_item = _GetVT("item") as ContextHandler<Variable> ?? s.CallItem;
+            mro_iterator = _GetVT("iterator") as ContextHandler<Variable> ?? s.CallIterator;
+            mro_list = _GetVT("list") as ContextHandler<Variable> ?? s.CallList;
+            mro_Numeric = _GetVT("Numeric") as ContextHandler<Variable> ?? s.CallNumeric;
+            mro_pred = _GetVTU("pred") as ContextHandler<P6any> ?? s.CallPred;
+            mro_raw_Bool = _GetVTU("Bool") as ContextHandler<bool> ?? s.RawCallBool;
+            mro_raw_defined = _GetVTU("defined") as ContextHandler<bool> ?? s.RawCallDefined;
+            mro_raw_iterator = _GetVTU("iterator") as ContextHandler<VarDeque> ?? s.RawCallIterator;
+            mro_raw_Numeric = _GetVTU("Numeric") as ContextHandler<double> ?? s.RawCallNumeric;
+            mro_raw_reify = _GetVT("reify") as ContextHandler<Variable[]> ?? s.RawCallReify;
+            mro_raw_Str = _GetVTU("Str") as ContextHandler<string> ?? s.RawCallStr;
+            mro_Str = _GetVT("Str") as ContextHandler<Variable> ?? s.CallStr;
+            mro_succ = _GetVTU("succ") as ContextHandler<P6any> ?? s.CallSucc;
             mro_to_clr = _GetVT("to-clr") as ContextHandler<object>;
 
             if (Compartment.Top.ComplexMO != null && HasType(Compartment.Top.ComplexMO))

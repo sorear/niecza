@@ -4615,6 +4615,35 @@ have_v:
         internal Dictionary<Type, STable> wrapper_cache;
         internal Dictionary<string, STable> named_wrapper_cache;
 
+        /// well-known context handlers {{{
+        public ContextHandler<Variable> CallStr;
+        public ContextHandler<Variable> CallBool;
+        public ContextHandler<Variable> CallNumeric;
+        public ContextHandler<Variable> CallDefined;
+        public ContextHandler<Variable> CallIterator;
+        public ContextHandler<Variable> CallItem;
+        public ContextHandler<Variable> CallList;
+        public ContextHandler<Variable> CallHash;
+        public ContextHandler<Variable> CallShift;
+        public ContextHandler<Variable> CallPop;
+        public ContextHandler<P6any> CallPred;
+        public ContextHandler<P6any> CallSucc;
+        public ContextHandler<string> RawCallStr;
+        public ContextHandler<bool> RawCallBool;
+        public ContextHandler<double> RawCallNumeric;
+        public ContextHandler<bool> RawCallDefined;
+        public ContextHandler<VarDeque> RawCallIterator;
+        public ContextHandler<Variable[]> RawCallReify;
+        public IndexHandler CallAtPos;
+        public IndexHandler CallAtKey;
+        public IndexHandler CallExistsKey;
+        public IndexHandler CallDeleteKey;
+        public IndexHandler CallLISTSTORE;
+        public InvokeHandler CallINVOKE;
+        public PushyHandler CallPush;
+        public PushyHandler CallUnshift;
+        /// }}}
+
         static Compartment() {
             AppDomain.CurrentDomain.ProcessExit += BeforeExit;
         }
@@ -4865,6 +4894,33 @@ have_v:
                     2, 3, SubInfo.ON_REDO, 1, 0,
                     2, 3, SubInfo.ON_LAST, 3, 0,
                 }, new string[] { "" }, 0);
+
+            c.CallStr         = new CtxCallMethod("Str");
+            c.CallBool        = new CtxCallMethod("Bool");
+            c.CallNumeric     = new CtxCallMethod("Numeric");
+            c.CallDefined     = new CtxCallMethod("defined");
+            c.CallIterator    = new CtxCallMethod("iterator");
+            c.CallItem        = new CtxCallMethod("item");
+            c.CallList        = new CtxCallMethod("list");
+            c.CallHash        = new CtxCallMethod("hash");
+            c.CallShift       = new CtxCallMethod("shift");
+            c.CallPop         = new CtxCallMethod("pop");
+            c.CallPred        = new CtxCallMethodFetch("pred");
+            c.CallSucc        = new CtxCallMethodFetch("succ");
+            c.RawCallStr      = new CtxCallMethodUnbox<string>("Str");
+            c.RawCallBool     = new CtxCallMethodUnboxBool("Bool");
+            c.RawCallNumeric  = new CtxCallMethodUnboxNumeric("Numeric");
+            c.RawCallDefined  = new CtxCallMethodUnboxBool("defined");
+            c.RawCallIterator = new CtxCallMethodUnbox<VarDeque>("iterator");
+            c.RawCallReify    = new CtxCallMethodUnbox<Variable[]>("reify");
+            c.CallAtPos       = new IxCallMethod("postcircumfix:<[ ]>", null);
+            c.CallAtKey       = new IxCallMethod("postcircumfix:<{ }>", null);
+            c.CallExistsKey   = new IxCallMethod("postcircumfix:<{ }>", "exists");
+            c.CallDeleteKey   = new IxCallMethod("postcircumfix:<{ }>", "delete");
+            c.CallLISTSTORE   = new IxCallMethod("LISTSTORE", null);
+            c.CallINVOKE      = new InvokeCallMethod();
+            c.CallPush        = new PushyCallMethod("push");
+            c.CallUnshift     = new PushyCallMethod("unshift");
         }
 
         public static P6any MakeSub(SubInfo info, Frame outer) {
