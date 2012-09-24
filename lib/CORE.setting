@@ -845,19 +845,7 @@ my class Int does Integral {
         push @res, '-' if self < 0;
         join '', @res.reverse;
     }
-    method expmod($power, $mod) {
-        # Routine by TimToady; should be replaced with BigInteger.ModPow.
-        my $x = self;
-        my $y = $power.Int;
-        my $z = $mod.Int;
-
-        my $result = 1;
-        repeat while $y div= 2 {
-            ($result *= $x) %= $z if $y % 2;
-            ($x *= $x) %= $z;
-        }
-        $result;
-    }
+    method expmod($power, $mod) { expmod(self, $power, $mod) }
     method is-prime($tries = 100) { is-prime(self, $tries) }
 }
 my class Rat does Real {
@@ -3871,7 +3859,7 @@ sub hypot($a, $b) is pure {
     my $r = $min / $max;
     $max * sqrt(1 + $r * $r);
 }
-sub expmod($exp, $base, $mod) { $exp.Int.expmod($base, $mod) }
+sub expmod($exp, $power, $mod) is pure { Q:CgOp { (expmod {$exp.Int} {$power.Int} {$mod.Int}) } }
 sub is-prime($candidate, $tries = 100) {
     # Miller-Rabin via TimToady
     my Int $n = $candidate.Int;

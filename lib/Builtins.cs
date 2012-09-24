@@ -1088,6 +1088,23 @@ public partial class Builtins {
         return MakeInt(BigInteger.GreatestCommonDivisor(PromoteToBigInt(r1, n1), PromoteToBigInt(r2, n2)));
     }
 
+    static readonly Func<Constants,Variable,Variable,Variable,Variable> expmod_d = expmod;
+    [ImplicitConsts] public static Variable expmod(Constants c, Variable a1, Variable a2, Variable a3) {
+        P6any o1 = a1.Fetch();
+        P6any o2 = a2.Fetch();
+        P6any o3 = a3.Fetch();
+        if (!o1.mo.is_any || !o2.mo.is_any || !o3.mo.is_any)
+            return HandleSpecial3(c, a1,a2,a3,o1,o2,o3, expmod_d);
+        int r1, r2, r3;
+        P6any n1 = GetNumber(a1, o1, out r1);
+        P6any n2 = GetNumber(a2, o2, out r2);
+        P6any n3 = GetNumber(a3, o3, out r3);
+
+        return MakeInt(BigInteger.ModPow(PromoteToBigInt(r1, n1),
+                                         PromoteToBigInt(r2, n2),
+                                         PromoteToBigInt(r3, n3)));
+    }
+
     [TrueGlobal] static IForeignInterpreter p5_interpreter;
     public static Variable eval_perl5(Variable v) {
         P6any o1 = v.Fetch();
