@@ -3021,7 +3021,7 @@ my class Range is Cool does Positional {
         my $elems = 1 + ($!excludes_max ?? $!max - 1 !! $!max) - $least;
 
         sub choose {
-            $elems ?? ($least + $elems.rand.floor) !! Any;
+            $elems ?? ($least + Q:CgOp { (bigrand {$elems}) }) !! Any;
         }
 
         return choose() xx * if $count ~~ Whatever;

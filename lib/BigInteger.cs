@@ -258,7 +258,7 @@ namespace Niecza {
 				sign = 1;
 
 			if (sign == 1) {
-				while (value [len - 1] == 0)
+				while (len > 1 && value [len - 1] == 0)
 					--len;
 
 				int full_words, size;

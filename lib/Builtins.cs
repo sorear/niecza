@@ -1105,6 +1105,32 @@ public partial class Builtins {
                                          PromoteToBigInt(r3, n3)));
     }
 
+    static readonly Func<Constants,Variable,Variable> bigrand_d = bigrand;
+    [ImplicitConsts] public static Variable bigrand(Constants c, Variable a1) {
+        // Assumes a1 is positive!
+        int r1;
+        P6any o1 = a1.Fetch();
+        if (!o1.mo.is_any)
+            return HandleSpecial1(c, a1, o1, bigrand_d);
+        P6any n1 = GetNumber(a1, o1, out r1);
+
+        BigInteger top = PromoteToBigInt(r1, n1);
+        int bits = (int) Math.Ceiling(BigInteger.Log(top, 2));
+        int bytes = bits / 8 + 1;
+        byte mask = (byte) ((1 << (bits % 8)) - 1);
+
+        Random rnd = new Random();
+        byte[] b = new byte[bytes + 1];
+        while (true) {
+            rnd.NextBytes(b);
+            b[bytes] = 0;
+            b[bytes - 1] &= mask;
+            BigInteger candidate = new BigInteger (b);
+            if (candidate < top)
+                return MakeInt(candidate);
+        }
+    }
+
     [TrueGlobal] static IForeignInterpreter p5_interpreter;
     public static Variable eval_perl5(Variable v) {
         P6any o1 = v.Fetch();
