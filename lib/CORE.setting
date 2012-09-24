@@ -3329,6 +3329,16 @@ sub infix:<cmp> is equiv<leg> (Mu $a, Mu $b) {
         }
         return $a <=> $b;
     }
+    if $a ~~ Hash {
+        my $keys = set $a.keys, $b.keys;
+        my @keys = $keys.keys.sort;
+        for @keys -> $k {
+            return Order::Decrease unless $a{$k} :exists;
+            return Order::Increase unless $b{$k} :exists;
+            (my $r = $a{$k} cmp $b{$k}) && return $r;
+        }
+        return Order::Same;
+    }
     return $a <=> $b;
 }
 sub infix:<eqv> is equiv<==> (Any $a, Any $b) { ($a.WHAT.gist cmp $b.WHAT.gist) == 0 && ($a cmp $b) == 0 }
