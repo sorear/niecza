@@ -2638,7 +2638,7 @@ dynamic:
                 return CpsOp.MethodCall(Tokens.Kernel_NewRWListVar,
                     CpsOp.MethodCall(Tokens.Kernel.GetMethod("BoxRaw").MakeGenericMethod(Tokens.FVarList),
                         CpsOp.NewArray(Tokens.Variable, JScalar.A<CpsOp>(1, zyg, th.Scan)),
-                        th.cpb.eu.TypeConstant(Compartment.Top.ParcelMO)));
+                        th.cpb.eu.TypeConstant(th.sub.setting.ParcelMO)));
             };
             handlers["makejunction"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.MethodCall(
@@ -2654,9 +2654,9 @@ dynamic:
                     // these might need to happen *early*, before user classes
                     // are set up
                     if (name == "Str") {
-                        real_mo = Compartment.Top.StrMO;
+                        real_mo = th.sub.setting.StrMO;
                     } else if (name == "Num") {
-                        real_mo = Compartment.Top.NumMO;
+                        real_mo = th.sub.setting.NumMO;
                     } else {
                         int dummy;
                         LexInfo li = th.ResolveLex(name,false,out dummy,true);
@@ -2911,7 +2911,7 @@ dynamic:
                         CpsOp.NewArray(Tokens.Variable, z)); };
             handlers["newrwscalar"] = delegate(NamProcessor th, object[] z) {
                 return CpsOp.MethodCall(Tokens.Kernel_NewRWScalar,
-                    th.cpb.eu.TypeConstant(Compartment.Top.AnyMO), th.Scan(z[1])); };
+                    th.cpb.eu.TypeConstant(th.sub.setting.AnyMO), th.Scan(z[1])); };
             thandlers["newvsubvar"] = delegate(CpsOp[] z) {
                 return CpsOp.ConstructorCall(Tokens.SV_ctor, z[0],
                     CpsOp.ConstructorCall(Tokens.SubViviHook_ctor,
@@ -3322,7 +3322,7 @@ dynamic:
                     object bit;
                     CpsOp tc = EmitUnit.Current.TypeConstant(ls.type);
                     if ((f & LISimple.ROINIT) != 0) {
-                        bit = a(j("class_ref"), j("typeObj"), Compartment.Top.AnyMO);
+                        bit = a(j("class_ref"), j("typeObj"), sub.setting.AnyMO);
                     } else if ((f & LISimple.DEFOUTER) != 0) {
                         bit = a(j("outerlex"), j(kv.Key));
                     } else if ((f & (LISimple.HASH | LISimple.LIST)) != 0) {
@@ -3403,7 +3403,7 @@ dynamic:
                 handlers.Add(kv.Key);
                 handlers.Add("goto_" + kv.Key);
             }
-            if (sub.mo.HasType(Compartment.Top.RoutineMO) &&
+            if (sub.mo.HasType(sub.setting.RoutineMO) &&
                     (sub.special & SubInfo.RETURN_PASS) == 0) {
                 handlers.Add("4");
                 handlers.Add("");
@@ -3527,17 +3527,17 @@ dynamic:
             return new object[] { "" };
         }
 
-        static STable ResolveSubClass(string cls) {
+        static STable ResolveSubClass(Compartment s, string cls) {
             // this happens before lexicals are created, so we can't
             // use lexicals.
-            STable rcls = (cls == "Sub") ? Compartment.Top.SubMO :
-                (cls == "Routine") ? Compartment.Top.RoutineMO :
-                (cls == "Regex") ? Compartment.Top.RegexMO :
-                (cls == "Method") ? Compartment.Top.MethodMO :
-                (cls == "Submethod") ? Compartment.Top.SubmethodMO :
-                (cls == "WhateverCode") ? Compartment.Top.WhateverCodeMO :
-                (cls == "Block") ? Compartment.Top.BlockMO :
-                (cls == "Code") ? Compartment.Top.CodeMO : null;
+            STable rcls = (cls == "Sub") ? s.SubMO :
+                (cls == "Routine") ? s.RoutineMO :
+                (cls == "Regex") ? s.RegexMO :
+                (cls == "Method") ? s.MethodMO :
+                (cls == "Submethod") ? s.SubmethodMO :
+                (cls == "WhateverCode") ? s.WhateverCodeMO :
+                (cls == "Block") ? s.BlockMO :
+                (cls == "Code") ? s.CodeMO : null;
 
             return rcls;
         }
@@ -3684,30 +3684,31 @@ dynamic:
             return null;
         }
         public static object new_unit(object[] args) {
-            RuntimeUnit ru = new RuntimeUnit((string)args[1],
-                    (string)args[2], (string)args[3],
-                    (bool)args[4], (bool)args[5]);
+            RuntimeUnit ru = new RuntimeUnit(Compartment.Top, (string)args[1],
+                    (string)args[2], (string)args[3], (bool)args[4],
+                    (bool)args[5]);
 
-            if (Compartment.Top.containerRootUnit == null) {
+            if (ru.setting.containerRootUnit == null) {
                 // this is a module unit
                 Kernel.InitCompartment();
-                Compartment.Top.containerRootUnit = ru;
+                ru.setting.containerRootUnit = ru;
                 ru.depended_units.Add(ru);
                 ru.owner = ru;
-                ru.globals = Compartment.Top.currentGlobals =
+                ru.globals = ru.setting.currentGlobals =
                     new Dictionary<string,StashEnt>();
             } else {
                 // needs to use the same globals as the other units in
                 // this serialization unit
-                ru.globals = Compartment.Top.currentGlobals;
-                ru.owner = Compartment.Top.containerRootUnit;
+                ru.globals = ru.setting.currentGlobals;
+                ru.owner = ru.setting.containerRootUnit;
                 ru.owner.subordinates.Add(ru);
             }
             return new Handle(ru);
         }
         public static object unit_get_incs(object[] args) {
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
             StashEnt bv;
-            if (!Compartment.Top.currentGlobals.TryGetValue("\u0008::GLOBAL@INC", out bv))
+            if (!ru.setting.currentGlobals.TryGetValue("\u0008::GLOBAL@INC", out bv))
                 return new string[0];
             return Builtins.UnboxLoS(bv.v);
         }
@@ -3724,7 +3725,7 @@ dynamic:
 
             RuntimeUnit tg;
             try {
-                tg = (RuntimeUnit) Compartment.Top.reg.LoadUnit(oname).root;
+                tg = (RuntimeUnit) ru.setting.reg.LoadUnit(oname).root;
             } catch (Exception ex) {
                 if (Config.SerFailInfo)
                     Console.WriteLine("Thaw {0} failed: >>>{1}<<<", oname, ex);
@@ -3733,7 +3734,7 @@ dynamic:
                     "compile_unit", oname });
                 if (r1 != null)
                     return r1;
-                tg = (RuntimeUnit) Compartment.Top.reg.LoadUnit(oname).root;
+                tg = (RuntimeUnit) ru.setting.reg.LoadUnit(oname).root;
             }
             string err = ru.owner.LinkUnit(tg);
             return err == null ? (object)new Handle(tg) : new Exception(err);
@@ -3905,7 +3906,7 @@ dynamic:
             if (li is LIConstant) {
                 ((LIConstant)li).value = v;
             } else if (li is LICommon) {
-                StashEnt hkey = Compartment.Top.currentGlobals[((LICommon)li).hkey];
+                StashEnt hkey = si.setting.currentGlobals[((LICommon)li).hkey];
                 hkey.constant = true;
                 hkey.v = v;
             } else {
@@ -3978,7 +3979,7 @@ dynamic:
         }
         public static object sub_set_class(object[] args) {
             SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-            STable  c = ResolveSubClass((string)args[2]);
+            STable  c = ResolveSubClass(s.setting, (string)args[2]);
             s.mo = c;
             if (s.protosub != null)
                 s.protosub.mo = c;
@@ -4056,7 +4057,7 @@ dynamic:
             var lcomm  = li as LICommon;
             if (lcomm != null) {
                 StashEnt se;
-                Compartment.Top.currentGlobals.TryGetValue(lcomm.hkey, out se);
+                csr.setting.currentGlobals.TryGetValue(lcomm.hkey, out se);
                 r = new object[] { "common",null,null,null, lcomm.Stash(), lcomm.VarName(), (se.constant ? Handle.Wrap(se.v) : null) };
             }
 
@@ -4113,11 +4114,11 @@ dynamic:
         }
         public static object sub_is_routine(object[] args) {
             SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-            return s.mo.HasType(Compartment.Top.RoutineMO);
+            return s.mo.HasType(s.setting.RoutineMO);
         }
         public static object sub_is_regex(object[] args) {
             SubInfo s = (SubInfo)Handle.Unbox(args[1]);
-            return s.mo.HasType(Compartment.Top.RegexMO);
+            return s.mo.HasType(s.setting.RegexMO);
         }
         public static object sub_has_lexical(object[] args) {
             SubInfo s = (SubInfo)Handle.Unbox(args[1]);
@@ -4143,7 +4144,7 @@ dynamic:
                 string key = (string) args[i];
                 string who = "";
                 if (pkg != null) {
-                    if (!pkg.who.Isa(Compartment.Top.StashMO))
+                    if (!pkg.who.Isa(c.setting.StashMO))
                         return new Exception(pkg.name + " fails to name a standard package");
                     who = Kernel.UnboxAny<string>(pkg.who);
                 }
@@ -4158,7 +4159,7 @@ dynamic:
                 } else {
                     c.globals[hkey] = v = new StashEnt();
                     v.constant = true;
-                    v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, Compartment.Top.StashMO));
+                    v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, c.setting.StashMO));
                     pkg = v.v.Fetch().mo;
                 }
             }
@@ -4178,8 +4179,8 @@ dynamic:
 
                 if (!b.v.Rw && !b.v.Fetch().IsDefined()) {
                     r.Add(new Handle(b.v.Fetch().mo));
-                } else if (!b.v.Rw && b.v.Fetch().Isa(Compartment.Top.CodeMO)) {
-                    r.Add(new Handle(b.v.Fetch().GetSlot(Compartment.Top.CodeMO, "$!info")));
+                } else if (!b.v.Rw && b.v.Fetch().Isa(c.setting.CodeMO)) {
+                    r.Add(new Handle(b.v.Fetch().GetSlot(c.setting.CodeMO, "$!info")));
                 } else {
                     r.Add(null);
                 }
@@ -4195,8 +4196,8 @@ dynamic:
             if (ru.globals.TryGetValue(hkey, out b)) {
                 if (!b.v.Rw && !b.v.Fetch().IsDefined()) {
                     return new Handle(b.v.Fetch().mo);
-                } else if (!b.v.Rw && b.v.Fetch().Isa(Compartment.Top.CodeMO)) {
-                    return new Handle(b.v.Fetch().GetSlot(Compartment.Top.CodeMO, "$!info"));
+                } else if (!b.v.Rw && b.v.Fetch().Isa(ru.setting.CodeMO)) {
+                    return new Handle(b.v.Fetch().GetSlot(ru.setting.CodeMO, "$!info"));
                 } else return null;
             } else {
                 return null;
@@ -4354,10 +4355,10 @@ dynamic:
             FieldInfo pf = ru.name == "CORE" ?
                 typeof(Compartment).GetField(name + "P") : null;
 
-            STable nst = mof == null ? null : (STable)mof.GetValue(Compartment.Top);
-            if (nst == null) { // not all Compartment.Top.FooMO are initialized by kernel
+            STable nst = mof == null ? null : (STable)mof.GetValue(ru.setting);
+            if (nst == null) { // not all FooMO are initialized by kernel
                 nst = new STable(name);
-                if (mof != null) mof.SetValue(Compartment.Top, nst);
+                if (mof != null) mof.SetValue(ru.setting, nst);
             }
             // Hack - we don't clear the MRO here, because we might need
             // to call methods on the type in the process of defining the
@@ -4365,21 +4366,21 @@ dynamic:
             nst.mo.superclasses.Clear();
             // OTOH, it needs call structures set up to avoid internal errors
             nst.mo.Revalidate();
-            if (nst.typeObj == null) // Compartment.Top.AnyMO.typeObj is set up early
+            if (nst.typeObj == null) // AnyMO.typeObj is set up early
                 nst.typeObj = new P6opaque(nst, 0);
             ((P6opaque)nst.typeObj).slots = null;
 
             if (ru.name == "CORE" && name == "Nil") {
                 // anomalously requires an iterable value
-                Compartment.Top.Nil = Kernel.NewRWListVar(nst.typeObj);
+                ru.setting.Nil = Kernel.NewRWListVar(nst.typeObj);
             }
 
             if (pf != null)
-                pf.SetValue(Compartment.Top, nst.typeObj);
+                pf.SetValue(ru.setting, nst.typeObj);
 
             nst.initObj = nst.typeObj;
-            nst.who        = Kernel.BoxRaw(who, Compartment.Top.StashMO);
-            nst.how        = Kernel.BoxRaw<STable>(nst, Compartment.Top.ClassHOWMO);
+            nst.who        = Kernel.BoxRaw(who, ru.setting.StashMO);
+            nst.how        = Kernel.BoxRaw<STable>(nst, ru.setting.ClassHOWMO);
             nst.mo.rtype   = type;
             nst.mo.type =
                 type == "package" ? P6how.PACKAGE :
@@ -4430,7 +4431,7 @@ dynamic:
                 outer_frame = null;
             }
 
-            STable rcls = ResolveSubClass(cls);
+            STable rcls = ResolveSubClass(ru.setting, cls);
             if (rcls == null)
                 return new Exception("sub-class lookup fail for " + cls);
 
@@ -4458,7 +4459,7 @@ dynamic:
                         vers.Substring(0, vers.Length - 1));
                 info["build-time"] = Builtins.now();
 
-                li.value = Kernel.BoxAnyMO(info, Compartment.Top.HashMO);
+                li.value = Kernel.BoxAnyMO(info, ru.setting.HashMO);
 
                 n.AddLexical("$?PERL", li);
             }
@@ -4484,7 +4485,7 @@ dynamic:
             SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
             STable  pkg   = (STable)Handle.Unbox(args[6]);
             string  pname = (string)args[7];
-            if (!pkg.who.Isa(Compartment.Top.StashMO))
+            if (!pkg.who.Isa(sub.setting.StashMO))
                 return new Exception("NYI usage of a nonstandard package");
             string  who   = Kernel.UnboxAny<string>(pkg.who);
 
@@ -4557,7 +4558,7 @@ dynamic:
             return Handle.Wrap(new Parameter(flags,
                 (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
                 name, (names.Count == 0 ? null : names.ToArray()),
-                deflt, type ?? Compartment.Top.AnyMO, attr, atype));
+                deflt, type ?? tgt.setting.AnyMO, attr, atype));
         }
         public static object param_constraints(object[] args) {
             Parameter tgt = (Parameter)Handle.Unbox(args[1]);
@@ -4605,11 +4606,11 @@ dynamic:
             if (p == Kernel.PHASER_CONTROL)
                 s.outer.control = s;
             if (p == Kernel.PHASER_INIT)
-                Compartment.Top.init.Add(s, true);
+                s.setting.init.Add(s, true);
             if (p == Kernel.PHASER_CHECK)
-                Compartment.Top.check.Add(s, true);
+                s.setting.check.Add(s, true);
             if (p == Kernel.PHASER_END)
-                Compartment.Top.end.Add(s, true);
+                s.setting.end.Add(s, true);
             return null;
         }
         public static object sub_set_extend(object[] args) {
@@ -4657,7 +4658,7 @@ dynamic:
             if (!ru.is_mainish && ru.bottom == null)
                 ru.RunMainline();
             if (ru.is_mainish)
-                Compartment.Top.check.Run();
+                ru.setting.check.Run();
             ru.Save();
             return null;
         }
@@ -4666,10 +4667,10 @@ dynamic:
             bool evalmode = (bool)args[2];
             Kernel.commandArgs = new string[args.Length - 3];
             Array.Copy(args, 3, Kernel.commandArgs, 0, args.Length - 3);
-            Compartment.Top.currentGlobals = ru.globals;
+            ru.setting.currentGlobals = ru.globals;
             ru.PrepareEval();
-            Compartment.Top.check.Run();
-            Compartment.Top.init.Run();
+            ru.setting.check.Run();
+            ru.setting.init.Run();
             if (!evalmode)
                 Kernel.RunMain(ru);
             return null;
@@ -4682,10 +4683,10 @@ dynamic:
         public static object unit_replrun(object[] args) {
             RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
             Frame fret = null;
-            Compartment.Top.check.Run();
-            Compartment.Top.init.Run();
+            ru.setting.check.Run();
+            ru.setting.init.Run();
             StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
-            b.Bind(Compartment.Top.FalseV);
+            b.Bind(ru.setting.FalseV);
             Frame ir = Kernel.GetInferiorRoot();
             fret = ru.mainline.protosub.Invoke(ir, Variable.None, null);
             fret.MarkShared();

@@ -699,6 +699,7 @@ namespace Niecza {
         public HashSet<RuntimeUnit> depended_units;
         public List<RuntimeUnit> subordinates = new List<RuntimeUnit>();
         public RuntimeUnit owner;
+        internal Compartment setting;
 
         public Dictionary<string, StashEnt> globals;
         public SubInfo mainline, bottom;
@@ -720,8 +721,9 @@ namespace Niecza {
 
         private RuntimeUnit() { }
 
-        public RuntimeUnit(string name, string filename, string source,
-                bool main, bool runnow) {
+        internal RuntimeUnit(Compartment setting, string name, string filename,
+                string source, bool main, bool runnow) {
+            this.setting = setting;
             this.name = name;
             this.filename = filename;
             this.source = source;
@@ -998,6 +1000,7 @@ namespace Niecza {
         internal static RuntimeUnit Thaw(ThawBuffer tb) {
             RuntimeUnit n = new RuntimeUnit();
             tb.Register(n);
+            n.setting = tb.setting;
 
             n.name     = tb.String();
             string[] srcinfo = tb.Strings();
