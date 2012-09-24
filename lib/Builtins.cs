@@ -1914,7 +1914,7 @@ flat_enough:;
     }
 
     public static Frame you_are_here(Frame th, string sname) {
-        P6any to_call = Kernel.MakeSub(Compartment.Top.setting_path[sname], th);
+        P6any to_call = Kernel.MakeSub(th.info.setting.setting_path[sname], th);
         return to_call.Invoke(th, Variable.None, null);
     }
 
@@ -2195,17 +2195,18 @@ again:
         VarDeque outq = (VarDeque) th.lex1;
         object fnc = th.lex2;
         int tailmode = th.lexi0;
+        var setting = th.info.setting;
 
         switch (th.ip) {
             case 0:
                 Variable[] pen;
                 if (!src.TryGet(out pen, tailmode != 0)) {
-                    P6opaque thunk = new P6opaque(Compartment.Top.GatherIteratorMO);
+                    P6opaque thunk = new P6opaque(setting.GatherIteratorMO);
                     th.coro_return = th;
                     th.MarkSharedChain();
                     thunk.slots[0] = Kernel.NewMuScalar(th);
-                    thunk.slots[1] = Kernel.NewMuScalar(Compartment.Top.AnyP);
-                    P6opaque lst = new P6opaque(Compartment.Top.ListMO);
+                    thunk.slots[1] = Kernel.NewMuScalar(setting.AnyP);
+                    P6opaque lst = new P6opaque(setting.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque(thunk);
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -2214,8 +2215,8 @@ again:
                 }
                 if (pen == null) {
                     if (tailmode != 0)
-                        return Kernel.Take(th, Compartment.Top.EMPTYP);
-                    P6opaque lst = new P6opaque(Compartment.Top.ListMO);
+                        return Kernel.Take(th, setting.EMPTYP);
+                    P6opaque lst = new P6opaque(setting.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -2259,8 +2260,9 @@ again:
         Variable fcn = iter.Shift();
         P6any fcni = fcn.Fetch();
         int arity = get_count(fcni);
+        var setting = th.info.setting;
 
-        Frame fr = th.MakeChild(null, Compartment.Top.CommonMEMap_I, Compartment.Top.AnyP);
+        Frame fr = th.MakeChild(null, setting.CommonMEMap_I, setting.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = new BatchSource(arity, iter);
         fr.lex1 = new VarDeque();
@@ -2271,8 +2273,9 @@ again:
     public static Frame MEMap_for_each(Frame th, P6any lst,
             Func<Variable,Variable> fcn) {
         VarDeque iter = new VarDeque(Kernel.NewRWListVar(lst));
+        var setting = th.info.setting;
 
-        Frame fr = th.MakeChild(null, Compartment.Top.CommonMEMap_I, Compartment.Top.AnyP);
+        Frame fr = th.MakeChild(null, setting.CommonMEMap_I, setting.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = new BatchSource(1, iter);
         fr.lex1 = new VarDeque();
@@ -2290,7 +2293,8 @@ again:
     }
 
     public static Frame MEZip(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, Compartment.Top.CommonMEMap_I, Compartment.Top.AnyP);
+        var setting = th.info.setting;
+        Frame fr = th.MakeChild(null, setting.CommonMEMap_I, setting.AnyP);
         Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
@@ -2300,7 +2304,8 @@ again:
     }
 
     public static Frame MECross(Frame th, bool with, Variable[] pcl) {
-        Frame fr = th.MakeChild(null, Compartment.Top.CommonMEMap_I, Compartment.Top.AnyP);
+        var setting = th.info.setting;
+        Frame fr = th.MakeChild(null, setting.CommonMEMap_I, setting.AnyP);
         Kernel.SetTopFrame(fr);
         fr.lexi0 = 0;
         fr.lex2 = ExtractWith(with, ref pcl);
@@ -2314,6 +2319,7 @@ again:
         VarDeque outq = (VarDeque) th.lex1;
         Variable flt = (Variable) th.lex2;
         int tailmode = th.lexi0;
+        var setting = th.info.setting;
 
         switch (th.ip) {
             case 0:
@@ -2323,13 +2329,13 @@ again:
                         if (!Kernel.IterHasFlat(src, false)) break;
                     } else {
                         if (src.Count() == 0) break;
-                        if (src[0].Fetch().mo.HasType(Compartment.Top.IterCursorMO)) {
-                            P6opaque thunk = new P6opaque(Compartment.Top.GatherIteratorMO);
+                        if (src[0].Fetch().mo.HasType(setting.IterCursorMO)) {
+                            P6opaque thunk = new P6opaque(setting.GatherIteratorMO);
                             th.coro_return = th;
                             th.MarkSharedChain();
                             thunk.slots[0] = Kernel.NewMuScalar(th);
-                            thunk.slots[1] = Kernel.NewMuScalar(Compartment.Top.AnyP);
-                            P6opaque lst = new P6opaque(Compartment.Top.ListMO);
+                            thunk.slots[1] = Kernel.NewMuScalar(setting.AnyP);
+                            P6opaque lst = new P6opaque(setting.ListMO);
                             lst.slots[0] = outq;
                             lst.slots[1] = new VarDeque(thunk);
                             th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -2341,8 +2347,8 @@ again:
                 }
                 if (pen == null) {
                     if (tailmode != 0)
-                        return Kernel.Take(th, Compartment.Top.EMPTYP);
-                    P6opaque lst = new P6opaque(Compartment.Top.ListMO);
+                        return Kernel.Take(th, setting.EMPTYP);
+                    P6opaque lst = new P6opaque(setting.ListMO);
                     lst.slots[0] = outq;
                     lst.slots[1] = new VarDeque();
                     th.caller.resultSlot = Kernel.NewRWListVar(lst);
@@ -2381,8 +2387,9 @@ again:
         VarDeque iter = new VarDeque(lst);
         Variable fcn = iter.Shift();
         iter = Kernel.IterFlatten(iter);
+        var setting = th.info.setting;
 
-        Frame fr = th.MakeChild(null, Compartment.Top.CommonGrep_I, Compartment.Top.AnyP);
+        Frame fr = th.MakeChild(null, setting.CommonGrep_I, setting.AnyP);
         fr.lexi0 = 0;
         fr.lex0 = iter;
         fr.lex1 = new VarDeque();
@@ -2897,9 +2904,10 @@ again:
     }
 
     public static Frame code_accepts_capture(Frame th, P6any code, P6any cap) {
+        var setting = th.info.setting;
         return Kernel.GetInfo(code).SetupCall(th, Kernel.GetOuter(code), code,
-            (Variable[])cap.GetSlot(Compartment.Top.CaptureMO, "$!positionals"),
-            (VarHash)cap.GetSlot(Compartment.Top.CaptureMO, "$!named"),
+            (Variable[])cap.GetSlot(setting.CaptureMO, "$!positionals"),
+            (VarHash)cap.GetSlot(setting.CaptureMO, "$!named"),
             true, null);
     }
 
@@ -2924,8 +2932,9 @@ again:
     public static Frame ind_method_call(Frame th, StashCursor root,
             string nm, P6any cap) {
         int cut = nm.LastIndexOf("::");
-        var pos = (Variable[]) cap.GetSlot(Compartment.Top.CaptureMO, "$!positionals");
-        var nam = (VarHash)    cap.GetSlot(Compartment.Top.CaptureMO, "$!named");
+        var setting = th.info.setting;
+        var pos = (Variable[]) cap.GetSlot(setting.CaptureMO, "$!positionals");
+        var nam = (VarHash)    cap.GetSlot(setting.CaptureMO, "$!named");
 
         if (cut < 0) {
             return pos[0].Fetch().InvokeMethod(th, nm, pos, nam);
