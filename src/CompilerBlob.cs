@@ -47,8 +47,10 @@ namespace Niecza {
 
     public class Downcaller {
         internal static Variable upcall_cb;
+        static Variable TrueV, FalseV;
         static IDictionary responder;
         static P6any UnitP, StaticSubP, TypeP, ParamP, ValueP;
+        static STable StrMO, NumMO, ListMO, AnyMO, BoolMO;
         static string obj_dir;
 
         // let the CLR load assemblies from obj/ too
@@ -64,7 +66,9 @@ namespace Niecza {
         }
         // Better, but still fudgy.  Relies too much on path structure.
         public static void InitSlave(Variable cb, P6any cmd_obj_dir, Variable unit,
-                Variable staticSub, Variable type, Variable param, Variable value) {
+                Variable staticSub, Variable type, Variable param, Variable value,
+                Variable str, Variable num, Variable @true, Variable @false,
+                Variable list, Variable any, Variable @bool) {
             if (responder != null) return;
 
             UnitP = unit.Fetch();
@@ -72,6 +76,13 @@ namespace Niecza {
             TypeP = type.Fetch();
             ParamP = param.Fetch();
             ValueP = value.Fetch();
+            StrMO = str.Fetch().mo;
+            NumMO = num.Fetch().mo;
+            TrueV = @true;
+            FalseV = @false;
+            ListMO = list.Fetch().mo;
+            AnyMO = any.Fetch().mo;
+            BoolMO = @bool.Fetch().mo;
 
             obj_dir = Path.GetFullPath(cmd_obj_dir.IsDefined() ?
                     cmd_obj_dir.mo.mro_raw_Str.Get(cmd_obj_dir) :
@@ -103,16 +114,16 @@ namespace Niecza {
             if (o is BoxObject<object>)
                 return Kernel.UnboxAny<object>(o);
             else if (o.IsDefined()) {
-                if (o.Isa(Kernel.StrMO))
+                if (o.Isa(StrMO))
                     return (string) o.mo.mro_raw_Str.Get(v);
-                else if (o.Isa(Kernel.BoolMO))
+                else if (o.Isa(BoolMO))
                     return (bool) o.mo.mro_raw_Bool.Get(v);
-                else if (o.Isa(Kernel.NumMO)) {
+                else if (o.Isa(NumMO)) {
                     double d = Kernel.UnboxAny<double>(o);
                     if ((d % 1) == 0 && d <= int.MaxValue && d >= int.MinValue)
                         return (object)(int)d;
                     return (object)d;
-                } else if (o.Isa(Kernel.ListMO)) {
+                } else if (o.Isa(ListMO)) {
                     VarDeque it = o.mo.mro_raw_iterator.Get(v);
                     var lo = new List<object>();
                     while (Kernel.IterHasFlat(it, true))
@@ -134,10 +145,10 @@ namespace Niecza {
         }
 
         internal static Variable DCResult(object r) {
-            if (r == null) return Kernel.AnyP;
-            else if (r is string) return Kernel.BoxAnyMO((string)r, Kernel.StrMO);
+            if (r == null) return AnyMO.typeObj;
+            else if (r is string) return Kernel.BoxAnyMO((string)r, StrMO);
             else if (r is int) return Builtins.MakeInt((int)r);
-            else if (r is bool) return ((bool)r) ? Kernel.TrueV : Kernel.FalseV;
+            else if (r is bool) return ((bool)r) ? TrueV : FalseV;
             else if (r is Exception) throw new NieczaException(((Exception)r).Message);
             else if (r is object[]) {
                 object[] ra = (object[])r;
@@ -151,7 +162,7 @@ namespace Niecza {
                     (t == "sub") ? StaticSubP :
                     (t == "param") ? ParamP :
                     (t == "value") ? ValueP :
-                    (t == "unit") ? UnitP : Kernel.AnyP;
+                    (t == "unit") ? UnitP : AnyMO.typeObj;
                 return Kernel.BoxAnyMO(r, pr.mo);
             }
         }
@@ -178,7 +189,7 @@ namespace Niecza {
                 sb.Append('"');
             } else if (!o.IsDefined()) {
                 sb.Append("null");
-            } else if (o.Isa(Kernel.ListMO)) {
+            } else if (o.Isa(ListMO)) {
                 VarDeque d = o.mo.mro_raw_iterator.Get(v);
                 bool comma = false;
                 sb.Append('[');

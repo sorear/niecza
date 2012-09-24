@@ -105,6 +105,7 @@ mknext: run/Niecza.exe obj/Run.Kernel.dll obj/Kernel.dll
 	cp -a src lib docs README.pod LICENSE Makefile test.pl next/
 	cp -a run lib next/boot/
 	cp obj/Run.Kernel.dll obj/Kernel.dll next/boot/obj/
+	ln -s ../t next/t
 	NIECZA_KEEP_IL=1 $(RUN_CLR) next/boot/run/Niecza.exe --obj-dir next/boot/obj -C $(libunits)
 
 realclean: clean
