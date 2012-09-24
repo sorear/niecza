@@ -1,0 +1,59 @@
+    Announce: Niecza Perl 6 v22
+
+This is the twenty-second release of Niecza Perl 6, scheduled on the last
+Monday of the month.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you still need a
+binary for bootstrapping.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+
+[Bug fixes]
+
+Range.roll and Range.pick now properly handle ranges which are finer than the
+resolution of Num.  (Solomon Foster)
+
+
+
+[New features]
+
+Added sub hypot. (Solomon Foster)
+
+Added expmod (modular exponentiation) and is-prime for Int types.  (Solomon
+Foster, Larry Wall)
+
+Taking logarithms of integers larger than the largest representable "Num" now
+behaves more intelligently.  (Solomon Foster)
+
+Allowed infix:<cmp> to examine the contents of Hash objects.  (Solomon Foster,
+Carl Mäsak)
+
+
+
+[Internal]
+
+A project has been started to remove global state to allow multiple
+interpreters to coexist more easily in a single process, with applications to
+sandboxing and improving the compiler/runtime relationship.
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-22.zip
+[2] https://github.com/sorear/niecza
