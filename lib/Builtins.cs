@@ -1119,10 +1119,9 @@ public partial class Builtins {
         int bytes = bits / 8 + 1;
         byte mask = (byte) ((1 << (bits % 8)) - 1);
 
-        Random rnd = new Random();
         byte[] b = new byte[bytes + 1];
         while (true) {
-            rnd.NextBytes(b);
+            lock (rng_lock) { rng.NextBytes(b); }
             b[bytes] = 0;
             b[bytes - 1] &= mask;
             BigInteger candidate = new BigInteger (b);
