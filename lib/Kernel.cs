@@ -4333,7 +4333,7 @@ tryagain:
                     throw new NieczaException("CLR objects may not be used directly in safe mode");
                 if (bind_to != null)
                     throw new NieczaException("Cannot bind interop namespaces");
-                v = CLRWrapperProvider.GetNamedWrapper((string)p1 + "." + key).typeObj;
+                v = CLRWrapperProvider.GetNamedWrapper(Compartment.Top, (string)p1 + "." + key).typeObj;
                 goto have_v;
             }
             else if (type == WHO) {
@@ -5153,7 +5153,7 @@ have_v:
                     if (craw == null) { group_n++; continue; }
                     mc.Add(new MMDCandidate(craw, group_n, filter_n++));
                 }
-                cs = new CandidateSet(dth.info.name, mc.ToArray());
+                cs = new CandidateSet(th.info.setting, dth.info.name, mc.ToArray());
                 Interlocked.CompareExchange(ref dth.info.param[1], cs, null);
             }
             if (tailcall) th = th.Return();

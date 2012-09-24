@@ -48,11 +48,13 @@ namespace Niecza {
     }
 
     class CandidateSet : IFreeze {
+        Compartment setting;
         object[] cands; // XXX no VolatileRead<T> ?
         MultiCandidate[] orig;
         string name;
 
-        public CandidateSet(string name, MultiCandidate[] orig) {
+        public CandidateSet(Compartment setting, string name, MultiCandidate[] orig) {
+            this.setting = setting;
             this.orig = orig;
             this.name = name;
             int max_arity = 0;
@@ -82,10 +84,10 @@ namespace Niecza {
             }
         }
 
-        static void CheckJunctionArg(Variable v, ref int jun_pivot,
+        void CheckJunctionArg(Variable v, ref int jun_pivot,
                 ref string jun_pivot_n, ref int jun_rank, int num, string nam) {
             P6any obj = v.Fetch();
-            if (!obj.mo.HasType(Compartment.Top.JunctionMO))
+            if (!obj.mo.HasType(setting.JunctionMO))
                 return;
             int jrank = Kernel.UnboxAny<int>((P6any) ((P6opaque)obj).slots[0]) / 2;
             if (jrank < jun_rank) {
@@ -95,7 +97,7 @@ namespace Niecza {
             }
         }
 
-        static Frame CheckJunctions(Frame th, Variable[] pos, VarHash named, P6any junc_call) {
+        Frame CheckJunctions(Frame th, Variable[] pos, VarHash named, P6any junc_call) {
             int jun_pivot = -1;
             int jun_rank  = int.MaxValue;
             string jun_pivot_n = null;
@@ -113,7 +115,7 @@ namespace Niecza {
 
             Variable jct = (jun_pivot == -2 ? named[jun_pivot_n] :
                     pos[jun_pivot]);
-            Frame nth = th.MakeChild(null, Compartment.Top.AutoThreadSubSI, Compartment.Top.AnyP);
+            Frame nth = th.MakeChild(null, setting.AutoThreadSubSI, setting.AnyP);
 
             P6opaque jo  = (P6opaque) jct.Fetch();
 
@@ -242,14 +244,16 @@ namespace Niecza {
     }
 
     sealed class PropertyProxy : Variable {
+        Compartment  setting;
         PropertyInfo prop;
         object       obj;
         object[]     argv;
 
-        public PropertyProxy(PropertyInfo prop, object obj, object[] argv) {
-            this.prop   = prop;
-            this.obj    = obj;
-            this.argv   = argv;
+        public PropertyProxy(Compartment setting, PropertyInfo prop, object obj, object[] argv) {
+            this.setting = setting;
+            this.prop    = prop;
+            this.obj     = obj;
+            this.argv    = argv;
         }
 
         public override P6any Fetch() {
@@ -257,7 +261,7 @@ namespace Niecza {
                 throw new NieczaException("Property " + prop.Name + " is write-only");
             MethodInfo mi = prop.GetGetMethod();
             object ret = mi.Invoke(obj, argv);
-            return CLRWrapperProvider.BoxResult(mi.ReturnType, ret).Fetch();
+            return CLRWrapperProvider.BoxResult(setting, mi.ReturnType, ret).Fetch();
         }
 
         public override void Store(P6any v) {
@@ -266,7 +270,7 @@ namespace Niecza {
             MethodInfo mi = prop.GetSetMethod();
             object[] argv_ = argv;
             Array.Resize(ref argv_, argv.Length + 1);
-            if (!CLRWrapperProvider.CoerceArgument(out argv_[argv.Length],
+            if (!CLRWrapperProvider.CoerceArgument(setting, out argv_[argv.Length],
                         prop.PropertyType, v))
                 throw new NieczaException("Unable to coerce value of type " + v.mo.name + " for " + prop.Name); // could also be a range problem
             mi.Invoke(obj, argv_);
@@ -276,24 +280,26 @@ namespace Niecza {
     }
 
     sealed class FieldProxy : Variable {
-        FieldInfo field;
-        object    obj;
+        Compartment setting;
+        FieldInfo   field;
+        object      obj;
 
-        public FieldProxy(FieldInfo field, object obj) {
-            this.field  = field;
-            this.obj    = obj;
+        public FieldProxy(Compartment s, FieldInfo field, object obj) {
+            this.setting = s;
+            this.field   = field;
+            this.obj     = obj;
         }
 
         public override P6any Fetch() {
             object ret = field.GetValue(obj);
-            return CLRWrapperProvider.BoxResult(field.FieldType, ret).Fetch();
+            return CLRWrapperProvider.BoxResult(setting, field.FieldType, ret).Fetch();
         }
 
         public override void Store(P6any v) {
             if (field.IsInitOnly || field.IsLiteral)
                 throw new NieczaException("Field " + field.Name + " is read-only");
             object clr;
-            if (!CLRWrapperProvider.CoerceArgument(out clr, field.FieldType, v))
+            if (!CLRWrapperProvider.CoerceArgument(setting, out clr, field.FieldType, v))
                 throw new NieczaException("Unable to coerce value of type " + v.mo.name + " for " + field.Name); // could also be a range problem
             field.SetValue(obj, clr);
         }
@@ -306,17 +312,19 @@ namespace Niecza {
         Type[] args;
         bool[] refs;
         Type param_array;
+        Compartment setting;
 
-        private OverloadCandidate(MemberInfo what_call, Type[] args,
-                bool[] refs, Type param_array) {
+        private OverloadCandidate(Compartment s, MemberInfo what_call,
+                Type[] args, bool[] refs, Type param_array) {
             this.what_call = what_call;
             this.args = args;
             this.refs = refs;
             this.param_array = param_array;
+            this.setting = s;
         }
 
-        public static void MakeCandidates(MemberInfo what, ParameterInfo[] pi,
-                List<MultiCandidate> into) {
+        public static void MakeCandidates(Compartment s, MemberInfo what,
+                ParameterInfo[] pi, List<MultiCandidate> into) {
             Type[] args1 = new Type[pi.Length];
             bool[] refs = new bool[pi.Length];
             for (int i = 0; i < pi.Length; i++) {
@@ -326,13 +334,13 @@ namespace Niecza {
                     refs[i] = true;
                 }
             }
-            into.Add(new OverloadCandidate(what, args1, refs, null));
+            into.Add(new OverloadCandidate(s, what, args1, refs, null));
 
             if (pi.Length != 0 && pi[pi.Length-1].GetCustomAttributes(
                         typeof(ParamArrayAttribute), false).Length != 0) {
                 Type[] args2 = new Type[args1.Length - 1];
                 Array.Copy(args1, 0, args2, 0, args2.Length);
-                into.Add(new OverloadCandidate(what, args2, refs,
+                into.Add(new OverloadCandidate(s, what, args2, refs,
                             args1[args1.Length - 1].GetElementType()));
             }
         }
@@ -349,8 +357,8 @@ namespace Niecza {
         void WritebackRefs(Variable[] pos, object[] argv) {
             for (int i = 0; i < args.Length; i++)
                 if (refs[i])
-                    pos[i+1].Store(CLRWrapperProvider.BoxResult(args[i],
-                                argv[i]).Fetch());
+                    pos[i+1].Store(CLRWrapperProvider.BoxResult(setting,
+                            args[i], argv[i]).Fetch());
         }
 
         // pos[0] = self is not used for dispatch
@@ -358,13 +366,13 @@ namespace Niecza {
             object[] argv = new object[args.Length +
                 (param_array != null ? 1 : 0)];
             for (int i = 0; i < args.Length; i++)
-                CLRWrapperProvider.CoerceArgument(out argv[i], args[i], pos[i+1]);
+                CLRWrapperProvider.CoerceArgument(setting, out argv[i], args[i], pos[i+1]);
             if (param_array != null) {
                 int npa = pos.Length - 1 - args.Length;
                 Array pa = Array.CreateInstance(param_array, npa);
                 for (int j = 0; j < npa; j++) {
                     object arg;
-                    CLRWrapperProvider.CoerceArgument(out arg, param_array, pos[j + args.Length + 1]);
+                    CLRWrapperProvider.CoerceArgument(setting, out arg, param_array, pos[j + args.Length + 1]);
                     pa.SetValue(arg, j);
                 }
                 argv[args.Length] = pa;
@@ -374,16 +382,16 @@ namespace Niecza {
                 MethodInfo mi = (MethodInfo) what_call;
                 object ret = mi.Invoke((mi.IsStatic ? null : obj), argv);
                 WritebackRefs(pos, argv);
-                th.resultSlot = CLRWrapperProvider.BoxResult(mi.ReturnType, ret);
+                th.resultSlot = CLRWrapperProvider.BoxResult(setting, mi.ReturnType, ret);
             } else if (what_call is ConstructorInfo) {
                 ConstructorInfo ci = (ConstructorInfo) what_call;
                 object ret = ci.Invoke(argv);
                 WritebackRefs(pos, argv);
-                th.resultSlot = CLRWrapperProvider.BoxResult(ci.DeclaringType, ret);
+                th.resultSlot = CLRWrapperProvider.BoxResult(setting, ci.DeclaringType, ret);
             } else if (what_call is FieldInfo) {
-                th.resultSlot = new FieldProxy((FieldInfo) what_call, obj);
+                th.resultSlot = new FieldProxy(setting, (FieldInfo) what_call, obj);
             } else if (what_call is PropertyInfo) {
-                th.resultSlot = new PropertyProxy((PropertyInfo) what_call, obj, argv);
+                th.resultSlot = new PropertyProxy(setting, (PropertyInfo) what_call, obj, argv);
             } else {
                 throw new NieczaException("Unhandled member type " + what_call.GetType());
             }
@@ -398,18 +406,18 @@ namespace Niecza {
 
             object dummy;
             for (int i = 0; i < args.Length; i++)
-                if (!CLRWrapperProvider.CoerceArgument(out dummy, args[i], pos[i+1])
+                if (!CLRWrapperProvider.CoerceArgument(setting, out dummy, args[i], pos[i+1])
                         || (refs[i] && !pos[i+1].Rw))
                     return false;
             // XXX: maybe param arrays should be treated as slurpies?
             for (int i = args.Length; i < pos.Length - 1; i++)
-                if (!CLRWrapperProvider.CoerceArgument(out dummy, param_array, pos[i+1]))
+                if (!CLRWrapperProvider.CoerceArgument(setting, out dummy, param_array, pos[i+1]))
                     return false;
 
             return true;
         }
 
-        public override int  Compare(int arity, MultiCandidate other_) {
+        public override int Compare(int arity, MultiCandidate other_) {
             bool any_better = false, any_worse = false, any_diff = false;
             OverloadCandidate other = (OverloadCandidate) other_;
 
@@ -489,25 +497,23 @@ namespace Niecza {
     public class CLRWrapperProvider {
         [TrueGlobal] static object wrapper_cache_lock = new object();
 
-        public static STable GetWrapper(Type t) {
-            var c = Compartment.Top;
+        internal static STable GetWrapper(Compartment c, Type t) {
             lock (wrapper_cache_lock) {
                 if (c.wrapper_cache == null)
                     c.wrapper_cache = new Dictionary<Type, STable>();
                 STable r;
                 if (c.wrapper_cache.TryGetValue(t, out r))
                     return r;
-                c.wrapper_cache[t] = r = NewWrapper(t);
+                c.wrapper_cache[t] = r = NewWrapper(c, t);
                 return r;
             }
         }
 
-        internal static void LoadWrapper(string tn) {
-            GetWrapper(Type.GetType(tn));
+        internal static void LoadWrapper(Compartment s, string tn) {
+            GetWrapper(s, Type.GetType(tn));
         }
 
-        public static STable GetNamedWrapper(string nm) {
-            var c = Compartment.Top;
+        internal static STable GetNamedWrapper(Compartment c, string nm) {
             lock (wrapper_cache_lock) {
                 if (c.named_wrapper_cache == null)
                     c.named_wrapper_cache = new Dictionary<string, STable>();
@@ -518,7 +524,7 @@ namespace Niecza {
                 if (CLROpts.Debug)
                     Console.WriteLine("Loading type {0} ... {1}", nm.Substring(1), ty == null ? "failed" : "succeeded");
                 if (ty != null) {
-                    c.named_wrapper_cache[nm] = r = GetWrapper(ty);
+                    c.named_wrapper_cache[nm] = r = GetWrapper(c, ty);
                 } else {
                     c.named_wrapper_cache[nm] = r = StashCursor.MakePackage(
                         "CLR" + nm.Replace(".","::"),
@@ -528,12 +534,13 @@ namespace Niecza {
             }
         }
 
-        static void MultiAdd(Dictionary<string,List<MultiCandidate>> d,
+        static void MultiAdd(Compartment s,
+                Dictionary<string,List<MultiCandidate>> d,
                 string n, MemberInfo mi, ParameterInfo[] pi) {
             List<MultiCandidate> l;
             if (!d.TryGetValue(n, out l))
                 d[n] = l = new List<MultiCandidate>();
-            OverloadCandidate.MakeCandidates(mi, pi, l);
+            OverloadCandidate.MakeCandidates(s, mi, pi, l);
         }
 
         static Frame Binder(Frame th) {
@@ -588,13 +595,14 @@ for $args (0..9) {
 
         static object Callback(P6any fun, Type ret, object[] args, Type[] aty) {
             Variable[] pos = new Variable[args.Length];
+            var s = Kernel.GetInfo(fun).setting;
             for (int i = 0; i < args.Length; i++)
-                pos[i] = BoxResult(aty[i], args[i]);
+                pos[i] = BoxResult(s, aty[i], args[i]);
             Variable retv = Kernel.RunInferior(fun.Invoke(
                 Kernel.GetInferiorRoot(), pos, null));
             if (ret == typeof(void)) return null;
             object reto;
-            if (!CoerceArgument(out reto, ret, retv))
+            if (!CoerceArgument(s, out reto, ret, retv))
                 throw new Exception("Return value coercion failed, " + retv.Fetch().mo.name + " to " + ret.FullName);
             return reto;
         }
@@ -613,7 +621,7 @@ for $args (0..9) {
             if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             STable mo = ((Variable)th.lex0).Fetch().mo;
             object clr;
-            if (!CoerceArgument(out clr, mo.box_type, (Variable)th.lex1))
+            if (!CoerceArgument(th.info.setting, out clr, mo.box_type, (Variable)th.lex1))
                 return Kernel.Die(th, "Cannot coerce value of type " + ((Variable)th.lex1).Fetch().mo.name + " to " + mo.box_type.FullName);
             th.caller.resultSlot = clr == null ? mo.typeObj :
                 Kernel.BoxAnyMO<object>(clr, mo);
@@ -623,7 +631,7 @@ for $args (0..9) {
         static Frame unmarshal_handler(Frame th) {
             if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             object o = Kernel.UnboxAny<object>(((Variable)th.lex0).Fetch());
-            th.caller.resultSlot = BoxResult(o == null ? typeof(void) : o.GetType(), o);
+            th.caller.resultSlot = BoxResult(th.info.setting, o == null ? typeof(void) : o.GetType(), o);
             return th.caller;
         }
 
@@ -631,7 +639,7 @@ for $args (0..9) {
             if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             object o = Kernel.UnboxAny<object>(((Variable)th.lex0).Fetch());
             ((IDisposable)o).Dispose();
-            th.caller.resultSlot = Compartment.Top.Nil;
+            th.caller.resultSlot = th.info.setting.Nil;
             return th.caller;
         }
 
@@ -639,24 +647,23 @@ for $args (0..9) {
             if (th.ip == 0) { th.ip = 1; return Frame.Binder(th); }
             P6any ro = ((Variable)th.lex0).Fetch();
             object o = Kernel.UnboxAny<object>(ro);
-            th.caller.resultSlot = Kernel.BoxAnyMO(o == null ? ro.mo.name : o.ToString(), Compartment.Top.StrMO);
+            th.caller.resultSlot = Kernel.BoxAnyMO(o == null ? ro.mo.name : o.ToString(), th.info.setting.StrMO);
             return th.caller;
         }
 
-        static STable NewWrapper(Type t) {
+        static STable NewWrapper(Compartment s, Type t) {
             if (CLROpts.Debug)
                 Console.WriteLine("Setting up wrapper for {0}", t.FullName);
             STable m = new STable("CLR::" + t.FullName.Replace(".","::"));
             m.who = StashCursor.MakeCLR_WHO("." + t.FullName);
-            m.how = Kernel.BoxRaw(m, Compartment.Top.ClassHOWMO);
-            STable pm = t.BaseType == null ? Compartment.Top.AnyMO :
-                GetWrapper(t.BaseType);
+            m.how = Kernel.BoxRaw(m, s.ClassHOWMO);
+            STable pm = t.BaseType == null ? s.AnyMO : GetWrapper(s, t.BaseType);
             STable[] mro = new STable[pm.mo.mro.Length + 1];
             Array.Copy(pm.mo.mro, 0, mro, 1, pm.mo.mro.Length);
             mro[0] = m;
             m.FillClass(new string[] { }, new STable[] { }, new STable[] { pm }, mro);
             foreach (Type ity in t.GetInterfaces())
-                m.mo.role_typecheck_list.Add(GetWrapper(ity));
+                m.mo.role_typecheck_list.Add(GetWrapper(s, ity));
             if (t.IsInterface) {
                 m.mo.role_typecheck_list.Add(m);
             }
@@ -675,7 +682,7 @@ for $args (0..9) {
                     continue; // ignore property accessors
                 if (mi.GetBaseDefinition().DeclaringType == t)
                     needNewWrapper.Add(mi.Name);
-                MultiAdd(allMembers, mi.Name, mi, mi.GetParameters());
+                MultiAdd(s, allMembers, mi.Name, mi, mi.GetParameters());
             }
 
             foreach (ConstructorInfo mi in t.GetConstructors(BindingFlags.Public |
@@ -683,7 +690,7 @@ for $args (0..9) {
                 if (CLROpts.Debug)
                     Console.WriteLine("Checking constructor : {0}", mi);
                 needNewWrapper.Add("new");
-                MultiAdd(allMembers, "new", mi, mi.GetParameters());
+                MultiAdd(s, allMembers, "new", mi, mi.GetParameters());
             }
 
             foreach (PropertyInfo pi in t.GetProperties(BindingFlags.Public |
@@ -692,7 +699,7 @@ for $args (0..9) {
                     Console.WriteLine("Checking property : {0}", pi);
                 if (pi.DeclaringType == t)
                     needNewWrapper.Add(pi.Name);
-                MultiAdd(allMembers, pi.Name, pi, pi.GetIndexParameters());
+                MultiAdd(s, allMembers, pi.Name, pi, pi.GetIndexParameters());
             }
 
             foreach (FieldInfo fi in t.GetFields(BindingFlags.Public |
@@ -701,7 +708,7 @@ for $args (0..9) {
                     Console.WriteLine("Checking fields : {0}", fi);
                 if (fi.DeclaringType == t)
                     needNewWrapper.Add(fi.Name);
-                MultiAdd(allMembers, fi.Name, fi, new ParameterInfo[0]);
+                MultiAdd(s, allMembers, fi.Name, fi, new ParameterInfo[0]);
             }
 
             if (typeof(IDisposable).IsAssignableFrom(t)) {
@@ -739,7 +746,7 @@ for $args (0..9) {
 
                 SubInfo si = new SubInfo(siname, Binder);
                 si.param = new object[] {
-                    new CandidateSet(siname, allMembers[n].ToArray()) };
+                    new CandidateSet(s, siname, allMembers[n].ToArray()) };
                 if (CLROpts.Debug)
                     Console.WriteLine("Installing {0}", siname);
                 P6any sub = Kernel.MakeSub(si, null);
@@ -757,14 +764,14 @@ for $args (0..9) {
                     Console.WriteLine("type {0}", o.name);
             }
 
-            Compartment.Top.reg.InstallFakeUnit("CLR," + t.AssemblyQualifiedName,
+            s.reg.InstallFakeUnit("CLR," + t.AssemblyQualifiedName,
                 m, m.who, m.how, m.mo, m.typeObj);
             return m;
         }
 
-        public static Variable BoxResult(Type cty, object ret) {
+        internal static Variable BoxResult(Compartment s, Type cty, object ret) {
             if (cty == typeof(void))
-                return Compartment.Top.Nil;
+                return s.Nil;
             if (cty == typeof(sbyte))
                 return Builtins.MakeInt((sbyte)ret);
             if (cty == typeof(byte))
@@ -786,20 +793,20 @@ for $args (0..9) {
             if (cty == typeof(double))
                 return Builtins.MakeFloat((double)ret);
             if (cty == typeof(bool))
-                return Kernel.BoxAnyMO((bool)ret, Compartment.Top.BoolMO);
+                return Kernel.BoxAnyMO((bool)ret, s.BoolMO);
             if (cty == typeof(string))
-                return ret == null ? Compartment.Top.StrMO.typeObj : Kernel.BoxAnyMO((string)ret, Compartment.Top.StrMO);
+                return ret == null ? s.StrMO.typeObj : Kernel.BoxAnyMO((string)ret, s.StrMO);
             if (cty == typeof(Variable))
                 return (Variable)ret;
             if (cty == typeof(P6any))
                 return ((P6any)ret);
 
             if (ret == null)
-                return Compartment.Top.AnyP;
-            return Kernel.BoxAnyMO<object>(ret, GetWrapper(ret.GetType()));
+                return s.AnyP;
+            return Kernel.BoxAnyMO<object>(ret, GetWrapper(s, ret.GetType()));
         }
 
-        public static bool CoerceArgument(out object clr, Type ty, Variable var) {
+        internal static bool CoerceArgument(Compartment s, out object clr, Type ty, Variable var) {
             P6any obj = var.Fetch();
             clr = null;
 
@@ -810,7 +817,7 @@ for $args (0..9) {
                     // is this enough?
                     return (ty.IsAssignableFrom(t) && !ty.IsValueType &&
                             ty != typeof(void));
-                } else if (obj.mo == Compartment.Top.MuMO || obj.mo == Compartment.Top.AnyMO) {
+                } else if (obj.mo == s.MuMO || obj.mo == s.AnyMO) {
                     // untyped-ish null
                     return !ty.IsValueType && ty != typeof(void);
                 } else {
@@ -822,11 +829,11 @@ for $args (0..9) {
             // in all other cases we're definitely passing a non-null value
 
             // Boolean values marshal to bool
-            if (obj.Does(Compartment.Top.BoolMO)) {
+            if (obj.Does(s.BoolMO)) {
                 clr = Kernel.UnboxAny<int>(obj) != 0;
             }
             // note, Bool ~~ Int ~~ Integral
-            else if (obj.Does(Compartment.Top.IntegralMO)) {
+            else if (obj.Does(s.IntegralMO)) {
                 // important type directed case!
                 int small;
                 BigInteger big;
@@ -864,7 +871,7 @@ for $args (0..9) {
                         clr = obj;
                 }
             }
-            else if (obj.Does(Compartment.Top.RealMO)) {
+            else if (obj.Does(s.RealMO)) {
                 // fractional value
 
                 if (ty == typeof(decimal)) {
@@ -926,14 +933,14 @@ for $args (0..9) {
                         clr = (object)val;
                 }
             }
-            else if (obj.Does(Compartment.Top.StrMO)) {
-                string s = Kernel.UnboxAny<string>(obj);
-                if (ty == typeof(char) && s.Length == 1)
-                    clr = s[0];
+            else if (obj.Does(s.StrMO)) {
+                string st = Kernel.UnboxAny<string>(obj);
+                if (ty == typeof(char) && st.Length == 1)
+                    clr = st[0];
                 else if (ty == typeof(string))
-                    clr = s;
+                    clr = st;
                 else if (ty == typeof(object))
-                    clr = s;
+                    clr = st;
                 else
                     clr = obj;
             }
@@ -971,6 +978,5 @@ for $args (0..9) {
 
             return clr != null && ty.IsAssignableFrom(clr.GetType());
         }
-
     }
 }

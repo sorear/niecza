@@ -141,7 +141,7 @@ namespace Niecza.Serialization {
 
             if (fake) {
                 if (name.StartsWith("CLR,"))
-                    CLRWrapperProvider.LoadWrapper(name.Substring(4));
+                    CLRWrapperProvider.LoadWrapper(Compartment.Top, name.Substring(4));
                 else
                     throw new ThawException("No handler for fake unit name " + name);
 
