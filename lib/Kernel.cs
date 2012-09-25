@@ -4606,6 +4606,7 @@ have_v:
         internal SubInfo CommonMEMap_I;
         internal SubInfo CommonGrep_I;
         internal SubInfo TEMP_SI;
+        internal SubInfo ArrayHelperSI;
 
         public Dictionary<string, StashEnt> currentGlobals;
         // The root unit of this isolation container; will not point to
@@ -4875,6 +4876,7 @@ have_v:
             c.SubInvokeSubSI = new SubInfo("Sub.postcircumfix:<( )>",
                     SubInvokeSubC);
             c.TEMP_SI       = new SubInfo("KERNEL Scalar.TEMP", Builtins.TEMP_C);
+            c.ArrayHelperSI = new SubInfo("KERNEL ArrayHelper", RxFrame.ArrayHelperC);
 
             c.RunCATCH_I = new SubInfo("KERNEL run_CATCH", null,
                 Builtins.RunCATCH_C, null, null, new int[] {
