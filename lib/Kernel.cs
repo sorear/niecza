@@ -731,7 +731,7 @@ namespace Niecza {
             this.stubbed_stashes = new List<KeyValuePair<int,STable>>();
             this.is_mainish = main;
             if (name == "CORE")
-                Kernel.CreateBasicTypes(Compartment.Top);
+                Kernel.CreateBasicTypes(setting);
 
             this.asm_name = Backend.prefix + name.Replace("::", ".");
             this.dll_name = asm_name + (main ? ".exe" : ".dll");
@@ -793,7 +793,7 @@ namespace Niecza {
             foreach (RuntimeUnit zu in subordinates)
                 zu.type = type;
 
-            Compartment.Top.reg.SaveUnit(name, this);
+            setting.reg.SaveUnit(name, this);
         }
 
         internal void SetConstants() { SetConstants(type, constTable, constants); }
@@ -819,15 +819,15 @@ namespace Niecza {
 
         internal void RunMainline() {
             RuntimeUnit csr = this;
-            Compartment.Top.setting_path = new Dictionary<string,SubInfo>();
+            setting.setting_path = new Dictionary<string,SubInfo>();
             while (csr.mainline.outer != null) {
                 RuntimeUnit o = csr.mainline.outer.unit;
-                Compartment.Top.setting_path[o.name] = csr.mainline;
+                setting.setting_path[o.name] = csr.mainline;
                 csr = o;
             }
 
             Kernel.RunInferior(Kernel.GetInferiorRoot().
-                    MakeChild(null, csr.mainline, Compartment.Top.AnyP));
+                    MakeChild(null, csr.mainline, setting.AnyP));
         }
 
         internal string LinkUnit(RuntimeUnit other) {
@@ -846,9 +846,9 @@ namespace Niecza {
                 globals[gm.Key] = nse;
             }
 
-            Compartment.Top.check.RunNew();
-            Compartment.Top.init.RunNew();
-            Compartment.Top.end.RunNew();
+            setting.check.RunNew();
+            setting.init.RunNew();
+            setting.end.RunNew();
 
             return null;
         }
@@ -861,14 +861,14 @@ namespace Niecza {
             return Kernel.NewTypedScalar(null);
         }
 
-        static bool IsEmptyAggr(Variable v) {
+        bool IsEmptyAggr(Variable v) {
             if (!v.List) return false;
             P6any p = v.Fetch();
-            if (p.mo == Compartment.Top.ArrayMO) {
-                return ((VarDeque)p.GetSlot(Compartment.Top.ListMO, "$!items")).Count() == 0 &&
-                    ((VarDeque)p.GetSlot(Compartment.Top.ListMO, "$!rest")).Count() == 0;
+            if (p.mo == setting.ArrayMO) {
+                return ((VarDeque)p.GetSlot(setting.ListMO, "$!items")).Count() == 0 &&
+                    ((VarDeque)p.GetSlot(setting.ListMO, "$!rest")).Count() == 0;
             }
-            else if (p.mo == Compartment.Top.HashMO) {
+            else if (p.mo == setting.HashMO) {
                 return Kernel.UnboxAny<VarHash>(p).Count == 0;
             }
             else {
@@ -876,8 +876,7 @@ namespace Niecza {
             }
         }
 
-        public static string NsMerge(string who, string name,
-                ref StashEnt nse, StashEnt ose) {
+        public string NsMerge(string who, string name, ref StashEnt nse, StashEnt ose) {
 
             P6any nseo = nse.v.Fetch();
             P6any oseo = ose.v.Fetch();
@@ -907,8 +906,8 @@ namespace Niecza {
             // (mis)use
             if (ose.constant && !oseod && nse.constant && !nseod &&
                     (oseo.mo.mo.type == P6how.PACKAGE || nseo.mo.mo.type == P6how.PACKAGE) &&
-                    oseo.mo.who.Isa(Compartment.Top.StashMO) &&
-                    nseo.mo.who.Isa(Compartment.Top.StashMO) &&
+                    oseo.mo.who.Isa(setting.StashMO) &&
+                    nseo.mo.who.Isa(setting.StashMO) &&
                     Kernel.UnboxAny<string>(oseo.mo.who) ==
                         Kernel.UnboxAny<string>(nseo.mo.who)) {
                 if (nseo.mo.mo.type == P6how.PACKAGE)
@@ -990,8 +989,7 @@ namespace Niecza {
                         (f1, f2) => string.CompareOrdinal(f1.Name, f2.Name));
                 foreach (FieldInfo f in kf) {
                     if (f.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0) {
-                        //Console.WriteLine("Freeze {0} {1}", f, f.GetValue(Compartment.Top));
-                        fb.ObjRef(f.GetValue(Compartment.Top));
+                        fb.ObjRef(f.GetValue(setting));
                     }
                 }
             }
@@ -1081,7 +1079,6 @@ namespace Niecza {
                 foreach (FieldInfo f in kf) {
                     if (f.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0) {
                         f.SetValue(tb.setting, tb.ObjRef());
-                        //Console.WriteLine("Thaw {0} {1}", f, f.GetValue(Compartment.Top));
                     }
                 }
             }
@@ -4784,12 +4781,13 @@ have_v:
                 th.ip = 1;
                 return ((P6any)th.lex0).Invoke(th, Variable.None, null);
             } else {
-                return Take(th, Compartment.Top.EMPTYP);
+                return Take(th, th.info.setting.EMPTYP);
             }
         }
 
         public static Frame GatherHelper(Frame th, P6any sub) {
-            Frame n = th.MakeChild(null, Compartment.Top.dogather_SI, Compartment.Top.AnyP);
+            var s = th.info.setting;
+            Frame n = th.MakeChild(null, s.dogather_SI, s.AnyP);
             n.lex0 = sub;
             n.MarkSharedChain();
             n.coro_return = n;
@@ -4801,7 +4799,7 @@ have_v:
             Variable[] post;
             post = new Variable[th.pos.Length - 1];
             Array.Copy(th.pos, 1, post, 0, th.pos.Length - 1);
-            return Compartment.Top.CodeMO.mro_INVOKE.Invoke((P6opaque)th.pos[0].Fetch(),
+            return th.info.setting.CodeMO.mro_INVOKE.Invoke((P6opaque)th.pos[0].Fetch(),
                     th.Return(), post, th.named);
         }
 
@@ -4824,9 +4822,9 @@ have_v:
                 dst[th.ip - 1] = (Variable)th.resultSlot;
 
             if (th.ip == dst.Length) {
-                P6opaque nj = new P6opaque(Compartment.Top.JunctionMO);
+                P6opaque nj = new P6opaque(th.info.setting.JunctionMO);
                 nj.slots[0] = th.lex2;
-                nj.slots[1] = Kernel.BoxRaw(dst, Compartment.Top.ParcelMO);
+                nj.slots[1] = Kernel.BoxRaw(dst, th.info.setting.ParcelMO);
                 th.caller.resultSlot = nj;
                 return th.Return();
             }
@@ -4844,13 +4842,13 @@ have_v:
                 Console.WriteLine(DescribeBacktrace(caller, null));
             }
             return SearchForHandler(caller, SubInfo.ON_DIE, null, -1, null,
-                    BoxAnyMO<string>(msg, Compartment.Top.StrMO));
+                    BoxAnyMO<string>(msg, caller.info.setting.StrMO));
         }
 
         public static P6any SigSlurpCapture(Frame caller) {
-            P6any nw = new P6opaque(Compartment.Top.CaptureMO);
-            nw.SetSlot(Compartment.Top.CaptureMO, "$!positionals", caller.pos);
-            nw.SetSlot(Compartment.Top.CaptureMO, "$!named", caller.named);
+            P6any nw = new P6opaque(caller.info.setting.CaptureMO);
+            nw.SetSlot(nw.mo, "$!positionals", caller.pos);
+            nw.SetSlot(nw.mo, "$!named", caller.named);
             caller.named = null;
             return nw;
         }
@@ -5008,11 +5006,11 @@ have_v:
             }
 
             public override bool Admissable(Frame th, Variable[] pos, VarHash named) {
-                Frame   o = (Frame)impl.GetSlot(Compartment.Top.CodeMO, "$!outer");
+                Frame   o = (Frame)impl.GetSlot(info.setting.CodeMO, "$!outer");
                 // XXX sucks a bit to have an inf runloop here
                 var res = Kernel.RunInferior(info.SetupCall(
                     Kernel.GetInferiorRoot(), o, impl, pos, named, true, null));
-                return (res == Compartment.Top.TrueV);
+                return (res == info.setting.TrueV);
             }
 
             public override Frame Invoke(Frame th, Variable[] pos, VarHash named) {
@@ -5314,6 +5312,7 @@ ltm:
         }
 
         public static Variable ContextHelper(Frame th, string name, int up) {
+            var s = th.info.setting;
             object rt;
             uint m = SubInfo.FilterForName(name);
             while (th != null) {
@@ -5326,12 +5325,12 @@ ltm:
             name = name.Remove(1,1);
             StashEnt v;
 
-            if (Compartment.Top.currentGlobals.TryGetValue("\x8::GLOBAL" + name, out v)) {
+            if (s.currentGlobals.TryGetValue("\x8::GLOBAL" + name, out v)) {
                 return v.v;
-            } else if (Compartment.Top.currentGlobals.TryGetValue("\x9::PROCESS" + name, out v)) {
+            } else if (s.currentGlobals.TryGetValue("\x9::PROCESS" + name, out v)) {
                 return v.v;
             } else {
-                return Compartment.Top.AnyP;
+                return s.AnyP;
             }
         }
 
@@ -5414,15 +5413,16 @@ value:      vx = (Variable) th.resultSlot;
         }
 
         public static Frame PromoteToList(Frame th, Variable v) {
+            var listmo = th.info.setting.ListMO;
             if (!v.List) {
-                P6opaque lst = new P6opaque(Compartment.Top.ListMO);
+                P6opaque lst = new P6opaque(listmo);
                 lst.slots[0 /*items*/] = new VarDeque(v);
                 lst.slots[1 /*rest*/ ] = new VarDeque();
                 th.resultSlot = Kernel.NewRWListVar(lst);
                 return th;
             }
             P6any o = v.Fetch();
-            if (o.mo.HasType(Compartment.Top.ListMO)) {
+            if (o.mo.HasType(listmo)) {
                 th.resultSlot = v;
                 return th;
             }
@@ -5491,7 +5491,7 @@ again:
             if (IterHasFlat(inq, true)) {
                 return Take(th, inq.Shift());
             } else {
-                return Take(th, Compartment.Top.EMPTYP);
+                return Take(th, th.info.setting.EMPTYP);
             }
         }
 
@@ -5952,7 +5952,7 @@ slow:
 
         public static void RunMain(RuntimeUnit main_unit) {
             try {
-                Compartment.Top.init.Run();
+                main_unit.setting.init.Run();
                 main_unit.RunMainline();
             } catch (Exception n) {
                 Console.Error.WriteLine("Unhandled exception: {0}", n);
@@ -6342,7 +6342,7 @@ slow:
         }
 
         public static Variable NewLabelVar(Frame fr, string name) {
-            P6opaque dob = new P6opaque(Compartment.Top.LabelMO);
+            P6opaque dob = new P6opaque(fr.info.setting.LabelMO);
             fr.MarkSharedChain();
             dob.slots[0] = fr;
             dob.slots[1] = name;
@@ -6372,6 +6372,7 @@ slow:
         public static Frame SearchForHandler(Frame th, int type, Frame tgt,
                 int unused, string name, object payload) {
             Frame csr;
+            var s = th.info.setting;
 
             Frame unf = null;
             int unip = 0;
@@ -6405,7 +6406,7 @@ slow:
                     continue;
                 unip = csr.info.FindControlEnt(csr.ip, type, name);
                 if (unip >= 0) {
-                    if (csr.info == Compartment.Top.RunCATCH_I && type == SubInfo.ON_DIE) {
+                    if (csr.info == s.RunCATCH_I && type == SubInfo.ON_DIE) {
                         // Fudgy implementation of SIMPLECATCH
                         // A non-control exception has been thrown from handler
                         // Unwind will DTRT with control flow, but we need
@@ -6421,7 +6422,7 @@ slow:
                 }
 
                 if (type == SubInfo.ON_DIE && csr.info.catch_ != null) {
-                    Frame nfr = Compartment.Top.RunCATCH_I.SetupCall(
+                    Frame nfr = s.RunCATCH_I.SetupCall(
                         Kernel.GetInferiorRoot(), null, null, null, null,
                         false, null);
                     nfr.lex0 = Kernel.MakeSub(csr.info.catch_, csr);
@@ -6443,8 +6444,8 @@ slow:
                         Kernel.GetInferiorRoot(), csr, sub,
                         new Variable[] {
                             Builtins.MakeParcel(Builtins.MakeInt(type),
-                                Kernel.BoxAnyMO(name, Compartment.Top.StrMO),
-                                tgt == null ? Compartment.Top.AnyP : tgt)
+                                Kernel.BoxAnyMO(name, s.StrMO),
+                                tgt == null ? s.AnyP : tgt)
                         }, null, false, null);
                     Variable np = Kernel.RunInferior(nfr);
                     if (np.Fetch().mo.mro_raw_Bool.Get(np)) {
@@ -6501,12 +6502,13 @@ slow:
             Frame csr = th;
             if (tf != null && tf.info == null)
                 Panic("Catching frame has no info?");
+            var s = th.info.setting;
             if (tf != null && tf.caller == null)
                 Panic("Catching frame has no caller?" + tf.info.name);
             while (csr != tf) {
                 if (csr == null) Panic("Unwinding into null frame");
                 if (csr.info == null) Panic("Null SubInfo?");
-                if (csr.info == Compartment.Top.ExitRunloopSI) {
+                if (csr.info == s.ExitRunloopSI) {
                     // when this exception reaches the outer runloop,
                     // more frames will be added
                     if (bt == null)
@@ -6522,7 +6524,7 @@ slow:
                 } else {
                     if (csr.caller == null) Panic(csr.info.name + " has no caller?");
                     // TODO: catch generated exceptions and add to @!
-                    csr.caller.resultSlot = Compartment.Top.Nil;
+                    csr.caller.resultSlot = s.Nil;
                     Kernel.SetTopFrame(csr);
                     csr = csr.Return();
                 }
@@ -6548,7 +6550,7 @@ slow:
                     return de.info.SetupCall(tf.caller, de.outer, de.ip6, p, n,
                             false, de);
                 } else {
-                    tf.caller.resultSlot = Compartment.Top.AnyP;
+                    tf.caller.resultSlot = s.AnyP;
                     return tf.caller;
                 }
             } else if (type == SubInfo.ON_DIE) {
@@ -6556,14 +6558,14 @@ slow:
                 if (exn.Fetch().mo.mro_raw_Numeric.Get(exn) == 1)
                     exn = exn.Fetch().mo.mro_at_pos.Get(exn, Builtins.MakeInt(0));
                 tf.LexicalBind("$!", (Variable)exn);
-                td = Compartment.Top.AnyP;
+                td = s.AnyP;
             }
             tf.ip = tip;
             tf.resultSlot = td;
             if (tip < 0) {
                 // catch IP of -1 means to force an immediate return, as
                 // when a CATCH phaser is triggered.
-                tf.caller.resultSlot = Compartment.Top.Nil;
+                tf.caller.resultSlot = s.Nil;
                 return tf.Return();
             } else {
                 return tf;
@@ -6578,8 +6580,8 @@ slow:
             RuntimeUnit ru = (RuntimeUnit)
                 Compartment.Top.reg.LoadUnit(uname).root;
 
-            Compartment.Top.containerRootUnit = ru;
-            Compartment.Top.currentGlobals = ru.globals;
+            ru.setting.containerRootUnit = ru;
+            ru.setting.currentGlobals = ru.globals;
 
             RunMain(ru);
         }
@@ -6631,7 +6633,6 @@ slow:
                         Type ft = fi.FieldType;
                         // delegates can be stateful, but niecza
                         // doesn't assign stateful delegates to initonly fields
-                        // niecza also does not use any stateful callhandlers
                         if (fi.IsInitOnly && (ft.IsPrimitive ||
                                 ft == typeof(BigInteger) ||
                                 ft == typeof(Type) ||
@@ -6644,7 +6645,6 @@ slow:
                                 //    BindingFlags.Instance |
                                 //    BindingFlags.Public |
                                 //    BindingFlags.NonPublic).Length == 0 ||
-                                typeof(ReflectObj).IsAssignableFrom(ft) ||
                                 ft == typeof(string)))
                             continue;
 
