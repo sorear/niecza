@@ -4167,17 +4167,19 @@ tryagain:
         public const int DYNA = 3; // p1&p2
         public const int CLR  = 4; // p1(string)
 
+        Compartment setting;
         int type;
         object p1;
         int p2;
 
         public StashCursor(Frame fr, int depth) {
+            this.setting = fr.info.setting;
             this.type = ROOT;
             this.p1 = fr;
             this.p2 = depth;
         }
 
-        public static Variable MakePackage(string name, P6any who) {
+        internal static Variable MakePackage(Compartment s, string name, P6any who) {
             STable st = new STable(name);
             st.who = who;
             st.typeObj = st.initObj = new P6opaque(st, 0);
@@ -4185,7 +4187,7 @@ tryagain:
             st.mo.type  = P6how.PACKAGE;
             st.mo.rtype = "package";
             // XXX should be PackageHOW
-            st.how = new BoxObject<STable>(st, Compartment.Top.ClassHOWMO, 0);
+            st.how = new BoxObject<STable>(st, s.ClassHOWMO, 0);
             st.mo.Revalidate();
             st.SetupVTables();
             return st.typeObj;
@@ -4195,7 +4197,7 @@ tryagain:
             Frame f = (Frame)p1;
             if (p2 == 0) {
                 f = f.caller;
-                if (f != null && f.info == Compartment.Top.ExitRunloopSI) f = f.caller;
+                if (f != null && f.info == setting.ExitRunloopSI) f = f.caller;
                 if (f == null) return false;
             }
             return true;
@@ -4275,8 +4277,8 @@ tryagain:
                 key = key.Remove(1,1);
                 StashEnt bv;
 
-                if (Compartment.Top.currentGlobals.TryGetValue("\x8::GLOBAL" + key, out bv) ||
-                        Compartment.Top.currentGlobals.TryGetValue("\x9::PROCESS" + key, out bv)) {
+                if (setting.currentGlobals.TryGetValue("\x8::GLOBAL" + key, out bv) ||
+                        setting.currentGlobals.TryGetValue("\x9::PROCESS" + key, out bv)) {
                     if (rbar_w) { bv.Bind(o); } else { o = bv.v; }
                     return true;
                 }
@@ -4303,12 +4305,13 @@ tryagain:
             return true;
         }
 
-        public static P6any MakeCLR_WHO(string name) {
+        internal static P6any MakeCLR_WHO(Compartment s, string name) {
             StashCursor sc = default(StashCursor);
+            sc.setting = s;
             sc.type = CLR;
             sc.p1 = name;
-            P6any who = Kernel.BoxRaw(sc, Compartment.Top.PseudoStashMO);
-            who.SetSlot(Compartment.Top.PseudoStashMO, "$!name", Kernel.BoxAnyMO(name, Compartment.Top.StrMO));
+            P6any who = Kernel.BoxRaw(sc, s.PseudoStashMO);
+            who.SetSlot(s.PseudoStashMO, "$!name", Kernel.BoxAnyMO(name, s.StrMO));
             return who;
         }
 
@@ -4325,7 +4328,7 @@ tryagain:
                 }
                 if (bind_to != null)
                     throw new NieczaException("No slot to bind");
-                v = Compartment.Top.AnyP;
+                v = setting.AnyP;
                 goto have_v;
             }
             else if (type == CLR) {
@@ -4333,13 +4336,13 @@ tryagain:
                     throw new NieczaException("CLR objects may not be used directly in safe mode");
                 if (bind_to != null)
                     throw new NieczaException("Cannot bind interop namespaces");
-                v = CLRWrapperProvider.GetNamedWrapper(Compartment.Top, (string)p1 + "." + key).typeObj;
+                v = CLRWrapperProvider.GetNamedWrapper(setting, (string)p1 + "." + key).typeObj;
                 goto have_v;
             }
             else if (type == WHO) {
                 // only special type is PARENT, maybe not even that?
                 P6any who = (P6any) p1;
-                Variable keyv = Kernel.BoxAnyMO(key, Compartment.Top.StrMO);
+                Variable keyv = Kernel.BoxAnyMO(key, setting.StrMO);
                 if (bind_to != null) {
                     v = who.mo.mro_bind_key.Bind(who, keyv, bind_to);
                     return;
@@ -4349,12 +4352,12 @@ tryagain:
                 if (final) return;
 
                 if (v.Rw && !v.Fetch().IsDefined()) {
-                    if (!who.Isa(Compartment.Top.StashMO))
+                    if (!who.Isa(setting.StashMO))
                         throw new NieczaException("Autovivification only implemented for normal-type stashes");
                     string name = Kernel.UnboxAny<string>(who);
-                    P6any new_who = Kernel.BoxRaw(name + "::" + key, Compartment.Top.StashMO);
+                    P6any new_who = Kernel.BoxRaw(name + "::" + key, setting.StashMO);
                     who.mo.mro_bind_key.Bind(who, keyv,
-                        MakePackage(key, new_who));
+                        MakePackage(setting, key, new_who));
                     sc.p1 = new_who;
                     return;
                 }
@@ -4450,7 +4453,7 @@ tryagain:
                     }
                     if (bind_to != null)
                         throw new NieczaException("No slot to bind");
-                    v = Compartment.Top.AnyP;
+                    v = setting.AnyP;
                     goto have_v;
                 }
             }
@@ -4463,9 +4466,9 @@ have_sc:
             if (bind_to != null)
                 throw new NieczaException("cannot bind a pseudo package");
             {
-                P6any who = Kernel.BoxRaw(this, Compartment.Top.PseudoStashMO);
-                who.SetSlot(Compartment.Top.PseudoStashMO, "$!name", Kernel.BoxAnyMO(key, Compartment.Top.StrMO));
-                v = MakePackage(key, who);
+                P6any who = Kernel.BoxRaw(this, setting.PseudoStashMO);
+                who.SetSlot(setting.PseudoStashMO, "$!name", Kernel.BoxAnyMO(key, setting.StrMO));
+                v = MakePackage(setting, key, who);
             }
             return;
 
@@ -4517,14 +4520,14 @@ have_v:
                     throw new NieczaException("Cannot bind to a stash");
                 if (sc.type == WHO)
                     return (P6any) sc.p1;
-                P6any who = Kernel.BoxRaw(sc, Compartment.Top.PseudoStashMO);
-                who.SetSlot(Compartment.Top.PseudoStashMO, "$!name", Kernel.BoxAnyMO(last, Compartment.Top.StrMO));
+                P6any who = Kernel.BoxRaw(sc, setting.PseudoStashMO);
+                who.SetSlot(setting.PseudoStashMO, "$!name", Kernel.BoxAnyMO(last, setting.StrMO));
                 return who;
             }
             if (bind_to != null) {
                 bool list = key != "" && (key[0] == '@' || key[0] == '%');
                 bind_to = Kernel.NewBoundVar(list ? Kernel.NBV_LIST :
-                    bind_ro ? Kernel.NBV_RO : Kernel.NBV_RW, Compartment.Top.MuMO,
+                    bind_ro ? Kernel.NBV_RO : Kernel.NBV_RW, setting.MuMO,
                     bind_to); // XXX should use types maybe?
             }
             sc.Core(key, true, out r, out v, bind_to);

@@ -4158,7 +4158,7 @@ dynamic:
                 } else {
                     c.globals[hkey] = v = new StashEnt();
                     v.constant = true;
-                    v.v = StashCursor.MakePackage((who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, c.setting.StashMO));
+                    v.v = StashCursor.MakePackage(c.setting, (who + "::" + key).Substring(2), Kernel.BoxRaw<string>(who + "::" + key, c.setting.StashMO));
                     pkg = v.v.Fetch().mo;
                 }
             }

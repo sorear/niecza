@@ -526,9 +526,9 @@ namespace Niecza {
                 if (ty != null) {
                     c.named_wrapper_cache[nm] = r = GetWrapper(c, ty);
                 } else {
-                    c.named_wrapper_cache[nm] = r = StashCursor.MakePackage(
+                    c.named_wrapper_cache[nm] = r = StashCursor.MakePackage(c,
                         "CLR" + nm.Replace(".","::"),
-                        StashCursor.MakeCLR_WHO(nm)).Fetch().mo;
+                        StashCursor.MakeCLR_WHO(c, nm)).Fetch().mo;
                 }
                 return r;
             }
@@ -655,7 +655,7 @@ for $args (0..9) {
             if (CLROpts.Debug)
                 Console.WriteLine("Setting up wrapper for {0}", t.FullName);
             STable m = new STable("CLR::" + t.FullName.Replace(".","::"));
-            m.who = StashCursor.MakeCLR_WHO("." + t.FullName);
+            m.who = StashCursor.MakeCLR_WHO(s, "." + t.FullName);
             m.how = Kernel.BoxRaw(m, s.ClassHOWMO);
             STable pm = t.BaseType == null ? s.AnyMO : GetWrapper(s, t.BaseType);
             STable[] mro = new STable[pm.mo.mro.Length + 1];
