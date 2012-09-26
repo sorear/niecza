@@ -4443,7 +4443,6 @@ dynamic:
 
             if (outer == null) {
                 /* Hack - embed build information */
-                var li = new LIConstant();
                 var info = new VarHash();
                 info["name"] = Builtins.MakeStr("niecza");
                 string vers = "(unknown)\n";
@@ -4458,7 +4457,7 @@ dynamic:
                         vers.Substring(0, vers.Length - 1));
                 info["build-time"] = Builtins.now();
 
-                li.value = Kernel.BoxAnyMO(info, ru.setting.HashMO);
+                var li = new LIConstant(Kernel.BoxAnyMO(info, ru.setting.HashMO));
 
                 n.AddLexical("$?PERL", li);
             }
@@ -4472,7 +4471,8 @@ dynamic:
             return AddLexical(args, new LISimple(flags, type));
         }
         public static object add_hint(object[] args) {
-            return AddLexical(args, new LIConstant());
+            SubInfo sub   = (SubInfo)Handle.Unbox(args[1]);
+            return AddLexical(args, new LIConstant(sub.setting.AnyP));
         }
         public static object add_label(object[] args) {
             return AddLexical(args, new LILabel());

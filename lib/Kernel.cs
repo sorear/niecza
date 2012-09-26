@@ -262,8 +262,8 @@ namespace Niecza {
             return this;
         }
         public override void Store(P6any v)  {
-            if (v == Compartment.Top.NilP) {
-                v = type == null ? Compartment.Top.AnyP : type.initObj;
+            if (v == v.mo.setting.NilP) {
+                v = type == null ? v.mo.setting.AnyP : type.initObj;
             }
             if (type != null && !v.Does(type)) {
                 throw new NieczaException("Nominal type check failed for scalar store; got " + v.mo.name + ", needed " + type.name + " or subtype");
@@ -315,7 +315,7 @@ namespace Niecza {
 
         public override P6any Fetch() {
             Variable vr = Kernel.RunInferior(fetch.Invoke(
-                Kernel.GetInferiorRoot(), new [] {Compartment.Top.AnyP}, null));
+                Kernel.GetInferiorRoot(), new [] {fetch.mo.setting.AnyP}, null));
             return vr.Fetch();
         }
 
@@ -326,7 +326,7 @@ namespace Niecza {
                 vh.Do(this);
             }
             Kernel.RunInferior(store.Invoke(Kernel.GetInferiorRoot(),
-                new [] { Compartment.Top.AnyP, v }, null));
+                new [] { store.mo.setting.AnyP, v }, null));
         }
 
         public override void Vivify() {
@@ -1226,8 +1226,7 @@ namespace Niecza {
 
     public class LIConstant : LexInfo {
         public Variable value;
-        public LIConstant() { this.value = Compartment.Top.AnyP; }
-        internal LIConstant(Variable value) { this.value = value; }
+        public LIConstant(Variable value) { this.value = value; }
         public override void Init(Frame f) { }
         public override void BindFields() { }
 
@@ -1292,7 +1291,7 @@ namespace Niecza {
             if ((flags & NOINIT) != 0)
                 return;
             if ((flags & ROINIT) != 0)
-                Set(f, Compartment.Top.AnyP);
+                Set(f, owner.setting.AnyP);
             else if ((flags & DEFOUTER) != 0)
                 Set(f, f.info.GetOuterTopic(f));
             else if ((flags & LIST) != 0)
@@ -1474,12 +1473,12 @@ namespace Niecza {
         public STable pkg;
         public LIPackage(STable pkg) { this.pkg = pkg; }
         public override object Get(Frame f) {
-            return pkg == Compartment.Top.NilP.mo ? (Variable)Compartment.Top.Nil : pkg.typeObj;
+            return pkg == owner.setting.NilP.mo ? (Variable)owner.setting.Nil : pkg.typeObj;
         }
         public override void Init(Frame f) { }
         internal override ClrOp GetCode(int up) {
-            return pkg == Compartment.Top.NilP.mo ?
-                EmitUnit.Current.RefConstant("Nil", "L", Compartment.Top.Nil, typeof(Variable)).head :
+            return pkg == owner.setting.NilP.mo ?
+                EmitUnit.Current.RefConstant("Nil", "L", owner.setting.Nil, typeof(Variable)).head :
                 EmitUnit.Current.TypeConstantP(pkg).head;
         }
         internal override void DoFreeze(FreezeBuffer fb) {
@@ -4741,9 +4740,9 @@ have_v:
             if (co != null) {
                 return co.value;
             } else {
-                if (typeof(T) == typeof(string) && o.Does(Compartment.Top.PseudoStrMO)) {
+                if (typeof(T) == typeof(string) && o.Does(o.mo.setting.PseudoStrMO)) {
                     // Truly vile hack to make dualvars work.
-                    return (T)o.GetSlot(Compartment.Top.PseudoStrMO, "$!value");
+                    return (T)o.GetSlot(o.mo.setting.PseudoStrMO, "$!value");
                 } else {
                     throw new NieczaException("Cannot unbox a {0} from an object of repr {1}", typeof(T).Name, o.ReprName());
                 }
@@ -4930,7 +4929,7 @@ have_v:
         }
 
         public static P6any MakeSub(SubInfo info, Frame outer) {
-            P6opaque n = new P6opaque(info.mo ?? Compartment.Top.CodeMO, 2);
+            P6opaque n = new P6opaque(info.mo ?? info.setting.CodeMO, 2);
             n.slots[0] = outer;
             if (outer != null) outer.MarkShared();
             n.slots[1] = info;
@@ -4938,10 +4937,10 @@ have_v:
         }
 
         public static SubInfo GetInfo(P6any sub) {
-            return (SubInfo)sub.GetSlot(Compartment.Top.CodeMO, "$!info");
+            return (SubInfo)sub.GetSlot(sub.mo.setting.CodeMO, "$!info");
         }
         public static Frame GetOuter(P6any sub) {
-            return (Frame)sub.GetSlot(Compartment.Top.CodeMO, "$!outer");
+            return (Frame)sub.GetSlot(sub.mo.setting.CodeMO, "$!outer");
         }
 
         public class MMDParameter {
@@ -5058,7 +5057,7 @@ have_v:
                 this.impl = impl;
                 this.group_n  = group_n;
                 this.filter_n = filter_n;
-                info = (SubInfo) impl.GetSlot(Compartment.Top.CodeMO, "$!info");
+                info = (SubInfo) impl.GetSlot(impl.mo.setting.CodeMO, "$!info");
 
                 pos = new List<MMDParameter>();
                 nam = new Dictionary<string,MMDParameter>();
@@ -5742,14 +5741,14 @@ slow:
         public static STable DoInstantiateRole(STable prole, Variable alist) {
             // get argument list - TODO make this saner
             P6any argv = alist.Fetch();
-            Variable[] args = argv.mo == Compartment.Top.ParcelMO ?
+            Variable[] args = argv.mo == prole.setting.ParcelMO ?
                 UnboxAny<Variable[]>(argv) : new Variable[] { alist };
 
             STable r = new STable(prole.name + "[curried]");
             r.mo.roleFactory = prole.mo.roleFactory;
             r.mo.curriedArgs = args;
             r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
-            r.how = new BoxObject<STable>(r, Compartment.Top.ClassHOWMO, 0);
+            r.how = new BoxObject<STable>(r, prole.setting.ClassHOWMO, 0);
             r.mo.type  = P6how.CURRIED_ROLE;
             r.mo.rtype = "crole";
             r.useAcceptsType = true;
@@ -5787,7 +5786,7 @@ slow:
 
                 r = new STable(arg.name + "[...]");
                 r.mo.FillRole(arg.mo.superclasses.ToArray(), null);
-                r.how = new BoxObject<STable>(r, Compartment.Top.ClassHOWMO, 0);
+                r.how = new BoxObject<STable>(r, arg.setting.ClassHOWMO, 0);
                 r.mo.type  = P6how.ROLE;
                 r.mo.rtype = "role";
                 r.mo.role_typecheck_list = arg.mo.role_typecheck_list;
@@ -5884,7 +5883,7 @@ slow:
             foreach (STable r in roles) {
                 foreach (P6how.MethodInfo mi in r.mo.lmethods) {
                     var name = Prod.C(mi.flags & P6how.V_MASK, mi.short_name);
-                    SubInfo info = mi.impl.Isa(Compartment.Top.CodeMO) ?
+                    SubInfo info = mi.impl.Isa(r.setting.CodeMO) ?
                         GetInfo(mi.impl) : null;
                     if ((mi.flags & P6how.M_MASK) != P6how.M_ONLY) {
                         // multi methods from roles are not suppressed and
@@ -6094,9 +6093,9 @@ slow:
 
         public static void AddCap(List<Variable> p,
                 VarHash n, P6any cap) {
-            Variable[] fp = cap.GetSlot(Compartment.Top.CaptureMO, "$!positionals") as Variable[];
-            VarHash fn = cap.GetSlot(Compartment.Top.CaptureMO, "$!named")
-                as VarHash;
+            var mo = cap.mo.setting.CaptureMO;
+            Variable[] fp = cap.GetSlot(mo, "$!positionals") as Variable[];
+            VarHash fn = cap.GetSlot(mo, "$!named") as VarHash;
             p.AddRange(fp);
             if (fn != null) AddMany(n, fn);
         }

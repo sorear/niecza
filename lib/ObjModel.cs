@@ -57,7 +57,7 @@ namespace Niecza {
                 Variable[] npos = new Variable[pos.Length + 1];
                 Array.Copy(pos, 1, npos, 2, pos.Length - 1);
                 npos[0] = pos[0];
-                npos[1] = Kernel.BoxAnyMO(name, Compartment.Top.StrMO);
+                npos[1] = Kernel.BoxAnyMO(name, mo.setting.StrMO);
                 return m.info.SetupCall(caller, m.outer, m.ip6,
                         npos, named, false, m);
             }
@@ -564,13 +564,13 @@ next_method: ;
             this.superclasses = new List<STable>(superclasses);
             local_roles = new List<STable>(cronies ?? new STable[0]);
             type = ROLE; rtype = "role";
-            SetMRO(Compartment.Top.AnyMO.mo.mro);
+            SetMRO(stable.setting.AnyMO.mo.mro);
         }
 
         public void FillParametricRole(P6any factory) {
             type = PARAMETRIZED_ROLE; rtype = "prole";
             roleFactory = factory;
-            SetMRO(Compartment.Top.AnyMO.mo.mro);
+            SetMRO(stable.setting.AnyMO.mo.mro);
         }
 
         string C3State(int[] pointers, List<STable> into, STable[][] from) {
@@ -674,7 +674,7 @@ next_method: ;
                 foreach (STable s2 in local_roles)
                     foreach (STable s3 in s2.mo.role_typecheck_list)
                         role_typecheck_list.Add(s3);
-                SetMRO(Compartment.Top.AnyMO.mo.mro);
+                SetMRO(stable.setting.AnyMO.mo.mro);
                 Revalidate();
                 stable.SetupVTables();
                 return null;
@@ -686,9 +686,9 @@ next_method: ;
                 Kernel.ApplyRoleToClass(stable, local_roles.ToArray());
             }
 
-            if (superclasses.Count == 0 && stable != Compartment.Top.MuMO) {
-                superclasses.Add(type == GRAMMAR ? Compartment.Top.GrammarMO :
-                        Compartment.Top.AnyMO);
+            if (superclasses.Count == 0 && stable != stable.setting.MuMO) {
+                superclasses.Add(type == GRAMMAR ? stable.setting.GrammarMO :
+                        stable.setting.AnyMO);
             }
 
             if ((err = ComputeMRO()) != null) return err;
@@ -717,7 +717,7 @@ next_method: ;
             if (pun != null) return pun;
             STable n = new STable(stable.name);
 
-            n.how = Kernel.BoxAnyMO<STable>(n, Compartment.Top.ClassHOWMO).Fetch();
+            n.how = Kernel.BoxAnyMO<STable>(n, stable.setting.ClassHOWMO).Fetch();
             n.typeObj = n.initObj = new P6opaque(n);
             ((P6opaque)n.typeObj).slots = null;
 
@@ -843,6 +843,7 @@ next_method: ;
         public bool useAcceptsType;
 
         public Type box_type;
+        internal Compartment setting = Compartment.Top;
         /// }}}
 
         /// compositon-created cache {{{
@@ -926,7 +927,7 @@ next_method: ;
         }
 
         internal void SetupVTables() {
-            var s = Compartment.Top;
+            var s = setting;
             mro_push = _GetVT("push") as PushyHandler ?? s.CallPush;
             mro_unshift = _GetVT("unshift") as PushyHandler ?? s.CallUnshift;
             mro_shift = _GetVT("shift") as ContextHandler<Variable> ?? s.CallShift;
@@ -957,20 +958,20 @@ next_method: ;
             mro_succ = _GetVTU("succ") as ContextHandler<P6any> ?? s.CallSucc;
             mro_to_clr = _GetVT("to-clr") as ContextHandler<object>;
 
-            if (Compartment.Top.ComplexMO != null && HasType(Compartment.Top.ComplexMO))
+            if (s.ComplexMO != null && HasType(s.ComplexMO))
                 num_rank = Builtins.NR_COMPLEX;
-            else if (Compartment.Top.NumMO != null && HasType(Compartment.Top.NumMO))
+            else if (s.NumMO != null && HasType(s.NumMO))
                 num_rank = Builtins.NR_FLOAT;
-            else if (Compartment.Top.FatRatMO != null && HasType(Compartment.Top.FatRatMO))
+            else if (s.FatRatMO != null && HasType(s.FatRatMO))
                 num_rank = Builtins.NR_FATRAT;
-            else if (Compartment.Top.RatMO != null && HasType(Compartment.Top.RatMO))
+            else if (s.RatMO != null && HasType(s.RatMO))
                 num_rank = Builtins.NR_FIXRAT;
-            else if (Compartment.Top.IntMO != null && HasType(Compartment.Top.IntMO))
+            else if (s.IntMO != null && HasType(s.IntMO))
                 num_rank = Builtins.NR_FIXINT;
             else
                 num_rank = -1;
 
-            is_any = Compartment.Top.AnyMO != null && HasType(Compartment.Top.AnyMO);
+            is_any = s.AnyMO != null && HasType(s.AnyMO);
         }
 
         private object _GetVT(string name) { return _GetVTi(name, 1); }
@@ -1004,7 +1005,7 @@ next_method: ;
             if (mo.type == P6how.ROLE || mo.type == P6how.CURRIED_ROLE ||
                     mo.type == P6how.PARAMETRIZED_ROLE) {
                 if (name == "ACCEPTS" || name == "defined")
-                    return Compartment.Top.MuMO.FindMethod(name);
+                    return setting.MuMO.FindMethod(name);
                 var pun = mo.PunRole();
                 var punfunc = Kernel.GetVar("::GLOBAL::Niecza", "&autopun").v;
                 var clone = Kernel.RunInferior(punfunc.Fetch().Invoke(
