@@ -56,10 +56,10 @@ t2 "\x13", '"\u0013"', 'Str (escaping other C0)';
 t2 "\x83", '"\u0083"', 'Str (escaping other C1)';
 
 t1 do { my $obj = Bob.new; $obj.def = 15; $obj },
-    '{"&":"A0","!":".!perl6/Bob","abc":null,"def":15}',
+    '{"&":"A0","!":".!perl6/Bob","$!abc":null,"$!def":15}',
     'User-defined types with tags';
 
-my $obj = from-jsync('{"&":"A0","!":".!perl6/Bob","abc":"twelve","def":15}');
+my $obj = from-jsync('{"&":"A0","!":".!perl6/Bob","$!abc":"twelve","$!def":15}');
 ok $obj.def == 15 && $obj.abc eq 'twelve', "JSYNC thaws object";
 
 # Test set 2: parser

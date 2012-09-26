@@ -3163,10 +3163,6 @@ dynamic:
             thandlers["iter_to_list"] = Methody(null, Tokens.Kernel.GetMethod("IterToList"));
             thandlers["iter_flatten"] = Methody(null, Tokens.Kernel.GetMethod("IterFlatten"));
             thandlers["iter_copy_elems"] = Methody(null, Tokens.Kernel.GetMethod("IterCopyElems"));
-            thandlers["to_jsync"] = Methody(null, typeof(JsyncWriter).GetMethod("ToJsync"));
-            thandlers["from_jsync"] = Methody(null, typeof(JsyncReader).GetMethod("FromJsync"));
-            thandlers["to_json"] = Methody(null, typeof(JsonWriter).GetMethod("ToJson"));
-            thandlers["from_json"] = Methody(null, typeof(JsyncReader).GetMethod("FromJson"));
             thandlers["frame_caller"] = FieldGet(Tokens.Frame, "caller");
             thandlers["frame_outer"] = FieldGet(Tokens.Frame, "outer");
             thandlers["frame_sub"] = FieldGet(Tokens.Frame, "sub");

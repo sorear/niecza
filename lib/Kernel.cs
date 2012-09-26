@@ -5202,11 +5202,13 @@ ltm:
                 info.code = SaferTrap;
         }
         public static Variable BoxAny<T>(T v, P6any proto) {
-            if (proto == Compartment.Top.BoolMO.typeObj) {
+            var mo = proto.mo;
+            var s  = mo.setting;
+            if (mo == s.BoolMO) {
                 if (v is bool)
-                    return ((bool) (object) v) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+                    return ((bool) (object) v) ? s.TrueV : s.FalseV;
                 else
-                    return ((int) (object) v) != 0 ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+                    return ((int) (object) v) != 0 ? s.TrueV : s.FalseV;
             }
             return new BoxObject<T>(v, ((P6opaque)proto).mo);
         }
@@ -5216,11 +5218,12 @@ ltm:
         }
 
         public static Variable BoxAnyMO<T>(T v, STable proto) {
-            if (proto == Compartment.Top.BoolMO) {
+            var s = proto.setting;
+            if (proto == proto.setting.BoolMO) {
                 if (v is bool)
-                    return ((bool) (object) v) ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+                    return ((bool) (object) v) ? s.TrueV : s.FalseV;
                 else
-                    return ((int) (object) v) != 0 ? Compartment.Top.TrueV : Compartment.Top.FalseV;
+                    return ((int) (object) v) != 0 ? s.TrueV : s.FalseV;
             }
             return new BoxObject<T>(v, proto);
         }
@@ -5510,7 +5513,7 @@ again:
                     continue;
                 }
                 P6any i0v = i0.Fetch();
-                if (i0v.mo.HasType(Compartment.Top.IterCursorMO)) {
+                if (i0v.mo.HasType(i0v.mo.setting.IterCursorMO)) {
                     iter[0] = null;
                     iter.Shift_UnshiftN(i0v.mo.mro_raw_reify.Get(i0));
                     continue;
@@ -5526,12 +5529,12 @@ again:
             }
             P6opaque dyl = lst.Fetch() as P6opaque;
             if (dyl == null) { goto slow; }
-            if (dyl.mo != Compartment.Top.ListMO) { goto slow; }
-            VarDeque itemsl = (VarDeque) dyl.GetSlot(Compartment.Top.ListMO, "$!items");
+            if (dyl.mo != dyl.mo.setting.ListMO) { goto slow; }
+            VarDeque itemsl = (VarDeque) dyl.GetSlot(dyl.mo, "$!items");
             if (itemsl.Count() == 0) {
-                VarDeque restl = (VarDeque) dyl.GetSlot(Compartment.Top.ListMO, "$!rest");
+                VarDeque restl = (VarDeque) dyl.GetSlot(dyl.mo, "$!rest");
                 if (restl.Count() == 0) {
-                    return Compartment.Top.AnyP;
+                    return dyl.mo.setting.AnyP;
                 }
                 goto slow;
             }

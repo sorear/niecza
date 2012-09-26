@@ -6,12 +6,13 @@ using System.Text;
 public class JsyncWriter {
     internal static readonly bool FailSoft =
         Environment.GetEnvironmentVariable("NIECZA_JSYNC_WRITER_FAILSOFT") != null;
-    StringBuilder o = new StringBuilder();
+    internal StringBuilder o = new StringBuilder();
+    internal Compartment setting;
     Dictionary<object,int> anchors = new Dictionary<object,int>();
     int nextanchor = 0;
 
     bool contUsed = false;
-    bool headerized = false;
+    internal bool headerized = false;
 
     void ScalarCheck() {
         if (!contUsed) {
@@ -20,21 +21,21 @@ public class JsyncWriter {
         }
     }
 
-    void WriteObj(P6any obj) {
+    internal void WriteObj(P6any obj) {
         int anchor;
         if (anchors.TryGetValue(obj, out anchor)) {
             WriteAnchor(anchor);
         } else if (!obj.IsDefined()) {
             WriteNull();
-        } else if (obj.Isa(Compartment.Top.ListMO)) {
+        } else if (obj.Isa(setting.ListMO)) {
             WriteArray(obj);
-        } else if (obj.Isa(Compartment.Top.HashMO)) {
+        } else if (obj.Isa(setting.HashMO)) {
             WriteHash(obj);
-        } else if (obj.Isa(Compartment.Top.BoolMO)) {
+        } else if (obj.Isa(setting.BoolMO)) {
             WriteBool(Kernel.UnboxAny<int>(obj) != 0);
-        } else if (obj.Isa(Compartment.Top.StrMO)) {
+        } else if (obj.Isa(setting.StrMO)) {
             WriteStr(true, Kernel.UnboxAny<string>(obj));
-        } else if (obj.Isa(Compartment.Top.NumMO) || obj.Isa(Compartment.Top.IntMO) || obj.Isa(Compartment.Top.RatMO) || obj.Isa(Compartment.Top.FatRatMO)) {
+        } else if (obj.Isa(setting.NumMO) || obj.Isa(setting.IntMO) || obj.Isa(setting.RatMO) || obj.Isa(setting.FatRatMO)) {
             WriteNum(obj.mo.mro_raw_Numeric.Get(obj));
         } else {
             WriteGeneral(obj);
@@ -68,7 +69,7 @@ public class JsyncWriter {
         o.Append('{');
         contUsed = true;
         o.AppendFormat("\"&\":\"A{0}\"", a);
-        if (obj.mo != Compartment.Top.HashMO) {
+        if (obj.mo != setting.HashMO) {
             if (obj.mo.nslots != 0)
                 throw new NieczaException("Cannot serialize subclasses of Hash  that add attributes");
             o.Append(",\"!\":");
@@ -186,21 +187,15 @@ public class JsyncWriter {
         ScalarCheck();
         o.AppendFormat("\"*A{0}\"", i);
     }
-
-    public static string ToJsync(P6any obj) {
-        JsyncWriter w = new JsyncWriter();
-        w.WriteObj(obj);
-        if (w.headerized) w.o.Append(']');
-        return w.o.ToString();
-    }
 }
 
 public class JsyncReader {
-    string from;
-    int ix = 0;
-    Dictionary<string,P6any> anchors = new Dictionary<string,P6any>();
-    Dictionary<string,List<Variable>> anchorrefs =
+    internal string from;
+    internal int ix = 0;
+    internal Dictionary<string,P6any> anchors = new Dictionary<string,P6any>();
+    internal Dictionary<string,List<Variable>> anchorrefs =
         new Dictionary<string,List<Variable>>();
+    internal Compartment setting;
 
     string s_tag;
     string s_anchor;
@@ -213,7 +208,7 @@ public class JsyncReader {
     const int DIRECTIVE = 3;
 
     // most parsers are expected to skip white before
-    char SkipWhite(bool more) {
+    internal char SkipWhite(bool more) {
         while (ix != from.Length) {
             char ch = from[ix];
             if (ch == ' ' || ch == '\r' || ch == '\t' || ch == '\n')
@@ -228,7 +223,7 @@ public class JsyncReader {
         } else { return '\0'; }
     }
 
-    void Err(string s) {
+    internal void Err(string s) {
         throw new NieczaException(string.Format("{0} in JSYNC string at position {1}", s, ix));
     }
 
@@ -265,13 +260,13 @@ public class JsyncReader {
                 return GetFromString();
             case 'n':
                 SkipToken("null");
-                return Kernel.NewMuScalar(Compartment.Top.AnyP);
+                return Kernel.NewMuScalar(setting.AnyP);
             case 't':
                 SkipToken("true");
-                return Kernel.NewMuScalar(Compartment.Top.TrueV.Fetch());
+                return Kernel.NewMuScalar(setting.TrueV.Fetch());
             case 'f':
                 SkipToken("false");
-                return Kernel.NewMuScalar(Compartment.Top.FalseV.Fetch());
+                return Kernel.NewMuScalar(setting.FalseV.Fetch());
             default:
                 return GetFromNumber();
         }
@@ -330,7 +325,7 @@ public class JsyncReader {
         }
     }
 
-    Variable GetFromJson(bool top_level) {
+    internal Variable GetFromJson(bool top_level) {
         char look = SkipWhite(true);
         if (look == '[') {
             VarDeque q = new VarDeque();
@@ -364,27 +359,27 @@ public class JsyncReader {
             }
             SkipWhite(true);
             SkipChar('}');
-            return BoxRW<VarHash>(q, Compartment.Top.HashMO);
+            return BoxRW<VarHash>(q, setting.HashMO);
         } else if (top_level) {
             Err("Top-level scalar found");
             return null;
         } else if (look == '"') {
-            return BoxRW<string>(GetJsonString(), Compartment.Top.StrMO);
+            return BoxRW<string>(GetJsonString(), setting.StrMO);
         } else if (look == 'n') {
             SkipToken("null");
-            return Kernel.NewMuScalar(Compartment.Top.AnyP);
+            return Kernel.NewMuScalar(setting.AnyP);
         } else if (look == 't') {
             SkipToken("true");
-            return Kernel.NewMuScalar(Compartment.Top.TrueV.Fetch());
+            return Kernel.NewMuScalar(setting.TrueV.Fetch());
         } else if (look == 'f') {
             SkipToken("false");
-            return Kernel.NewMuScalar(Compartment.Top.FalseV.Fetch());
+            return Kernel.NewMuScalar(setting.FalseV.Fetch());
         } else {
             double d;
             string tx = GetJsonNumber();
             if (!Utils.S2NB(tx, out d))
                 Err("Unparsable number " + tx);
-            return BoxRW<double>(d, Compartment.Top.NumMO);
+            return BoxRW<double>(d, setting.NumMO);
         }
     }
 
@@ -467,19 +462,19 @@ public class JsyncReader {
         List<Variable> lv;
         if (!anchorrefs.TryGetValue(name, out lv))
             anchorrefs[name] = lv = new List<Variable>();
-        Variable n = Kernel.NewMuScalar(Compartment.Top.AnyP);
+        Variable n = Kernel.NewMuScalar(setting.AnyP);
         lv.Add(n);
         return n;
     }
 
     Variable ParseScalar() {
         if (s_tag == null) {
-            return BoxRW<string>(s_content, Compartment.Top.StrMO);
+            return BoxRW<string>(s_content, setting.StrMO);
         } else if (s_tag == "Num") {
             double r;
             if (!Utils.S2NB(s_content, out r))
                 Err("Num format error");
-            return BoxRW<double>(r, Compartment.Top.NumMO);
+            return BoxRW<double>(r, setting.NumMO);
         } else {
             Err("Unhandled scalar tag " + s_tag);
             return null;
@@ -529,7 +524,7 @@ public class JsyncReader {
         SkipCharWS(']');
         if (a_tag != null)
             Err("Typed arrays are NYI in Niecza Perl 6");
-        return Kernel.NewRWScalar(Compartment.Top.AnyMO, obj);
+        return Kernel.NewRWScalar(setting.AnyMO, obj);
     }
 
     string GetSimpleStringValue() {
@@ -626,7 +621,7 @@ public class JsyncReader {
         if (h_tag != null) {
             if (!Utils.StartsWithInvariant("!perl6/", h_tag))
                 Err("Unsupported hash tag " + h_tag);
-            string s2 = "::" + h_tag.Substring(7);
+            string s2 = "::GLOBAL::" + h_tag.Substring(7);
             int cut = s2.LastIndexOf("::");
 
             Variable v_cursor = Kernel.GetVar(s2.Substring(0, cut),
@@ -636,7 +631,7 @@ public class JsyncReader {
                 Err(s2.Substring(2) + " does not name a loaded global class");
             P6any p_cursor = v_cursor.Fetch();
 
-            if (p_cursor.Isa(Compartment.Top.HashMO)) {
+            if (p_cursor.Isa(setting.HashMO)) {
                 if (p_cursor.mo.nslots != 0)
                     Err("Cannot thaw Hash subclass " + p_cursor.mo.name + "; it has attributes");
                 obj = BoxRW<VarHash>(zyg, p_cursor.mo);
@@ -655,7 +650,7 @@ public class JsyncReader {
                 obj = Kernel.NewMuScalar(dyo);
             }
         } else {
-            obj = BoxRW<VarHash>(zyg, Compartment.Top.HashMO);
+            obj = BoxRW<VarHash>(zyg, setting.HashMO);
         }
         if (h_anchor != null)
             AddAnchor(h_anchor, obj.Fetch());
@@ -732,7 +727,7 @@ public class JsyncReader {
         }
     }
 
-    Variable GetTopLevel() {
+    internal Variable GetTopLevel() {
         char f = SkipWhite(true);
         if (f != '[') {
             if (f != '{')
@@ -760,52 +755,20 @@ bare:
 
     // TODO GetTopLevel
 
-    public static P6any FromJson(string inp) {
-        JsyncReader j = new JsyncReader();
-        j.from = inp;
-        j.SkipWhite(true);
-        Variable top = j.GetFromJson(true);
-        j.SkipWhite(false);
-        if (j.ix != inp.Length)
-            j.Err("Trailing garbage after object");
-
-        return top.Fetch();
-    }
-
-    public static P6any FromJsync(string inp) {
-        JsyncReader j = new JsyncReader();
-        j.from = inp;
-        j.SkipWhite(true);
-        Variable top = j.GetTopLevel();
-
-
-        foreach (KeyValuePair<string, List<Variable>> da in j.anchorrefs) {
-            P6any r;
-            if (!j.anchors.TryGetValue(da.Key, out r))
-                j.Err("Undefined anchor " + da.Key);
-            foreach (Variable to in da.Value)
-                to.Store(r);
-        }
-
-        j.SkipWhite(false);
-        if (j.ix != inp.Length)
-            j.Err("Trailing garbage after object");
-
-        return top.Fetch();
-    }
 }
 
 public class JsonWriter {
-    StringBuilder o = new StringBuilder();
+    internal StringBuilder o = new StringBuilder();
+    internal Compartment setting;
 
     void WriteVal(P6any obj) {
         if (!obj.IsDefined()) {
             o.Append("null");
-        } else if (obj.Isa(Compartment.Top.BoolMO)) {
+        } else if (obj.Isa(setting.BoolMO)) {
             o.Append(Kernel.UnboxAny<int>(obj) != 0 ? "true" : "false");
-        } else if (obj.Isa(Compartment.Top.NumMO) || obj.Isa(Compartment.Top.IntMO) || obj.Isa(Compartment.Top.RatMO) || obj.Isa(Compartment.Top.FatRatMO)) {
+        } else if (obj.Isa(setting.NumMO) || obj.Isa(setting.IntMO) || obj.Isa(setting.RatMO) || obj.Isa(setting.FatRatMO)) {
             o.Append(Utils.N2S(obj.mo.mro_raw_Numeric.Get(obj)));
-        } else if (obj.Isa(Compartment.Top.StrMO)) {
+        } else if (obj.Isa(setting.StrMO)) {
             o.Append('"');
             JsyncWriter.AddStringContents(o, Kernel.UnboxAny<string>(obj));
             o.Append('"');
@@ -814,10 +777,10 @@ public class JsonWriter {
         }
     }
 
-    void WriteObj(P6any obj) {
+    internal void WriteObj(P6any obj) {
         bool comma = false;
         bool def = obj.IsDefined();
-        if (def && obj.Isa(Compartment.Top.HashMO)) {
+        if (def && obj.Isa(setting.HashMO)) {
             VarHash vh = Kernel.UnboxAny<VarHash>(obj);
             o.Append('{');
             foreach(KeyValuePair<string,Variable> kv in vh) {
@@ -830,7 +793,7 @@ public class JsonWriter {
                 WriteVal(kv.Value.Fetch());
             }
             o.Append('}');
-        } else if (def && obj.Isa(Compartment.Top.ListMO)) {
+        } else if (def && obj.Isa(setting.ListMO)) {
             VarDeque iter = obj.mo.mro_raw_iterator.Get(obj);
             o.Append('[');
             while (Kernel.IterHasFlat(iter, true)) {
@@ -847,9 +810,54 @@ public class JsonWriter {
         }
     }
 
-    public static string ToJson(P6any obj) {
+}
+
+public partial class Builtins {
+    [ImplicitConsts] public static string to_json(Constants c, P6any obj) {
         JsonWriter w = new JsonWriter();
+        w.setting = c.setting;
         w.WriteObj(obj);
         return w.o.ToString();
+    }
+
+    [ImplicitConsts] public static string to_jsync(Constants c, P6any obj) {
+        JsyncWriter w = new JsyncWriter();
+        w.setting = c.setting;
+        w.WriteObj(obj);
+        if (w.headerized) w.o.Append(']');
+        return w.o.ToString();
+    }
+
+    [ImplicitConsts] public static P6any from_json(Constants c, string inp) {
+        JsyncReader j = new JsyncReader() { setting = c.setting };
+        j.from = inp;
+        j.SkipWhite(true);
+        Variable top = j.GetFromJson(true);
+        j.SkipWhite(false);
+        if (j.ix != inp.Length)
+            j.Err("Trailing garbage after object");
+
+        return top.Fetch();
+    }
+
+    [ImplicitConsts] public static P6any from_jsync(Constants c, string inp) {
+        JsyncReader j = new JsyncReader() { setting = c.setting };
+        j.from = inp;
+        j.SkipWhite(true);
+        Variable top = j.GetTopLevel();
+
+        foreach (KeyValuePair<string, List<Variable>> da in j.anchorrefs) {
+            P6any r;
+            if (!j.anchors.TryGetValue(da.Key, out r))
+                j.Err("Undefined anchor " + da.Key);
+            foreach (Variable to in da.Value)
+                to.Store(r);
+        }
+
+        j.SkipWhite(false);
+        if (j.ix != inp.Length)
+            j.Err("Trailing garbage after object");
+
+        return top.Fetch();
     }
 }
