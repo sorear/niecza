@@ -2331,7 +2331,7 @@ namespace Niecza {
             lexn = (info_.nspill > 0) ? new object[info_.nspill] : null;
         }
 
-        public Frame() { mo = Compartment.Top.CallFrameMO; }
+        Frame() { }
 
         public static readonly bool TraceCalls =
             Environment.GetEnvironmentVariable("NIECZA_TRACE_CALLS") != null;
@@ -2369,6 +2369,7 @@ namespace Niecza {
             reusable_child.caller = this;
             reusable_child.outer = outer;
             reusable_child.info = info;
+            reusable_child.mo = info.setting.CallFrameMO; // we want callframe() to always be the expected type
             reusable_child.sub = sub;
             reusable_child.code = info.code;
             reusable_child.pos = null;
@@ -2420,16 +2421,16 @@ namespace Niecza {
         }
 
         public Variable GetArgs() {
-            P6any nw = new P6opaque(Compartment.Top.CaptureMO);
+            P6any nw = new P6opaque(mo.setting.CaptureMO);
             var poscap = pos ?? new Variable[0];
-            if (sub != null && poscap.Length > 0 && sub.Does(Compartment.Top.MethodMO)) {
+            if (sub != null && poscap.Length > 0 && sub.Does(mo.setting.MethodMO)) {
                 // Hide the self value so that using |callframe.args in a
                 // nextwith call will DTRT
                 poscap = new Variable[pos.Length - 1];
                 Array.Copy(pos, 1, poscap, 0, poscap.Length);
             }
-            nw.SetSlot(Compartment.Top.CaptureMO, "$!positionals", poscap);
-            nw.SetSlot(Compartment.Top.CaptureMO, "$!named", named);
+            nw.SetSlot(mo.setting.CaptureMO, "$!positionals", poscap);
+            nw.SetSlot(mo.setting.CaptureMO, "$!named", named);
             return nw;
         }
 
@@ -2529,7 +2530,7 @@ namespace Niecza {
                 }
                 csr = csr.outer;
             }
-            return Compartment.Top.AnyP;
+            return mo.setting.AnyP;
         }
 
         public void LexicalBind(string name, Variable to) {
@@ -2790,7 +2791,7 @@ gotit:
                     bool rw     = ((flags & Parameter.READWRITE) != 0) && !islist;
                     P6any srco  = src.Fetch();
 
-                    // XXX: in order for calling methods on Compartment.Top.Nil to work,
+                    // XXX: in order for calling methods on Nil to work,
                     // self needs to be ignored here.
                     if (srco == setting.NilP && obj_src != -1 &&
                             (flags & Parameter.INVOCANT) == 0) {
@@ -3022,6 +3023,7 @@ bound: ;
         }
         void IFixup.Fixup() {
             code = info.code;
+            mo = info.setting.CallFrameMO;
         }
     }
 

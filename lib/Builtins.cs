@@ -2528,7 +2528,8 @@ again:
                     new Variable[] { v }, null)).Fetch());
         }
         else {
-            Frame o = new Frame();
+            // this is quite dubious really, Frame and LexPad should be separated
+            Frame o = new Frame(null, null, c.setting.TEMP_SI, null);
             o.lex0 = v;
             o.lex1 = v.Fetch();
             fr.PushLeave(type, Kernel.MakeSub(c.setting.TEMP_SI, o));
