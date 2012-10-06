@@ -1699,7 +1699,7 @@ my class List is Cool does Positional {
             %result{$k} //= [];
             %result{$k}.push: $_;
         }
-        %result.pairs;
+        %result;
     }
 
     method categorize(&test) {
@@ -1711,7 +1711,7 @@ my class List is Cool does Positional {
                 %result{$k}.push: $_;
             }
         }
-        %result.pairs;
+        %result;
     }
 
     method min($cmp_ = &infix:<cmp>) {
