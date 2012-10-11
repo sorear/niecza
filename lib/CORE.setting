@@ -491,6 +491,9 @@ my class Cool {
     method rand() { self * rand; }
     method roots($n) { roots(self, $n); }
 
+    method gamma() { Q:CgOp { (gamma {self}) } }
+    method expm1() { Q:CgOp { (expm1 {self}) } }
+
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
         my $str = ~self;
@@ -3853,12 +3856,16 @@ sub acosech($x) is pure { $x.acosech }
 sub cotanh($x) is pure { $x.cotanh }
 sub acotanh($x) is pure { $x.acotanh }
 sub atan2($y, $x = 1) is pure { $y.atan2($x) }
+
 sub hypot($a, $b) is pure {
     my $max = $a.abs max $b.abs;
     my $min = $a.abs min $b.abs;
     my $r = $min / $max;
     $max * sqrt(1 + $r * $r);
 }
+sub gamma($x) is pure { $x.gamma }
+sub expm1($x) is pure { $x.expm1 }
+
 sub expmod($exp, $power, $mod) is pure { Q:CgOp { (expmod {$exp.Int} {$power.Int} {$mod.Int}) } }
 sub is-prime($candidate, $tries = 100) {
     # Miller-Rabin via TimToady
