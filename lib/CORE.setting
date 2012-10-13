@@ -491,8 +491,9 @@ my class Cool {
     method rand() { self * rand; }
     method roots($n) { roots(self, $n); }
 
-    method gamma() { Q:CgOp { (gamma {self}) } }
-    method expm1() { Q:CgOp { (expm1 {self}) } }
+    method gamma()  { Q:CgOp { (gamma {self}) } }
+    method lgamma() { Q:CgOp { (lgamma {self}) } }
+    method expm1()  { Q:CgOp { (expm1 {self}) } }
 
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
@@ -3864,6 +3865,7 @@ sub hypot($a, $b) is pure {
     $max * sqrt(1 + $r * $r);
 }
 sub gamma($x) is pure { $x.gamma }
+sub lgamma($x) is pure { $x.lgamma }
 sub expm1($x) is pure { $x.expm1 }
 
 sub expmod($exp, $power, $mod) is pure { Q:CgOp { (expmod {$exp.Int} {$power.Int} {$mod.Int}) } }

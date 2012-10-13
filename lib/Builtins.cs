@@ -1031,6 +1031,25 @@ public partial class Builtins {
         }
     }
 
+    static readonly Func<Constants,Variable,Variable> lgamma_d = lgamma;
+    [ImplicitConsts] public static Variable lgamma(Constants c, Variable a1) {
+        P6any o1 = a1.Fetch();
+        int r1;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(c, a1,o1, lgamma_d);
+        P6any n1 = GetNumber(a1, o1, out r1);
+
+//        if (r1 == NR_COMPLEX) {
+//            Complex v1 = PromoteToComplex(r1, n1);
+//            return MakeComplex(Math.Exp(v1.re) * Math.Cos(v1.im),
+//                               Math.Exp(v1.re) * Math.Sin(v1.im));
+//        }
+        {
+            double v1 = PromoteToFloat(r1, n1);
+            return MakeFloat(SpecialMathFunctions.SpecialFunctions.LogGamma(v1));
+        }
+    }
+
     static readonly Func<Constants,Variable,Variable> expm1_d = expm1;
     [ImplicitConsts] public static Variable expm1(Constants c, Variable a1) {
         P6any o1 = a1.Fetch();

@@ -360,6 +360,45 @@ namespace SpecialMathFunctions
             return result;
         }
 
+        public static double LogGamma(double x)
+        {
+            Validate.IsNonNegative(x);
+
+            if (x < 12.0)
+            {
+                return Math.Log(Math.Abs(Gamma(x)));
+            }
+
+            // Abramowitz and Stegun 6.1.41
+            // Asymptotic series should be good to at least 11 or 12 figures
+            // For error analysis, see Whittiker and Watson
+            // A Course in Modern Analysis (1927), page 252
+
+            double[] c =
+            {
+                 1.0/12.0,
+                -1.0/360.0,
+                1.0/1260.0,
+                -1.0/1680.0,
+                1.0/1188.0,
+                -691.0/360360.0,
+                1.0/156.0,
+                -3617.0/122400.0
+            };
+            double z = 1.0/(x*x);
+            double sum = c[7];
+            for (int i=6; i >= 0; i--)
+            {
+                sum *= z;
+                sum += c[i];
+            }
+            double series = sum/x;
+
+            double halfLogTwoPi = 0.91893853320467274178032973640562;
+            double logGamma = (x - 0.5)*Math.Log(x) - x + halfLogTwoPi + series;
+            return logGamma;
+        }
+
         /// <summary>
         /// Factorial. Is exact for return values that fit into an int. Uses table look-up.
         /// </summary>
