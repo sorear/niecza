@@ -495,6 +495,7 @@ my class Cool {
     method lgamma() { Q:CgOp { (lgamma {self}) } }
     method expm1()  { Q:CgOp { (expm1 {self}) } }
     method log1p()  { Q:CgOp { (log1p {self}) } }
+    method erf()    { Q:CgOp { (erf {self}) } }
 
     method split($matcher, $limit?, :$all?) {
         my $matchrx = (($matcher ~~ Regex) ?? $matcher !! /$matcher/);
@@ -3869,6 +3870,7 @@ sub gamma($x) is pure { $x.gamma }
 sub lgamma($x) is pure { $x.lgamma }
 sub expm1($x) is pure { $x.expm1 }
 sub log1p($x) is pure { $x.log1p }
+sub erf($x) is pure { $x.erf }
 
 sub expmod($exp, $power, $mod) is pure { Q:CgOp { (expmod {$exp.Int} {$power.Int} {$mod.Int}) } }
 sub is-prime($candidate, $tries = 100) {

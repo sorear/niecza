@@ -1088,6 +1088,25 @@ public partial class Builtins {
         }
     }
 
+    static readonly Func<Constants,Variable,Variable> erf_d = erf;
+    [ImplicitConsts] public static Variable erf(Constants c, Variable a1) {
+        P6any o1 = a1.Fetch();
+        int r1;
+        if (!o1.mo.is_any)
+            return HandleSpecial1(c, a1,o1, erf_d);
+        P6any n1 = GetNumber(a1, o1, out r1);
+
+//        if (r1 == NR_COMPLEX) {
+//            Complex v1 = PromoteToComplex(r1, n1);
+//            return MakeComplex(Math.Exp(v1.re) * Math.Cos(v1.im),
+//                               Math.Exp(v1.re) * Math.Sin(v1.im));
+//        }
+        {
+            double v1 = PromoteToFloat(r1, n1);
+            return MakeFloat(SpecialMathFunctions.SpecialFunctions.Erf(v1));
+        }
+    }
+
     static readonly Func<Constants,Variable,Variable,Variable> atan2_d = atan2;
     [ImplicitConsts] public static Variable atan2(Constants c, Variable a1, Variable a2) {
         P6any o1 = a1.Fetch();
