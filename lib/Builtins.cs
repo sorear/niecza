@@ -2569,6 +2569,7 @@ again:
             }
             case 5: return MakeStr(Environment.OSVersion.Platform.ToString());
             case 6: return MakeStr(Environment.OSVersion.Version.ToString());
+            case 7: return MakeStr(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData).ToString());
             default: return null;
         }
     }
