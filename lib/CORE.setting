@@ -1592,6 +1592,7 @@ my class Parcel is Cool does Positional {
         }
         @tok.join(" ");
     }
+    method Array () { my @a = @(self); @a; }
 
     method fmt($format = '%s', $separator = ' ') { # duplicates version in List
         self.map({ .fmt($format) }).join($separator);
@@ -1679,6 +1680,8 @@ my class List is Cool does Positional {
     }
 
     method gist() { defined(self) ?? self.map(*.gist).join(" ") !! nextsame }
+
+    method Array () { my @a = @(self); @a; }
 
     method sort($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
