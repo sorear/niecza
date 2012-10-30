@@ -3370,7 +3370,7 @@ sub eval($str,:$lang="perl6") is return-pass {
     }
 }
 
-sub rungather($command_line) { Q:CgOp { (box Str (command_qx (obj_getstr {$command_line}))) } }
+sub rungather($command_line) is unsafe { Q:CgOp { (box Str (command_qx (obj_getstr {$command_line}))) } }
 
 # tiny stub for Dancer
 my class DateTime {
