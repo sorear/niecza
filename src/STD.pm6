@@ -3197,9 +3197,9 @@ grammar P6 is STD {
 
         :dba('postfix')
         [
+        | <postop> $<O> = {$<postop><O>} $<sym> = {$<postop><sym>}
         | <dotty>  $<O> = {$<dotty><O>}  $<sym> = {$<dotty><sym>}
         | <privop> $<O> = {$<privop><O>} $<sym> = {$<privop><sym>}
-        | <postop> $<O> = {$<postop><O>} $<sym> = {$<postop><sym>}
         ]
         { $*LEFTSIGIL = '@'; }
     }
