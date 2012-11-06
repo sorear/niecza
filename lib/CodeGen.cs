@@ -320,14 +320,6 @@ namespace Niecza.CLRBackend {
                     STable, typeof(ViviHook), P6any });
         public static readonly ConstructorInfo SubViviHook_ctor =
             typeof(SubViviHook).GetConstructor(new Type[] { P6any });
-        public static readonly ConstructorInfo HashViviHook_ctor =
-            typeof(HashViviHook).GetConstructor(new Type[] { P6any, String });
-        public static readonly ConstructorInfo ArrayViviHook_ctor =
-            typeof(ArrayViviHook).GetConstructor(new Type[] { P6any, Int32 });
-        public static readonly ConstructorInfo NewHashViviHook_ctor =
-            typeof(NewHashViviHook).GetConstructor(new Type[] { Variable, String });
-        public static readonly ConstructorInfo NewArrayViviHook_ctor =
-            typeof(NewArrayViviHook).GetConstructor(new Type[] { Variable, Int32 });
         public static readonly ConstructorInfo Rat_ctor =
             typeof(Rat).GetConstructor(new Type[] { typeof(BigInteger), typeof(ulong) });
         public static readonly ConstructorInfo BigInteger_ctor =
@@ -2916,22 +2908,6 @@ dynamic:
                 return CpsOp.ConstructorCall(Tokens.SV_ctor, z[0],
                     CpsOp.ConstructorCall(Tokens.SubViviHook_ctor,
                         z[1]), z[2]); };
-            thandlers["newvhashvar"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.SV_ctor, z[0],
-                    CpsOp.ConstructorCall(Tokens.HashViviHook_ctor,
-                        z[1], z[2]), z[3]); };
-            thandlers["newvarrayvar"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.SV_ctor, z[0],
-                    CpsOp.ConstructorCall(Tokens.ArrayViviHook_ctor,
-                        z[1], z[2]), z[3]); };
-            thandlers["newvnewhashvar"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.SV_ctor, z[0],
-                    CpsOp.ConstructorCall(Tokens.NewHashViviHook_ctor,
-                        z[1], z[2]), z[3]); };
-            thandlers["newvnewarrayvar"] = delegate(CpsOp[] z) {
-                return CpsOp.ConstructorCall(Tokens.SV_ctor, z[0],
-                    CpsOp.ConstructorCall(Tokens.NewArrayViviHook_ctor,
-                        z[1], z[2]), z[3]); };
             thandlers["strbuf_append"] = delegate(CpsOp[] z) {
                 return CpsOp.Sink(CpsOp.MethodCall(Tokens.StringBuilder_Append_String, z)); };
             thandlers["varhash_delete_key"] = delegate(CpsOp[] z) {
@@ -3141,7 +3117,6 @@ dynamic:
             thandlers["delete_key"] = thandlers["obj_delete_key"] = Contexty("mro_delete_key");
             thandlers["cross"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MECross"));
             thandlers["zip"] = Methody(Tokens.Variable, Tokens.Builtins.GetMethod("MEZip"));
-            thandlers["var_get_var"] = Methody(null, Tokens.Variable.GetMethod("GetVar"));
             thandlers["var_new_tied"] = Constructy(typeof(TiedVariable).GetConstructor(new Type[] { Tokens.P6any, Tokens.P6any, Tokens.P6any }));
             thandlers["obj_typename"] = Methody(null, Tokens.P6any.GetMethod("GetTypeName"));
             thandlers["fetch"] = Methody(null, Tokens.Variable_Fetch);

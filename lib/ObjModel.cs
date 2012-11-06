@@ -11,7 +11,6 @@ namespace Niecza {
         public override void Store(P6any val) {
             throw new NieczaException("Writing to readonly scalar");
         }
-        public override Variable GetVar() { return this; }
 
         public virtual object GetSlot(STable type, string name) {
             throw new NieczaException("Representation " + ReprName() + " does not support attributes");
@@ -112,12 +111,12 @@ namespace Niecza {
 
         public Variable ViviHash(Variable obj, Variable key) {
             return new RWVariable(setting.MuMO,
-                    new NewHashViviHook(obj, key.Fetch().mo.mro_raw_Str.Get(key)),
+                    new NewHashViviHook(setting.HashMO, obj, key.Fetch().mo.mro_raw_Str.Get(key)),
                     setting.AnyP);
         }
         public Variable ViviArray(Variable obj, Variable key) {
             return new RWVariable(setting.MuMO,
-                    new NewArrayViviHook(obj, (int)key.Fetch().mo.mro_raw_Numeric.Get(key)),
+                    new NewArrayViviHook(setting.ArrayMO, obj, (int)key.Fetch().mo.mro_raw_Numeric.Get(key)),
                     setting.AnyP);
         }
 

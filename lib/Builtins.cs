@@ -2121,7 +2121,7 @@ flat_enough:;
             MakeInt(i);
     }
     public static int get_count(P6any fcni) {
-        if (!fcni.Isa(Compartment.Top.CodeMO))
+        if (!fcni.Isa(fcni.mo.setting.CodeMO))
             return 1; // can't introspect fake subs (?)
         return sig_count(Kernel.GetInfo(fcni).sig);
     }
@@ -2182,7 +2182,7 @@ again:
                 if (items.Count() == 0) return -1;
                 Variable v = items[0];
                 P6any i = v.Fetch();
-                if (i.mo.HasType(Compartment.Top.IterCursorMO))
+                if (i.mo.HasType(i.mo.setting.IterCursorMO))
                     return 0;
                 if (v.List) {
                     items.Shift();
@@ -2932,6 +2932,10 @@ again:
     [ImplicitConsts] public static Variable is_role(Constants c, Variable o) {
         int rty = o.Fetch().mo.mo.type;
         return (rty == P6how.ROLE || rty == P6how.CURRIED_ROLE || rty == P6how.PARAMETRIZED_ROLE) ? c.setting.TrueV : c.setting.FalseV;
+    }
+
+    [ImplicitConsts] public static Variable var_get_var(Constants c, Variable o) {
+        return Kernel.BoxAnyMO<Variable>(o, c.setting.ScalarMO);
     }
 
     public class Blackhole : Variable {

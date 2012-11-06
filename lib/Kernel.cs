@@ -78,10 +78,6 @@ namespace Niecza {
         public abstract P6any Fetch();
         public abstract void Store(P6any v);
 
-        public virtual Variable GetVar() {
-            return Kernel.BoxAnyMO<Variable>(this, Compartment.Top.ScalarMO);
-        }
-
         public abstract void Freeze(FreezeBuffer fb);
 
         // note: callers need to make sure type is set up properly if null
@@ -138,22 +134,25 @@ namespace Niecza {
     }
 
     public class NewHashViviHook : ViviHook {
+        STable mo;
         Variable hashv;
         string key;
-        public NewHashViviHook(Variable hashv, string key) { this.hashv = hashv; this.key = key; }
+        public NewHashViviHook(STable mo, Variable hashv, string key) { this.mo = mo; this.hashv = hashv; this.key = key; }
         public override void Do(Variable toviv) {
             VarHash rh = new VarHash();
             rh[key] = toviv;
-            hashv.Store(Kernel.BoxRaw(rh, Compartment.Top.HashMO));
+            hashv.Store(Kernel.BoxRaw(rh, mo));
         }
         public override void Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.NewHashViviHook);
+            fb.ObjRef(mo);
             fb.ObjRef(hashv);
             fb.String(key);
         }
         internal static IFreeze Thaw(ThawBuffer tb) {
-            var n = new NewHashViviHook(null, null);
+            var n = new NewHashViviHook(null, null, null);
             tb.Register(n);
+            n.mo = (STable) tb.ObjRef();
             n.hashv = (Variable) tb.ObjRef();
             n.key = tb.String();
             return n;
@@ -165,7 +164,7 @@ namespace Niecza {
         int key;
         public ArrayViviHook(P6any ary, int key) { this.ary = ary; this.key = key; }
         public override void Do(Variable toviv) {
-            VarDeque vd = (VarDeque) ary.GetSlot(Compartment.Top.ListMO, "$!items");
+            VarDeque vd = (VarDeque) ary.GetSlot(ary.mo.setting.ListMO, "$!items");
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewTypedScalar(null));
             vd[key] = toviv;
@@ -185,27 +184,30 @@ namespace Niecza {
     }
 
     public class NewArrayViviHook : ViviHook {
+        STable mo;
         Variable ary;
         int key;
-        public NewArrayViviHook(Variable ary, int key) { this.ary = ary; this.key = key; }
+        public NewArrayViviHook(STable mo, Variable ary, int key) { this.mo = mo; this.ary = ary; this.key = key; }
         public override void Do(Variable toviv) {
             VarDeque vd = new VarDeque();
             while (vd.Count() <= key)
                 vd.Push(Kernel.NewTypedScalar(null));
             vd[key] = toviv;
-            P6opaque d = new P6opaque(Compartment.Top.ArrayMO);
+            P6opaque d = new P6opaque(mo);
             d.slots[0] = vd;
             d.slots[1] = new VarDeque();
             ary.Store(d);
         }
         public override void Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.NewArrayViviHook);
+            fb.ObjRef(mo);
             fb.ObjRef(ary);
             fb.Int(key);
         }
         internal static IFreeze Thaw(ThawBuffer tb) {
-            var n = new NewArrayViviHook(null, 0);
+            var n = new NewArrayViviHook(null, null, 0);
             tb.Register(n);
+            n.mo = (STable) tb.ObjRef();
             n.ary = (Variable) tb.ObjRef();
             n.key = tb.Int();
             return n;

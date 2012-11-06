@@ -2421,10 +2421,6 @@ my class Junction is Mu {
 }
 # }}}
 # List utilities {{{
-sub _vivify_array_at_pos(\ary, $ix) {
-    Q:CgOp { (newvnewarrayvar (class_ref mo Any) {ary} (cast int (obj_getnum {$ix})) (@ {Any})) };
-}
-
 my class GatherIterator is IterCursor {
     has $.frame;
     has $!reify;
