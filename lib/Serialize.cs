@@ -545,7 +545,7 @@ namespace Niecza.Serialization {
     }
     // implement this if you need to copy in data from other objects, &c
     interface IFixup {
-        void Fixup();
+        void Fixup(Compartment c);
     }
 
     class ThawBuffer {
@@ -573,7 +573,7 @@ namespace Niecza.Serialization {
         internal void RunFixups() {
             P6how.BulkRevalidate(revalidate);
             foreach (IFixup f in fixups_needed)
-                f.Fixup();
+                f.Fixup(setting);
             fixups_needed.Clear();
         }
 

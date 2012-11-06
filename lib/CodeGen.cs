@@ -4525,7 +4525,7 @@ dynamic:
             string attr = (string)args[ix++];
             STable atype = (STable)Handle.Unbox(args[ix++]);
 
-            return Handle.Wrap(new Parameter(flags,
+            return Handle.Wrap(new Parameter(tgt.setting, flags,
                 (slot == null ? -1 : tgt.dylex[slot].SigIndex()),
                 name, (names.Count == 0 ? null : names.ToArray()),
                 deflt, type ?? tgt.setting.AnyMO, attr, atype));
@@ -4546,7 +4546,7 @@ dynamic:
                 sig.Add((Parameter)Handle.Unbox(args[ix++]));
             object[] pc = tgt.post_constraints;
             Array.Resize(ref pc, pc == null ? 1 : pc.Length + 1);
-            pc[pc.Length - 1] = new Signature(sig.ToArray());
+            pc[pc.Length - 1] = new Signature(tgt.mo.setting, sig.ToArray());
             tgt.post_constraints = pc;
             return null;
         }
@@ -4556,7 +4556,7 @@ dynamic:
             List<Parameter> sig = new List<Parameter>();
             while (ix != args.Length)
                 sig.Add((Parameter)Handle.Unbox(args[ix++]));
-            tgt.sig = new Signature(sig.ToArray());
+            tgt.sig = new Signature(tgt.setting, sig.ToArray());
             return null;
         }
         public static object sub_contains_phaser(object[] args) {

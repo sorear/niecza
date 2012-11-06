@@ -818,7 +818,7 @@ next_method: ;
             return n;
         }
 
-        void IFixup.Fixup() {
+        void IFixup.Fixup(Compartment c) {
             SetMRO(mro);
         }
     }

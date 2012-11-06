@@ -1513,10 +1513,10 @@ namespace Niecza {
         public override string ReprName() { return "P6parameter"; }
 
         private Parameter() { }
-        public Parameter(int flags, int slot, string name,
+        internal Parameter(Compartment c, int flags, int slot, string name,
                 string[] names, object def, STable type, string attr,
                 STable atype) {
-            this.mo = Compartment.Top.ParameterMO;
+            this.mo = c.ParameterMO;
             this.flags = flags;
             this.name = name;
             this.slot = slot;
@@ -1527,14 +1527,14 @@ namespace Niecza {
             this.attribute_type = atype;
         }
 
-        public static Parameter TPos(string name, int slot) {
-            return new Parameter(RWTRANS | POSITIONAL, slot, name,
-                    null, null, Compartment.Top.AnyMO, null, null);
+        internal static Parameter TPos(Compartment c, string name, int slot) {
+            return new Parameter(c, RWTRANS | POSITIONAL, slot, name,
+                    null, null, c.AnyMO, null, null);
         }
 
-        public static Parameter TNamedOpt(string name, int slot) {
-            return new Parameter(RWTRANS | OPTIONAL, slot, name,
-                    new string[] { name }, null, Compartment.Top.AnyMO, null, null);
+        internal static Parameter TNamedOpt(Compartment c, string name, int slot) {
+            return new Parameter(c, RWTRANS | OPTIONAL, slot, name,
+                    new string[] { name }, null, c.AnyMO, null, null);
         }
 
         // Value processing
@@ -1601,7 +1601,7 @@ namespace Niecza {
             return n;
         }
 
-        void IFixup.Fixup() { mo = Compartment.Top.ParameterMO; }
+        void IFixup.Fixup(Compartment c) { mo = c.ParameterMO; }
     }
 
     public class Signature : P6any, IFixup {
@@ -1609,7 +1609,7 @@ namespace Niecza {
 
         public override string ReprName() { return "P6sig"; }
 
-        public Signature(params Parameter[] parms) { this.mo = Compartment.Top.SignatureMO; this.parms = parms; }
+        internal Signature(Compartment c, params Parameter[] parms) { this.mo = c.SignatureMO; this.parms = parms; }
         private Signature() { }
 
         public override void Freeze(FreezeBuffer fb) {
@@ -1625,7 +1625,7 @@ namespace Niecza {
             n.parms = tb.RefsA<Parameter>();
             return n;
         }
-        void IFixup.Fixup() { mo = Compartment.Top.SignatureMO; }
+        void IFixup.Fixup(Compartment c) { mo = c.SignatureMO; }
     }
 
     // This stores all the invariant stuff about a Sub, i.e. everything
@@ -2226,7 +2226,7 @@ namespace Niecza {
             return n;
         }
 
-        void IFixup.Fixup() {
+        void IFixup.Fixup(Compartment c) {
             SubInfo sc = outer;
             LexInfo li = null;
             for (outer_topic_rank = 1; sc != null; sc = sc.outer) {
@@ -3023,7 +3023,7 @@ bound: ;
             tb.PushFixup(n);
             return n;
         }
-        void IFixup.Fixup() {
+        void IFixup.Fixup(Compartment c) {
             code = info.code;
             mo = info.setting.CallFrameMO;
         }
@@ -5630,7 +5630,7 @@ slow:
                 ContextHandler<Variable> cvb, object cvu) {
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
                     WrapHandler0cb);
-            si.sig = new Signature(Parameter.TPos("self", 0));
+            si.sig = new Signature(kl.setting,Parameter.TPos(kl.setting,"self", 0));
             si.param = new object[] { cvu, cvb };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
@@ -5646,8 +5646,9 @@ slow:
                 IndexHandler cv) {
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
                 WrapHandler1cb);
-            si.sig = new Signature(Parameter.TPos("self", 0),
-                    Parameter.TPos("$key", 1));
+            si.sig = new Signature(kl.setting,
+                    Parameter.TPos(kl.setting,"self", 0),
+                    Parameter.TPos(kl.setting,"$key", 1));
             si.param = new object[] { null, cv };
             kl.AddMethod(0, name, MakeSub(si, null));
         }
@@ -5666,8 +5667,9 @@ slow:
                 PushyHandler cv) {
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
                     WrapPushycb);
-            si.sig = new Signature(Parameter.TPos("self", 0),
-                new Parameter(Parameter.RWTRANS | Parameter.SLURPY_PCL, 1, "$args", null, null, null, null, null)
+            si.sig = new Signature(kl.setting,
+                    Parameter.TPos(kl.setting, "self", 0),
+                    new Parameter(kl.setting, Parameter.RWTRANS | Parameter.SLURPY_PCL, 1, "$args", null, null, null, null, null)
             );
             si.param = new object[] { null, cv };
             kl.AddMethod(0, name, MakeSub(si, null));
@@ -5723,19 +5725,20 @@ slow:
                 BindHandler bind) {
             SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
                     DispIndexy);
+            var c = kl.setting;
             List<Parameter> lp = new List<Parameter>();
-            lp.Add(Parameter.TPos("self", 0));
-            lp.Add(new Parameter(Parameter.RWTRANS | Parameter.SLURPY_PCL, -1,
+            lp.Add(Parameter.TPos(c, "self", 0));
+            lp.Add(new Parameter(c, Parameter.RWTRANS | Parameter.SLURPY_PCL, -1,
                         "args", null, null, null, null, null));
             if (del != null) {
-                lp.Add(Parameter.TNamedOpt("exists", -1));
-                lp.Add(Parameter.TNamedOpt("delete", -1));
+                lp.Add(Parameter.TNamedOpt(c, "exists", -1));
+                lp.Add(Parameter.TNamedOpt(c, "delete", -1));
             }
-            lp.Add(Parameter.TNamedOpt("k", -1));
-            lp.Add(Parameter.TNamedOpt("kv", -1));
-            lp.Add(Parameter.TNamedOpt("p", -1));
-            lp.Add(Parameter.TNamedOpt("BIND_VALUE", -1));
-            si.sig = new Signature(lp.ToArray());
+            lp.Add(Parameter.TNamedOpt(c, "k", -1));
+            lp.Add(Parameter.TNamedOpt(c, "kv", -1));
+            lp.Add(Parameter.TNamedOpt(c, "p", -1));
+            lp.Add(Parameter.TNamedOpt(c, "BIND_VALUE", -1));
+            si.sig = new Signature(c, lp.ToArray());
             si.param = new object[] { at, exist, del, bind, name };
             kl.AddMethod(0, name, MakeSub(si, null));
         }

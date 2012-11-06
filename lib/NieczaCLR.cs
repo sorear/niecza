@@ -715,7 +715,7 @@ for $args (0..9) {
                 SubInfo si;
 
                 si = new SubInfo("KERNEL dispose-hack", dispose_handler);
-                si.sig = new Signature(Parameter.TPos("self", 0));
+                si.sig = new Signature(s,Parameter.TPos(s, "self", 0));
                 m.AddMethod(0, "dispose-hack", Kernel.MakeSub(si, null));
             }
 
@@ -723,20 +723,20 @@ for $args (0..9) {
                 SubInfo si;
 
                 si = new SubInfo("KERNEL default", default_handler);
-                si.sig = new Signature(Parameter.TPos("self", 0));
+                si.sig = new Signature(s, Parameter.TPos(s, "self", 0));
                 m.AddMethod(0, "default", Kernel.MakeSub(si, null));
 
                 si = new SubInfo("KERNEL marshal", marshal_handler);
-                si.sig = new Signature(Parameter.TPos("self", 0),
-                        Parameter.TPos("$obj", 1));
+                si.sig = new Signature(s, Parameter.TPos(s, "self", 0),
+                        Parameter.TPos(s, "$obj", 1));
                 m.AddMethod(0, "marshal", Kernel.MakeSub(si, null));
 
                 si = new SubInfo("KERNEL unmarshal", unmarshal_handler);
-                si.sig = new Signature(Parameter.TPos("self", 0));
+                si.sig = new Signature(s, Parameter.TPos(s, "self", 0));
                 m.AddMethod(0, "unmarshal", Kernel.MakeSub(si, null));
 
                 si = new SubInfo("KERNEL Str", Str_handler);
-                si.sig = new Signature(Parameter.TPos("self", 0));
+                si.sig = new Signature(s, Parameter.TPos(s, "self", 0));
                 m.AddMethod(0, "Str",  Kernel.MakeSub(si, null));
                 m.AddMethod(0, "gist", Kernel.MakeSub(si, null));
             }
