@@ -142,21 +142,23 @@ namespace Niecza {
         }
 
         public override P6any Fetch() {
-            string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
+            var mo = backing.Fetch().mo;
+            string str = mo.mro_raw_Str.Get(backing);
             string sub = Builtins.LaxSubstring2(str, from, length);
-            return sub == null ? Compartment.Top.StrMO.typeObj :
-                Kernel.BoxRaw(sub,Compartment.Top.StrMO);
+            return sub == null ? mo.setting.StrMO.typeObj :
+                Kernel.BoxRaw(sub, mo.setting.StrMO);
         }
 
         public override void Store(P6any v) {
-            string str = backing.Fetch().mo.mro_raw_Str.Get(backing);
+            var mo = backing.Fetch().mo;
+            string str = mo.mro_raw_Str.Get(backing);
             int left = (from < 0) ? 0 : (from > str.Length) ? str.Length : from;
             int right = ((length > (str.Length - left)) ? (str.Length - left) :
                 (length < 0) ? 0 : length) + left;
             string lfr = str.Substring(0, left);
             string mfr = v.mo.mro_raw_Str.Get(v);
             string rfr = str.Substring(right);
-            backing.Store(Kernel.BoxRaw<string>(lfr + mfr + rfr, Compartment.Top.StrMO));
+            backing.Store(Kernel.BoxRaw<string>(lfr + mfr + rfr, mo.setting.StrMO));
         }
 
         public override void Freeze(Niecza.Serialization.FreezeBuffer fb) {
@@ -193,11 +195,11 @@ public partial class Builtins {
     // When calling builtins, the binder is often bypassed, so we need to
     // check arguement types ourselves.  This is the really simple version
     // that doesn't handle junctions, not often used.
-    public static P6any NominalCheck(string name, STable mo, Variable v) {
+    public static P6any NominalCheck(string name, Variable v) {
         P6any r = v.Fetch();
-        if (!r.mo.HasType(mo))
+        if (!r.mo.is_any)
             throw new NieczaException("Nominal type check failed for " + name +
-                    " needed " + mo.name + " got " + r.mo.name);
+                    " needed Any got " + r.mo.name);
         return r;
     }
 
@@ -312,7 +314,7 @@ public partial class Builtins {
         if (o.mo.num_rank >= 0) {
             rank = o.mo.num_rank;
         } else {
-            if (o.Does(Compartment.Top.RealMO)) {
+            if (o.Does(o.mo.setting.RealMO)) {
                 rank = NR_FLOAT;
                 o = Kernel.RunInferior(o.InvokeMethod(Kernel.GetInferiorRoot(), "Bridge", new Variable[] { v }, null)).Fetch();
                 return o;
@@ -1633,8 +1635,8 @@ public partial class Builtins {
 
     // only called from .Rat
     [ImplicitConsts] public static Variable rat_approx(Constants c, Variable v1, Variable v2) {
-        NominalCheck("$x", c.setting.AnyMO, v1);
-        NominalCheck("$y", c.setting.AnyMO, v2);
+        NominalCheck("$x", v1);
+        NominalCheck("$y", v2);
 
         BigInteger nc, dc, ne, de, na, da;
         GetAsRational(v1, out nc, out dc);
@@ -1758,7 +1760,7 @@ public partial class Builtins {
     }
 
     [ImplicitConsts] public static Variable UniCat(Constants c, Variable v) {
-        P6any o1 = NominalCheck("$x", c.setting.AnyMO, v);
+        P6any o1 = NominalCheck("$x", v);
         char ch = (char) o1.mo.mro_raw_Numeric.Get(v);
         int ix = (int) char.GetUnicodeCategory(ch);
         return MakeInt(ix);
@@ -1793,7 +1795,7 @@ flat_enough:;
     }
 
     public static VarDeque HashIterRaw(int mode, Variable v) {
-        P6any o = NominalCheck("$x", Compartment.Top.AnyMO, v);
+        P6any o = NominalCheck("$x", v);
         VarHash d = Kernel.UnboxAny<VarHash>(o);
 
         VarDeque lv = new VarDeque();
@@ -2848,7 +2850,7 @@ again:
         if ((ai.flags & P6how.A_TYPE) == P6how.A_SCALAR) {
             if (ai.type == null)
                 obj = Kernel.NewMuScalar(
-                    vx != null ? vx.Fetch() : Compartment.Top.AnyMO.typeObj);
+                    vx != null ? vx.Fetch() : n.mo.setting.AnyMO.typeObj);
             else
                 obj = Kernel.NewRWScalar(ai.type,
                     vx != null ? vx.Fetch() : ai.type.initObj);

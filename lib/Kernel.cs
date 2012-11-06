@@ -5447,16 +5447,17 @@ value:      vx = (Variable) th.resultSlot;
         public static void IterToList(P6any list, VarDeque iter) {
             VarDeque items = new VarDeque();
             P6any item;
+            var s = list.mo.setting;
             while (iter.Count() != 0) {
                 item = iter[0].Fetch();
-                if (item.mo.HasType(Compartment.Top.IterCursorMO)) {
+                if (item.mo.HasType(s.IterCursorMO)) {
                     break;
                 } else {
                     items.Push(iter.Shift());
                 }
             }
-            list.SetSlot(Compartment.Top.ListMO, "$!items", items);
-            list.SetSlot(Compartment.Top.ListMO, "$!rest", iter);
+            list.SetSlot(s.ListMO, "$!items", items);
+            list.SetSlot(s.ListMO, "$!rest", iter);
         }
 
         public static VarDeque IterFlatten(VarDeque inq) {
@@ -5477,13 +5478,14 @@ again:
                 inq.UnshiftD(inq0.mo.mro_raw_iterator.Get(inq0v));
                 goto again;
             }
-            if (inq0.mo.HasType(Compartment.Top.IterCursorMO)) {
-                Frame th = new Frame(null, null, Compartment.Top.IF_SI, Compartment.Top.AnyP);
+            var s = inq0.mo.setting;
+            if (inq0.mo.HasType(s.IterCursorMO)) {
+                Frame th = new Frame(null, null, s.IF_SI, s.AnyP);
                 th.lex0 = inq;
-                P6opaque thunk = new P6opaque(Compartment.Top.GatherIteratorMO);
+                P6opaque thunk = new P6opaque(s.GatherIteratorMO);
                 th.coro_return = th;
                 thunk.slots[0] = NewMuScalar(th);
-                thunk.slots[1] = NewMuScalar(Compartment.Top.AnyP);
+                thunk.slots[1] = NewMuScalar(s.AnyP);
                 outq.Push(thunk);
                 return outq;
             }
