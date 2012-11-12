@@ -22,9 +22,7 @@ namespace Niecza.UCD {
 
         protected static bool DoMatch(string value, Variable filter) {
             var sub = filter.Fetch();
-            Variable r = Kernel.RunInferior(sub.InvokeMethod(
-                Kernel.GetInferiorRoot(), "ACCEPTS",
-                new Variable[] { filter, sub.mo.setting.MakeStr(value) }, null));
+            Variable r = Builtins.InvokeMethod("ACCEPTS", filter, sub.mo.setting.MakeStr(value));
             return r.Fetch().mo.mro_raw_Bool.Get(r);
         }
     }

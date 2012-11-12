@@ -518,8 +518,7 @@ next_method: ;
                 if (!obj.Does(superclasses[0]))
                     return false;
                 if (subsetFilter == null)
-                    subsetFilter = Kernel.RunInferior(subsetWhereThunk.Invoke(
-                        Kernel.GetInferiorRoot(), Variable.None, null));
+                    subsetFilter = Builtins.InvokeSub(subsetWhereThunk);
                 return Kernel.ACCEPTS(obj, subsetFilter);
             }
             if (type == CURRIED_ROLE) {
@@ -1007,9 +1006,7 @@ next_method: ;
                     return setting.MuMO.FindMethod(name);
                 var pun = mo.PunRole();
                 var punfunc = setting.GetVar("::GLOBAL::Niecza", "&autopun").v;
-                var clone = Kernel.RunInferior(punfunc.Fetch().Invoke(
-                    Kernel.GetInferiorRoot(), new Variable[] { pun.typeObj,
-                        setting.MakeStr(name) }, null));
+                var clone = Builtins.InvokeSub(punfunc.Fetch(), pun.typeObj, setting.MakeStr(name));
                 return new DispatchEnt(null, clone.Fetch());
             }
             return null;

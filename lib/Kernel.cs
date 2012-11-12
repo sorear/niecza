@@ -96,8 +96,7 @@ namespace Niecza {
         P6any sub;
         public SubViviHook(P6any sub) { this.sub = sub; }
         public override void Do(Variable toviv) {
-            Kernel.RunInferior(sub.Invoke(Kernel.GetInferiorRoot(),
-                new Variable[] { toviv }, null));
+            Builtins.InvokeSub(sub, toviv);
         }
         public override void Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.SubViviHook);
@@ -316,9 +315,7 @@ namespace Niecza {
         }
 
         public override P6any Fetch() {
-            Variable vr = Kernel.RunInferior(fetch.Invoke(
-                Kernel.GetInferiorRoot(), new [] {fetch.mo.setting.AnyP}, null));
-            return vr.Fetch();
+            return Builtins.InvokeSub(fetch, fetch.mo.setting.AnyP).Fetch();
         }
 
         public override void Store(P6any v) {
@@ -327,8 +324,7 @@ namespace Niecza {
                 whence = null;
                 vh.Do(this);
             }
-            Kernel.RunInferior(store.Invoke(Kernel.GetInferiorRoot(),
-                new [] { store.mo.setting.AnyP, v }, null));
+            Builtins.InvokeSub(store, store.mo.setting.AnyP, v);
         }
 
         public override void Vivify() {
@@ -1879,8 +1875,7 @@ namespace Niecza {
         }
 
         internal Variable RunBEGIN() {
-            return Kernel.RunInferior(protosub.Invoke(Kernel.GetInferiorRoot(),
-                Variable.None, null));
+            return Builtins.InvokeSub(protosub);
         }
 
         internal bool IsTopicalizer() {
@@ -2434,9 +2429,7 @@ namespace Niecza {
             string ret = null;
             try {
                 Variable a = GetArgs();
-                Variable sa = Kernel.RunInferior(a.Fetch().InvokeMethod(
-                    Kernel.GetInferiorRoot(), "perl", new Variable[] { a },
-                    null));
+                Variable sa = Builtins.InvokeMethod("perl", a);
                 ret = sa.Fetch().mo.mro_raw_Str.Get(sa);
             } catch (Exception ex) {
                 ret = "[cannot display arguments: " + ex + "]";
@@ -2600,9 +2593,7 @@ namespace Niecza {
                 // dummy values; no junctional operation in subsigs
                 int jun_pivot = -1, jun_rank = int.MaxValue;
                 string jun_pivot_n = null;
-                P6any cap = Kernel.RunInferior(arg.Fetch().InvokeMethod(
-                    Kernel.GetInferiorRoot(), "Capture", new Variable[] { arg },
-                    null)).Fetch();
+                P6any cap = Builtins.InvokeMethod("Capture", arg).Fetch();
                 return BindSignature(th, (Signature)c,
                         NO_JUNCTION + (quiet ? CHECK_ONLY : 0), param.name,
                         (Variable[])cap.GetSlot(setting.CaptureMO, "$!positionals"),
@@ -2841,10 +2832,8 @@ bound: ;
                             GetSlot(param.attribute_type, param.attribute))),
                                 src);
                     } else {
-                        Variable dest = Kernel.RunInferior(selfv.Fetch().
-                            InvokeMethod(Kernel.GetInferiorRoot(),
-                                param.attribute.Substring(2),
-                                new Variable[] { selfv }, null));
+                        Variable dest = Builtins.InvokeMethod(
+                                param.attribute.Substring(2), selfv);
                         Kernel.Assign(dest, src);
                     }
                 }
@@ -2925,8 +2914,7 @@ bound: ;
                 for (; c != null; c = c.next) {
                     if (0 == ((ok ? LeaveHook.KEEP : LeaveHook.UNDO) & c.type))
                         continue;
-                    Variable r = Kernel.RunInferior(c.thunk.Invoke(
-                        Kernel.GetInferiorRoot(), new Variable[] {ret}, null));
+                    Variable r = Builtins.InvokeSub(c.thunk, ret);
                     if ((c.type & LeaveHook.DIE) != 0 &&
                             !r.Fetch().mo.mro_raw_Bool.Get(r))
                         throw new NieczaException("Post-constraint failed for " + info.name);
@@ -3083,7 +3071,7 @@ bound: ;
             Variable[] rargs = new Variable[args.Length + 1];
             Array.Copy(args, 0, rargs, 1, args.Length);
             rargs[0] = obj;
-            return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, rargs, null));
+            return Builtins.InvokeMethod(method, rargs);
         }
     }
 
@@ -3095,8 +3083,7 @@ bound: ;
         protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override T Get(Variable obj) {
-            Variable v = Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
-            return Kernel.UnboxAny<T>(v.Fetch());
+            return Kernel.UnboxAny<T>(Builtins.InvokeMethod(method, obj).Fetch());
         }
     }
     class CtxCallMethodUnboxBool : ContextHandler<bool> {
@@ -3107,8 +3094,7 @@ bound: ;
         protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override bool Get(Variable obj) {
-            Variable v = Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
-            return Kernel.UnboxAny<int>(v.Fetch()) != 0;
+            return Kernel.UnboxAny<int>(Builtins.InvokeMethod(method, obj).Fetch()) != 0;
         }
     }
 
@@ -3120,7 +3106,7 @@ bound: ;
         protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override double Get(Variable obj) {
-            Variable v = method == null ? obj : Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
+            Variable v = method == null ? obj : Builtins.InvokeMethod(method, obj);
             P6any o = v.Fetch();
             if (o.mo.HasType(setting.NumMO)) {
                 return Kernel.UnboxAny<double>(o);
@@ -3155,7 +3141,7 @@ bound: ;
         protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override Variable Get(Variable obj) {
-            return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null));
+            return Builtins.InvokeMethod(method, obj);
         }
     }
 
@@ -3167,7 +3153,7 @@ bound: ;
         protected override void SetData(object[]o) { method = (string)o[0]; }
 
         public override P6any Get(Variable obj) {
-            return Kernel.RunInferior(obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), method, new Variable[] { obj }, null)).Fetch();
+            return Builtins.InvokeMethod(method, obj).Fetch();
         }
     }
 
@@ -3857,9 +3843,7 @@ tryagain:
             }
         }
         public override Variable Get(Variable obj, Variable key) {
-            return (Variable) Kernel.RunInferior(
-                    obj.Fetch().InvokeMethod(Kernel.GetInferiorRoot(), name,
-                        new Variable[] { obj, key }, named));
+            return Builtins.InvokeMethod(name, new [] { obj, key }, named);
         }
     }
 
@@ -3901,8 +3885,7 @@ tryagain:
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return setting.AnyP;
-            return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
-                "delete_key", new Variable[] { obj, key }, null));
+            return Builtins.InvokeMethod("delete_key", obj, key);
         }
     }
     class IxAnyExistsKey : IndexHandler {
@@ -3914,16 +3897,14 @@ tryagain:
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return setting.FalseV;
-            return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
-                "exists_key", new Variable[] { obj, key }, null));
+            return Builtins.InvokeMethod("exists_key", obj, key);
         }
     }
     class IxAnyBindKey : BindHandler {
         public override Variable Bind(Variable obj, Variable key, Variable to) {
             P6any os = obj.Fetch();
             if (os.IsDefined())
-                return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
-                    "bind_key", new Variable[] { obj, key, to }, null));
+                return Builtins.InvokeMethod("bind_key", obj, key, to);
             obj.Store(Kernel.BoxRaw(new VarHash(), setting.HashMO));
             return setting.HashMO.mro_bind_key.Bind(obj, key, to);
         }
@@ -3932,8 +3913,7 @@ tryagain:
         public override Variable Bind(Variable obj, Variable key, Variable to) {
             P6any os = obj.Fetch();
             if (os.IsDefined())
-                return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
-                    "bind_pos", new Variable[] { obj, key, to }, null));
+                return Builtins.InvokeMethod("bind_pos", obj, key, to);
             obj.Store(setting.CreateArray().Fetch());
             return setting.ArrayMO.mro_bind_key.Bind(obj, key, to);
         }
@@ -3949,8 +3929,7 @@ tryagain:
             P6any os = obj.Fetch();
             if (!os.IsDefined())
                 return ViviHash(obj, key);
-            return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
-                "at_key", new Variable[] { obj, key }, null));
+            return Builtins.InvokeMethod("at_key", obj, key);
         }
     }
     class IxAnyAtPos : IndexHandler {
@@ -3965,16 +3944,11 @@ tryagain:
             if (!os.IsDefined())
                 return ViviArray(obj, key);
             if (ks.mo != setting.IntMO && ks.mo.HasType(setting.CodeMO)) {
-                Variable elts = Kernel.RunInferior(os.InvokeMethod(
-                        Kernel.GetInferiorRoot(), "elems",
-                        new Variable[] { obj }, null));
-                return Get(obj, Kernel.RunInferior(ks.Invoke(
-                    Kernel.GetInferiorRoot(),
-                    new Variable[] { elts }, null)));
+                Variable elts = Builtins.InvokeMethod("elems", obj);
+                return Get(obj, Builtins.InvokeSub(ks, elts));
             }
 
-            return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
-                "at_pos", new Variable[] { obj, key }, null));
+            return Builtins.InvokeMethod("at_pos", obj, key);
         }
     }
 
@@ -4099,9 +4073,7 @@ tryagain:
 
             if (ks.mo != setting.IntMO && ks.mo.HasType(setting.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
-                return Get(obj, Kernel.RunInferior(ks.Invoke(
-                    Kernel.GetInferiorRoot(),
-                    new Variable[] { nr }, null)));
+                return Get(obj, Builtins.InvokeSub(ks, nr));
             }
 
             int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
@@ -4137,8 +4109,7 @@ tryagain:
 
             if (ks.mo != setting.IntMO && ks.mo.HasType(setting.CodeMO)) {
                 Variable nr = os.mo.mro_Numeric.Get(obj);
-                key = Kernel.RunInferior(ks.Invoke(Kernel.GetInferiorRoot(),
-                    new Variable[] { nr }, null));
+                key = Builtins.InvokeSub(ks, nr);
             }
 
             int ix = (int) key.Fetch().mo.mro_raw_Numeric.Get(key);
@@ -4846,8 +4817,7 @@ have_v:
             while (to_run.Count() != 0) {
                 Variable next = lifo ? to_run.Pop() : to_run.Shift();
                 if (next == null) continue;
-                Kernel.RunInferior(next.Fetch().Invoke(
-                    Kernel.GetInferiorRoot(), Variable.None, null));
+                Builtins.InvokeSub(next.Fetch());
             }
         }
 
@@ -5453,8 +5423,7 @@ ltm:
         public static VarDeque SortHelper(Frame th, P6any cb, VarDeque from) {
             Variable[] tmp = from.CopyAsArray();
             Array.Sort(tmp, delegate (Variable v1, Variable v2) {
-                Variable v = RunInferior(cb.Invoke(GetInferiorRoot(),
-                        new Variable[] { v1, v2 }, null));
+                Variable v = Builtins.InvokeSub(cb, v1, v2);
                 double rv = v.Fetch().mo.mro_raw_Numeric.Get(v);
                 return (rv > 0 ? +1 : rv < 0 ? -1 : 0);
             });
@@ -5689,8 +5658,7 @@ again:
             return itemsl[0];
 
 slow:
-            return RunInferior(lst.Fetch().InvokeMethod(
-                        GetInferiorRoot(), "head", new Variable[] {lst}, null));
+            return Builtins.InvokeMethod("head", lst);
         }
 
         private static void Handler_Vonly(STable kl, string name,
@@ -5888,8 +5856,7 @@ slow:
                 Variable[] pass = new Variable[arg.mo.curriedArgs.Length+1];
                 pass[0] = cls.typeObj;
                 Array.Copy(arg.mo.curriedArgs, 0, pass, 1, pass.Length-1);
-                Frame ifr = (Frame)RunInferior(arg.mo.roleFactory.
-                    Invoke(GetInferiorRoot(), pass, null)).Fetch();
+                Frame ifr = (Frame)Builtins.InvokeSub(arg.mo.roleFactory, pass).Fetch();
 
                 r = new STable(arg.name + "[...]");
                 r.mo.FillRole(arg.mo.superclasses.ToArray(), null);
@@ -6464,8 +6431,7 @@ slow:
                 Variable v1 = (Variable) payload;
                 if (v1.Fetch().mo.FindMethod("gist") == null)
                     return "(no .gist on " + v1.Fetch().mo + " yet)";
-                Variable v2 = RunInferior(v1.Fetch().InvokeMethod(
-                    GetInferiorRoot(), "gist", new Variable[] { v1 }, null));
+                Variable v2 = Builtins.InvokeMethod("gist", v1);
                 return v2.Fetch().mo.mro_raw_Str.Get(v2);
             } catch (Exception ex) {
                 return "(stringificiation failed: " + ex + ")";
@@ -6805,9 +6771,7 @@ slow:
         }
 
         public static bool ACCEPTS(Variable obj, Variable filter) {
-            Variable ret = Kernel.RunInferior(filter.Fetch().
-                InvokeMethod(Kernel.GetInferiorRoot(), "ACCEPTS",
-                    new Variable[] { filter, obj }, null));
+            Variable ret = Builtins.InvokeMethod("ACCEPTS", filter, obj);
             return ret.Fetch().mo.mro_raw_Bool.Get(ret);
         }
     }

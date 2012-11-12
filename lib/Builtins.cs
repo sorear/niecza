@@ -316,7 +316,7 @@ public partial class Builtins {
         } else {
             if (o.Does(o.mo.setting.RealMO)) {
                 rank = NR_FLOAT;
-                o = Kernel.RunInferior(o.InvokeMethod(Kernel.GetInferiorRoot(), "Bridge", new Variable[] { v }, null)).Fetch();
+                o = InvokeMethod("Bridge", v).Fetch();
                 return o;
             }
             o = o.mo.mro_Numeric.Get(v).Fetch();
@@ -535,13 +535,21 @@ public partial class Builtins {
     }
 
     public static Variable InvokeSub(P6any obj, params Variable[] pos) {
-        return Kernel.RunInferior(obj.Invoke(Kernel.GetInferiorRoot(), pos,
-                    null));
+        return Kernel.RunInferior(obj.Invoke(Kernel.GetInferiorRoot(), pos, null));
+    }
+
+    public static Variable InvokeSub(P6any obj, Variable[] pos, VarHash nam) {
+        return Kernel.RunInferior(obj.Invoke(Kernel.GetInferiorRoot(), pos, nam));
     }
 
     public static Variable InvokeMethod(string name, params Variable[] pos) {
         return Kernel.RunInferior(pos[0].Fetch().InvokeMethod(
             Kernel.GetInferiorRoot(), name, pos, null));
+    }
+
+    public static Variable InvokeMethod(string name, Variable[] pos, VarHash nam) {
+        return Kernel.RunInferior(pos[0].Fetch().InvokeMethod(
+            Kernel.GetInferiorRoot(), name, pos, nam));
     }
 
     public static bool ToBool(Variable v) {
@@ -639,9 +647,7 @@ public partial class Builtins {
         int r2;
         if (o2.Does(s.CodeMO)) {
             string s1 = o1.mo.mro_raw_Str.Get(v1);
-            Variable no2 = Kernel.RunInferior(o2.Invoke(
-                Kernel.GetInferiorRoot(), new Variable[] {
-                    s.MakeInt(s1.Length) }, null));
+            Variable no2 = InvokeSub(o2, s.MakeInt(s1.Length));
             r2 = (int)no2.Fetch().mo.mro_raw_Numeric.Get(no2);
         } else {
             r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
@@ -654,9 +660,7 @@ public partial class Builtins {
         int r3;
         if (o3.Does(s.CodeMO)) {
             string s1 = o1.mo.mro_raw_Str.Get(v1);
-            Variable no3 = Kernel.RunInferior(o3.Invoke(
-                Kernel.GetInferiorRoot(), new Variable[] {
-                    s.MakeInt(s1.Length) }, null));
+            Variable no3 = InvokeSub(o3, s.MakeInt(s1.Length));
             r3 = (int)no3.Fetch().mo.mro_raw_Numeric.Get(no3) - pos;
         } else {
             r3 = (int)o3.mo.mro_raw_Numeric.Get(v3);
@@ -2003,8 +2007,7 @@ public partial class Builtins {
             th.info.rx_compile_cache[code] = main;
         }
         P6any sub = Kernel.MakeSub(main, th);
-        return Kernel.RunInferior(sub.Invoke(Kernel.GetInferiorRoot(),
-            Variable.None, null)).Fetch();
+        return InvokeSub(sub).Fetch();
     }
 
     public static P6any MakePair(Variable key, Variable value) {
@@ -2543,9 +2546,7 @@ again:
             fr.PushLeave(type, v.Fetch());
         }
         else if (v.List) {
-            fr.PushLeave(type, Kernel.RunInferior(v.Fetch().InvokeMethod(
-                    Kernel.GetInferiorRoot(), "TEMP",
-                    new Variable[] { v }, null)).Fetch());
+            fr.PushLeave(type, InvokeMethod("TEMP", v).Fetch());
         }
         else {
             // this is quite dubious really, Frame and LexPad should be separated
@@ -2623,8 +2624,7 @@ again:
     internal static string DumpVar(Variable v) {
         string ret;
         try {
-            Variable p = Kernel.RunInferior(v.Fetch().InvokeMethod(
-                Kernel.GetInferiorRoot(), "perl", new Variable[] { v }, null));
+            Variable p = InvokeMethod("perl", v);
             ret = p.Fetch().mo.mro_raw_Str.Get(p);
         } catch (Exception ex) {
             ret = "(stringification failed: " + ex.ToString() +  ")";
@@ -2648,8 +2648,7 @@ again:
         th.MarkSharedChain();
         Thread thr = new Thread(delegate () {
                 Kernel.SetupThreadParent(th);
-                Kernel.RunInferior(sub.Invoke(Kernel.GetInferiorRoot(),
-                        Variable.None, null));
+                InvokeSub(sub);
             });
         thr.Start();
         return thr;
@@ -2798,16 +2797,13 @@ again:
 
         foreach (P6how.AttrInfo ai in obj.mo.mo.local_attr) {
             Variable vx = null;
-            if (ai.init != null) {
-                vx = Kernel.RunInferior(ai.init.Invoke(Kernel.GetInferiorRoot(),
-                    new [] { obj }, null));
-            }
+            if (ai.init != null)
+                vx = InvokeSub(ai.init, obj);
             EstablishSlot(obj, ai, vx);
         }
 
         if (build != null)
-            Kernel.RunInferior(build.Invoke(Kernel.GetInferiorRoot(),
-                new Variable[] { obj }, null));
+            InvokeSub(build, obj);
     }
 
     public static Variable enum_mixin_role(string name, P6any meth) {

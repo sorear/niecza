@@ -598,8 +598,7 @@ for $args (0..9) {
             var s = Kernel.GetInfo(fun).setting;
             for (int i = 0; i < args.Length; i++)
                 pos[i] = BoxResult(s, aty[i], args[i]);
-            Variable retv = Kernel.RunInferior(fun.Invoke(
-                Kernel.GetInferiorRoot(), pos, null));
+            Variable retv = Builtins.InvokeSub(fun, pos);
             if (ret == typeof(void)) return null;
             object reto;
             if (!CoerceArgument(s, out reto, ret, retv))

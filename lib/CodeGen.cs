@@ -3835,8 +3835,7 @@ dynamic:
             try {
                 P6any tocall = (callee is Variable) ?
                     ((Variable)callee).Fetch() : ((SubInfo)callee).protosub;
-                r = Handle.Wrap(Kernel.RunInferior(tocall.Invoke(
-                    Kernel.GetInferiorRoot(), pos.ToArray(), nam)));
+                r = Handle.Wrap(Builtins.InvokeSub(tocall, pos.ToArray(), nam));
             } catch (Exception ex) {
                 r = ex.ToString();
             }
@@ -4663,9 +4662,7 @@ dynamic:
             fret.MarkShared();
             Variable r = Kernel.RunInferior(fret);
             if (!b.v.Fetch().mo.mro_raw_Bool.Get(b.v)) {
-                Variable pl = Kernel.RunInferior(
-                    r.Fetch().InvokeMethod(Kernel.GetInferiorRoot(),
-                        "gist", new Variable[] { r }, null));
+                Variable pl = Builtins.InvokeMethod("gist", r);
                 Console.WriteLine(pl.Fetch().mo.mro_raw_Str.Get(pl));
             }
             return new Handle(fret);
