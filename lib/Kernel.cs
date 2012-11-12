@@ -4696,6 +4696,26 @@ have_v:
             return Kernel.NewRWListVar(v);
         }
 
+        public P6any MakeList(VarDeque items, VarDeque rest) {
+            P6any l = new P6opaque(ListMO);
+            l.SetSlot(ListMO, "$!rest", rest);
+            l.SetSlot(ListMO, "$!items", items);
+            return l;
+        }
+
+        public P6any MakeArray(VarDeque items, VarDeque rest) {
+            P6any l = new P6opaque(ArrayMO);
+            l.SetSlot(ListMO, "$!rest", rest);
+            l.SetSlot(ListMO, "$!items", items);
+            return l;
+        }
+
+        public Variable BoxLoS(string[] los) {
+            VarDeque items = new VarDeque();
+            foreach (string i in los) items.Push(MakeStr(i));
+            return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
+        }
+
         public Variable MakeAppropriateVar(string name) {
             if (name.Length >= 1 && name[0] == '@')
                 return CreateArray();
@@ -4791,6 +4811,26 @@ have_v:
 
         public Variable MakeParcel(params Variable[] bits) {
             return Kernel.NewRWListVar(Kernel.BoxRaw(bits, ParcelMO));
+        }
+
+        public Variable MakeJunction(int type, Variable[] elems) {
+            if (type >= 8) {
+                type -= 8;
+                foreach (Variable e in elems)
+                    if (e.List) goto need_flatten;
+                goto flat_enough;
+    need_flatten:;
+                VarDeque iter = new VarDeque(elems);
+                VarDeque into = new VarDeque();
+                while (Kernel.IterHasFlat(iter, true))
+                    into.Push(iter.Shift());
+                elems = into.CopyAsArray();
+    flat_enough:;
+            }
+            P6opaque nj = new P6opaque(JunctionMO);
+            nj.slots[0] = Kernel.BoxRaw(type, IntMO);
+            nj.slots[1] = Kernel.BoxRaw(elems, ParcelMO);
+            return nj;
         }
     }
 
@@ -6449,6 +6489,7 @@ slow:
             // TODO: possibly should make X::AdHoc?
             if (type == SubInfo.ON_DIE) {
                 payload = Kernel.NewRWListVar(Builtins.array_constructor(
+                    new Constants { setting = s },
                     (Variable)payload).Fetch());
             }
 

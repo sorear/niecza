@@ -340,7 +340,7 @@ public class JsyncReader {
             }
             SkipWhite(true);
             SkipChar(']');
-            return Builtins.MakeArray(q, new VarDeque());
+            return setting.MakeArray(q, new VarDeque());
         } else if (look == '{') {
             VarHash q = new VarHash();
             int ct = 0;
@@ -495,7 +495,7 @@ public class JsyncReader {
     Variable GetFromArray() {
         SkipCharWS('[');
         VarDeque kids = new VarDeque();
-        P6any obj = Builtins.MakeArray(kids, new VarDeque());
+        P6any obj = setting.MakeArray(kids, new VarDeque());
         bool comma = false;
         string a_tag = null;
 

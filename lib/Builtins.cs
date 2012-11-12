@@ -1726,26 +1726,6 @@ public partial class Builtins {
         return c.setting.MakeInt(ix);
     }
 
-    public static Variable MakeJunction(int type, Variable[] elems) {
-        if (type >= 8) {
-            type -= 8;
-            foreach (Variable e in elems)
-                if (e.List) goto need_flatten;
-            goto flat_enough;
-need_flatten:;
-            VarDeque iter = new VarDeque(elems);
-            VarDeque into = new VarDeque();
-            while (Kernel.IterHasFlat(iter, true))
-                into.Push(iter.Shift());
-            elems = into.CopyAsArray();
-flat_enough:;
-        }
-        P6opaque nj = new P6opaque(Compartment.Top.JunctionMO);
-        nj.slots[0] = Kernel.BoxRaw(type, Compartment.Top.IntMO);
-        nj.slots[1] = Kernel.BoxRaw(elems, Compartment.Top.ParcelMO);
-        return nj;
-    }
-
     public static Variable Make(Frame fr, Variable v) {
         if (fr.info.name == "CORE make")
             fr = fr.caller;
@@ -1757,24 +1737,25 @@ flat_enough:;
     public static VarDeque HashIterRaw(int mode, Variable v) {
         P6any o = NominalCheck("$x", v);
         VarHash d = Kernel.UnboxAny<VarHash>(o);
+        var s = o.mo.setting;
 
         VarDeque lv = new VarDeque();
 
         foreach (KeyValuePair<string,Variable> kv in d) {
             switch (mode) {
                 case 0:
-                    lv.Push(Kernel.BoxAnyMO<string>(kv.Key, Compartment.Top.StrMO));
+                    lv.Push(s.MakeStr(kv.Key));
                     break;
                 case 1:
                     lv.Push(kv.Value);
                     break;
                 case 2:
-                    lv.Push(Kernel.BoxAnyMO<string>(kv.Key, Compartment.Top.StrMO));
+                    lv.Push(s.MakeStr(kv.Key));
                     lv.Push(kv.Value);
                     break;
                 case 3:
-                    P6opaque p = new P6opaque(Compartment.Top.PairMO);
-                    p.slots[0] = Kernel.BoxAnyMO<string>(kv.Key, Compartment.Top.StrMO);
+                    P6opaque p = new P6opaque(s.PairMO);
+                    p.slots[0] = s.MakeStr(kv.Key);
                     p.slots[1] = kv.Value;
                     lv.Push(p);
                     break;
@@ -1965,27 +1946,6 @@ flat_enough:;
         return PosixWrapper.getuid() == (uint)stat[5];
     }
 
-    public static P6any MakeList(VarDeque items, VarDeque rest) {
-        P6any l = new P6opaque(Compartment.Top.ListMO);
-        l.SetSlot(Compartment.Top.ListMO, "$!rest", rest);
-        l.SetSlot(Compartment.Top.ListMO, "$!items", items);
-        return l;
-    }
-
-    public static P6any MakeArray(VarDeque items, VarDeque rest) {
-        P6any l = new P6opaque(Compartment.Top.ArrayMO);
-        l.SetSlot(Compartment.Top.ListMO, "$!rest", rest);
-        l.SetSlot(Compartment.Top.ListMO, "$!items", items);
-        return l;
-    }
-
-    public static Variable BoxLoS(string[] los) {
-        VarDeque items = new VarDeque();
-        foreach (string i in los)
-            items.Push(Kernel.BoxAnyMO(i, Compartment.Top.StrMO));
-        return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
-    }
-
     public static string[] UnboxLoS(Variable args) {
         List<string> la = new List<string>();
         VarDeque iter = start_iter(args);
@@ -2065,12 +2025,12 @@ flat_enough:;
             return new VarDeque(thing);
     }
 
-    public static Variable array_constructor(Variable bits) {
+    [ImplicitConsts] public static Variable array_constructor(Constants c, Variable bits) {
         VarDeque rest  = start_iter(bits);
         VarDeque items = new VarDeque();
         while (Kernel.IterHasFlat(rest, true))
             items.Push(Kernel.NewMuScalar(rest.Shift().Fetch()));
-        return MakeArray(items, rest);
+        return c.setting.MakeArray(items, rest);
     }
 
     public static string frame_subname(Frame fr) {
@@ -2519,7 +2479,7 @@ again:
     [ImplicitConsts] public static Variable sysquery(Constants c, int ix) {
         var s = c.setting;
         switch (ix) {
-            case 0: return BoxLoS(Kernel.commandArgs);
+            case 0: return s.BoxLoS(Kernel.commandArgs);
             case 1: return s.MakeStr(programName ?? AppDomain.CurrentDomain.FriendlyName);
             case 2: return s.MakeStr(execName);
             case 3: return s.MakeStr(AppDomain.CurrentDomain.BaseDirectory);
@@ -2672,7 +2632,7 @@ again:
         return ret;
     }
 
-    public static Variable dir(string s) {
+    [ImplicitConsts] public static Variable dir(Constants c, string s) {
         string[] raw = Directory.GetFileSystemEntries(s);
         string[] forperl = new string[raw.Length + 2];
         forperl[0] = "."; forperl[1] = "..";
@@ -2680,7 +2640,7 @@ again:
             int ix = raw[i].LastIndexOf(Path.DirectorySeparatorChar);
             forperl[i+2] = (ix >= 0) ? raw[i].Substring(ix+1) : raw[i];
         }
-        return BoxLoS(forperl);
+        return c.setting.BoxLoS(forperl);
     }
 
     public static Thread start_p6_thread(P6any sub) {
@@ -2926,10 +2886,10 @@ again:
         return new Blackhole(o.Fetch());
     }
 
-    public static Variable sig_params(P6any sig) {
+    [ImplicitConsts] public static Variable sig_params(Constants c, P6any sig) {
         VarDeque items = new VarDeque();
         items.PushN(((Signature)sig).parms);
-        return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
+        return Kernel.NewRWListVar(c.setting.MakeList(items, new VarDeque()));
     }
 
     public static string code_name(P6any obj) {
@@ -2951,15 +2911,15 @@ again:
         } else {
             items.Push(sub);
         }
-        return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
+        return Kernel.NewRWListVar(si.setting.MakeList(items, new VarDeque()));
     }
 
     public static int param_flags(P6any param) {
         return ((Parameter)param).flags;
     }
 
-    public static Variable param_names(P6any param) {
-        return BoxLoS(((Parameter)param).names ?? new string[0]);
+    [ImplicitConsts] public static Variable param_names(Constants c, P6any param) {
+        return c.setting.BoxLoS(((Parameter)param).names ?? new string[0]);
     }
 
     [ImplicitConsts] public static Variable param_type(Constants c, P6any param) {
@@ -2986,7 +2946,7 @@ again:
                     items.Push((Variable)o);
             }
         }
-        return Kernel.NewRWListVar(MakeList(items, new VarDeque()));
+        return Kernel.NewRWListVar(param.mo.setting.MakeList(items, new VarDeque()));
     }
 
     public static string param_name(P6any param) {
@@ -3110,5 +3070,9 @@ again:
 
     [ImplicitConsts] public static Variable newhash(Constants c) {
         return c.setting.CreateHash();
+    }
+
+    public static Variable MakeJunction(Constants c, int type, Variable[] args) {
+        return c.setting.MakeJunction(type, args);
     }
 }

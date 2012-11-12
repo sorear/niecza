@@ -2635,6 +2635,7 @@ dynamic:
             handlers["makejunction"] = delegate(NamProcessor th, object[] zyg) {
                 return CpsOp.MethodCall(
                         Tokens.Builtins.GetMethod("MakeJunction"),
+                        CpsOp.Constants(),
                         CpsOp.IntLiteral(JScalar.I(zyg[1])),
                         CpsOp.NewArray(Tokens.Variable, JScalar.A<CpsOp>(2, zyg, th.Scan)));
             };
