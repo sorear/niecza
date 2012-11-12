@@ -59,6 +59,7 @@ namespace Niecza.Serialization {
             public SerUnit unit;
             public int id;
         }
+        Compartment setting;
         Dictionary<object,ObjRef> byref = new Dictionary<object,ObjRef>();
 
         Dictionary<string,SerUnit> units =
@@ -73,6 +74,8 @@ namespace Niecza.Serialization {
 
         static readonly string signature = "Niecza-Serialized-Module";
         static readonly int version = 31;
+
+        public ObjectRegistry(Compartment s) { setting = s; }
 
         // Routines for use by serialization code
         public bool CheckWriteObject(SerUnit into, object o,
@@ -141,7 +144,7 @@ namespace Niecza.Serialization {
 
             if (fake) {
                 if (name.StartsWith("CLR,"))
-                    CLRWrapperProvider.LoadWrapper(Compartment.Top, name.Substring(4));
+                    CLRWrapperProvider.LoadWrapper(setting, name.Substring(4));
                 else
                     throw new ThawException("No handler for fake unit name " + name);
 
@@ -156,7 +159,7 @@ namespace Niecza.Serialization {
             su.name = name;
             su.hash = NewHash().ComputeHash(bytes);
 
-            ThawBuffer tb = new ThawBuffer(Compartment.Top, this, su, bytes);
+            ThawBuffer tb = new ThawBuffer(setting, this, su, bytes);
 
             units[name] = su;
             bool success = false;

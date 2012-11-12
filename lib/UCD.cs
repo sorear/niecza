@@ -73,8 +73,9 @@ namespace Niecza.UCD {
 
         public override int[] GetRanges(Variable filter) {
             bool[] cfilter = new bool[values.Length];
+            var setting = filter.Fetch().mo.setting;
             // minor hack to make :BoolProp work - converts to True/False
-            if (filter.Fetch().Isa(Compartment.Top.BoolMO))
+            if (filter.Fetch().Isa(setting.BoolMO))
                 filter = filter.Fetch().mo.mro_Str.Get(filter);
             for (int i = 0; i < values.Length; i++) {
                 foreach (string s in values[i]) {
@@ -644,8 +645,8 @@ namespace Niecza.UCD {
 
         public static object CompileCClass(Variable pair) {
             P6any pairo = pair.Fetch();
-            Variable tbl = (Variable)pairo.GetSlot(Compartment.Top.EnumMO, "$!key");
-            Variable sm =  (Variable)pairo.GetSlot(Compartment.Top.EnumMO, "$!value");
+            Variable tbl = (Variable)pairo.GetSlot(pairo.mo.setting.EnumMO, "$!key");
+            Variable sm =  (Variable)pairo.GetSlot(pairo.mo.setting.EnumMO, "$!value");
             Property p = (Property)DataSet.GetTable(
                     tbl.Fetch().mo.mro_raw_Str.Get(tbl));
             int[] rranges = p.GetRanges(sm);

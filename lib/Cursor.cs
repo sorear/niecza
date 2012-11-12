@@ -987,7 +987,7 @@ public partial class Builtins {
             if (!it.cap.Fetch().Isa(s.MatchMO))
                 continue;
             foreach (string name in it.names)
-                dq.Unshift(pair(s.MakeStr(name), it.cap));
+                dq.Unshift(s.MakePair(s.MakeStr(name), it.cap));
         }
 
         P6opaque lst = new P6opaque(s.ListMO);

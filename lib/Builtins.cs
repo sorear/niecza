@@ -1769,7 +1769,7 @@ public partial class Builtins {
     }
     public static Variable HashIter(int mode, Variable v) {
         VarDeque lv = HashIterRaw(mode, v);
-        P6opaque l = new P6opaque(Compartment.Top.ListMO);
+        P6opaque l = new P6opaque(v.Fetch().mo.setting.ListMO);
         l.slots[0] = lv;
         l.slots[1] = new VarDeque();
         return Kernel.NewRWListVar(l);
@@ -2010,15 +2010,8 @@ public partial class Builtins {
         return InvokeSub(sub).Fetch();
     }
 
-    public static P6any MakePair(Variable key, Variable value) {
-        P6any l = new P6opaque(Compartment.Top.PairMO);
-        l.SetSlot(Compartment.Top.EnumMO, "$!key", key);
-        l.SetSlot(Compartment.Top.EnumMO, "$!value", value);
-        return l;
-    }
-
-    public static Variable pair(Variable key, Variable value) {
-        return MakePair(key, value);
+    [ImplicitConsts] public static Variable pair(Constants c, Variable key, Variable value) {
+        return c.setting.MakePair(key, value);
     }
 
     public static VarDeque start_iter(Variable thing) {

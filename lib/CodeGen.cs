@@ -3682,11 +3682,12 @@ dynamic:
             return Builtins.UnboxLoS(bv.v);
         }
         public static object unit_use_perl5_module(object[] args) {
-		string name = (string)args[2];
-		Variable code = Kernel.BoxAnyMO<string>("Niecza::Helpers::use_module('"+name+"')", Compartment.Top.StrMO);
-		string sub = Kernel.UnboxAny<string>(Builtins.eval_perl5(code).Fetch());
-		return sub;
-	}
+            RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
+            string name = (string)args[2];
+            Variable code = Kernel.BoxAnyMO<string>("Niecza::Helpers::use_module('"+name+"')", ru.setting.StrMO);
+            string sub = Kernel.UnboxAny<string>(Builtins.eval_perl5(code).Fetch());
+            return sub;
+        }
         public static object unit_need_unit(object[] args) {
             // LinkUnit state is owned by the root
             RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
@@ -3787,7 +3788,7 @@ dynamic:
         }
         public static object value_to_sub(object[] args) {
             var v = ((Variable)Handle.Unbox(args[1])).Fetch();
-            return Handle.Wrap(v.Isa(Compartment.Top.CodeMO) ? Kernel.GetInfo(v) : null);
+            return Handle.Wrap(v.Isa(v.mo.setting.CodeMO) ? Kernel.GetInfo(v) : null);
         }
         public static object value_to_string(object[] args) {
             return Builtins.ToStr((Variable)Handle.Unbox(args[1]));
@@ -3805,9 +3806,9 @@ dynamic:
         }
         public static object value_starts_with_pair(object[] args) {
             var ob = ((Variable)Handle.Unbox(args[1])).Fetch();
-            if (ob.Isa(Compartment.Top.PairMO))
+            if (ob.Isa(ob.mo.setting.PairMO))
                 return true;
-            if (ob.Isa(Compartment.Top.ParcelMO) && Kernel.UnboxAny<Variable[]>(ob)[0].Fetch().Isa(Compartment.Top.PairMO))
+            if (ob.Isa(ob.mo.setting.ParcelMO) && Kernel.UnboxAny<Variable[]>(ob)[0].Fetch().Isa(ob.mo.setting.PairMO))
                 return true;
             return false;
         }

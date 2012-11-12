@@ -3871,7 +3871,7 @@ tryagain:
             switch (mode) {
                 case 0:  return key;
                 case 1:  return setting.MakeParcel(key, bas.Get(obj, key));
-                default: return Builtins.pair(key, bas.Get(obj, key));
+                default: return setting.MakePair(key, bas.Get(obj, key));
             }
         }
     }
@@ -4780,6 +4780,13 @@ have_v:
             return Kernel.BoxAnyMO<Complex>(z, ComplexMO);
         }
 
+        public P6any MakePair(Variable key, Variable value) {
+            P6any l = new P6opaque(PairMO);
+            l.SetSlot(EnumMO, "$!key", key);
+            l.SetSlot(EnumMO, "$!value", value);
+            return l;
+        }
+
         public Variable MakeParcel(params Variable[] bits) {
             return Kernel.NewRWListVar(Kernel.BoxRaw(bits, ParcelMO));
         }
@@ -4981,7 +4988,7 @@ have_v:
 
         internal static void InitCompartment() {
             var c = Compartment.Top;
-            c.reg = new ObjectRegistry();
+            c.reg = new ObjectRegistry(c);
 
             c.AutoThreadSubSI = new SubInfo("KERNEL AutoThreadSub",
                     SubInfo.AutoThreadSubC);
@@ -6754,7 +6761,7 @@ slow:
                 RewriteUnits(root, root, new HashSet<RuntimeUnit>());
 
                 // reset for writability
-                Compartment.Top.reg = new ObjectRegistry();
+                Compartment.Top.reg = new ObjectRegistry(Compartment.Top);
 
                 root.dll_name = exename + ".exe";
                 root.asm_name = exename;

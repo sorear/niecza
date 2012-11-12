@@ -10,7 +10,7 @@ public partial class Builtins {
     public static Variable sprintf(Variable[] args) {
         char[] fmt = args[0].Fetch().mo.mro_raw_Str.Get(args[0]).ToCharArray();
         List<PrintfFormat> fmtlist = ParseFormatString(fmt);
-        return RenderFormat(fmtlist, args);
+        return args[0].Fetch().mo.setting.MakeStr(RenderFormat(fmtlist, args));
     }
 
     private enum PrintfDirective {
@@ -297,7 +297,7 @@ public partial class Builtins {
         }
     }
 
-    private static Variable RenderFormat(List<PrintfFormat> formatlist, Variable[] args) {
+    private static string RenderFormat(List<PrintfFormat> formatlist, Variable[] args) {
         string result = "";
         int argi = 0;
         foreach (PrintfFormat format in formatlist) {
@@ -328,7 +328,7 @@ public partial class Builtins {
                 throw new NieczaException("index out of range");
             }
         }
-        return Kernel.BoxAnyMO(result, Compartment.Top.StrMO);
+        return result;
     }
 }
 
