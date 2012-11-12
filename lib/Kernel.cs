@@ -4624,34 +4624,39 @@ have_v:
         internal static void BeforeExit(object sender, EventArgs args) {
             if (disable_end) return;
             disable_end = true;
-            while (Top.prev != null) { Pop(); }
-            Top.end.Run();
+
+            while (true) {
+                Compartment tokill = null;
+                lock (pending) {
+                    if (pending.Count > 0) tokill = ((IEnumerable<Compartment>)pending).GetEnumerator().Current;
+                }
+                if (tokill == null) break;
+                tokill.RunEnd();
+            }
+
             // XXX is this really the best place?
             Builtins.stdout.Flush();
             Builtins.stderr.Flush();
         }
 
-        Compartment prev;
-        private Compartment() { }
+        internal Compartment() { lock(pending) pending.Add(this); }
 
         [TrueGlobal]
+        internal static HashSet<Compartment> pending = new HashSet<Compartment>();
+        [TrueGlobal]
         public static Compartment Top = new Compartment();
+        internal bool end_run;
 
         internal PhaserList check = new PhaserList(true);
         internal PhaserList init  = new PhaserList(false);
         internal PhaserList end   = new PhaserList(true);
 
-        internal static void Push() {
-            Compartment n = new Compartment();
-            n.prev = Top;
+        internal void RunEnd() {
+            if (end_run) return;
+            end_run = true;
+            lock(pending) pending.Remove(this);
 
-            Top = n;
-            Kernel.InitCompartment();
-        }
-
-        internal static void Pop() {
-            Top.end.Run();
-            Top = Top.prev;
+            end.Run();
         }
 
         // and here's a bunch of smart constructors

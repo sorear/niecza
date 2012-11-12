@@ -3645,11 +3645,14 @@ dynamic:
             return null;
         }
         public static object push_compartment(object[] args) {
-            Compartment.Push();
-            return null;
+            var old = Compartment.Top;
+            Compartment.Top = new Compartment();
+            Kernel.InitCompartment();
+            return Handle.Wrap(old);
         }
         public static object pop_compartment(object[] args) {
-            Compartment.Pop();
+            Compartment.Top.RunEnd();
+            Compartment.Top = (Compartment)Handle.Unbox(args[1]);
             return null;
         }
         public static object new_unit(object[] args) {
