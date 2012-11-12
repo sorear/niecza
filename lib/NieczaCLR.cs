@@ -773,25 +773,25 @@ for $args (0..9) {
             if (cty == typeof(void))
                 return s.Nil;
             if (cty == typeof(sbyte))
-                return Builtins.MakeInt((sbyte)ret);
+                return s.MakeInt((sbyte)ret);
             if (cty == typeof(byte))
-                return Builtins.MakeInt((byte)ret);
+                return s.MakeInt((byte)ret);
             if (cty == typeof(short))
-                return Builtins.MakeInt((short)ret);
+                return s.MakeInt((short)ret);
             if (cty == typeof(ushort))
-                return Builtins.MakeInt((ushort)ret);
+                return s.MakeInt((ushort)ret);
             if (cty == typeof(int))
-                return Builtins.MakeInt((int)ret);
+                return s.MakeInt((int)ret);
             if (cty == typeof(uint))
-                return Builtins.MakeInt((uint)ret);
+                return s.MakeInt((uint)ret);
             if (cty == typeof(long))
-                return Builtins.MakeInt((long)ret);
+                return s.MakeInt((long)ret);
             if (cty == typeof(ulong))
-                return Builtins.MakeInt((ulong)ret);
+                return s.MakeInt((ulong)ret);
             if (cty == typeof(float))
-                return Builtins.MakeFloat((float)ret);
+                return s.MakeFloat((float)ret);
             if (cty == typeof(double))
-                return Builtins.MakeFloat((double)ret);
+                return s.MakeFloat((double)ret);
             if (cty == typeof(bool))
                 return Kernel.BoxAnyMO((bool)ret, s.BoolMO);
             if (cty == typeof(string))

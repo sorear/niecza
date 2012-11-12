@@ -38,15 +38,15 @@ foreach my $function (@normal_functions) {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.$upper_function());
+            return c.setting.MakeComplex(v1.$upper_function());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.$upper_function();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -66,11 +66,11 @@ Function
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.$upper_function());
+            return c.setting.MakeComplex(v1.$upper_function());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.$upper_function(v1));
+            return c.setting.MakeFloat(Math.$upper_function(v1));
         }
     }
 Function
@@ -100,15 +100,15 @@ foreach my $function (keys %inverted_functions) {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.$upper_function());
+            return c.setting.MakeComplex(v1.$upper_function());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.$upper_function();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -128,11 +128,11 @@ Function
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.$upper_function());
+            return c.setting.MakeComplex(v1.$upper_function());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat($double);
+            return c.setting.MakeFloat($double);
         }
     }
 Function

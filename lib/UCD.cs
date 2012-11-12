@@ -21,9 +21,10 @@ namespace Niecza.UCD {
         public abstract string GetValue(int cp);
 
         protected static bool DoMatch(string value, Variable filter) {
-            Variable r = Kernel.RunInferior(filter.Fetch().InvokeMethod(
+            var sub = filter.Fetch();
+            Variable r = Kernel.RunInferior(sub.InvokeMethod(
                 Kernel.GetInferiorRoot(), "ACCEPTS",
-                new Variable[] { filter, Builtins.MakeStr(value) }, null));
+                new Variable[] { filter, sub.mo.setting.MakeStr(value) }, null));
             return r.Fetch().mo.mro_raw_Bool.Get(r);
         }
     }
@@ -661,25 +662,25 @@ namespace Niecza.UCD {
 }
 
 public partial class Builtins {
-    public static Variable ucd_get_ranges(Variable tbl, Variable sm) {
+    [ImplicitConsts] public static Variable ucd_get_ranges(Constants c, Variable tbl, Variable sm) {
         Property p = (Property)DataSet.GetTable(
                 tbl.Fetch().mo.mro_raw_Str.Get(tbl));
         int[] rranges = p.GetRanges(sm);
         Variable[] cranges = new Variable[rranges.Length];
         for (int i = 0; i < rranges.Length; i++)
-            cranges[i] = Builtins.MakeInt(rranges[i]);
-        return Builtins.MakeParcel(cranges);
+            cranges[i] = c.setting.MakeInt(rranges[i]);
+        return c.setting.MakeParcel(cranges);
     }
 
-    public static Variable ucd_get_value(Variable tbl, Variable ch) {
+    [ImplicitConsts] public static Variable ucd_get_value(Constants c, Variable tbl, Variable ch) {
         Property p = (Property)DataSet.GetTable(
                 tbl.Fetch().mo.mro_raw_Str.Get(tbl));
-        return MakeStr(p.GetValue(
+        return c.setting.MakeStr(p.GetValue(
                 (int) ch.Fetch().mo.mro_raw_Numeric.Get(ch)));
     }
 
-    public static Variable ucd_get_codepoint(Variable ch) {
-        return MakeStr(DataSet.GetCodepoint(
+    [ImplicitConsts] public static Variable ucd_get_codepoint(Constants c, Variable ch) {
+        return c.setting.MakeStr(DataSet.GetCodepoint(
             ch.Fetch().mo.mro_raw_Str.Get(ch)));
     }
 

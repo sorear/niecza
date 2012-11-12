@@ -429,23 +429,6 @@ public partial class Builtins {
         return Kernel.UnboxAny<int>(vret);
     }
 
-    // Produce a number from an int
-    public static Variable MakeInt(int v) {
-        return Kernel.BoxAnyMO<int>(v, Compartment.Top.IntMO);
-    }
-
-    public static Variable MakeInt(BigInteger v) {
-        int vs;
-        if (v.AsInt32(out vs)) return Kernel.BoxAnyMO<int>(vs, Compartment.Top.IntMO);
-        else return Kernel.BoxAnyMO<BigInteger>(v, Compartment.Top.IntMO);
-    }
-
-    public static Variable MakeInt(long v) {
-        if (v <= (long)int.MaxValue && v >= (long)int.MinValue)
-            return Kernel.BoxAnyMO<int>((int)v, Compartment.Top.IntMO);
-        else return Kernel.BoxAnyMO<BigInteger>(v, Compartment.Top.IntMO);
-    }
-
     // Coerce a number to a real rational value - note that this loses
     // the "inexact" annotation carried by Nums
     public static void GetAsRational(Variable v,
@@ -549,41 +532,6 @@ public partial class Builtins {
     public static double RatToFloat(BigInteger num, BigInteger den) {
         // TODO: avoid overflow
         return (double) num / (double) den;
-    }
-
-    public static Variable MakeFixRat(BigInteger num, BigInteger den) {
-        ulong sden;
-        SimplifyFrac(ref num, ref den);
-        if (den.AsUInt64(out sden) && sden != 0)
-            return Kernel.BoxAnyMO<Rat>(new Rat(num, sden), Compartment.Top.RatMO);
-        return MakeFloat(RatToFloat(num, den));
-    }
-
-    public static Variable MakeFatRat(BigInteger num, BigInteger den) {
-        SimplifyFrac(ref num, ref den);
-        if (den.Sign != 0)
-            return Kernel.BoxAnyMO<FatRat>(new FatRat(num, den), Compartment.Top.FatRatMO);
-        return MakeFloat(den.Sign * double.PositiveInfinity);
-    }
-
-    public static Variable MakeFloat(double val) {
-        return Kernel.BoxAnyMO<double>(val, Compartment.Top.NumMO);
-    }
-
-    public static Variable MakeComplex(double re, double im) {
-        return Kernel.BoxAnyMO<Complex>(new Complex(re, im), Compartment.Top.ComplexMO);
-    }
-
-    public static Variable MakeStr(string str) {
-        return Kernel.BoxAnyMO(str, Compartment.Top.StrMO);
-    }
-
-    public static Variable MakeComplex(Complex z) {
-        return Kernel.BoxAnyMO<Complex>(z, Compartment.Top.ComplexMO);
-    }
-
-    public static Variable MakeParcel(params Variable[] bits) {
-        return Kernel.NewRWListVar(Kernel.BoxRaw(bits, Compartment.Top.ParcelMO));
     }
 
     public static Variable InvokeSub(P6any obj, params Variable[] pos) {
@@ -693,7 +641,7 @@ public partial class Builtins {
             string s1 = o1.mo.mro_raw_Str.Get(v1);
             Variable no2 = Kernel.RunInferior(o2.Invoke(
                 Kernel.GetInferiorRoot(), new Variable[] {
-                    MakeInt(s1.Length) }, null));
+                    s.MakeInt(s1.Length) }, null));
             r2 = (int)no2.Fetch().mo.mro_raw_Numeric.Get(no2);
         } else {
             r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
@@ -708,7 +656,7 @@ public partial class Builtins {
             string s1 = o1.mo.mro_raw_Str.Get(v1);
             Variable no3 = Kernel.RunInferior(o3.Invoke(
                 Kernel.GetInferiorRoot(), new Variable[] {
-                    MakeInt(s1.Length) }, null));
+                    s.MakeInt(s1.Length) }, null));
             r3 = (int)no3.Fetch().mo.mro_raw_Numeric.Get(no3) - pos;
         } else {
             r3 = (int)o3.mo.mro_raw_Numeric.Get(v3);
@@ -729,15 +677,16 @@ public partial class Builtins {
 
     static readonly Func<Constants,Variable,Variable,Variable,Variable> substr_ro3_d = substr_ro3;
     [ImplicitConsts] public static Variable substr_ro3(Constants c, Variable v1, Variable v2, Variable v3) {
+        var s = c.setting;
         P6any o1 = v1.Fetch(), o2 = v2.Fetch(), o3 = v3.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any && o3.mo.is_any))
             return HandleSpecial3(c, v1,v2,v3, o1,o2,o3, substr_ro3_d);
 
-        int pos = substr_pos(c.setting, v1, v2);
-        int len = substr_len(c.setting, v1, pos, v3);
+        int pos = substr_pos(s, v1, v2);
+        int len = substr_len(s, v1, pos, v3);
         string str = v1.Fetch().mo.mro_raw_Str.Get(v1);
         string sub = Builtins.LaxSubstring2(str, pos, len);
-        return sub == null ? c.setting.StrMO.typeObj : MakeStr(sub);
+        return sub == null ? s.StrMO.typeObj : s.MakeStr(sub);
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> plus_d = plus;
@@ -748,31 +697,32 @@ public partial class Builtins {
             return HandleSpecial2(c, a1, a2, o1, o2, plus_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
-            return MakeComplex(v1.re + v2.re, v1.im + v2.im);
+            return s.MakeComplex(v1.re + v2.re, v1.im + v2.im);
         }
         if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
-            return MakeFloat(PromoteToFloat(r1, n1) + PromoteToFloat(r2, n2));
+            return s.MakeFloat(PromoteToFloat(r1, n1) + PromoteToFloat(r2, n2));
         }
         if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
             FatRat v2 = PromoteToFatRat(r2, n2);
 
-            return MakeFatRat(v1.num*v2.den + v2.num*v1.den, v1.den*v2.den);
+            return s.MakeFatRat(v1.num*v2.den + v2.num*v1.den, v1.den*v2.den);
         }
         if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
             Rat v1 = PromoteToFixRat(r1, n1);
             Rat v2 = PromoteToFixRat(r2, n2);
 
-            return MakeFixRat(v1.num*v2.den + v2.num*v1.den, ((BigInteger)v1.den)*v2.den);
+            return s.MakeFixRat(v1.num*v2.den + v2.num*v1.den, ((BigInteger)v1.den)*v2.den);
         }
         if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
-            return MakeInt(PromoteToBigInt(r1, n1) + PromoteToBigInt(r2, n2));
+            return s.MakeInt(PromoteToBigInt(r1, n1) + PromoteToBigInt(r2, n2));
         }
-        return MakeInt((long)PromoteToFixInt(r1, n1) +
+        return s.MakeInt((long)PromoteToFixInt(r1, n1) +
                 (long)PromoteToFixInt(r2, n2));
     }
 
@@ -784,31 +734,32 @@ public partial class Builtins {
             return HandleSpecial2(c, a1,a2, o1,o2, minus_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
-            return MakeComplex(v1.re - v2.re, v1.im - v2.im);
+            return s.MakeComplex(v1.re - v2.re, v1.im - v2.im);
         }
         if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
-            return MakeFloat(PromoteToFloat(r1, n1) - PromoteToFloat(r2, n2));
+            return s.MakeFloat(PromoteToFloat(r1, n1) - PromoteToFloat(r2, n2));
         }
         if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
             FatRat v2 = PromoteToFatRat(r2, n2);
 
-            return MakeFatRat(v1.num*v2.den - v2.num*v1.den, v1.den*v2.den);
+            return s.MakeFatRat(v1.num*v2.den - v2.num*v1.den, v1.den*v2.den);
         }
         if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
             Rat v1 = PromoteToFixRat(r1, n1);
             Rat v2 = PromoteToFixRat(r2, n2);
 
-            return MakeFixRat(v1.num*v2.den - v2.num*v1.den, ((BigInteger)v1.den)*v2.den);
+            return s.MakeFixRat(v1.num*v2.den - v2.num*v1.den, ((BigInteger)v1.den)*v2.den);
         }
         if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
-            return MakeInt(PromoteToBigInt(r1, n1) - PromoteToBigInt(r2, n2));
+            return s.MakeInt(PromoteToBigInt(r1, n1) - PromoteToBigInt(r2, n2));
         }
-        return MakeInt((long)PromoteToFixInt(r1, n1) -
+        return s.MakeInt((long)PromoteToFixInt(r1, n1) -
                 (long)PromoteToFixInt(r2, n2));
     }
 
@@ -831,22 +782,22 @@ public partial class Builtins {
     // Unifies the MakeFixRat logic and tries to avoid a huge computation
     // that will just be rounded away.
     // Invariant: pow >= 0
-    static Variable RatPow(BigInteger num, BigInteger den, BigInteger pow) {
+    static Variable RatPow(Compartment s, BigInteger num, BigInteger den, BigInteger pow) {
         if (den == -BigInteger.One) { den = BigInteger.One; num = -num; }
 
         if (den == BigInteger.One) {
             // den won't be getting any bigger
-            return MakeFixRat(big_pow(num, pow), 1);
+            return s.MakeFixRat(big_pow(num, pow), 1);
         }
         // den >= 2
         if (pow >= 64) {
             // Overflow is inevitable.
-            return MakeFloat(Math.Pow(RatToFloat(num, den), (double)pow));
+            return s.MakeFloat(Math.Pow(RatToFloat(num, den), (double)pow));
         }
         // we might consider detecting smaller overflows, but the penalty
         // of $int ** 63 is not _that_ huge.
 
-        return MakeFixRat(big_pow(num, pow), big_pow(den, pow));
+        return s.MakeFixRat(big_pow(num, pow), big_pow(den, pow));
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> pow_d = pow;
@@ -857,55 +808,56 @@ public partial class Builtins {
             return HandleSpecial2(c, a1, a2, o1, o2, pow_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex c1 = PromoteToComplex(r1, n1);
             Complex c2 = PromoteToComplex(r2, n2);
             double r = Math.Sqrt(c1.re * c1.re + c1.im * c1.im);
             if (r == 0.0) {
-                return MakeComplex(0.0, 0.0);
+                return s.MakeComplex(0.0, 0.0);
             }
             double theta = Math.Atan2(c1.im, c1.re);
             // Log z = ln r + iθ
             // ($a.log * $b).exp;
             double lp_re = Math.Log(r)*c2.re - theta*c2.im;
             double lp_im = theta*c2.re + Math.Log(r)*c2.im;
-            return MakeComplex(Math.Exp(lp_re) * Math.Cos(lp_im),
+            return s.MakeComplex(Math.Exp(lp_re) * Math.Cos(lp_im),
                                Math.Exp(lp_re) * Math.Sin(lp_im));
         }
 
         if (r1 == NR_FLOAT || (r2 != NR_BIGINT && r2 != NR_FIXINT)) {
-            return MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
+            return s.MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
         }
 
         BigInteger v2 = PromoteToBigInt(r2, n2);
         if (v2 >= 0) {
             if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
-                return MakeInt(big_pow(PromoteToBigInt(r1, n1), v2));
+                return s.MakeInt(big_pow(PromoteToBigInt(r1, n1), v2));
             }
             if (r1 == NR_FATRAT) {
                 FatRat v1 = PromoteToFatRat(r1, n1);
-                return MakeFatRat(big_pow(v1.num, v2), big_pow(v1.den, v2));
+                return s.MakeFatRat(big_pow(v1.num, v2), big_pow(v1.den, v2));
             }
             if (r1 == NR_FIXRAT) {
                 Rat v1 = PromoteToFixRat(r1, n1);
-                return RatPow(v1.num, v1.den, v2);
+                return RatPow(s, v1.num, v1.den, v2);
             }
         } else {
             if (r1 == NR_FIXINT || r1 == NR_BIGINT) {
-                return RatPow(1, PromoteToBigInt(r1, n1), -v2);
+                return RatPow(s, 1, PromoteToBigInt(r1, n1), -v2);
             }
             if (r1 == NR_FATRAT) {
                 FatRat v1 = PromoteToFatRat(r1, n1);
-                return MakeFatRat(big_pow(v1.den, -v2), big_pow(v1.num, -v2));
+                return s.MakeFatRat(big_pow(v1.den, -v2), big_pow(v1.num, -v2));
             }
             if (r1 == NR_FIXRAT) {
                 Rat v1 = PromoteToFixRat(r1, n1);
-                return RatPow(v1.den, v1.num, -v2);
+                return RatPow(s, v1.den, v1.num, -v2);
             }
         }
 
-        return MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
+        return s.MakeFloat(Math.Pow(PromoteToFloat(r1, n1), PromoteToFloat(r2, n2)));
     }
 
     static readonly Func<Constants,Variable,Variable> negate_d = negate;
@@ -915,26 +867,27 @@ public partial class Builtins {
         if (!o1.mo.is_any)
             return HandleSpecial1(c, a1,o1, negate_d);
         P6any n1 = GetNumber(a1, o1, out r1);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(-v1.re, -v1.im);
+            return s.MakeComplex(-v1.re, -v1.im);
         }
         if (r1 == NR_FLOAT) {
-            return MakeFloat(-PromoteToFloat(r1, n1));
+            return s.MakeFloat(-PromoteToFloat(r1, n1));
         }
         if (r1 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
-            return MakeFatRat(-v1.num, v1.den);
+            return s.MakeFatRat(-v1.num, v1.den);
         }
         if (r1 == NR_FIXRAT) {
             Rat v1 = PromoteToFixRat(r1, n1);
-            return MakeFixRat(-v1.num, v1.den);
+            return s.MakeFixRat(-v1.num, v1.den);
         }
         if (r1 == NR_BIGINT) {
-            return MakeInt(-PromoteToBigInt(r1, n1));
+            return s.MakeInt(-PromoteToBigInt(r1, n1));
         }
-        return MakeInt(-(long)PromoteToFixInt(r1, n1));
+        return s.MakeInt(-(long)PromoteToFixInt(r1, n1));
     }
 
     static readonly Func<Constants,Variable,Variable> abs_d = abs;
@@ -944,30 +897,31 @@ public partial class Builtins {
         if (!o1.mo.is_any)
             return HandleSpecial1(c, a1,o1, abs_d);
         P6any n1 = GetNumber(a1, o1, out r1);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeFloat(Math.Sqrt(v1.re * v1.re + v1.im * v1.im));
+            return s.MakeFloat(Math.Sqrt(v1.re * v1.re + v1.im * v1.im));
         }
         if (r1 == NR_FLOAT) {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(v1 < 0 ? -v1 : v1);
+            return s.MakeFloat(v1 < 0 ? -v1 : v1);
         }
         if (r1 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
-            return v1.num < 0 ? MakeFatRat(-v1.num, v1.den) : MakeFatRat(v1.num, v1.den);
+            return v1.num < 0 ? s.MakeFatRat(-v1.num, v1.den) : s.MakeFatRat(v1.num, v1.den);
         }
         if (r1 == NR_FIXRAT) {
             Rat v1 = PromoteToFixRat(r1, n1);
-            return v1.num < 0 ? MakeFixRat(-v1.num, v1.den) : MakeFixRat(v1.num, v1.den);
+            return v1.num < 0 ? s.MakeFixRat(-v1.num, v1.den) : s.MakeFixRat(v1.num, v1.den);
         }
         if (r1 == NR_BIGINT) {
             BigInteger v1 = PromoteToBigInt(r1, n1);
-            return MakeInt(v1 < 0 ? -v1 : v1);
+            return s.MakeInt(v1 < 0 ? -v1 : v1);
         }
         {
             long v1 = PromoteToFixInt(r1, n1);
-            return MakeInt(v1 < 0 ? -v1 : v1);
+            return s.MakeInt(v1 < 0 ? -v1 : v1);
         }
     }
 
@@ -978,20 +932,21 @@ public partial class Builtins {
         if (!o1.mo.is_any)
             return HandleSpecial1(c, a1,o1, ln_d);
         P6any n1 = GetNumber(a1, o1, out r1);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX) {
             // Log z = ln r + iθ
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(Math.Log(Math.Sqrt(v1.re * v1.re + v1.im * v1.im)),
+            return s.MakeComplex(Math.Log(Math.Sqrt(v1.re * v1.re + v1.im * v1.im)),
                                Math.Atan2(v1.im, v1.re));
         }
         if (r1 == NR_BIGINT) {
             BigInteger v1 = PromoteToBigInt(r1, n1);
-            return MakeFloat(BigInteger.Log(v1));
+            return s.MakeFloat(BigInteger.Log(v1));
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Log(v1));
+            return s.MakeFloat(Math.Log(v1));
         }
     }
 
@@ -1005,12 +960,12 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(Math.Exp(v1.re) * Math.Cos(v1.im),
+            return c.setting.MakeComplex(Math.Exp(v1.re) * Math.Cos(v1.im),
                                Math.Exp(v1.re) * Math.Sin(v1.im));
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Exp(v1));
+            return c.setting.MakeFloat(Math.Exp(v1));
         }
     }
 
@@ -1029,7 +984,7 @@ public partial class Builtins {
 //        }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(SpecialMathFunctions.SpecialFunctions.Gamma(v1));
+            return c.setting.MakeFloat(SpecialMathFunctions.SpecialFunctions.Gamma(v1));
         }
     }
 
@@ -1048,7 +1003,7 @@ public partial class Builtins {
 //        }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(SpecialMathFunctions.SpecialFunctions.LogGamma(v1));
+            return c.setting.MakeFloat(SpecialMathFunctions.SpecialFunctions.LogGamma(v1));
         }
     }
 
@@ -1067,7 +1022,7 @@ public partial class Builtins {
 //        }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(SpecialMathFunctions.SpecialFunctions.ExpMinusOne(v1));
+            return c.setting.MakeFloat(SpecialMathFunctions.SpecialFunctions.ExpMinusOne(v1));
         }
     }
 
@@ -1086,7 +1041,7 @@ public partial class Builtins {
 //        }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(SpecialMathFunctions.SpecialFunctions.LogOnePlusX(v1));
+            return c.setting.MakeFloat(SpecialMathFunctions.SpecialFunctions.LogOnePlusX(v1));
         }
     }
 
@@ -1105,7 +1060,7 @@ public partial class Builtins {
 //        }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(SpecialMathFunctions.SpecialFunctions.Erf(v1));
+            return c.setting.MakeFloat(SpecialMathFunctions.SpecialFunctions.Erf(v1));
         }
     }
 
@@ -1123,7 +1078,7 @@ public partial class Builtins {
         {
             double v1 = PromoteToFloat(r1, n1);
             double v2 = PromoteToFloat(r2, n2);
-            return MakeFloat(Math.Atan2(v1, v2));
+            return c.setting.MakeFloat(Math.Atan2(v1, v2));
         }
     }
 
@@ -1134,6 +1089,7 @@ public partial class Builtins {
         if (!o1.mo.is_any)
             return HandleSpecial1(c, a1,o1, floor_d);
         P6any n1 = GetNumber(a1, o1, out r1);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX) {
             throw new NieczaException("floor is only defined for Reals, you have a Complex()");
@@ -1141,7 +1097,7 @@ public partial class Builtins {
         if (r1 == NR_FLOAT) {
             double v1 = PromoteToFloat(r1, n1);
             if (Double.IsNaN(v1) || Double.IsNegativeInfinity(v1) || Double.IsPositiveInfinity(v1)) {
-                return MakeFloat(v1);
+                return s.MakeFloat(v1);
             }
             ulong bits = (ulong)BitConverter.DoubleToInt64Bits(v1);
             BigInteger big = (bits & ((1UL << 52) - 1)) + (1UL << 52);
@@ -1150,25 +1106,25 @@ public partial class Builtins {
             if ((bits & (1UL << 63)) != 0) big = -big;
             if (power > 0) big <<= power;
             else big >>= -power;
-            return MakeInt(big);
+            return s.MakeInt(big);
         }
         if (r1 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
             BigInteger rem;
             BigInteger red = BigInteger.DivRem(v1.num, v1.den, out rem);
             if (rem.Sign != 0 && v1.num.Sign < 0)
-                return MakeInt(red - 1);
+                return s.MakeInt(red - 1);
             else
-                return MakeInt(red);
+                return s.MakeInt(red);
         }
         if (r1 == NR_FIXRAT) {
             Rat v1 = PromoteToFixRat(r1, n1);
             BigInteger rem;
             BigInteger red = BigInteger.DivRem(v1.num, v1.den, out rem);
             if (rem.Sign != 0 && v1.num.Sign < 0)
-                return MakeInt(red - 1);
+                return s.MakeInt(red - 1);
             else
-                return MakeInt(red);
+                return s.MakeInt(red);
         }
         return n1;
     }
@@ -1183,7 +1139,7 @@ public partial class Builtins {
         P6any n2 = GetNumber(a2, o2, out r2);
 
         // SHOULD: optimize for the case of two small sized Ints
-        return MakeInt(BigInteger.GreatestCommonDivisor(PromoteToBigInt(r1, n1), PromoteToBigInt(r2, n2)));
+        return c.setting.MakeInt(BigInteger.GreatestCommonDivisor(PromoteToBigInt(r1, n1), PromoteToBigInt(r2, n2)));
     }
 
     static readonly Func<Constants,Variable,Variable,Variable,Variable> expmod_d = expmod;
@@ -1198,7 +1154,7 @@ public partial class Builtins {
         P6any n2 = GetNumber(a2, o2, out r2);
         P6any n3 = GetNumber(a3, o3, out r3);
 
-        return MakeInt(BigInteger.ModPow(PromoteToBigInt(r1, n1),
+        return c.setting.MakeInt(BigInteger.ModPow(PromoteToBigInt(r1, n1),
                                          PromoteToBigInt(r2, n2),
                                          PromoteToBigInt(r3, n3)));
     }
@@ -1224,7 +1180,7 @@ public partial class Builtins {
             b[bytes - 1] &= mask;
             BigInteger candidate = new BigInteger (b);
             if (candidate < top)
-                return MakeInt(candidate);
+                return c.setting.MakeInt(candidate);
         }
     }
 
@@ -1243,28 +1199,28 @@ public partial class Builtins {
     // we don't need to do nominal checking stuff here because this
     // is in a method, never inlined, and as such the binder had to
     // already have been called.
-    public static Variable complex_new(Variable a1, Variable a2) {
+    [ImplicitConsts] public static Variable complex_new(Constants c, Variable a1, Variable a2) {
         double d1 = a1.Fetch().mo.mro_raw_Numeric.Get(a1);
         double d2 = a2.Fetch().mo.mro_raw_Numeric.Get(a2);
-        return MakeComplex(d1,d2);
+        return c.setting.MakeComplex(d1,d2);
     }
-    public static Variable complex_re(Variable a1) {
-        return MakeFloat(Kernel.UnboxAny<Complex>(a1.Fetch()).re);
+    [ImplicitConsts] public static Variable complex_re(Constants c, Variable a1) {
+        return c.setting.MakeFloat(Kernel.UnboxAny<Complex>(a1.Fetch()).re);
     }
-    public static Variable complex_im(Variable a1) {
-        return MakeFloat(Kernel.UnboxAny<Complex>(a1.Fetch()).im);
+    [ImplicitConsts] public static Variable complex_im(Constants c, Variable a1) {
+        return c.setting.MakeFloat(Kernel.UnboxAny<Complex>(a1.Fetch()).im);
     }
-    public static Variable rat_nu(Variable a1) {
-        return MakeInt(Kernel.UnboxAny<Rat>(a1.Fetch()).num);
+    [ImplicitConsts] public static Variable rat_nu(Constants c, Variable a1) {
+        return c.setting.MakeInt(Kernel.UnboxAny<Rat>(a1.Fetch()).num);
     }
-    public static Variable rat_de(Variable a1) {
-        return MakeInt(Kernel.UnboxAny<Rat>(a1.Fetch()).den);
+    [ImplicitConsts] public static Variable rat_de(Constants c, Variable a1) {
+        return c.setting.MakeInt(Kernel.UnboxAny<Rat>(a1.Fetch()).den);
     }
-    public static Variable fatrat_nu(Variable a1) {
-        return MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).num);
+    [ImplicitConsts] public static Variable fatrat_nu(Constants c, Variable a1) {
+        return c.setting.MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).num);
     }
-    public static Variable fatrat_de(Variable a1) {
-        return MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).den);
+    [ImplicitConsts] public static Variable fatrat_de(Constants c, Variable a1) {
+        return c.setting.MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).den);
     }
 
     const int O_IS_GREATER = 1;
@@ -1339,31 +1295,32 @@ public partial class Builtins {
             return HandleSpecial2(c, a1,a2, o1,o2, mul_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
-            return MakeComplex(v1.re*v2.re - v1.im*v2.im, v1.im*v2.re + v1.re*v2.im);
+            return s.MakeComplex(v1.re*v2.re - v1.im*v2.im, v1.im*v2.re + v1.re*v2.im);
         }
         if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
-            return MakeFloat(PromoteToFloat(r1, n1) * PromoteToFloat(r2, n2));
+            return s.MakeFloat(PromoteToFloat(r1, n1) * PromoteToFloat(r2, n2));
         }
         if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
             FatRat v2 = PromoteToFatRat(r2, n2);
 
-            return MakeFatRat(v1.num*v2.num, v1.den*v2.den);
+            return s.MakeFatRat(v1.num*v2.num, v1.den*v2.den);
         }
         if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
             Rat v1 = PromoteToFixRat(r1, n1);
             Rat v2 = PromoteToFixRat(r2, n2);
 
-            return MakeFixRat(v1.num*v2.num, ((BigInteger)v1.den)*v2.den);
+            return s.MakeFixRat(v1.num*v2.num, ((BigInteger)v1.den)*v2.den);
         }
         if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
-            return MakeInt(PromoteToBigInt(r1, n1) * PromoteToBigInt(r2, n2));
+            return s.MakeInt(PromoteToBigInt(r1, n1) * PromoteToBigInt(r2, n2));
         }
-        return MakeInt((long)PromoteToFixInt(r1, n1) *
+        return s.MakeInt((long)PromoteToFixInt(r1, n1) *
                 (long)PromoteToFixInt(r2, n2));
     }
 
@@ -1375,33 +1332,34 @@ public partial class Builtins {
             return HandleSpecial2(c, a1,a2, o1,o2, divide_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
             double sn2 = v2.re*v2.re + v2.im*v2.im;
-            return MakeComplex((v1.re*v2.re + v1.im*v2.im)/sn2,
+            return s.MakeComplex((v1.re*v2.re + v1.im*v2.im)/sn2,
                     (v2.re*v1.im - v2.im*v1.re)/sn2);
         }
         if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
-            return MakeFloat(PromoteToFloat(r1, n1) / PromoteToFloat(r2, n2));
+            return s.MakeFloat(PromoteToFloat(r1, n1) / PromoteToFloat(r2, n2));
         }
         if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
             FatRat v2 = PromoteToFatRat(r2, n2);
 
-            return MakeFatRat(v1.num*v2.den, v1.den*v2.num);
+            return s.MakeFatRat(v1.num*v2.den, v1.den*v2.num);
         }
         if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
             Rat v1 = PromoteToFixRat(r1, n1);
             Rat v2 = PromoteToFixRat(r2, n2);
 
-            return MakeFixRat(v1.num*v2.den, v2.num*v1.den);
+            return s.MakeFixRat(v1.num*v2.den, v2.num*v1.den);
         }
         if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
-            return MakeFixRat(PromoteToBigInt(r1, n1), PromoteToBigInt(r2, n2));
+            return s.MakeFixRat(PromoteToBigInt(r1, n1), PromoteToBigInt(r2, n2));
         }
-        return MakeFixRat(PromoteToFixInt(r1, n1), PromoteToFixInt(r2, n2));
+        return s.MakeFixRat(PromoteToFixInt(r1, n1), PromoteToFixInt(r2, n2));
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> mod_d = mod;
@@ -1412,6 +1370,7 @@ public partial class Builtins {
             return HandleSpecial2(c, a1,a2, o1,o2, mod_d);
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
+        var s = c.setting;
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             throw new NieczaException("Modulus operation not defined with complex arguments");
@@ -1419,7 +1378,7 @@ public partial class Builtins {
         if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
             double v1 = PromoteToFloat(r1, n1);
             double v2 = PromoteToFloat(r2, n2);
-            return MakeFloat(v1 - v2 * Math.Floor(v1 / v2));
+            return s.MakeFloat(v1 - v2 * Math.Floor(v1 / v2));
         }
         if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
@@ -1434,7 +1393,7 @@ public partial class Builtins {
             if (c2.Sign > 0 && rem.Sign < 0) red--;
             if (c2.Sign < 0 && rem.Sign > 0) red--;
 
-            return MakeFatRat(c1 - red*cd, cd);
+            return s.MakeFatRat(c1 - red*cd, cd);
         }
         if (r1 == NR_FIXRAT || r2 == NR_FIXRAT) {
             Rat v1 = PromoteToFixRat(r1, n1);
@@ -1449,7 +1408,7 @@ public partial class Builtins {
             if (c2.Sign > 0 && rem.Sign < 0) red--;
             if (c2.Sign < 0 && rem.Sign > 0) red--;
 
-            return MakeFixRat(c1 - red*c2, cd);
+            return s.MakeFixRat(c1 - red*c2, cd);
         }
         if (r1 == NR_BIGINT || r2 == NR_BIGINT) {
             BigInteger v1 = PromoteToBigInt(r1, n1);
@@ -1458,7 +1417,7 @@ public partial class Builtins {
             BigInteger red = BigInteger.DivRem(v1, v2, out rem);
             if (v2.Sign > 0 && rem.Sign < 0) red--;
             if (v2.Sign < 0 && rem.Sign > 0) red--;
-            return MakeInt(v1 - v2*red);
+            return s.MakeInt(v1 - v2*red);
         }
         {
             long v1 = PromoteToFixInt(r1, n1);
@@ -1467,12 +1426,12 @@ public partial class Builtins {
             long red = Math.DivRem(v1, v2, out rem);
             if (v2 > 0 && rem < 0) red--;
             if (v2 < 0 && rem > 0) red--;
-            return MakeInt(v1 - v2*red);
+            return s.MakeInt(v1 - v2*red);
         }
     }
 
     // this is only called from .Int
-    public static Variable coerce_to_int(Variable a1) {
+    [ImplicitConsts] public static Variable coerce_to_int(Constants c, Variable a1) {
         int r1;
         P6any o1 = a1.Fetch();
         P6any n1 = GetNumber(a1, o1, out r1);
@@ -1480,22 +1439,23 @@ public partial class Builtins {
         if (r1 == NR_FLOAT) {
             double v1 = PromoteToFloat(r1, n1);
             if (Double.IsNaN(v1) || Double.IsNegativeInfinity(v1) || Double.IsPositiveInfinity(v1)) {
-                return MakeFloat(v1);
+                return c.setting.MakeFloat(v1);
             }
         }
 
         int small; BigInteger big;
         return GetAsInteger(a1, out small, out big) ?
-            MakeInt(big) : MakeInt(small);
+            c.setting.MakeInt(big) : c.setting.MakeInt(small);
     }
 
     // only called from infix for now
     // when it's not, it'll need to be split anyway, I think
     // I fumbled spec reading - only 4 and 5 are actually needed
-    public static Variable divop(int opc, Variable a1, Variable a2) {
+    [ImplicitConsts] public static Variable divop(Constants c, int opc, Variable a1, Variable a2) {
         int small1, small2; BigInteger big1, big2;
         bool b1 = GetAsInteger(a1, out small1, out big1);
         bool b2 = GetAsInteger(a2, out small2, out big2);
+        var s = c.setting;
 
         if (b1 || b2 || small1 == int.MinValue || small2 == int.MinValue) {
             if (!b1) big1 = small1;
@@ -1511,9 +1471,9 @@ public partial class Builtins {
                 rem += big2;
             }
             switch (opc & 3) {
-                case 0: return MakeInt(red);
-                case 1: return MakeInt(rem);
-                default: return MakeParcel(MakeInt(red), MakeInt(rem));
+                case 0: return s.MakeInt(red);
+                case 1: return s.MakeInt(rem);
+                default: return s.MakeParcel(s.MakeInt(red), s.MakeInt(rem));
             }
         } else {
             int rem = small1 % small2;
@@ -1527,15 +1487,15 @@ public partial class Builtins {
                 rem += small2;
             }
             switch (opc & 3) {
-                case 0: return MakeInt(red);
-                case 1: return MakeInt(rem);
-                default: return MakeParcel(MakeInt(red), MakeInt(rem));
+                case 0: return s.MakeInt(red);
+                case 1: return s.MakeInt(rem);
+                default: return s.MakeParcel(s.MakeInt(red), s.MakeInt(rem));
             }
         }
     }
 
     // called from .Num
-    public static Variable coerce_to_num(Variable a1) {
+    [ImplicitConsts] public static Variable coerce_to_num(Constants c, Variable a1) {
         int r1;
         P6any n1 = GetNumber(a1, a1.Fetch(), out r1);
 
@@ -1543,9 +1503,9 @@ public partial class Builtins {
             Complex v1 = PromoteToComplex(r1, n1);
             if (v1.im != 0)
                 throw new NieczaException("Complex cannot be used here");
-            return MakeFloat(v1.re);
+            return c.setting.MakeFloat(v1.re);
         } else {
-            return MakeFloat(PromoteToFloat(r1, n1));
+            return c.setting.MakeFloat(PromoteToFloat(r1, n1));
         }
     }
 
@@ -1561,10 +1521,10 @@ public partial class Builtins {
             Complex v1 = PromoteToComplex(r1, n1);
             double angle = Math.Atan2(v1.im, v1.re) / 2;
             double mag = Math.Sqrt(Math.Sqrt(v1.im*v1.im + v1.re*v1.re));
-            return MakeComplex(mag * Math.Cos(angle), mag * Math.Sin(angle));
+            return c.setting.MakeComplex(mag * Math.Cos(angle), mag * Math.Sin(angle));
         } else {
             double val = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Sqrt(val));
+            return c.setting.MakeFloat(Math.Sqrt(val));
         }
     }
 
@@ -1576,7 +1536,7 @@ public partial class Builtins {
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return MakeInt(r1 & r2);
+        return c.setting.MakeInt(r1 & r2);
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> numor_d = numor;
@@ -1587,7 +1547,7 @@ public partial class Builtins {
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return MakeInt(r1 | r2);
+        return c.setting.MakeInt(r1 | r2);
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> numxor_d = numxor;
@@ -1598,7 +1558,7 @@ public partial class Builtins {
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return MakeInt(r1 ^ r2);
+        return c.setting.MakeInt(r1 ^ r2);
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> numlshift_d = numlshift;
@@ -1609,7 +1569,7 @@ public partial class Builtins {
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return MakeInt(r1 << r2);
+        return c.setting.MakeInt(r1 << r2);
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> numrshift_d = numrshift;
@@ -1620,7 +1580,7 @@ public partial class Builtins {
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
         int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return MakeInt(r1 >> r2);
+        return c.setting.MakeInt(r1 >> r2);
     }
 
     static readonly Func<Constants,Variable,Variable> numcompl_d = numcompl;
@@ -1630,7 +1590,7 @@ public partial class Builtins {
             return HandleSpecial1(c, v1,o1, numcompl_d);
 
         int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
-        return MakeInt(~r1);
+        return c.setting.MakeInt(~r1);
     }
 
     // only called from .Rat
@@ -1654,9 +1614,9 @@ public partial class Builtins {
         // XXX: is it appropriate to return FatRat from a method named Rat?
         ulong sda;
         if (da.AsUInt64(out sda)) {
-            return MakeFixRat(na,da);
+            return c.setting.MakeFixRat(na,da);
         } else {
-            return MakeFatRat(na,da);
+            return c.setting.MakeFatRat(na,da);
         }
     }
 
@@ -1711,7 +1671,7 @@ public partial class Builtins {
             return HandleSpecial1(c, v,o1, chars_d);
 
         string r = o1.mo.mro_raw_Str.Get(v);
-        return MakeInt(r.Length);
+        return c.setting.MakeInt(r.Length);
     }
 
     static readonly Func<Constants,Variable,Variable> codes_d = codes;
@@ -1727,7 +1687,7 @@ public partial class Builtins {
             if (((uint)(ch - 0xDC00)) >= 0x400)
                 i++;
 
-        return MakeInt(i);
+        return c.setting.MakeInt(i);
     }
 
     static readonly Func<Constants,Variable,Variable> ord_d = ord;
@@ -1742,9 +1702,9 @@ public partial class Builtins {
         else if (r.Length >= 2 &&
                 r[0] >= (char)0xD800 && r[0] <= (char)0xDBFF &&
                 r[1] >= (char)0xDC00 && r[1] <= (char)0xDFFF)
-            return MakeInt((0x10000 - 0xDC00) +
+            return c.setting.MakeInt((0x10000 - 0xDC00) +
                     ((int)r[0] - 0xD800) * 0x400 + (int)r[1]);
-        return MakeInt((int)r[0]);
+        return c.setting.MakeInt((int)r[0]);
     }
 
     static readonly Func<Constants,Variable,Variable> chr_d = chr;
@@ -1763,7 +1723,7 @@ public partial class Builtins {
         P6any o1 = NominalCheck("$x", v);
         char ch = (char) o1.mo.mro_raw_Numeric.Get(v);
         int ix = (int) char.GetUnicodeCategory(ch);
-        return MakeInt(ix);
+        return c.setting.MakeInt(ix);
     }
 
     public static Variable MakeJunction(int type, Variable[] elems) {
@@ -1830,32 +1790,32 @@ flat_enough:;
         return Kernel.NewRWListVar(l);
     }
 
-    public static Variable path_modified(string path) {
+    [ImplicitConsts] public static Variable path_modified(Constants c, string path) {
         long t = File.GetLastWriteTimeUtc(path).Ticks;
-        return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
+        return c.setting.MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
     }
 
-    public static Variable now() {
+    [ImplicitConsts] public static Variable now(Constants c) {
         long t = DateTime.UtcNow.Ticks;
-        return MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
+        return c.setting.MakeFloat(((double)(t - 621355968000000000L)) / 10000000.0);
     }
 
-    public static Variable times() {
+    [ImplicitConsts] public static Variable times(Constants c) {
         Process p = Process.GetCurrentProcess();
         Variable[] ret = new Variable[4];
-        ret[0] = ret[2] = MakeFloat(((double)p.UserProcessorTime.Ticks) / 10000000.0);
-        ret[1] = ret[3] = MakeFloat(((double)p.PrivilegedProcessorTime.Ticks) / 10000000.0);
-        return MakeParcel(ret);
+        ret[0] = ret[2] = c.setting.MakeFloat(((double)p.UserProcessorTime.Ticks) / 10000000.0);
+        ret[1] = ret[3] = c.setting.MakeFloat(((double)p.PrivilegedProcessorTime.Ticks) / 10000000.0);
+        return c.setting.MakeParcel(ret);
     }
 
     [TrueGlobal]
     private static object rng_lock = new object();
     private static Random rng = new Random();
 
-    public static Variable rand() {
+    [ImplicitConsts] public static Variable rand(Constants c) {
         double i;
         lock (rng_lock) { i = rng.NextDouble(); }
-        return MakeFloat(i);
+        return c.setting.MakeFloat(i);
     }
 
     public static void srand(int seed) {
@@ -2119,8 +2079,8 @@ flat_enough:;
 
     [ImplicitConsts] public static Variable count(Constants c, P6any fcni) {
         int i = get_count(fcni);
-        return (i == int.MaxValue) ? MakeFloat(double.PositiveInfinity) :
-            MakeInt(i);
+        return (i == int.MaxValue) ? c.setting.MakeFloat(double.PositiveInfinity) :
+            c.setting.MakeInt(i);
     }
     public static int get_count(P6any fcni) {
         if (!fcni.Isa(fcni.mo.setting.CodeMO))
@@ -2159,11 +2119,11 @@ flat_enough:;
     }
     [ImplicitConsts] public static Variable arity(Constants c, P6any fcni) {
         if (!fcni.Isa(c.setting.CodeMO))
-            return MakeInt(1); // can't introspect fake subs (?)
+            return c.setting.MakeInt(1); // can't introspect fake subs (?)
         SubInfo si = (SubInfo) Kernel.GetInfo(fcni);
         if (si.sig == null)
-            return MakeInt(1);
-        return MakeInt(sig_arity(si.sig));
+            return c.setting.MakeInt(1);
+        return c.setting.MakeInt(sig_arity(si.sig));
     }
 
     class ItemSource {
@@ -2353,7 +2313,7 @@ again:
                 if (fnc is P6any) {
                     return ((P6any)fnc).Invoke(th, (Variable[])th.lex3, null);
                 } else if (fnc == null) {
-                    th.resultSlot = MakeParcel((Variable[]) th.lex3);
+                    th.resultSlot = setting.MakeParcel((Variable[]) th.lex3);
                     goto case 2;
                 } else {
                     th.resultSlot = ((Func<Variable,Variable>)fnc).Invoke(
@@ -2557,21 +2517,22 @@ again:
     }
 
     [ImplicitConsts] public static Variable sysquery(Constants c, int ix) {
+        var s = c.setting;
         switch (ix) {
             case 0: return BoxLoS(Kernel.commandArgs);
-            case 1: return MakeStr(programName ?? AppDomain.CurrentDomain.FriendlyName);
-            case 2: return MakeStr(execName);
-            case 3: return MakeStr(AppDomain.CurrentDomain.BaseDirectory);
+            case 1: return s.MakeStr(programName ?? AppDomain.CurrentDomain.FriendlyName);
+            case 2: return s.MakeStr(execName);
+            case 3: return s.MakeStr(AppDomain.CurrentDomain.BaseDirectory);
             case 4: {
                 VarHash ret = new VarHash();
                 foreach (System.Collections.DictionaryEntry de in Environment.GetEnvironmentVariables()) {
-                    ret[(string) de.Key] = Kernel.BoxAnyMO((string)de.Value, c.setting.StrMO);
+                    ret[(string) de.Key] = Kernel.BoxAnyMO((string)de.Value, s.StrMO);
                 }
-                return Kernel.BoxAnyMO(ret, c.setting.HashMO);
+                return Kernel.BoxAnyMO(ret, s.HashMO);
             }
-            case 5: return MakeStr(Environment.OSVersion.Platform.ToString());
-            case 6: return MakeStr(Environment.OSVersion.Version.ToString());
-            case 7: return MakeStr(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData).ToString());
+            case 5: return s.MakeStr(Environment.OSVersion.Platform.ToString());
+            case 6: return s.MakeStr(Environment.OSVersion.Version.ToString());
+            case 7: return s.MakeStr(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData).ToString());
             default: return null;
         }
     }
@@ -2584,12 +2545,12 @@ again:
         return c.setting.currentGlobals.ContainsKey(lkey) ? c.setting.TrueV : c.setting.FalseV;
     }
 
-    public static Variable stash_at_key(P6any st, string key) {
-        return Kernel.GetVar(Kernel.UnboxAny<string>(st), key).v;
+    [ImplicitConsts] public static Variable stash_at_key(Constants c, P6any st, string key) {
+        return c.setting.GetVar(Kernel.UnboxAny<string>(st), key).v;
     }
 
-    public static Variable stash_bind_key(P6any st, string key, Variable to) {
-        Kernel.GetVar(Kernel.UnboxAny<string>(st), key).Bind(to);
+    [ImplicitConsts] public static Variable stash_bind_key(Constants c, P6any st, string key, Variable to) {
+        c.setting.GetVar(Kernel.UnboxAny<string>(st), key).Bind(to);
         return to;
     }
 
@@ -2664,7 +2625,7 @@ again:
         P6any v1;
         switch (th.ip) {
             case 0:
-                th.lex2 = Kernel.CreateArray();
+                th.lex2 = th.info.setting.CreateArray();
                 t1 = (Variable)th.lex1;
                 th.lex4 = t1.Fetch().mo.mro_raw_iterator.Get(t1);
                 goto case 1;
@@ -2734,14 +2695,14 @@ again:
         return thr;
     }
 
-    public static Variable sleep(double secs) {
+    [ImplicitConsts] public static Variable sleep(Constants c, double secs) {
         Stopwatch stopwatch = new Stopwatch();
 
         stopwatch.Start();
         Thread.Sleep((int)(secs * 1000.0));
         stopwatch.Stop();
 
-        return MakeFloat(stopwatch.Elapsed.TotalSeconds);
+        return c.setting.MakeFloat(stopwatch.Elapsed.TotalSeconds);
     }
 
     public static void pun_helper(Variable pun, Variable vname, Frame fr) {
@@ -2856,7 +2817,7 @@ again:
                     vx != null ? vx.Fetch() : ai.type.initObj);
         } else {
             obj = (ai.flags & P6how.A_HASH) != 0 ?
-                Kernel.CreateHash() : Kernel.CreateArray();
+                n.mo.setting.CreateHash() : n.mo.setting.CreateArray();
             if (vx != null) {
                 // https://github.com/sorear/niecza/issues/104
                 if (!vx.List)
@@ -3141,5 +3102,13 @@ again:
 
     public static Socket socket_accept(Socket sock) {
         return sock.Accept();
+    }
+
+    [ImplicitConsts] public static Variable newarray(Constants c) {
+        return c.setting.CreateArray();
+    }
+
+    [ImplicitConsts] public static Variable newhash(Constants c) {
+        return c.setting.CreateHash();
     }
 }

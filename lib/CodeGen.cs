@@ -3088,8 +3088,6 @@ dynamic:
             thandlers["rxstripcaps"] = Methody(null, Tokens.Cursor.GetMethod("StripCaps"));
 
             thandlers["prog"] = CpsOp.Sequence;
-            thandlers["newarray"] = Methody(null, Tokens.Kernel_CreateArray);
-            thandlers["newhash"] = Methody(null, Tokens.Kernel_CreateHash);
 
             thandlers["shift"] = Contexty("mro_shift");
             thandlers["pop"] = Contexty("mro_pop");
@@ -3844,16 +3842,18 @@ dynamic:
             return r;
         }
         public static object unit_string_constant(object[] args) {
-            return Handle.Wrap(Builtins.MakeStr((string)args[2]));
+            RuntimeUnit c = (RuntimeUnit)Handle.Unbox(args[1]);
+            return Handle.Wrap(c.setting.MakeStr((string)args[2]));
         }
         public static object unit_numeric_constant(object[] args) {
+            RuntimeUnit c = (RuntimeUnit)Handle.Unbox(args[1]);
             if (args.Length == 4) {
                 int bas       = (int)args[2];
                 string digits = (string)args[3];
-                return Handle.Wrap(EmitUnit.ExactNum(bas, digits));
+                return Handle.Wrap(EmitUnit.ExactNum(c.setting, bas, digits));
             } else {
                 double d = (args[2] is double) ? (double)args[2] : (int)args[2];
-                return Handle.Wrap(Builtins.MakeFloat(d));
+                return Handle.Wrap(c.setting.MakeFloat(d));
             }
         }
         public static object sub_run_BEGIN_raw(object[] args) {
@@ -4415,7 +4415,7 @@ dynamic:
             if (outer == null) {
                 /* Hack - embed build information */
                 var info = new VarHash();
-                info["name"] = Builtins.MakeStr("niecza");
+                info["name"] = ru.setting.MakeStr("niecza");
                 string vers = "(unknown)\n";
                 try {
                     string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
@@ -4424,9 +4424,9 @@ dynamic:
                 } catch (Exception) {
                     // ignore
                 }
-                info["version"] = Builtins.MakeStr(
+                info["version"] = ru.setting.MakeStr(
                         vers.Substring(0, vers.Length - 1));
-                info["build-time"] = Builtins.now();
+                info["build-time"] = Builtins.now(new Constants { setting = ru.setting });
 
                 var li = new LIConstant(Kernel.BoxAnyMO(info, ru.setting.HashMO));
 
@@ -4655,7 +4655,7 @@ dynamic:
             Frame fret = null;
             ru.setting.check.Run();
             ru.setting.init.Run();
-            StashEnt b = Kernel.GetVar("::PROCESS", "$OUTPUT_USED");
+            StashEnt b = ru.setting.GetVar("::PROCESS", "$OUTPUT_USED");
             b.Bind(ru.setting.FalseV);
             Frame ir = Kernel.GetInferiorRoot();
             fret = ru.mainline.protosub.Invoke(ir, Variable.None, null);

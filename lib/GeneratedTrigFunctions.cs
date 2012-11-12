@@ -14,11 +14,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Sin());
+            return c.setting.MakeComplex(v1.Sin());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Sin(v1));
+            return c.setting.MakeFloat(Math.Sin(v1));
         }
     }
 
@@ -32,11 +32,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Asin());
+            return c.setting.MakeComplex(v1.Asin());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Asin(v1));
+            return c.setting.MakeFloat(Math.Asin(v1));
         }
     }
 
@@ -50,11 +50,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Cos());
+            return c.setting.MakeComplex(v1.Cos());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Cos(v1));
+            return c.setting.MakeFloat(Math.Cos(v1));
         }
     }
 
@@ -68,11 +68,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Acos());
+            return c.setting.MakeComplex(v1.Acos());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Acos(v1));
+            return c.setting.MakeFloat(Math.Acos(v1));
         }
     }
 
@@ -86,11 +86,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Tan());
+            return c.setting.MakeComplex(v1.Tan());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Tan(v1));
+            return c.setting.MakeFloat(Math.Tan(v1));
         }
     }
 
@@ -104,11 +104,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Atan());
+            return c.setting.MakeComplex(v1.Atan());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Atan(v1));
+            return c.setting.MakeFloat(Math.Atan(v1));
         }
     }
 
@@ -122,15 +122,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Sinh());
+            return c.setting.MakeComplex(v1.Sinh());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Sinh();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -145,15 +145,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Asinh());
+            return c.setting.MakeComplex(v1.Asinh());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Asinh();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -168,15 +168,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Cosh());
+            return c.setting.MakeComplex(v1.Cosh());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Cosh();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -191,15 +191,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Acosh());
+            return c.setting.MakeComplex(v1.Acosh());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Acosh();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -214,15 +214,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Tanh());
+            return c.setting.MakeComplex(v1.Tanh());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Tanh();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -237,15 +237,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Atanh());
+            return c.setting.MakeComplex(v1.Atanh());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Atanh();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -260,15 +260,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Acotanh());
+            return c.setting.MakeComplex(v1.Acotanh());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Acotanh();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -283,11 +283,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Asec());
+            return c.setting.MakeComplex(v1.Asec());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Acos(1 / v1));
+            return c.setting.MakeFloat(Math.Acos(1 / v1));
         }
     }
 
@@ -301,15 +301,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Cosech());
+            return c.setting.MakeComplex(v1.Cosech());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Cosech();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -324,15 +324,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Acosech());
+            return c.setting.MakeComplex(v1.Acosech());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Acosech();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -347,11 +347,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Sec());
+            return c.setting.MakeComplex(v1.Sec());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(1 / Math.Cos(v1));
+            return c.setting.MakeFloat(1 / Math.Cos(v1));
         }
     }
 
@@ -365,11 +365,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Acosec());
+            return c.setting.MakeComplex(v1.Acosec());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Asin(1 / v1));
+            return c.setting.MakeFloat(Math.Asin(1 / v1));
         }
     }
 
@@ -383,15 +383,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Cotanh());
+            return c.setting.MakeComplex(v1.Cotanh());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Cotanh();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -406,15 +406,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Sech());
+            return c.setting.MakeComplex(v1.Sech());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Sech();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }
@@ -429,11 +429,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Cotan());
+            return c.setting.MakeComplex(v1.Cotan());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(1 / Math.Tan(v1));
+            return c.setting.MakeFloat(1 / Math.Tan(v1));
         }
     }
 
@@ -447,11 +447,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Acotan());
+            return c.setting.MakeComplex(v1.Acotan());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(Math.Atan(1 / v1));
+            return c.setting.MakeFloat(Math.Atan(1 / v1));
         }
     }
 
@@ -465,11 +465,11 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Cosec());
+            return c.setting.MakeComplex(v1.Cosec());
         }
         {
             double v1 = PromoteToFloat(r1, n1);
-            return MakeFloat(1 / Math.Sin(v1));
+            return c.setting.MakeFloat(1 / Math.Sin(v1));
         }
     }
 
@@ -483,15 +483,15 @@ public partial class Builtins {
 
         if (r1 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
-            return MakeComplex(v1.Asech());
+            return c.setting.MakeComplex(v1.Asech());
         }
         {
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = v1.Asech();
             if (v2.im < -1e-15 || v2.im > 1e-15) {
-                return MakeFloat(double.NaN);
+                return c.setting.MakeFloat(double.NaN);
             } else {
-                return MakeFloat(v2.re);
+                return c.setting.MakeFloat(v2.re);
             }
         }
     }

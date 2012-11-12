@@ -427,8 +427,9 @@ namespace Niecza {
         List<NamProcessor> fill = new List<NamProcessor>();
         string dll_name;
         int funique;
+        Compartment setting;
 
-        public EmitUnit(string uname, string asm_name, string dll_name, bool is_mainish) {
+        public EmitUnit(Compartment s, string uname, string asm_name, string dll_name, bool is_mainish) {
 
             if (Config.CGForceSave && dll_name == null)
                 dll_name = asm_name + ".exe";
@@ -464,6 +465,7 @@ namespace Niecza {
 
             constants = new Dictionary<object,FieldInfo>(new IdentityComparer());
             val_constants = new Dictionary<string,CpsOp>();
+            setting = s;
         }
 
         public void CgSub(SubInfo sub, bool erase) {
@@ -539,7 +541,7 @@ namespace Niecza {
         }
 
         internal CpsOp VarConstStr(string s) {
-            return ValConstant('S' + s, Builtins.MakeStr(s));
+            return ValConstant('S' + s, setting.MakeStr(s));
         }
 
         internal CpsOp VarConstNum(double n) {
@@ -550,10 +552,10 @@ namespace Niecza {
             c[2] = (char)(b >> 16);
             c[3] = (char)(b >> 32);
             c[4] = (char)(b >> 48);
-            return ValConstant(new string(c), Builtins.MakeFloat(n));
+            return ValConstant(new string(c), setting.MakeFloat(n));
         }
 
-        public static Variable ExactNum(int numbase, string digits) {
+        public static Variable ExactNum(Compartment s, int numbase, string digits) {
             BigInteger num = BigInteger.Zero;
             BigInteger den = BigInteger.Zero;
 
@@ -600,17 +602,17 @@ namespace Niecza {
 
             ulong sden;
             if (!den.AsUInt64(out sden)) {
-                return Builtins.MakeFloat((double)num / (double)den);
+                return s.MakeFloat((double)num / (double)den);
             }
 
             if (sden == 0)
-                return Builtins.MakeInt(num);
+                return s.MakeInt(num);
 
-            return Builtins.MakeFixRat(num, sden);
+            return s.MakeFixRat(num, sden);
         }
 
         internal CpsOp VarConstExact(int bas, string digs) {
-            return ValConstant("X" + bas + ',' + digs, ExactNum(bas, digs));
+            return ValConstant("X" + bas + ',' + digs, ExactNum(setting, bas, digs));
         }
 
         internal CpsOp CCConst(int[] cc) {
@@ -769,7 +771,7 @@ namespace Niecza {
             if (Config.CGVerbose > 0)
                 Console.WriteLine("Generating code for {0} now because it's about to be run", sub.name);
 
-            EmitUnit eu = new EmitUnit(null, "Anon." + Interlocked.Increment(
+            EmitUnit eu = new EmitUnit(sub.setting, null, "Anon." + Interlocked.Increment(
                         ref anon_id), null, false);
             eu.CgSub(sub, false);
             Constants jit_consts;
@@ -785,7 +787,7 @@ namespace Niecza {
         // note that after Save the unit is _not_ run; the compartment
         // is immediately discarded!
         public void Save() {
-            EmitUnit eu = new EmitUnit(name, asm_name, dll_name, is_mainish);
+            EmitUnit eu = new EmitUnit(setting, name, asm_name, dll_name, is_mainish);
 
             SaveSubs(eu, !Config.KeepIL);
 
@@ -811,7 +813,7 @@ namespace Niecza {
         // This is called when compiling a unit which will be run without
         // saving _only_
         public void PrepareEval() {
-            EmitUnit eu = new EmitUnit(name, "Anon." + Interlocked.Increment(
+            EmitUnit eu = new EmitUnit(setting, name, "Anon." + Interlocked.Increment(
                         ref anon_id) + "." + asm_name, null, false);
             SaveSubs(eu, false);
 
@@ -853,14 +855,6 @@ namespace Niecza {
             setting.end.RunNew();
 
             return null;
-        }
-
-        public static Variable MakeAppropriateVar(string name) {
-            if (name.Length >= 1 && name[0] == '@')
-                return Kernel.CreateArray();
-            if (name.Length >= 1 && name[0] == '%')
-                return Kernel.CreateHash();
-            return Kernel.NewTypedScalar(null);
         }
 
         bool IsEmptyAggr(Variable v) {
@@ -928,7 +922,7 @@ namespace Niecza {
             StashEnt nse = new StashEnt();
             nse.constant = (var != null);
             if (var == null)
-                var = MakeAppropriateVar(name);
+                var = setting.MakeAppropriateVar(name);
             nse.v = var;
             nse.file = file;
             nse.line = line;
@@ -1297,9 +1291,9 @@ namespace Niecza {
             else if ((flags & DEFOUTER) != 0)
                 Set(f, f.info.GetOuterTopic(f));
             else if ((flags & LIST) != 0)
-                Set(f, Kernel.CreateArray());
+                Set(f, owner.setting.CreateArray());
             else if ((flags & HASH) != 0)
-                Set(f, Kernel.CreateHash());
+                Set(f, owner.setting.CreateHash());
             else
                 Set(f, Kernel.NewTypedScalar(type));
         }
@@ -2752,9 +2746,9 @@ get_default:
                 if ((flags & Parameter.OPTIONAL) != 0) {
                     // Array is the "default" Positional -masak
                     if ((flags & Parameter.IS_LIST) != 0)
-                        src = Kernel.CreateArray();
+                        src = setting.CreateArray();
                     else if ((flags & Parameter.IS_HASH) != 0)
-                        src = Kernel.CreateHash();
+                        src = setting.CreateHash();
                     else
                         src = type.initObj;
                     goto gotit;
@@ -2781,10 +2775,10 @@ gotit:
                 if ((flags & Parameter.RWTRANS) != 0) {
                 } else if ((flags & Parameter.IS_COPY) != 0) {
                     if ((flags & Parameter.IS_HASH) != 0)
-                        src = Kernel.Assign(Kernel.CreateHash(),
+                        src = Kernel.Assign(setting.CreateHash(),
                             Kernel.NewRWListVar(src.Fetch()));
                     else if ((flags & Parameter.IS_LIST) != 0)
-                        src = Kernel.Assign(Kernel.CreateArray(),
+                        src = Kernel.Assign(setting.CreateArray(),
                             Kernel.NewRWListVar(src.Fetch()));
                     else
                         src = Kernel.Assign(Kernel.NewTypedScalar(type), src);
@@ -3313,7 +3307,7 @@ bound: ;
             this.inner = inner;
         }
         public override Variable Get(Variable obj) {
-            return Builtins.MakeInt((long)inner.Get(obj));
+            return setting.MakeInt((long)inner.Get(obj));
         }
     }
 
@@ -3892,7 +3886,7 @@ tryagain:
 
             switch (mode) {
                 case 0:  return key;
-                case 1:  return Builtins.MakeParcel(key, bas.Get(obj, key));
+                case 1:  return setting.MakeParcel(key, bas.Get(obj, key));
                 default: return Builtins.pair(key, bas.Get(obj, key));
             }
         }
@@ -3940,7 +3934,7 @@ tryagain:
             if (os.IsDefined())
                 return Kernel.RunInferior(os.InvokeMethod(Kernel.GetInferiorRoot(),
                     "bind_pos", new Variable[] { obj, key, to }, null));
-            obj.Store(Kernel.CreateArray().Fetch());
+            obj.Store(setting.CreateArray().Fetch());
             return setting.ArrayMO.mro_bind_key.Bind(obj, key, to);
         }
     }
@@ -4135,7 +4129,7 @@ tryagain:
             P6any ks = key.Fetch();
             P6any os = obj.Fetch();
             if (!os.IsDefined())
-                obj.Store(os = Kernel.CreateArray().Fetch());
+                obj.Store(os = setting.CreateArray().Fetch());
 
             P6opaque dos = (P6opaque) os;
             VarDeque items = (VarDeque) dos.slots[0];
@@ -4375,11 +4369,11 @@ tryagain:
                     v = ToInfo().cur_pkg.typeObj;
                     goto have_v;
                 } else if (key == "GLOBAL") {
-                    sc.p1 = Kernel.GetVar("", "GLOBAL").v.Fetch().mo.who;
+                    sc.p1 = setting.GetVar("", "GLOBAL").v.Fetch().mo.who;
                     sc.type = WHO;
                     goto have_sc;
                 } else if (key == "PROCESS") {
-                    sc.p1 = Kernel.GetVar("", "PROCESS").v.Fetch().mo.who;
+                    sc.p1 = setting.GetVar("", "PROCESS").v.Fetch().mo.who;
                     sc.type = WHO;
                     goto have_sc;
                 } else if (key == "UNIT" || key == "OUTER" ||
@@ -4418,7 +4412,7 @@ tryagain:
                     n.p1 = (key == "PARENT" || key.Length > 0 &&
                             "$&@%".IndexOf(key[0]) >= 0)
                         ? ToInfo().cur_pkg.who
-                        : Kernel.GetVar("", "GLOBAL").v.Fetch().mo.who;
+                        : setting.GetVar("", "GLOBAL").v.Fetch().mo.who;
                     n.Core(key, final, out sc, out v, bind_to);
                     return;
                 }
@@ -4535,7 +4529,7 @@ have_v:
         }
     }
 
-    class Compartment {
+    public class Compartment {
         [CORESaved] public STable PairMO;
         [CORESaved] public STable EnumMO;
         [CORESaved] public STable EnumMapMO;
@@ -4672,9 +4666,9 @@ have_v:
         [TrueGlobal]
         public static Compartment Top = new Compartment();
 
-        public PhaserList check = new PhaserList(true);
-        public PhaserList init  = new PhaserList(false);
-        public PhaserList end   = new PhaserList(true);
+        internal PhaserList check = new PhaserList(true);
+        internal PhaserList init  = new PhaserList(false);
+        internal PhaserList end   = new PhaserList(true);
 
         internal static void Push() {
             Compartment n = new Compartment();
@@ -4687,6 +4681,116 @@ have_v:
         internal static void Pop() {
             Top.end.Run();
             Top = Top.prev;
+        }
+
+        // and here's a bunch of smart constructors
+        public Variable CreateArray() {
+            P6any v = new P6opaque(ArrayMO, 2);
+            v.SetSlot(ListMO, "$!items", new VarDeque());
+            v.SetSlot(ListMO, "$!rest", new VarDeque());
+            return Kernel.NewRWListVar(v);
+        }
+
+        public Variable CreateHash() {
+            P6any v = Kernel.BoxRaw(new VarHash(), HashMO);
+            return Kernel.NewRWListVar(v);
+        }
+
+        public Variable MakeAppropriateVar(string name) {
+            if (name.Length >= 1 && name[0] == '@')
+                return CreateArray();
+            if (name.Length >= 1 && name[0] == '%')
+                return CreateHash();
+            return Kernel.NewTypedScalar(null);
+        }
+
+        public static Variable StashyMerge(Variable o, Variable n, string d1, string d2) {
+            P6any oo = o as P6any;
+            P6any nn = n as P6any;
+
+            if (oo == null) return n;
+            if (nn == null) return o;
+            if (oo == nn) return o;
+
+            if (!oo.IsDefined() && !nn.IsDefined() && oo.mo.who == nn.mo.who) {
+                if (oo.mo.mo.type == P6how.PACKAGE) return n;
+                if (nn.mo.mo.type == P6how.PACKAGE) return o;
+            }
+
+            throw new NieczaException("Funny merge failure " + d1 + "::" + d2 +
+                    " (" + oo.mo.name + ", " + nn.mo.name + ")");
+        }
+
+        public StashEnt GetVar(string who, string name) {
+            StashEnt v;
+            string key = (char)who.Length + who + name;
+
+            if (currentGlobals.TryGetValue(key, out v))
+                return v;
+            else
+                v = currentGlobals[key] = new StashEnt();
+
+            if (name.StartsWith("@")) {
+                v.v = CreateArray();
+            } else if (name.StartsWith("%")) {
+                v.v = CreateHash();
+            } else {
+                v.v = Kernel.NewTypedScalar(null);
+            }
+
+            return v;
+        }
+
+        // Produce a number from an int
+        public Variable MakeInt(int v) {
+            return Kernel.BoxAnyMO<int>(v, IntMO);
+        }
+
+        public Variable MakeInt(BigInteger v) {
+            int vs;
+            if (v.AsInt32(out vs)) return Kernel.BoxAnyMO<int>(vs, IntMO);
+            else return Kernel.BoxAnyMO<BigInteger>(v, IntMO);
+        }
+
+        public Variable MakeInt(long v) {
+            if (v <= (long)int.MaxValue && v >= (long)int.MinValue)
+                return Kernel.BoxAnyMO<int>((int)v, IntMO);
+            else return Kernel.BoxAnyMO<BigInteger>(v, IntMO);
+        }
+
+        public Variable MakeFixRat(BigInteger num, BigInteger den) {
+            ulong sden;
+            Builtins.SimplifyFrac(ref num, ref den);
+            if (den.AsUInt64(out sden) && sden != 0)
+                return Kernel.BoxAnyMO<Rat>(new Rat(num, sden), RatMO);
+            return MakeFloat(Builtins.RatToFloat(num, den));
+        }
+
+        public Variable MakeFatRat(BigInteger num, BigInteger den) {
+            Builtins.SimplifyFrac(ref num, ref den);
+            if (den.Sign != 0)
+                return Kernel.BoxAnyMO<FatRat>(new FatRat(num, den), FatRatMO);
+            return MakeFloat(den.Sign * double.PositiveInfinity);
+        }
+
+        public Variable MakeFloat(double val) {
+            return Kernel.BoxAnyMO<double>(val, NumMO);
+        }
+
+        public Variable MakeComplex(double re, double im) {
+            return Kernel.BoxAnyMO<Complex>(new Complex(re, im), ComplexMO);
+        }
+
+        public Variable MakeStr(string str) {
+            return Kernel.BoxAnyMO(str, StrMO);
+        }
+
+        public Variable MakeComplex(Complex z) {
+            return Kernel.BoxAnyMO<Complex>(z, ComplexMO);
+        }
+
+        public Variable MakeParcel(params Variable[] bits) {
+            return Kernel.NewRWListVar(Kernel.BoxRaw(bits, ParcelMO));
         }
     }
 
@@ -5549,55 +5653,6 @@ slow:
                         GetInferiorRoot(), "head", new Variable[] {lst}, null));
         }
 
-        public static Variable CreateArray() {
-            P6any v = new P6opaque(Compartment.Top.ArrayMO, 2);
-            v.SetSlot(Compartment.Top.ListMO, "$!items", new VarDeque());
-            v.SetSlot(Compartment.Top.ListMO, "$!rest", new VarDeque());
-            return NewRWListVar(v);
-        }
-
-        public static Variable CreateHash() {
-            P6any v = BoxRaw(new VarHash(), Compartment.Top.HashMO);
-            return NewRWListVar(v);
-        }
-
-        public static Variable StashyMerge(Variable o, Variable n, string d1, string d2) {
-            P6any oo = o as P6any;
-            P6any nn = n as P6any;
-
-            if (oo == null) return n;
-            if (nn == null) return o;
-            if (oo == nn) return o;
-
-            if (!oo.IsDefined() && !nn.IsDefined() && oo.mo.who == nn.mo.who) {
-                if (oo.mo.mo.type == P6how.PACKAGE) return n;
-                if (nn.mo.mo.type == P6how.PACKAGE) return o;
-            }
-
-            throw new NieczaException("Funny merge failure " + d1 + "::" + d2 +
-                    " (" + oo.mo.name + ", " + nn.mo.name + ")");
-        }
-
-        public static StashEnt GetVar(string who, string name) {
-            StashEnt v;
-            string key = (char)who.Length + who + name;
-
-            if (Compartment.Top.currentGlobals.TryGetValue(key, out v))
-                return v;
-            else
-                v = Compartment.Top.currentGlobals[key] = new StashEnt();
-
-            if (name.StartsWith("@")) {
-                v.v = CreateArray();
-            } else if (name.StartsWith("%")) {
-                v.v = CreateHash();
-            } else {
-                v.v = NewTypedScalar(null);
-            }
-
-            return v;
-        }
-
         private static void Handler_Vonly(STable kl, string name,
                 ContextHandler<Variable> cv, object cvu) {
             WrapHandler0(kl, name, cv, cvu);
@@ -5826,7 +5881,7 @@ slow:
                 r.SetupVTables();
                 return r;
             } else if (arg.mo.type == P6how.PARAMETRIZED_ROLE) {
-                return ToComposable(DoInstantiateRole(arg, Builtins.MakeParcel()), cls);
+                return ToComposable(DoInstantiateRole(arg, arg.setting.MakeParcel()), cls);
             } else if (arg.mo.type == P6how.ROLE) {
                 return arg;
             } else {
@@ -6454,7 +6509,7 @@ slow:
                     Frame nfr = csr.info.control.SetupCall(
                         Kernel.GetInferiorRoot(), csr, sub,
                         new Variable[] {
-                            Builtins.MakeParcel(Builtins.MakeInt(type),
+                            s.MakeParcel(s.MakeInt(type),
                                 Kernel.BoxAnyMO(name, s.StrMO),
                                 tgt == null ? s.AnyP : tgt)
                         }, null, false, null);
@@ -6567,7 +6622,7 @@ slow:
             } else if (type == SubInfo.ON_DIE) {
                 Variable exn = (Variable)td; // will be an Array
                 if (exn.Fetch().mo.mro_raw_Numeric.Get(exn) == 1)
-                    exn = exn.Fetch().mo.mro_at_pos.Get(exn, Builtins.MakeInt(0));
+                    exn = exn.Fetch().mo.mro_at_pos.Get(exn, s.MakeInt(0));
                 tf.LexicalBind("$!", (Variable)exn);
                 td = s.AnyP;
             }

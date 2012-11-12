@@ -1006,10 +1006,10 @@ next_method: ;
                 if (name == "ACCEPTS" || name == "defined")
                     return setting.MuMO.FindMethod(name);
                 var pun = mo.PunRole();
-                var punfunc = Kernel.GetVar("::GLOBAL::Niecza", "&autopun").v;
+                var punfunc = setting.GetVar("::GLOBAL::Niecza", "&autopun").v;
                 var clone = Kernel.RunInferior(punfunc.Fetch().Invoke(
                     Kernel.GetInferiorRoot(), new Variable[] { pun.typeObj,
-                        Builtins.MakeStr(name) }, null));
+                        setting.MakeStr(name) }, null));
                 return new DispatchEnt(null, clone.Fetch());
             }
             return null;

@@ -276,7 +276,7 @@ public sealed class RxFrame: IFreeze {
     // field to the backtrack state.
     public void SetEndpoint(string which) {
         flags |= USED_ENDS;
-        PushCapture(new string[] { null, which }, Builtins.MakeInt(st.pos));
+        PushCapture(new string[] { null, which }, global.setting.MakeInt(st.pos));
     }
 
     public void IncorporateChild(string[] names, P6any match) {
@@ -359,7 +359,7 @@ public sealed class RxFrame: IFreeze {
     public void PushGoal(Frame th, string newGoal) {
         bt = new Choice(bt, -1, st);
         bt.st.subrule_iter = th.LexicalFind("$*GOAL");
-        th.LexicalBind("$*GOAL", Builtins.MakeStr(newGoal));
+        th.LexicalBind("$*GOAL", global.setting.MakeStr(newGoal));
         st.ns = new NState(bt, "GOAL", st.ns);
         st.ns.quant = st.pos;
     }
@@ -987,7 +987,7 @@ public partial class Builtins {
             if (!it.cap.Fetch().Isa(s.MatchMO))
                 continue;
             foreach (string name in it.names)
-                dq.Unshift(pair(MakeStr(name), it.cap));
+                dq.Unshift(pair(s.MakeStr(name), it.cap));
         }
 
         P6opaque lst = new P6opaque(s.ListMO);

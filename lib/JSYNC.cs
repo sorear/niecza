@@ -624,7 +624,7 @@ public class JsyncReader {
             string s2 = "::GLOBAL::" + h_tag.Substring(7);
             int cut = s2.LastIndexOf("::");
 
-            Variable v_cursor = Kernel.GetVar(s2.Substring(0, cut),
+            Variable v_cursor = setting.GetVar(s2.Substring(0, cut),
                     s2.Substring(cut+2)).v;
 
             if (v_cursor.Rw)
