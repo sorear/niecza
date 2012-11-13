@@ -373,6 +373,8 @@ namespace Niecza.CLRBackend {
             typeof(Kernel).GetMethod("NewRWScalar");
         public static readonly MethodInfo Kernel_NewTypedScalar =
             typeof(Kernel).GetMethod("NewTypedScalar");
+        public static readonly MethodInfo Kernel_NewMuAnyScalar =
+            typeof(Kernel).GetMethod("NewMuAnyScalar");
         public static readonly MethodInfo Kernel_Assign =
             typeof(Kernel).GetMethod("Assign");
         public static readonly MethodInfo Kernel_CreateArray =
@@ -2335,6 +2337,8 @@ namespace Niecza.CLRBackend {
                     let.Add(new object[] { "newhash" });
                 else if ((li.flags & LISimple.LIST) != 0)
                     let.Add(new object[] { "newarray" });
+                else if (li.type == null)
+                    let.Add(new object[] { "newblankrwscalar" });
                 else
                     let.Add(new object[] { "_newoftype",
                             eu.TypeConstant(li.type) });
@@ -2499,6 +2503,8 @@ namespace Niecza.CLRBackend {
                             init = CpsOp.MethodCall(Tokens.Kernel_CreateHash);
                         } else if ((flags & Parameter.IS_LIST) != 0) {
                             init = CpsOp.MethodCall(Tokens.Kernel_CreateArray);
+                        } else if (type == null) {
+                            init = CpsOp.MethodCall(Tokens.Kernel_NewMuAnyScalar);
                         } else {
                             init = CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
                                     eu.TypeConstant(type));
@@ -2847,9 +2853,7 @@ dynamic:
                 return CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
                         (CpsOp)z[1]); };
             thandlers["newblankrwscalar"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
-                    CpsOp.Null(Tokens.STable)); };
-            thandlers["newtypedscalar"] = Methody(null, Tokens.Kernel_NewTypedScalar);
+                return CpsOp.MethodCall(Tokens.Kernel_NewMuAnyScalar); };
             // XXX - wrong order - problem?
             thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,
@@ -3298,6 +3302,8 @@ dynamic:
                     } else if ((f & (LISimple.HASH | LISimple.LIST)) != 0) {
                         bit = a(j( ((f & LISimple.HASH) != 0) ?
                             "newhash" : "newarray" ));
+                    } else if (ls.type == null) {
+                        bit = a(j("newblankrwscalar"));
                     } else {
                         bit = a(j("_newoftype"), tc);
                     }
