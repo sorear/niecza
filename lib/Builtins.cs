@@ -535,21 +535,23 @@ public partial class Builtins {
     }
 
     public static Variable InvokeSub(P6any obj, params Variable[] pos) {
-        return Kernel.RunInferior(obj.Invoke(Kernel.GetInferiorRoot(), pos, null));
+        return Kernel.RunInferior(obj.Invoke(Kernel.GetInferiorRoot(obj.mo.setting), pos, null));
     }
 
     public static Variable InvokeSub(P6any obj, Variable[] pos, VarHash nam) {
-        return Kernel.RunInferior(obj.Invoke(Kernel.GetInferiorRoot(), pos, nam));
+        return Kernel.RunInferior(obj.Invoke(Kernel.GetInferiorRoot(obj.mo.setting), pos, nam));
     }
 
     public static Variable InvokeMethod(string name, params Variable[] pos) {
-        return Kernel.RunInferior(pos[0].Fetch().InvokeMethod(
-            Kernel.GetInferiorRoot(), name, pos, null));
+        var o = pos[0].Fetch();
+        return Kernel.RunInferior(o.InvokeMethod(
+            Kernel.GetInferiorRoot(o.mo.setting), name, pos, null));
     }
 
     public static Variable InvokeMethod(string name, Variable[] pos, VarHash nam) {
-        return Kernel.RunInferior(pos[0].Fetch().InvokeMethod(
-            Kernel.GetInferiorRoot(), name, pos, nam));
+        var o = pos[0].Fetch();
+        return Kernel.RunInferior(o.InvokeMethod(
+            Kernel.GetInferiorRoot(o.mo.setting), name, pos, nam));
     }
 
     public static bool ToBool(Variable v) {

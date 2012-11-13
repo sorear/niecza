@@ -826,7 +826,7 @@ namespace Niecza {
                 csr = o;
             }
 
-            Kernel.RunInferior(Kernel.GetInferiorRoot().
+            Kernel.RunInferior(Kernel.GetInferiorRoot(setting).
                     MakeChild(null, csr.mainline, setting.AnyP));
         }
 
@@ -2605,7 +2605,7 @@ namespace Niecza {
                         ref jun_pivot, ref jun_pivot_n, ref jun_rank);
             }
             if (c is SubInfo) {
-                Frame thn = Kernel.GetInferiorRoot()
+                Frame thn = Kernel.GetInferiorRoot(setting)
                     .MakeChild(th, (SubInfo)c, setting.AnyP);
                 var sm = Kernel.RunInferior(thn);
                 bool res = Kernel.ACCEPTS(arg, sm);
@@ -2720,7 +2720,7 @@ get_default:
                     if (param.def is Variable) {
                         src = (Variable)param.def;
                     } else {
-                        Frame thn = Kernel.GetInferiorRoot()
+                        Frame thn = Kernel.GetInferiorRoot(setting)
                             .MakeChild(th, (SubInfo)param.def, setting.AnyP);
                         src = Kernel.RunInferior(thn);
                         if (src == null)
@@ -5144,7 +5144,7 @@ have_v:
                 Frame   o = (Frame)impl.GetSlot(info.setting.CodeMO, "$!outer");
                 // XXX sucks a bit to have an inf runloop here
                 var res = Kernel.RunInferior(info.SetupCall(
-                    Kernel.GetInferiorRoot(), o, impl, pos, named, true, null));
+                    Kernel.GetInferiorRoot(info.setting), o, impl, pos, named, true, null));
                 return (res == info.setting.TrueV);
             }
 
@@ -6124,7 +6124,7 @@ slow:
         class LastFrameNode {
             public LastFrameNode next, prev;
             public Frame cur, root;
-            public Compartment compartment = Compartment.Top;
+            public Compartment compartment;
         }
         [ThreadStatic] static LastFrameNode rlstack;
         public static void SetTopFrame(Frame f) {
@@ -6140,22 +6140,21 @@ slow:
 
         // it is an error to throw an exception between GetInferiorRoot
         // and RunInferior
-        public static Frame GetInferiorRoot() {
+        public static Frame GetInferiorRoot(Compartment s) {
             LastFrameNode lfn = rlstack;
             if (lfn == null)
-                lfn = rlstack = new LastFrameNode();
+                lfn = rlstack = new LastFrameNode() { compartment = s };
             if (lfn.next == null) {
-                lfn.next = new LastFrameNode();
-                lfn.next.prev = lfn;
+                lfn.next = new LastFrameNode() { compartment = s, prev = lfn };
             }
             Frame l = lfn.cur;
-            if (lfn.compartment != Compartment.Top)
+            if (lfn.compartment != s)
                 l = null; // hide other objects
             rlstack = lfn.next;
-            lfn.next.compartment = Compartment.Top;
+            lfn.next.compartment = s;
             return lfn.next.cur = lfn.next.root = ((l == null ?
-                        new Frame(null, null, Compartment.Top.ExitRunloopSI, Compartment.Top.AnyP) :
-                        l.MakeChild(null, Compartment.Top.ExitRunloopSI, Compartment.Top.AnyP)));
+                        new Frame(null, null, s.ExitRunloopSI, s.AnyP) :
+                        l.MakeChild(null, s.ExitRunloopSI, s.AnyP)));
             //lfn.next.cur = lfn.next.root = ((l == null ?
             //            new Frame(null, null, ExitRunloopSI, Compartment.Top.AnyP) :
             //            l.MakeChild(null, ExitRunloopSI, Compartment.Top.AnyP)));
@@ -6517,7 +6516,7 @@ slow:
 
                 if (type == SubInfo.ON_DIE && csr.info.catch_ != null) {
                     Frame nfr = s.RunCATCH_I.SetupCall(
-                        Kernel.GetInferiorRoot(), null, null, null, null,
+                        Kernel.GetInferiorRoot(s), null, null, null, null,
                         false, null);
                     nfr.lex0 = Kernel.MakeSub(csr.info.catch_, csr);
                     nfr.lex1 = payload;
@@ -6535,7 +6534,7 @@ slow:
                 if (type != SubInfo.ON_DIE && csr.info.control != null) {
                     P6any sub = Kernel.MakeSub(csr.info.control, csr);
                     Frame nfr = csr.info.control.SetupCall(
-                        Kernel.GetInferiorRoot(), csr, sub,
+                        Kernel.GetInferiorRoot(s), csr, sub,
                         new Variable[] {
                             s.MakeParcel(s.MakeInt(type),
                                 Kernel.BoxAnyMO(name, s.StrMO),

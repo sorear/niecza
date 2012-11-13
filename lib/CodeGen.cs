@@ -4662,7 +4662,7 @@ dynamic:
             ru.setting.init.Run();
             StashEnt b = ru.setting.GetVar("::PROCESS", "$OUTPUT_USED");
             b.Bind(ru.setting.FalseV);
-            Frame ir = Kernel.GetInferiorRoot();
+            Frame ir = Kernel.GetInferiorRoot(ru.setting);
             fret = ru.mainline.protosub.Invoke(ir, Variable.None, null);
             fret.MarkShared();
             Variable r = Kernel.RunInferior(fret);
