@@ -2504,7 +2504,7 @@ namespace Niecza.CLRBackend {
                         } else if ((flags & Parameter.IS_LIST) != 0) {
                             init = CpsOp.MethodCall(Tokens.Kernel_CreateArray);
                         } else if (type == null) {
-                            init = CpsOp.MethodCall(Tokens.Kernel_NewMuAnyScalar);
+                            init = CpsOp.MethodCall(Tokens.Kernel_NewMuAnyScalar, CpsOp.CallFrame());
                         } else {
                             init = CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
                                     eu.TypeConstant(type));
@@ -2853,7 +2853,7 @@ dynamic:
                 return CpsOp.MethodCall(Tokens.Kernel_NewTypedScalar,
                         (CpsOp)z[1]); };
             thandlers["newblankrwscalar"] = delegate(CpsOp[] z) {
-                return CpsOp.MethodCall(Tokens.Kernel_NewMuAnyScalar); };
+                return CpsOp.MethodCall(Tokens.Kernel_NewMuAnyScalar, CpsOp.CallFrame()); };
             // XXX - wrong order - problem?
             thandlers["fvarlist_item"] = delegate(CpsOp[] z) {
                 return CpsOp.Operator(Tokens.Variable, OpCodes.Ldelem_Ref,

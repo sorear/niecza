@@ -165,7 +165,7 @@ namespace Niecza {
         public override void Do(Variable toviv) {
             VarDeque vd = (VarDeque) ary.GetSlot(ary.mo.setting.ListMO, "$!items");
             while (vd.Count() <= key)
-                vd.Push(Kernel.NewMuAnyScalar());
+                vd.Push(ary.mo.setting.NewMuAnyScalar());
             vd[key] = toviv;
         }
         public override void Freeze(FreezeBuffer fb) {
@@ -190,7 +190,7 @@ namespace Niecza {
         public override void Do(Variable toviv) {
             VarDeque vd = new VarDeque();
             while (vd.Count() <= key)
-                vd.Push(Kernel.NewMuAnyScalar());
+                vd.Push(mo.setting.NewMuAnyScalar());
             vd[key] = toviv;
             P6opaque d = new P6opaque(mo);
             d.slots[0] = vd;
@@ -1293,7 +1293,7 @@ namespace Niecza {
             else if ((flags & HASH) != 0)
                 Set(f, owner.setting.CreateHash());
             else
-                Set(f, type == null ? Kernel.NewMuAnyScalar() : Kernel.NewTypedScalar(type));
+                Set(f, type == null ? owner.setting.NewMuAnyScalar() : Kernel.NewTypedScalar(type));
         }
     }
 
@@ -2778,7 +2778,7 @@ gotit:
                         src = Kernel.Assign(setting.CreateArray(),
                             Kernel.NewRWListVar(src.Fetch()));
                     else
-                        src = Kernel.Assign(type == null ? Kernel.NewMuAnyScalar() : Kernel.NewTypedScalar(type), src);
+                        src = Kernel.Assign(type == null ? setting.NewMuAnyScalar() : Kernel.NewTypedScalar(type), src);
                 } else {
                     bool islist = ((flags & (Parameter.IS_HASH | Parameter.IS_LIST)) != 0);
                     bool rw     = ((flags & Parameter.READWRITE) != 0) && !islist;
@@ -4125,7 +4125,7 @@ tryagain:
             if (ix < 0)
                 throw new NieczaException("binding to out of range slot " + ix);
             while (items.Count() <= ix) {
-                items.Push(Kernel.NewMuAnyScalar());
+                items.Push(setting.NewMuAnyScalar());
             }
             return items[ix] = to;
         }
@@ -4704,7 +4704,7 @@ have_v:
                 return CreateArray();
             if (name.Length >= 1 && name[0] == '%')
                 return CreateHash();
-            return Kernel.NewMuAnyScalar();
+            return NewMuAnyScalar();
         }
 
         public static Variable StashyMerge(Variable o, Variable n, string d1, string d2) {
@@ -4738,10 +4738,14 @@ have_v:
             } else if (name.StartsWith("%")) {
                 v.v = CreateHash();
             } else {
-                v.v = Kernel.NewMuAnyScalar();
+                v.v = NewMuAnyScalar();
             }
 
             return v;
+        }
+
+        public Variable NewMuAnyScalar() {
+            return new RWVariable(null, null, AnyMO.typeObj);
         }
 
         // Produce a number from an int
@@ -5413,8 +5417,8 @@ ltm:
             return new RWVariable(null, null, obj);
         }
 
-        public static Variable NewMuAnyScalar() {
-            return new RWVariable(null, null, Compartment.Top.AnyMO.typeObj);
+        public static Variable NewMuAnyScalar(Frame f) {
+            return new RWVariable(null, null, f.info.setting.AnyMO.typeObj);
         }
 
         public static Variable NewTypedScalar(STable t) {
