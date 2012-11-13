@@ -3647,8 +3647,7 @@ dynamic:
         }
         public static object push_compartment(object[] args) {
             var old = Compartment.Top;
-            Compartment.Top = new Compartment();
-            Kernel.InitCompartment();
+            Kernel.InitCompartment( Compartment.Top = new Compartment() );
             return Handle.Wrap(old);
         }
         public static object pop_compartment(object[] args) {
@@ -3663,7 +3662,7 @@ dynamic:
 
             if (ru.setting.containerRootUnit == null) {
                 // this is a module unit
-                Kernel.InitCompartment();
+                Kernel.InitCompartment(ru.setting);
                 ru.setting.containerRootUnit = ru;
                 ru.depended_units.Add(ru);
                 ru.owner = ru;

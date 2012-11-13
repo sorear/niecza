@@ -490,6 +490,7 @@ namespace Niecza {
         public Type Finish(out Constants constTable) {
             var type = type_builder.CreateType();
             constTable = (Constants)Activator.CreateInstance(type);
+            constTable.setting = setting;
 
             if (dll_name != null)
                 asm_builder.Save(dll_name);
@@ -687,7 +688,7 @@ namespace Niecza {
     }
 
     public class Constants {
-        internal Compartment setting = Compartment.Top;
+        internal Compartment setting;
     }
 
     // There are two kinds of units.  Primary units have their own hash of
@@ -1028,6 +1029,7 @@ namespace Niecza {
                     Assembly assembly = Assembly.Load(n.asm_name);
                     n.type = tb.type = assembly.GetType(n.asm_name, true);
                     n.constTable = (Constants)Activator.CreateInstance(n.type);
+                    n.constTable.setting = tb.setting;
                     n.constants = new Dictionary<object,FieldInfo>();
                     var fields = new Dictionary<string,FieldInfo>();
                     foreach (FieldInfo fi in n.type.GetFields())
@@ -1193,21 +1195,21 @@ namespace Niecza {
         internal string VarName() { return hkey.Substring(1 + (int)hkey[0]); }
 
         public override object Get(Frame f) {
-            return Kernel.GetGlobal(hkey);
+            return Kernel.GetGlobal(f, hkey);
         }
 
         public override void Set(Frame f, object to) {
-            Kernel.BindGlobal(hkey, (Variable)to);
+            Kernel.BindGlobal(f, hkey, (Variable)to);
         }
 
         internal override ClrOp GetCode(int up) {
             return new ClrMethodCall(false, Tokens.Kernel_GetGlobal,
-                    new ClrStringLiteral(hkey));
+                    ClrCpsFrame.Instance, new ClrStringLiteral(hkey));
         }
 
         internal override ClrOp SetCode(int up, ClrOp to) {
             return new ClrMethodCall(false, Tokens.Kernel_BindGlobal,
-                    new ClrStringLiteral(hkey), to);
+                    ClrCpsFrame.Instance, new ClrStringLiteral(hkey), to);
         }
 
         internal override void DoFreeze(FreezeBuffer fb) {
@@ -1528,7 +1530,7 @@ namespace Niecza {
         }
 
         // Value processing
-        public const int HASTYPE    = 1; // else Compartment.Top.AnyMO
+        public const int HASTYPE    = 1; // else AnyMO
         public const int MULTI_IGNORED = 16384;
         public const int ANY_DEF    =  0x40000;
         public const int UNDEF_ONLY =  0x80000;
@@ -4996,8 +4998,7 @@ have_v:
             SetTrace();
         }
 
-        internal static void InitCompartment() {
-            var c = Compartment.Top;
+        internal static void InitCompartment(Compartment c) {
             c.reg = new ObjectRegistry(c);
 
             c.AutoThreadSubSI = new SubInfo(c, "KERNEL AutoThreadSub",
@@ -6155,9 +6156,6 @@ slow:
             return lfn.next.cur = lfn.next.root = ((l == null ?
                         new Frame(null, null, s.ExitRunloopSI, s.AnyP) :
                         l.MakeChild(null, s.ExitRunloopSI, s.AnyP)));
-            //lfn.next.cur = lfn.next.root = ((l == null ?
-            //            new Frame(null, null, ExitRunloopSI, Compartment.Top.AnyP) :
-            //            l.MakeChild(null, ExitRunloopSI, Compartment.Top.AnyP)));
             //Console.WriteLine("Created exit-runloop {0:X} caller={1:X}",
             //    lfn.next.cur.GetHashCode(), lfn.next.cur.caller == null ? 0 :
             //    lfn.next.cur.caller.GetHashCode());
@@ -6201,12 +6199,12 @@ slow:
             }
         }
 
-        public static Variable GetGlobal(string key) {
-            return Compartment.Top.currentGlobals[key].v;
+        [ImplicitFrame] public static Variable GetGlobal(Frame f, string key) {
+            return f.info.setting.currentGlobals[key].v;
         }
 
-        public static void BindGlobal(string key, Variable to) {
-            Compartment.Top.currentGlobals[key].Bind(to);
+        [ImplicitFrame] public static void BindGlobal(Frame f, string key, Variable to) {
+            f.info.setting.currentGlobals[key].Bind(to);
         }
 
         internal static void CreateBasicTypes(Compartment s) {
@@ -6666,12 +6664,13 @@ slow:
         }
 
         public static void MainHandler(string uname, string[] args) {
-            InitCompartment();
+            var c = Compartment.Top;
+            InitCompartment(c);
             InitGlobal();
             commandArgs = args;
 
             RuntimeUnit ru = (RuntimeUnit)
-                Compartment.Top.reg.LoadUnit(uname).root;
+                c.reg.LoadUnit(uname).root;
 
             ru.setting.containerRootUnit = ru;
             ru.setting.currentGlobals = ru.globals;
@@ -6702,8 +6701,9 @@ slow:
 
         public static void Main(string[] args) {
             string cmd = args.Length > 0 ? args[0] : "-help";
+            var comp = Compartment.Top;
 
-            InitCompartment();
+            InitCompartment(comp);
             InitGlobal();
 
             if (cmd == "-field-inventory") {
@@ -6765,7 +6765,7 @@ slow:
                 Backend.cross_level_load = true;
 
                 RuntimeUnit root = (RuntimeUnit)
-                    Compartment.Top.reg.LoadUnit("MAIN").root;
+                    comp.reg.LoadUnit("MAIN").root;
 
                 // reset for writing
                 Backend.obj_dir = AppDomain.CurrentDomain.BaseDirectory;
@@ -6774,7 +6774,7 @@ slow:
                 RewriteUnits(root, root, new HashSet<RuntimeUnit>());
 
                 // reset for writability
-                Compartment.Top.reg = new ObjectRegistry(Compartment.Top);
+                comp.reg = new ObjectRegistry(comp);
 
                 root.dll_name = exename + ".exe";
                 root.asm_name = exename;
