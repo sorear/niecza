@@ -1355,7 +1355,7 @@ namespace Niecza {
                 f = f.outer;
             }
 
-            Set(into, Kernel.MakeDispatcher(name, proto, cands.ToArray()));
+            Set(into, Kernel.MakeDispatcher(owner.setting, name, proto, cands.ToArray()));
         }
     }
 
@@ -1644,7 +1644,7 @@ namespace Niecza {
         public string outervar;
 
         // References to related objects
-        internal Compartment setting = Compartment.Top;
+        internal Compartment setting;
         public RuntimeUnit unit;
         public SubInfo outer;
         public P6any protosub;
@@ -1952,6 +1952,7 @@ namespace Niecza {
         // a lot of immutable-ish objects that are referenced.
         internal SubInfo(SubInfo o) {
             code = o.code;
+            setting = o.setting;
             nspill = o.nspill;
             sig = o.sig;
             lines = o.lines;
@@ -1990,9 +1991,10 @@ namespace Niecza {
             prototype = o.prototype ?? o;
         }
 
-        public SubInfo(string name, int[] lines, DynBlockDelegate code,
+        public SubInfo(Compartment setting, string name, int[] lines, DynBlockDelegate code,
                 SubInfo outer, LAD ltm, int[] edata, string[] label_names,
                 int nspill) {
+            this.setting = setting;
             this.lines = lines;
             this.code = code;
             this.outer = outer;
@@ -2010,6 +2012,7 @@ namespace Niecza {
         public SubInfo(RuntimeUnit unit, string name, SubInfo outer,
                 STable cls, STable pkg, bool once, Frame ofr) {
             edata = new int[0];
+            this.setting = unit.setting;
             this.name  = name;
             this.unit  = unit;
             this.mo    = cls;
@@ -2037,8 +2040,8 @@ namespace Niecza {
             }
         }
 
-        public SubInfo(string name, DynBlockDelegate code) :
-            this(name, null, code, null, null, new int[0], null, 0) { }
+        public SubInfo(Compartment s, string name, DynBlockDelegate code) :
+            this(s, name, null, code, null, null, new int[0], null, 0) { }
 
         void IFreeze.Freeze(FreezeBuffer fb) {
             fb.Byte((byte)SerializationCode.SubInfo);
@@ -2216,6 +2219,7 @@ namespace Niecza {
         }
 
         void IFixup.Fixup(Compartment c) {
+            setting = c;
             SubInfo sc = outer;
             LexInfo li = null;
             for (outer_topic_rank = 1; sc != null; sc = sc.outer) {
@@ -3007,7 +3011,7 @@ bound: ;
         }
         void IFixup.Fixup(Compartment c) {
             code = info.code;
-            mo = info.setting.CallFrameMO;
+            mo = c.CallFrameMO;
         }
     }
 
@@ -4145,7 +4149,7 @@ tryagain:
         }
 
         internal static Variable MakePackage(Compartment s, string name, P6any who) {
-            STable st = new STable(name);
+            STable st = new STable(s, name);
             st.who = who;
             st.typeObj = st.initObj = new P6opaque(st, 0);
             ((P6opaque)st.typeObj).slots = null;
@@ -4575,6 +4579,7 @@ have_v:
         internal SubInfo CommonGrep_I;
         internal SubInfo TEMP_SI;
         internal SubInfo ArrayHelperSI;
+        internal SubInfo StandardLexerSI;
 
         public Dictionary<string, StashEnt> currentGlobals;
         // The root unit of this isolation container; will not point to
@@ -4995,20 +5000,21 @@ have_v:
             var c = Compartment.Top;
             c.reg = new ObjectRegistry(c);
 
-            c.AutoThreadSubSI = new SubInfo("KERNEL AutoThreadSub",
+            c.AutoThreadSubSI = new SubInfo(c, "KERNEL AutoThreadSub",
                     SubInfo.AutoThreadSubC);
-            c.dogather_SI   = new SubInfo("KERNEL dogather", dogather);
-            c.ExitRunloopSI = new SubInfo("ExitRunloop", ExitRunloopC);
+            c.dogather_SI   = new SubInfo(c, "KERNEL dogather", dogather);
+            c.ExitRunloopSI = new SubInfo(c, "ExitRunloop", ExitRunloopC);
             c.ExitRunloopSI.special = SubInfo.TRANSPARENT;
-            c.IF_SI         = new SubInfo("iter_flatten", IF_C);
-            c.JunctionFallbackSI = new SubInfo("Junction.FALLBACK",
+            c.IF_SI         = new SubInfo(c, "iter_flatten", IF_C);
+            c.JunctionFallbackSI = new SubInfo(c, "Junction.FALLBACK",
                     JunctionFallbackC);
-            c.SubInvokeSubSI = new SubInfo("Sub.postcircumfix:<( )>",
+            c.SubInvokeSubSI = new SubInfo(c, "Sub.postcircumfix:<( )>",
                     SubInvokeSubC);
-            c.TEMP_SI       = new SubInfo("KERNEL Scalar.TEMP", Builtins.TEMP_C);
-            c.ArrayHelperSI = new SubInfo("KERNEL ArrayHelper", RxFrame.ArrayHelperC);
+            c.TEMP_SI       = new SubInfo(c, "KERNEL Scalar.TEMP", Builtins.TEMP_C);
+            c.ArrayHelperSI = new SubInfo(c, "KERNEL ArrayHelper", RxFrame.ArrayHelperC);
+            c.StandardLexerSI = new SubInfo(c, "KERNEL protoregex", Lexer.StandardProtoC);
 
-            c.RunCATCH_I = new SubInfo("KERNEL run_CATCH", null,
+            c.RunCATCH_I = new SubInfo(c, "KERNEL run_CATCH", null,
                 Builtins.RunCATCH_C, null, null, new int[] {
                     0, 5, SubInfo.ON_NEXT, 1, 0,
                     0, 5, SubInfo.ON_REDO, 2, 0,
@@ -5016,14 +5022,14 @@ have_v:
                     0, 5, SubInfo.ON_DIE,  1, 0,
                 }, new string[] { "" }, 0);
 
-            c.CommonMEMap_I = new SubInfo("KERNEL map", null,
+            c.CommonMEMap_I = new SubInfo(c, "KERNEL map", null,
                 Builtins.CommonMEMap_C, null, null, new int[] {
                     2, 3, SubInfo.ON_NEXT, 0, 0,
                     2, 3, SubInfo.ON_REDO, 1, 0,
                     2, 3, SubInfo.ON_LAST, 3, 0,
                 }, new string[] { "" }, 0);
 
-            c.CommonGrep_I = new SubInfo("KERNEL grep", null,
+            c.CommonGrep_I = new SubInfo(c, "KERNEL grep", null,
                 Builtins.CommonGrep_C, null, null, new int[] {
                     2, 3, SubInfo.ON_NEXT, 0, 0,
                     2, 3, SubInfo.ON_REDO, 1, 0,
@@ -5296,7 +5302,10 @@ have_v:
             return TypeDispatcher(th, true);
         }
 
-        public static P6any MakeDispatcher(string name, P6any proto, P6any[] cands) {
+        public static P6any MakeDispatcherF(Frame f, string name, P6any proto, P6any[] cands) {
+            return MakeDispatcher(f.info.setting, name, proto, cands);
+        }
+        public static P6any MakeDispatcher(Compartment s, string name, P6any proto, P6any[] cands) {
             if (proto != null && proto.mo.name == "Regex") goto ltm;
             for (int i = 0; i < cands.Length; i++) {
                 if (cands[i] == null) continue;
@@ -5307,7 +5316,7 @@ have_v:
             SubInfo si;
 
             si = (proto != null) ? new SubInfo(GetInfo(proto)) :
-                new SubInfo(name, StandardTypeProtoC);
+                new SubInfo(s, name, StandardTypeProtoC);
 
             si.param = new object[] { cands, null };
             return Kernel.MakeSub(si, proto == null ? null : GetOuter(proto));
@@ -5315,7 +5324,7 @@ ltm:
             List<P6any> lp = new List<P6any>();
             foreach (P6any p in cands)
                 if (p != null) lp.Add(p);
-            return Lexer.MakeDispatcher(name, proto, lp.ToArray());
+            return Lexer.MakeDispatcher(s, name, proto, lp.ToArray());
         }
 
         [TrueGlobal]
@@ -5705,7 +5714,7 @@ slow:
 
         private static void WrapHandler0(STable kl, string name,
                 ContextHandler<Variable> cvb, object cvu) {
-            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
+            SubInfo si = new SubInfo(kl.setting, "KERNEL " + kl.name + "." + name,
                     WrapHandler0cb);
             si.sig = new Signature(kl.setting,Parameter.TPos(kl.setting,"self", 0));
             si.param = new object[] { cvu, cvb };
@@ -5721,7 +5730,7 @@ slow:
         }
         private static void WrapHandler1(STable kl, string name,
                 IndexHandler cv) {
-            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
+            SubInfo si = new SubInfo(kl.setting, "KERNEL " + kl.name + "." + name,
                 WrapHandler1cb);
             si.sig = new Signature(kl.setting,
                     Parameter.TPos(kl.setting,"self", 0),
@@ -5742,7 +5751,7 @@ slow:
         }
         private static void WrapPushy(STable kl, string name,
                 PushyHandler cv) {
-            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
+            SubInfo si = new SubInfo(kl.setting, "KERNEL " + kl.name + "." + name,
                     WrapPushycb);
             si.sig = new Signature(kl.setting,
                     Parameter.TPos(kl.setting, "self", 0),
@@ -5800,7 +5809,7 @@ slow:
         private static void WrapIndexy(STable kl, string name,
                 IndexHandler at, IndexHandler exist, IndexHandler del,
                 BindHandler bind) {
-            SubInfo si = new SubInfo("KERNEL " + kl.name + "." + name,
+            SubInfo si = new SubInfo(kl.setting, "KERNEL " + kl.name + "." + name,
                     DispIndexy);
             var c = kl.setting;
             List<Parameter> lp = new List<Parameter>();
@@ -5831,7 +5840,7 @@ slow:
             Variable[] args = argv.mo == prole.setting.ParcelMO ?
                 UnboxAny<Variable[]>(argv) : new Variable[] { alist };
 
-            STable r = new STable(prole.name + "[curried]");
+            STable r = new STable(prole.setting, prole.name + "[curried]");
             r.mo.roleFactory = prole.mo.roleFactory;
             r.mo.curriedArgs = args;
             r.mo.FillRole(prole.mo.superclasses.ToArray(), null);
@@ -5870,7 +5879,7 @@ slow:
                 Array.Copy(arg.mo.curriedArgs, 0, pass, 1, pass.Length-1);
                 Frame ifr = (Frame)Builtins.InvokeSub(arg.mo.roleFactory, pass).Fetch();
 
-                r = new STable(arg.name + "[...]");
+                r = new STable(arg.setting, arg.name + "[...]");
                 r.mo.FillRole(arg.mo.superclasses.ToArray(), null);
                 r.how = new BoxObject<STable>(r, arg.setting.ClassHOWMO, 0);
                 r.mo.type  = P6how.ROLE;
@@ -6004,7 +6013,7 @@ slow:
         }
 
         public static STable RoleApply(STable b, STable role) {
-            STable n = new STable(b.name + " but " + role.name);
+            STable n = new STable(b.setting, b.name + " but " + role.name);
 
             n.how = BoxAny<STable>(n, b.how).Fetch();
             n.typeObj = n.initObj = new P6opaque(n);
@@ -6202,11 +6211,11 @@ slow:
         }
 
         internal static void CreateBasicTypes(Compartment s) {
-            s.CodeMO = new STable("Code"); // forward decl
-            s.MuMO = new STable("Mu");
-            s.AnyMO = new STable("Any");
-            s.ParameterMO = new STable("Parameter");
-            s.SignatureMO = new STable("Signature");
+            s.CodeMO = new STable(s, "Code"); // forward decl
+            s.MuMO = new STable(s, "Mu");
+            s.AnyMO = new STable(s, "Any");
+            s.ParameterMO = new STable(s, "Parameter");
+            s.SignatureMO = new STable(s, "Signature");
             Handler_Vonly(s.MuMO, "defined", new CtxBoolNativeDefined(),
                     new CtxRawNativeDefined());
             Handler_Vonly(s.MuMO, "Bool", new CtxBoolNativeDefined(),
@@ -6234,13 +6243,13 @@ slow:
             s.CodeMO.AddMethod(0, "postcircumfix:<( )>", MakeSub(s.SubInvokeSubSI, null));
             s.CodeMO.Invalidate();
 
-            s.BlockMO = new STable("Block");
-            s.RoutineMO = new STable("Routine");
-            s.WhateverCodeMO = new STable("WhateverCode");
-            s.SubMO = new STable("Sub");
-            s.SubmethodMO = new STable("Submethod");
-            s.MethodMO = new STable("Method");
-            s.RegexMO = new STable("Regex");
+            s.BlockMO = new STable(s, "Block");
+            s.RoutineMO = new STable(s, "Routine");
+            s.WhateverCodeMO = new STable(s, "WhateverCode");
+            s.SubMO = new STable(s, "Sub");
+            s.SubmethodMO = new STable(s, "Submethod");
+            s.MethodMO = new STable(s, "Method");
+            s.RegexMO = new STable(s, "Regex");
 
             s.BlockMO.FillProtoClass(s.CodeMO);
             s.RoutineMO.FillProtoClass(s.BlockMO);
@@ -6250,21 +6259,21 @@ slow:
             s.SubmethodMO.FillProtoClass(s.RoutineMO);
             s.RegexMO.FillProtoClass(s.MethodMO);
 
-            s.LabelMO = new STable("Label");
+            s.LabelMO = new STable(s, "Label");
             s.LabelMO.FillProtoClass(s.AnyMO, new string[] { "$!target", "$!name" },
                     new STable[] { s.LabelMO, s.LabelMO });
 
-            s.EnumMO = new STable("Enum");
+            s.EnumMO = new STable(s, "Enum");
             s.EnumMO.FillProtoClass(s.AnyMO, new string[] { "$!key", "$!value" },
                     new STable[] { s.EnumMO, s.EnumMO });
-            s.PairMO = new STable("Pair");
+            s.PairMO = new STable(s, "Pair");
             s.PairMO.FillProtoClass(s.EnumMO);
 
             // forward reference
-            s.StrMO = new STable("Str");
-            s.BoolMO = new STable("Bool");
+            s.StrMO = new STable(s, "Str");
+            s.BoolMO = new STable(s, "Bool");
 
-            s.IntMO = new STable("Int");
+            s.IntMO = new STable(s, "Int");
             Handler_Vonly(s.IntMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
             Handler_PandBox(s.IntMO, "Bool", new CtxIntBool(), s.BoolMO);
@@ -6289,17 +6298,17 @@ slow:
             Handler_PandCont(s.StrMO, "pred", new CtxStrSuccish(false));
             s.StrMO.FillProtoClass(s.AnyMO);
 
-            s.JunctionMO = new STable("Junction");
+            s.JunctionMO = new STable(s, "Junction");
             Handler_PandBox(s.JunctionMO, "Bool", new CtxJunctionBool(), s.BoolMO);
             s.JunctionMO.AddMethod(0, "FALLBACK", MakeSub(s.JunctionFallbackSI, null));
             s.JunctionMO.FillProtoClass(s.MuMO,
                     new string[] { "$!kind_", "$!eigenstates_" },
                     new STable[] { s.JunctionMO, s.JunctionMO });
 
-            s.IteratorMO = new STable("Iterator");
+            s.IteratorMO = new STable(s, "Iterator");
             s.IteratorMO.FillProtoClass(s.AnyMO);
 
-            s.NumMO = new STable("Num");
+            s.NumMO = new STable(s, "Num");
             Handler_Vonly(s.NumMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
             Handler_Vonly(s.NumMO, "Str", new CtxStrNativeNum2Str(),
@@ -6309,7 +6318,7 @@ slow:
             Handler_PandCont(s.NumMO, "pred", new CtxNumSuccish(-1));
             s.NumMO.FillProtoClass(s.AnyMO);
 
-            s.RatMO = new STable("Rat");
+            s.RatMO = new STable(s, "Rat");
             Handler_Vonly(s.RatMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
             Handler_PandBox(s.RatMO, "Bool", new CtxRatBool(), s.BoolMO);
@@ -6318,7 +6327,7 @@ slow:
             Handler_PandCont(s.RatMO, "pred", new CtxRatSuccish(false));
             s.RatMO.FillProtoClass(s.AnyMO);
 
-            s.FatRatMO = new STable("FatRat");
+            s.FatRatMO = new STable(s, "FatRat");
             Handler_Vonly(s.FatRatMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
             Handler_PandBox(s.FatRatMO, "Bool", new CtxFatRatBool(), s.BoolMO);
@@ -6327,7 +6336,7 @@ slow:
             Handler_PandCont(s.FatRatMO, "pred", new CtxFatRatSuccish(false));
             s.FatRatMO.FillProtoClass(s.AnyMO);
 
-            s.ComplexMO = new STable("Complex");
+            s.ComplexMO = new STable(s, "Complex");
             Handler_Vonly(s.ComplexMO, "Numeric", new CtxReturnSelf(),
                     new CtxCallMethodUnboxNumeric(null));
             Handler_PandBox(s.ComplexMO, "Bool", new CtxComplexBool(), s.BoolMO);
@@ -6336,7 +6345,7 @@ slow:
             Handler_PandCont(s.ComplexMO, "pred", new CtxComplexSuccish(-1));
             s.ComplexMO.FillProtoClass(s.AnyMO);
 
-            s.StashMO = new STable("Stash");
+            s.StashMO = new STable(s, "Stash");
             s.StashMO.FillProtoClass(s.AnyMO);
             s.StashP = new P6opaque(s.StashMO);
 
@@ -6344,10 +6353,10 @@ slow:
 
             s.SignatureMO.FillProtoClass(s.AnyMO);
 
-            s.ClassHOWMO = new STable("ClassHOW");
+            s.ClassHOWMO = new STable(s, "ClassHOW");
             s.ClassHOWMO.FillProtoClass(s.AnyMO);
 
-            s.ParcelMO = new STable("Parcel");
+            s.ParcelMO = new STable(s, "Parcel");
             Handler_PandBox(s.ParcelMO, "iterator", new CtxParcelIterator(),
                     s.IteratorMO);
             Handler_PandBox(s.ParcelMO, "Str", new CtxParcelListStr(), s.StrMO);
@@ -6355,7 +6364,7 @@ slow:
             Handler_Vonly(s.ParcelMO, "list", new CtxParcelList(), null);
             s.ParcelMO.FillProtoClass(s.AnyMO);
 
-            s.ListMO = new STable("List");
+            s.ListMO = new STable(s, "List");
             WrapIndexy(s.ListMO, "postcircumfix:<[ ]>", new IxListAtPos(false),
                     null, null, new IxListBindPos());
             Handler_PandBox(s.ListMO, "Str", new CtxParcelListStr(), s.StrMO);
@@ -6371,13 +6380,13 @@ slow:
             s.ListMO.FillProtoClass(s.AnyMO, new string[] { "$!items", "$!rest" },
                 new STable[] { s.ListMO, s.ListMO });
 
-            s.ArrayMO = new STable("Array");
+            s.ArrayMO = new STable(s, "Array");
             WrapHandler1(s.ArrayMO, "LISTSTORE", new IxArrayLISTSTORE());
             WrapIndexy(s.ArrayMO, "postcircumfix:<[ ]>", new IxListAtPos(true),
                     null, null, new IxListBindPos());
             s.ArrayMO.FillProtoClass(s.ListMO);
 
-            s.HashMO = new STable("Hash");
+            s.HashMO = new STable(s, "Hash");
             WrapHandler1(s.HashMO, "LISTSTORE", new IxHashLISTSTORE());
             WrapIndexy(s.HashMO, "postcircumfix:<{ }>", new IxHashAtKey(),
                     new IxHashExistsKey(), new IxHashDeleteKey(),
@@ -6387,7 +6396,7 @@ slow:
             Handler_Vonly(s.HashMO, "hash", new CtxReturnSelfList(), null);
             s.HashMO.FillProtoClass(s.AnyMO);
 
-            s.CursorMO = new STable("Cursor");
+            s.CursorMO = new STable(s, "Cursor");
             WrapIndexy(s.CursorMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
                     s.AnyMO.mro_exists_key, s.AnyMO.mro_delete_key,
                     s.AnyMO.mro_bind_key);
@@ -6395,7 +6404,7 @@ slow:
                     null, null, s.AnyMO.mro_bind_pos);
             s.CursorMO.FillProtoClass(s.AnyMO);
 
-            s.MatchMO = new STable("Match");
+            s.MatchMO = new STable(s, "Match");
             WrapIndexy(s.MatchMO, "postcircumfix:<{ }>", new IxCursorAtKey(),
                     s.AnyMO.mro_exists_key, s.AnyMO.mro_delete_key,
                     s.AnyMO.mro_bind_key);
@@ -6404,7 +6413,7 @@ slow:
             Handler_PandBox(s.MatchMO, "Str", new CtxMatchStr(), s.StrMO);
             s.MatchMO.FillProtoClass(s.AnyMO);
 
-            s.ScalarMO = new STable("Scalar");
+            s.ScalarMO = new STable(s, "Scalar");
             s.ScalarMO.FillProtoClass(s.AnyMO);
         }
 

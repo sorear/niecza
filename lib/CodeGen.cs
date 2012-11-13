@@ -356,7 +356,7 @@ namespace Niecza.CLRBackend {
         public static readonly MethodInfo Kernel_NewLabelVar =
             typeof(Kernel).GetMethod("NewLabelVar");
         public static readonly MethodInfo Kernel_MakeDispatcher =
-            typeof(Kernel).GetMethod("MakeDispatcher");
+            typeof(Kernel).GetMethod("MakeDispatcherF");
         public static readonly MethodInfo Kernel_Die =
             typeof(Kernel).GetMethod("Die");
         public static readonly MethodInfo Kernel_SFH =
@@ -2278,6 +2278,7 @@ namespace Niecza.CLRBackend {
             }
 
             return CpsOp.MethodCall(Tokens.Kernel_MakeDispatcher,
+                    CpsOp.CallFrame(),
                     CpsOp.StringLiteral(prefix), proto,
                     CpsOp.NewArray(Tokens.P6any, cands.ToArray()));
         }
@@ -4331,7 +4332,7 @@ dynamic:
 
             STable nst = mof == null ? null : (STable)mof.GetValue(ru.setting);
             if (nst == null) { // not all FooMO are initialized by kernel
-                nst = new STable(name);
+                nst = new STable(ru.setting, name);
                 if (mof != null) mof.SetValue(ru.setting, nst);
             }
             // Hack - we don't clear the MRO here, because we might need

@@ -2717,7 +2717,7 @@ again:
         while (Kernel.IterHasFlat(iter, true))
             roles.Add(iter.Shift().Fetch().mo);
 
-        STable n = new STable(obj.mo.name + "+" + Kernel.JoinS(",", roles));
+        STable n = new STable(c.setting, obj.mo.name + "+" + Kernel.JoinS(",", roles));
 
         n.how = Kernel.BoxAny<STable>(n, obj.mo.how).Fetch();
         n.typeObj = n.initObj = new P6opaque(n);
@@ -2800,7 +2800,7 @@ again:
     }
 
     public static Variable enum_mixin_role(string name, P6any meth) {
-        STable r = new STable('{' + name + '}');
+        STable r = new STable(meth.mo.setting, '{' + name + '}');
         r.mo.FillRole(new STable[0], null);
         r.typeObj = r.initObj = new P6opaque(r);
         r.mo.AddMethod(0, name, meth);
@@ -2811,7 +2811,7 @@ again:
 
     // TODO: merge
     public static Variable cat_mixin_role(string name, P6any meth) {
-        STable r = new STable('{' + name + '}');
+        STable r = new STable(meth.mo.setting, '{' + name + '}');
         r.mo.FillRole(new STable[0], null);
         r.typeObj = r.initObj = new P6opaque(r);
         r.mo.AddMethod(P6how.M_MULTI, name, meth);
@@ -2823,7 +2823,7 @@ again:
     public static Variable type_mixin_role(Variable type, Variable meth) {
         STable stype = type.Fetch().mo;
         string name = stype.name;
-        STable r = new STable("ANON");
+        STable r = new STable(stype.setting, "ANON");
 
         r.mo.FillRole(new STable[0], null);
         r.typeObj = r.initObj = new P6opaque(r);

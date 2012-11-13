@@ -601,7 +601,7 @@ retry:
     }
 
     public Frame proto_dispatch(Frame th, Variable unused) {
-        Frame nth = th.MakeChild(null, Lexer.StandardProtoSI, global.setting.AnyP);
+        Frame nth = th.MakeChild(null, th.info.setting.StandardLexerSI, global.setting.AnyP);
         nth.pos = new Variable[] { MakeCursorV() };
         return nth;
     }
@@ -2147,8 +2147,6 @@ anew:
         return ret;
     }
 
-    internal static SubInfo StandardProtoSI =
-        new SubInfo("KERNEL protoregex", StandardProtoC);
     internal static Frame StandardProtoC(Frame th) {
         Variable[] al;
         switch (th.ip) {
@@ -2183,13 +2181,13 @@ anew:
         }
     }
 
-    public static P6any MakeDispatcher(string name, P6any proto, P6any[] cands) {
+    public static P6any MakeDispatcher(Compartment s, string name, P6any proto, P6any[] cands) {
         if (proto != null) {
             SubInfo si = new SubInfo(Kernel.GetInfo(proto));
             si.param = new object[] { cands, null };
             return Kernel.MakeSub(si, Kernel.GetOuter(proto));
         } else {
-            SubInfo si = new SubInfo(name, StandardProtoC);
+            SubInfo si = new SubInfo(s, name, StandardProtoC);
             si.param = new object[] { cands, null };
             si.ltm = new LADDispatcher();
             return Kernel.MakeSub(si, null);

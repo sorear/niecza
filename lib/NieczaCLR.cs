@@ -653,7 +653,7 @@ for $args (0..9) {
         static STable NewWrapper(Compartment s, Type t) {
             if (CLROpts.Debug)
                 Console.WriteLine("Setting up wrapper for {0}", t.FullName);
-            STable m = new STable("CLR::" + t.FullName.Replace(".","::"));
+            STable m = new STable(s, "CLR::" + t.FullName.Replace(".","::"));
             m.who = StashCursor.MakeCLR_WHO(s, "." + t.FullName);
             m.how = Kernel.BoxRaw(m, s.ClassHOWMO);
             STable pm = t.BaseType == null ? s.AnyMO : GetWrapper(s, t.BaseType);
@@ -713,7 +713,7 @@ for $args (0..9) {
             if (typeof(IDisposable).IsAssignableFrom(t)) {
                 SubInfo si;
 
-                si = new SubInfo("KERNEL dispose-hack", dispose_handler);
+                si = new SubInfo(s, "KERNEL dispose-hack", dispose_handler);
                 si.sig = new Signature(s,Parameter.TPos(s, "self", 0));
                 m.AddMethod(0, "dispose-hack", Kernel.MakeSub(si, null));
             }
@@ -721,20 +721,20 @@ for $args (0..9) {
             if (t == typeof(object)) {
                 SubInfo si;
 
-                si = new SubInfo("KERNEL default", default_handler);
+                si = new SubInfo(s, "KERNEL default", default_handler);
                 si.sig = new Signature(s, Parameter.TPos(s, "self", 0));
                 m.AddMethod(0, "default", Kernel.MakeSub(si, null));
 
-                si = new SubInfo("KERNEL marshal", marshal_handler);
+                si = new SubInfo(s, "KERNEL marshal", marshal_handler);
                 si.sig = new Signature(s, Parameter.TPos(s, "self", 0),
                         Parameter.TPos(s, "$obj", 1));
                 m.AddMethod(0, "marshal", Kernel.MakeSub(si, null));
 
-                si = new SubInfo("KERNEL unmarshal", unmarshal_handler);
+                si = new SubInfo(s, "KERNEL unmarshal", unmarshal_handler);
                 si.sig = new Signature(s, Parameter.TPos(s, "self", 0));
                 m.AddMethod(0, "unmarshal", Kernel.MakeSub(si, null));
 
-                si = new SubInfo("KERNEL Str", Str_handler);
+                si = new SubInfo(s,"KERNEL Str", Str_handler);
                 si.sig = new Signature(s, Parameter.TPos(s, "self", 0));
                 m.AddMethod(0, "Str",  Kernel.MakeSub(si, null));
                 m.AddMethod(0, "gist", Kernel.MakeSub(si, null));
@@ -743,7 +743,7 @@ for $args (0..9) {
             foreach (string n in needNewWrapper) {
                 string siname = string.Format("{0}.{1}", m.name, n);
 
-                SubInfo si = new SubInfo(siname, Binder);
+                SubInfo si = new SubInfo(s, siname, Binder);
                 si.param = new object[] {
                     new CandidateSet(s, siname, allMembers[n].ToArray()) };
                 if (CLROpts.Debug)

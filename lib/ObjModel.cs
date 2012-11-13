@@ -360,7 +360,7 @@ next_method: ;
                 P6any[] cl = new P6any[cands.Count];
                 for (int ix = 0; ix < cl.Length; ix++)
                     cl[ix] = cands[ix].impl;
-                P6any disp = Kernel.MakeDispatcher(ds.name, ds.proto, cl);
+                P6any disp = Kernel.MakeDispatcher(stable.setting, ds.name, ds.proto, cl);
                 DispatchEnt de;
                 inherit_methods.TryGetValue(ds.name, out de);
                 inherit_methods[ds.name] = new DispatchEnt(de, disp);
@@ -713,7 +713,7 @@ next_method: ;
         public STable PunRole() {
             var pun = Thread.VolatileRead(ref rolePun) as STable;
             if (pun != null) return pun;
-            STable n = new STable(stable.name);
+            STable n = new STable(stable.setting, stable.name);
 
             n.how = Kernel.BoxAnyMO<STable>(n, stable.setting.ClassHOWMO).Fetch();
             n.typeObj = n.initObj = new P6opaque(n);
@@ -841,7 +841,7 @@ next_method: ;
         public bool useAcceptsType;
 
         public Type box_type;
-        internal Compartment setting = Compartment.Top;
+        internal Compartment setting;
         /// }}}
 
         /// compositon-created cache {{{
@@ -882,7 +882,8 @@ next_method: ;
         /// }}}
 
         private STable() {}
-        public STable(string name) {
+        public STable(Compartment setting, string name) {
+            this.setting = setting;
             this.name = name;
             mo = new P6how();
             mo.stable = this;
@@ -1064,6 +1065,7 @@ next_method: ;
         internal static STable Thaw(ThawBuffer tb) {
             STable n = new STable();
             tb.Register(n);
+            n.setting = tb.setting;
             n.mo = (P6how)tb.ObjRef();
             n.how = (P6any)tb.ObjRef();
             n.who = (P6any)tb.ObjRef();
