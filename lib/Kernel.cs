@@ -3832,23 +3832,25 @@ tryagain:
 
     class IxCallMethod : IndexHandler {
         string name;
-        VarHash named;
+        string adv;
         public IxCallMethod() { }
         protected override object[] GetData() {
-            return new object[] { name, named };
+            return new object[] { name, adv };
         }
         protected override void SetData(object[] o) {
             name = (string) o[0];
-            named = (VarHash) o[1];
+            adv = (string) o[1];
         }
         public IxCallMethod(string name, string adv) {
             this.name = name;
+            this.adv = adv;
+        }
+        public override Variable Get(Variable obj, Variable key) {
+            VarHash named = null;
             if (adv != null) {
                 named = new VarHash();
                 named[adv] = setting.TrueV;
             }
-        }
-        public override Variable Get(Variable obj, Variable key) {
             return Builtins.InvokeMethod(name, new [] { obj, key }, named);
         }
     }
@@ -5043,32 +5045,32 @@ have_v:
                     2, 3, SubInfo.ON_LAST, 3, 0,
                 }, new string[] { "" }, 0);
 
-            c.CallStr         = new CtxCallMethod("Str");
-            c.CallBool        = new CtxCallMethod("Bool");
-            c.CallNumeric     = new CtxCallMethod("Numeric");
-            c.CallDefined     = new CtxCallMethod("defined");
-            c.CallIterator    = new CtxCallMethod("iterator");
-            c.CallItem        = new CtxCallMethod("item");
-            c.CallList        = new CtxCallMethod("list");
-            c.CallHash        = new CtxCallMethod("hash");
-            c.CallShift       = new CtxCallMethod("shift");
-            c.CallPop         = new CtxCallMethod("pop");
-            c.CallPred        = new CtxCallMethodFetch("pred");
-            c.CallSucc        = new CtxCallMethodFetch("succ");
-            c.RawCallStr      = new CtxCallMethodUnbox<string>("Str");
-            c.RawCallBool     = new CtxCallMethodUnboxBool("Bool");
-            c.RawCallNumeric  = new CtxCallMethodUnboxNumeric("Numeric");
-            c.RawCallDefined  = new CtxCallMethodUnboxBool("defined");
-            c.RawCallIterator = new CtxCallMethodUnbox<VarDeque>("iterator");
-            c.RawCallReify    = new CtxCallMethodUnbox<Variable[]>("reify");
-            c.CallAtPos       = new IxCallMethod("postcircumfix:<[ ]>", null);
-            c.CallAtKey       = new IxCallMethod("postcircumfix:<{ }>", null);
-            c.CallExistsKey   = new IxCallMethod("postcircumfix:<{ }>", "exists");
-            c.CallDeleteKey   = new IxCallMethod("postcircumfix:<{ }>", "delete");
-            c.CallLISTSTORE   = new IxCallMethod("LISTSTORE", null);
-            c.CallINVOKE      = new InvokeCallMethod();
-            c.CallPush        = new PushyCallMethod("push");
-            c.CallUnshift     = new PushyCallMethod("unshift");
+            c.CallStr         = new CtxCallMethod("Str") { setting = c };
+            c.CallBool        = new CtxCallMethod("Bool") { setting = c };
+            c.CallNumeric     = new CtxCallMethod("Numeric") { setting = c };
+            c.CallDefined     = new CtxCallMethod("defined") { setting = c };
+            c.CallIterator    = new CtxCallMethod("iterator") { setting = c };
+            c.CallItem        = new CtxCallMethod("item") { setting = c };
+            c.CallList        = new CtxCallMethod("list") { setting = c };
+            c.CallHash        = new CtxCallMethod("hash") { setting = c };
+            c.CallShift       = new CtxCallMethod("shift") { setting = c };
+            c.CallPop         = new CtxCallMethod("pop") { setting = c };
+            c.CallPred        = new CtxCallMethodFetch("pred") { setting = c };
+            c.CallSucc        = new CtxCallMethodFetch("succ") { setting = c };
+            c.RawCallStr      = new CtxCallMethodUnbox<string>("Str") { setting = c };
+            c.RawCallBool     = new CtxCallMethodUnboxBool("Bool") { setting = c };
+            c.RawCallNumeric  = new CtxCallMethodUnboxNumeric("Numeric") { setting = c };
+            c.RawCallDefined  = new CtxCallMethodUnboxBool("defined") { setting = c };
+            c.RawCallIterator = new CtxCallMethodUnbox<VarDeque>("iterator") { setting = c };
+            c.RawCallReify    = new CtxCallMethodUnbox<Variable[]>("reify") { setting = c };
+            c.CallAtPos       = new IxCallMethod("postcircumfix:<[ ]>", null) { setting = c };
+            c.CallAtKey       = new IxCallMethod("postcircumfix:<{ }>", null) { setting = c };
+            c.CallExistsKey   = new IxCallMethod("postcircumfix:<{ }>", "exists") { setting = c };
+            c.CallDeleteKey   = new IxCallMethod("postcircumfix:<{ }>", "delete") { setting = c };
+            c.CallLISTSTORE   = new IxCallMethod("LISTSTORE", null) { setting = c };
+            c.CallINVOKE      = new InvokeCallMethod() { setting = c };
+            c.CallPush        = new PushyCallMethod("push") { setting = c };
+            c.CallUnshift     = new PushyCallMethod("unshift") { setting = c };
         }
 
         public static P6any MakeSub(SubInfo info, Frame outer) {
@@ -5691,7 +5693,7 @@ slow:
         }
 
         private static void Handler_Vonly(STable kl, string name,
-                ContextHandler<Variable> cv, object cvu) {
+                ContextHandler<Variable> cv, ReflectObj cvu) {
             WrapHandler0(kl, name, cv, cvu);
         }
 
@@ -5721,7 +5723,9 @@ slow:
         }
 
         private static void WrapHandler0(STable kl, string name,
-                ContextHandler<Variable> cvb, object cvu) {
+                ContextHandler<Variable> cvb, ReflectObj cvu) {
+            if (cvb != null) cvb.setting = kl.setting;
+            if (cvu != null) cvu.setting = kl.setting;
             SubInfo si = new SubInfo(kl.setting, "KERNEL " + kl.name + "." + name,
                     WrapHandler0cb);
             si.sig = new Signature(kl.setting,Parameter.TPos(kl.setting,"self", 0));
@@ -5738,6 +5742,7 @@ slow:
         }
         private static void WrapHandler1(STable kl, string name,
                 IndexHandler cv) {
+            cv.setting = kl.setting;
             SubInfo si = new SubInfo(kl.setting, "KERNEL " + kl.name + "." + name,
                 WrapHandler1cb);
             si.sig = new Signature(kl.setting,
@@ -5759,6 +5764,7 @@ slow:
         }
         private static void WrapPushy(STable kl, string name,
                 PushyHandler cv) {
+            cv.setting = kl.setting;
             SubInfo si = new SubInfo(kl.setting, "KERNEL " + kl.name + "." + name,
                     WrapPushycb);
             si.sig = new Signature(kl.setting,
@@ -5799,11 +5805,11 @@ slow:
             } else if (p[2] != null && n.ContainsKey("delete")) {
                 res = ((IndexHandler)p[2]).Get(self, index);
             } else if (n.ContainsKey("k")) {
-                res =  new KeySlicer(0, p[0]).Get(self, index);
+                res =  new KeySlicer(0, p[0]) { setting = th.info.setting }.Get(self, index);
             } else if (n.ContainsKey("kv")) {
-                res = new KeySlicer(1, p[0]).Get(self, index);
+                res = new KeySlicer(1, p[0]) { setting = th.info.setting }.Get(self, index);
             } else if (n.ContainsKey("p")) {
-                res = new KeySlicer(2, p[0]).Get(self, index);
+                res = new KeySlicer(2, p[0]) { setting = th.info.setting }.Get(self, index);
             } else if (n.ContainsKey("BIND_VALUE")) {
                 res = ((BindHandler)p[3]).Bind(self, index, n["BIND_VALUE"]);
             } else {
@@ -5817,6 +5823,8 @@ slow:
         private static void WrapIndexy(STable kl, string name,
                 IndexHandler at, IndexHandler exist, IndexHandler del,
                 BindHandler bind) {
+            bind.setting = at.setting = kl.setting;
+            if (del != null) del.setting = exist.setting = kl.setting;
             SubInfo si = new SubInfo(kl.setting, "KERNEL " + kl.name + "." + name,
                     DispIndexy);
             var c = kl.setting;

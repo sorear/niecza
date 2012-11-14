@@ -877,7 +877,7 @@ badhash:
     }
 
     public class ReflectObj : IFreeze {
-        internal Compartment setting = Compartment.Top;
+        internal Compartment setting; // set on installation in WrapHandler0 et al
         protected virtual object[] GetData() { return new object[0]; }
         protected virtual void SetData(object[] a) { }
         void IFreeze.Freeze(FreezeBuffer fb) {
@@ -894,6 +894,7 @@ badhash:
             ReflectObj n = (ReflectObj)
                 nt.GetConstructor(new Type[0]).Invoke(new object[0]);
             tb.Register(n);
+            n.setting = tb.setting;
             n.SetData(tb.RefsA<object>());
             return n;
         }
