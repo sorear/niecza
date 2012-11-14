@@ -4507,6 +4507,8 @@ have_v:
     }
 
     public class Compartment {
+        internal Compartment link;
+
         [CORESaved] public STable PairMO;
         [CORESaved] public STable EnumMO;
         [CORESaved] public STable EnumMapMO;

@@ -3652,19 +3652,22 @@ dynamic:
             return null;
         }
         public static object push_compartment(object[] args) {
-            var old = Compartment.Top;
-            Kernel.InitCompartment( Compartment.Top = new Compartment() );
-            return Handle.Wrap(old);
+            var nc = Compartment.Top = new Compartment() { link = Compartment.Top };
+            Kernel.InitCompartment(nc);
+            return Handle.Wrap(nc);
         }
         public static object pop_compartment(object[] args) {
-            Compartment.Top.RunEnd();
-            Compartment.Top = (Compartment)Handle.Unbox(args[1]);
+            var c = (Compartment)Handle.Unbox(args[1]);
+            c.RunEnd();
+            Compartment.Top = c.link;
             return null;
         }
         public static object new_unit(object[] args) {
-            RuntimeUnit ru = new RuntimeUnit(Compartment.Top, (string)args[1],
-                    (string)args[2], (string)args[3], (bool)args[4],
-                    (bool)args[5]);
+            object cref = Handle.Unbox(args[1]);
+            Compartment comp = (cref as Compartment) ?? ((SubInfo)cref).setting;
+            RuntimeUnit ru = new RuntimeUnit(comp, (string)args[2],
+                    (string)args[3], (string)args[4], (bool)args[5],
+                    (bool)args[6]);
 
             if (ru.setting.containerRootUnit == null) {
                 // this is a module unit

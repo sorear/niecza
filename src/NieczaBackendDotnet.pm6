@@ -345,6 +345,6 @@ method push_compartment() { downcall("push_compartment") }
 method pop_compartment($c) { downcall("pop_compartment", $c) }
 method get_codepoint($str) { downcall("get_codepoint", $str) }
 
-method create_unit($name, $filename, $source, $main, $run) {
-    downcall("new_unit", ~$name, ~$filename, ~$source, ?$main, ?$run);
+method create_unit($comph, $name, $filename, $source, $main, $run) {
+    downcall("new_unit", $comph, ~$name, ~$filename, ~$source, ?$main, ?$run);
 }
