@@ -3652,14 +3652,13 @@ dynamic:
             return null;
         }
         public static object push_compartment(object[] args) {
-            var nc = Compartment.Top = new Compartment() { link = Compartment.Top };
+            var nc = new Compartment();
             Kernel.InitCompartment(nc);
             return Handle.Wrap(nc);
         }
         public static object pop_compartment(object[] args) {
             var c = (Compartment)Handle.Unbox(args[1]);
             c.RunEnd();
-            Compartment.Top = c.link;
             return null;
         }
         public static object new_unit(object[] args) {

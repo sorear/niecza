@@ -4509,8 +4509,6 @@ have_v:
     }
 
     public class Compartment {
-        internal Compartment link;
-
         [CORESaved] public STable PairMO;
         [CORESaved] public STable EnumMO;
         [CORESaved] public STable EnumMapMO;
@@ -4654,8 +4652,6 @@ have_v:
 
         [TrueGlobal]
         internal static HashSet<Compartment> pending = new HashSet<Compartment>();
-        [TrueGlobal]
-        public static Compartment Top = new Compartment();
         internal bool end_run;
 
         internal PhaserList check = new PhaserList(true);
@@ -6679,7 +6675,7 @@ slow:
         }
 
         public static void MainHandler(string uname, string[] args) {
-            var c = Compartment.Top;
+            var c = new Compartment();
             InitCompartment(c);
             InitGlobal();
             commandArgs = args;
@@ -6716,7 +6712,7 @@ slow:
 
         public static void Main(string[] args) {
             string cmd = args.Length > 0 ? args[0] : "-help";
-            var comp = Compartment.Top;
+            var comp = new Compartment();
 
             InitCompartment(comp);
             InitGlobal();
