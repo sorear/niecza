@@ -3419,8 +3419,6 @@ dynamic:
 
     public class Backend {
         [TrueGlobal]
-        public static string obj_dir = AppDomain.CurrentDomain.BaseDirectory;
-        [TrueGlobal]
         public static string prefix = (typeof(Backend).Assembly.GetName().Name == "Kernel") ? "" : "Run.";
         [TrueGlobal]
         public static bool cross_level_load;
@@ -3646,13 +3644,14 @@ dynamic:
                 Kernel.TraceFlags = Kernel.TRACE_CUR;
                 Kernel.TraceCount = Kernel.TraceFreq = 1;
             }
-            Kernel.InitGlobal();
-            Backend.obj_dir = (string)args[1];
-            Builtins.upcall_receiver = (System.Collections.IDictionary)args[2];
+            var c = (Compartment)Handle.Unbox(args[1]);
+            c.obj_dir = (string)args[2];
+            c.upcall_receiver = (System.Collections.IDictionary)args[3];
             return null;
         }
         public static object push_compartment(object[] args) {
             var nc = new Compartment();
+            Kernel.InitGlobal();
             Kernel.InitCompartment(nc);
             return Handle.Wrap(nc);
         }
@@ -3711,7 +3710,7 @@ dynamic:
                 if (Config.SerFailInfo)
                     Console.WriteLine("Thaw {0} failed: >>>{1}<<<", oname, ex);
                 // assume stale at first
-                object r1 = Builtins.UpCall(new object[] {
+                object r1 = Builtins.UpCall(ru.setting, new object[] {
                     "compile_unit", oname });
                 if (r1 != null)
                     return r1;

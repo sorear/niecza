@@ -1971,19 +1971,18 @@ public partial class Builtins {
         System.Diagnostics.Process.Start(file, args).WaitForExit();
     }
 
-    [TrueGlobal] internal static System.Collections.IDictionary upcall_receiver;
-    internal static object UpCall(object[] args) {
-        return upcall_receiver[args];
+    internal static object UpCall(Compartment c, params object[] args) {
+        return c.upcall_receiver[args];
     }
     public static Frame simple_eval(Frame th, Variable str) {
-        if (upcall_receiver == null)
+        if (th.info.setting.upcall_receiver == null)
             return Kernel.Die(th, "Cannot eval; no compiler available");
         SubInfo outer = th.caller.info;
-        object r = UpCall(new object[] { "eval",
+        object r = UpCall(th.info.setting, "eval",
                 str.Fetch().mo.mro_raw_Str.Get(str),
                 new Niecza.CLRBackend.Handle(outer),
                 new Niecza.CLRBackend.Handle(th.caller)
-                });
+                );
         if (r is Exception)
             return Kernel.Die(th, ((Exception)r).Message);
         P6any sub = Kernel.MakeSub(((RuntimeUnit)Niecza.CLRBackend.Handle.Unbox(r)).mainline, th.caller);
@@ -1997,12 +1996,11 @@ public partial class Builtins {
         // TODO: it would be better if the compiler could be modified to
         // compile a regex directly as the mainline
         if (!th.info.rx_compile_cache.TryGetValue(code, out main)) {
-            if (upcall_receiver == null)
+            if (th.info.setting.upcall_receiver == null)
                 throw new NieczaException("Cannot eval; no compiler available");
-            object r = UpCall(new object[] { "eval",
+            object r = UpCall(th.info.setting, "eval",
                     "regex {" + code + "}",
-                    new Niecza.CLRBackend.Handle(th.info)
-                    });
+                    new Niecza.CLRBackend.Handle(th.info));
             if (r is Exception)
                 throw new NieczaException(((Exception)r).Message);
             main = ((RuntimeUnit)Niecza.CLRBackend.Handle.Unbox(r)).mainline;

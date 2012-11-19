@@ -434,7 +434,7 @@ namespace Niecza {
                     new AssemblyName(asm_name),
                     (dll_name == null ? AssemblyBuilderAccess.Run :
                         AssemblyBuilderAccess.RunAndSave),
-                    Backend.obj_dir);
+                    s.obj_dir);
 
             mod_builder = dll_name == null ?
                 asm_builder.DefineDynamicModule(asm_name) :
@@ -995,11 +995,11 @@ namespace Niecza {
 
             n.name     = tb.String();
             string[] srcinfo = tb.Strings();
-            if (Builtins.upcall_receiver != null) {
+            if (tb.setting.upcall_receiver != null) {
                 object[] args = new object[srcinfo.Length + 1];
                 Array.Copy(srcinfo, 0, args, 1, srcinfo.Length);
                 args[0] = "check_dated";
-                object result = Builtins.UpCall(args);
+                object result = Builtins.UpCall(tb.setting, args);
                 if (result is Exception)
                     throw (Exception)result;
                 if ((string)result != "ok")
@@ -1026,7 +1026,7 @@ namespace Niecza {
                         tb.ObjRef();
                     }
                 } else {
-                    Assembly assembly = Assembly.Load(n.asm_name);
+                    Assembly assembly = Assembly.LoadFrom(Path.Combine(tb.setting.obj_dir, n.dll_name));
                     n.type = tb.type = assembly.GetType(n.asm_name, true);
                     n.constTable = (Constants)Activator.CreateInstance(n.type);
                     n.constTable.setting = tb.setting;
@@ -4569,6 +4569,8 @@ have_v:
         [CORESaved] public BoxObject<int> FalseV;
 
         internal ObjectRegistry reg;
+        public string obj_dir = AppDomain.CurrentDomain.BaseDirectory;
+        internal System.Collections.IDictionary upcall_receiver;
 
         // SubInfo objects can be mutated at runtime by .wrap so they
         // must be containerized
@@ -4993,7 +4995,10 @@ have_v:
             return nw;
         }
 
+        internal static bool gl_inited = false; // TODO threads?
         internal static void InitGlobal() {
+            if (gl_inited) return;
+            gl_inited = true;
             Random r = new Random();
             VarHash.string_hash_argument =
                 (uint)r.Next(VarHash.HASH_ARG_MAX + 1);
@@ -5003,6 +5008,8 @@ have_v:
         }
 
         internal static void InitCompartment(Compartment c) {
+            InitGlobal();
+
             c.reg = new ObjectRegistry(c);
 
             c.AutoThreadSubSI = new SubInfo(c, "KERNEL AutoThreadSub",
@@ -6677,7 +6684,6 @@ slow:
         public static void MainHandler(string uname, string[] args) {
             var c = new Compartment();
             InitCompartment(c);
-            InitGlobal();
             commandArgs = args;
 
             RuntimeUnit ru = (RuntimeUnit)
@@ -6715,7 +6721,6 @@ slow:
             var comp = new Compartment();
 
             InitCompartment(comp);
-            InitGlobal();
 
             if (cmd == "-field-inventory") {
                 foreach (Type ty in typeof(Kernel).Assembly.GetTypes()) {
@@ -6771,7 +6776,7 @@ slow:
 
                 // allow loading of Run. files, but don't try to load the
                 // assemblies, since we're not Run.Kernel
-                Backend.obj_dir = fromdir;
+                comp.obj_dir = fromdir;
                 Backend.prefix  = "Run.";
                 Backend.cross_level_load = true;
 
@@ -6779,7 +6784,7 @@ slow:
                     comp.reg.LoadUnit("MAIN").root;
 
                 // reset for writing
-                Backend.obj_dir = AppDomain.CurrentDomain.BaseDirectory;
+                comp.obj_dir = AppDomain.CurrentDomain.BaseDirectory;
                 Backend.prefix  = "";
 
                 RewriteUnits(root, root, new HashSet<RuntimeUnit>());

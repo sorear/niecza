@@ -341,7 +341,11 @@ class Unit {
     }
 }
 
-method push_compartment() { downcall("push_compartment") }
+method push_compartment() {
+    my \c = downcall("push_compartment");
+    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitCompartment {c})) };
+    c;
+}
 method pop_compartment($c) { downcall("pop_compartment", $c) }
 method get_codepoint($str) { downcall("get_codepoint", $str) }
 

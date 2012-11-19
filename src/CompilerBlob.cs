@@ -53,17 +53,6 @@ namespace Niecza {
         static STable StrMO, NumMO, ListMO, AnyMO, BoolMO;
         static string obj_dir;
 
-        // let the CLR load assemblies from obj/ too
-        static Assembly ObjLoader(object source, ResolveEventArgs e) {
-            string name = e.Name;
-            if (name.IndexOf(',') >= 0)
-                name = name.Substring(0, name.IndexOf(','));
-            string file = Path.Combine(obj_dir, name + ".dll");
-            if (File.Exists(file))
-                return Assembly.LoadFrom(file);
-            else
-                return null;
-        }
         // Better, but still fudgy.  Relies too much on path structure.
         public static void InitSlave(Variable cb, P6any cmd_obj_dir, Variable unit,
                 Variable staticSub, Variable type, Variable param, Variable value,
@@ -98,12 +87,13 @@ namespace Niecza {
                 );
             }
 
-            AppDomain.CurrentDomain.AssemblyResolve += ObjLoader;
+            var down_asm = Assembly.LoadFrom(Path.Combine(obj_dir, "Run.Kernel.dll"));
 
             upcall_cb = cb;
-            responder = (IDictionary) Activator.CreateInstance(Type.GetType(
-                    "Niecza.CLRBackend.DowncallReceiver,Run.Kernel", true));
-            RawDowncall("set_binding", obj_dir, new UpcallReceiver());
+            responder = (IDictionary) down_asm.CreateInstance("Niecza.CLRBackend.DowncallReceiver");
+        }
+        public static void InitCompartment(Variable c) {
+            RawDowncall("set_binding", DCArg(c), obj_dir, new UpcallReceiver());
         }
         public static object RawDowncall(params object[] args) {
             return responder[args];
