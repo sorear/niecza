@@ -734,8 +734,8 @@ namespace Niecza {
             if (name == "CORE")
                 Kernel.CreateBasicTypes(setting);
 
-            this.asm_name = Backend.prefix + name.Replace("::", ".");
-            this.dll_name = asm_name + (main ? ".exe" : ".dll");
+            this.asm_name = name.Replace("::", ".") + "." + Guid.NewGuid(); // force unique assembly names so that we can load multiple versions in a process
+            this.dll_name = name.Replace("::", ".") + (main ? ".exe" : ".dll");
             our_subs = new List<SubInfo>();
         }
 
@@ -6766,10 +6766,7 @@ slow:
                 // procedure, because initial code generation makes Run.CORE
                 // and we need to turn it into CORE for the compiler proper.
 
-                if (Backend.prefix != "") {
-                    Console.Error.WriteLine("-gen-app may only be used with Kernel.dll");
-                    Environment.Exit(1);
-                }
+                // this needs to be rethought for the new segregation model
 
                 string exename = args[1];
                 string fromdir = args[2];
@@ -6777,7 +6774,6 @@ slow:
                 // allow loading of Run. files, but don't try to load the
                 // assemblies, since we're not Run.Kernel
                 comp.obj_dir = fromdir;
-                Backend.prefix  = "Run.";
                 Backend.cross_level_load = true;
 
                 RuntimeUnit root = (RuntimeUnit)
@@ -6785,7 +6781,6 @@ slow:
 
                 // reset for writing
                 comp.obj_dir = AppDomain.CurrentDomain.BaseDirectory;
-                Backend.prefix  = "";
 
                 RewriteUnits(root, root, new HashSet<RuntimeUnit>());
 

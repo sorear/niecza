@@ -3002,12 +3002,6 @@ dynamic:
                 return CpsOp.MethodCall(mi, rst); };
             handlers["rawscall"] = delegate(NamProcessor th, object[] z) {
                 string name = JScalar.S(z[1]);
-                // Horrible, horrible hack.  We need to redirect references
-                // to CompilerBlob while compiling the compiler because
-                // otherwise they will be resolved to the compiler compiler's
-                // copy.
-                if (Backend.prefix == "Run.")
-                    name = name.Replace("CompilerBlob", "Run.CompilerBlob");
                 int ixn = name.LastIndexOf(':');
                 Type cpsrt = null;
                 if (ixn >= 0) {
@@ -3418,8 +3412,6 @@ dynamic:
     }
 
     public class Backend {
-        [TrueGlobal]
-        public static string prefix = (typeof(Backend).Assembly.GetName().Name == "Kernel") ? "" : "Run.";
         [TrueGlobal]
         public static bool cross_level_load;
 

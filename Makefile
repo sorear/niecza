@@ -22,13 +22,13 @@ srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar OptRxSimple \
 	 Operator NieczaActions NieczaFrontendSTD NieczaPassSimplifier \
 	 OptBeta NieczaPathSearch NieczaBackendDotnet NieczaCompiler GetOptLong
 
-all: run/Niecza.exe run/Run.Kernel.dll obj/Run.CORE.dll
+all: run/Niecza.exe run/Run.Kernel.dll obj/CORE.dll
 
 $(patsubst %,boot/obj/Run.%.ser,$(srcunits)): boot/obj/Run.%.ser: .fetch-stamp src/%.pm6 boot/obj/Run.CORE.ser
 	cd src && NIECZA_KEEP_IL=1 $(RUN_CLR) ../boot/run/Niecza.exe --obj-dir ../boot/obj -C $*
 
 # hack - put VERSION info in place so the setting build can embed it
-obj/Run.CORE.dll: run/Niecza.exe obj/Run.Kernel.dll lib/CORE.setting
+obj/CORE.dll: run/Niecza.exe obj/Run.Kernel.dll lib/CORE.setting
 	@git describe --tags > VERSION
 	$(RUN_CLR) run/Niecza.exe --obj-dir obj -C CORE
 
@@ -78,7 +78,7 @@ aot: all
 
 test: all
 	$(RUN_CLR) run/Niecza.exe --obj-dir obj -c test.pl
-	prove -e "$(RUN_CLR)" obj/Run.MAIN.exe
+	prove -e "$(RUN_CLR)" obj/MAIN.exe
 
 spectest: all
 	@t/run_spectests

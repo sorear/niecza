@@ -151,7 +151,7 @@ namespace Niecza.Serialization {
                 return units[name];
             }
 
-            string file = Path.Combine(setting.obj_dir, Backend.prefix +
+            string file = Path.Combine(setting.obj_dir,
                     name.Replace("::",".") + ".ser");
             byte[] bytes = File.ReadAllBytes(file);
 
@@ -203,7 +203,7 @@ namespace Niecza.Serialization {
                 throw new InvalidOperationException("unit " +name+ " exists");
 
             bool success = false;
-            string file = Path.Combine(setting.obj_dir, Backend.prefix +
+            string file = Path.Combine(setting.obj_dir,
                     name.Replace("::",".") + ".ser");
 
             FreezeBuffer fb = new FreezeBuffer(this, su);
