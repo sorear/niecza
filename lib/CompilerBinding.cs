@@ -224,7 +224,7 @@ public partial class Builtins {
         return Downcaller.DCResult(si.Fetch().mo.setting, Downcaller.RawDowncall(args));
     }
 
-    public static string DoHash(string input) {
+    public static string cb_do_hash(string input) {
         HashAlgorithm sha = SHA256.Create();
         byte[] ibytes = new UTF8Encoding().GetBytes(input);
         byte[] hash = sha.ComputeHash(ibytes);
@@ -236,13 +236,13 @@ public partial class Builtins {
         return new string(buf);
     }
 
-    public static string ExecName() {
+    public static string cb_exec_name() {
         return Assembly.GetEntryAssembly().Location;
     }
 
     static Dictionary<P6any,Dictionary<P6any,Variable>> role_cache =
         new Dictionary<P6any,Dictionary<P6any,Variable>>();
-    public static Variable CachedBut(P6any but, Variable v1, Variable v2) {
+    public static Variable cb_cached_but(P6any but, Variable v1, Variable v2) {
         P6any a1 = v1.Fetch();
         P6any a2 = v2.Fetch();
         Dictionary<P6any,Variable> subcache;
