@@ -53,7 +53,7 @@ our $Actions; $Actions = $Actions but role {
 }
 
 my $usage = q:to/EOM/;
-niecza -- a command line wrapper for Niecza
+niecza -- a Perl 6 compiler
 
 usage: niecza -e 'code'      # run a one-liner
    OR: niecza file.pl [args] # run a program
@@ -83,7 +83,7 @@ my @lib  = $basedir.append("lib"), ".".IO.realpath;
 my $lang = "CORE";
 my $safe = False;
 my $bcnd = "dotnet";
-my $odir = Str; # backend auto-detect
+my @odir; # backend auto-detect
 my $verb = 0;
 my @eval;
 my $cmod = False;
@@ -103,14 +103,14 @@ GetOptions(:!permute,
     "compile|c" => sub { $comp = True },
     "safe" => sub { $safe = True },
     "include|I=s" => sub { unshift @lib, $_.IO.realpath },
-    "obj-dir=s" => sub { $odir = $_ },
+    "obj-dir=s" => sub { push @odir, $_ },
     "help|h" => sub { say $usage; exit 0 },
     "no-include-source" => sub { $*no_incl_source = True },
 );
 
 my @*INC;
 if $bcnd eq 'dotnet' || $bcnd eq 'mono' {
-    $Backend = NieczaBackendDotnet.new(obj_dir => $odir, safemode => $safe);
+    $Backend = NieczaBackendDotnet.new(obj_dirs => @odir, safemode => $safe);
 }
 else {
     note "Backend '$bcnd' not supported";

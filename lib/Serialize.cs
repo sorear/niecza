@@ -132,6 +132,17 @@ namespace Niecza.Serialization {
                 byref[items[or.id]] = or;
         }
 
+        public bool DeleteTopUnit(string name) {
+            string path = Path.Combine(setting.obj_dirs[ setting.obj_dirs.Length - 1 ],
+                    name.Replace("::",".") + ".ser");
+            if (File.Exists(path)) {
+                File.Delete(path);
+                return true;
+            } else {
+                return false;
+            }
+        }
+
         // Loads a single unit from the compiled-data directory.
         // Will throw a ThawException if a stale reference is encountered
         // or other data format error.
@@ -151,15 +162,25 @@ namespace Niecza.Serialization {
                 return units[name];
             }
 
-            string file = Path.Combine(setting.obj_dir,
-                    name.Replace("::",".") + ".ser");
-            byte[] bytes = File.ReadAllBytes(file);
+            // Probe for the topmost cache that contains our module
+            string file = null;
+            byte[] bytes = null;
+            for (int i = setting.obj_dirs.Length - 1; i >= 0; i--) {
+                file = Path.Combine(setting.obj_dirs[i], name.Replace("::",".") + ".ser");
+                if (File.Exists(file)) {
+                    bytes = File.ReadAllBytes(file);
+                    break;
+                }
+            }
+            if (bytes == null)
+                throw new ThawException("unit not found: " + name);
 
             su = new SerUnit();
             su.name = name;
             su.hash = NewHash().ComputeHash(bytes);
 
             ThawBuffer tb = new ThawBuffer(setting, this, su, bytes);
+            tb.file = file;
 
             units[name] = su;
             bool success = false;
@@ -203,7 +224,7 @@ namespace Niecza.Serialization {
                 throw new InvalidOperationException("unit " +name+ " exists");
 
             bool success = false;
-            string file = Path.Combine(setting.obj_dir,
+            string file = Path.Combine(setting.obj_dirs[ setting.obj_dirs.Length - 1],
                     name.Replace("::",".") + ".ser");
 
             FreezeBuffer fb = new FreezeBuffer(this, su);
@@ -565,6 +586,7 @@ namespace Niecza.Serialization {
         List<object> revalidate = new List<object>();
 
         public Type type;
+        public string file;
 
         internal ThawBuffer(Compartment setting, ObjectRegistry reg, SerUnit unit, byte[] data) {
             this.data    = data;

@@ -49,7 +49,7 @@ namespace Niecza {
         internal static Variable upcall_cb;
         internal static IDictionary responder;
         internal static P6any UnitP, StaticSubP, TypeP, ParamP, ValueP;
-        internal static string obj_dir;
+        internal static string[] obj_dirs;
 
         public static object RawDowncall(params object[] args) {
             return responder[args];
@@ -173,19 +173,31 @@ public partial class Builtins {
         Downcaller.ParamP = param.Fetch();
         Downcaller.ValueP = value.Fetch();
 
-        Downcaller.obj_dir = Path.GetFullPath(cmd_obj_dir.IsDefined() ?
-                cmd_obj_dir.mo.mro_raw_Str.Get(cmd_obj_dir) :
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "NieczaModuleCache"));
+        string[] obj_dirs =
+            !cmd_obj_dir.IsDefined() ? new string[0] :
+            cmd_obj_dir.Isa(cmd_obj_dir.mo.setting.StrMO) ?
+                new string[] { cmd_obj_dir.mo.mro_raw_Str.Get(cmd_obj_dir) } :
+            Builtins.UnboxLoS(Kernel.NewRWListVar(cmd_obj_dir)) ;
 
-        Directory.CreateDirectory(Downcaller.obj_dir); // like mkdir -p
+        if (obj_dirs.Length == 0) {
+            obj_dirs = new string[2];
+            obj_dirs[0] = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Path.Combine("..", "obj"));
+            obj_dirs[1] = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NieczaModuleCache");
+        }
+
+        for (int i = 0; i < obj_dirs.Length; i++) {
+            Directory.CreateDirectory(obj_dirs[i]); // mkdir -p
+            obj_dirs[i] = Path.GetFullPath(obj_dirs[i]);
+        }
+
+        Downcaller.obj_dirs = obj_dirs;
 
         Downcaller.upcall_cb = cb;
         Downcaller.responder = (IDictionary) new Niecza.CLRBackend.DowncallReceiver();
     }
 
     public static void cb_init_compartment(Variable c) {
-        Downcaller.RawDowncall("set_binding", Downcaller.DCArg(c), Downcaller.obj_dir, new UpcallReceiver());
+        Downcaller.RawDowncall("set_binding", Downcaller.DCArg(c), Downcaller.obj_dirs, new UpcallReceiver());
     }
 
     public static Variable cb_prune_match(Variable vr) {

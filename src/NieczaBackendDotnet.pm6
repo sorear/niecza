@@ -3,7 +3,7 @@ our $PassSimplifier;
 class NieczaBackendDotnet;
 
 has $.safemode = False;
-has $.obj_dir;
+has @.obj_dirs;
 has $.run_args = [];
 
 enum Phaser < INIT END UNIT_INIT KEEP UNDO LEAVE ENTER PRE POST CATCH CONTROL CHECK >;
@@ -65,7 +65,7 @@ class Value { ... }
 
 method new(*%_) {
     my $self = callsame;
-    Q:CgOp { (rnull (cb_init_slave {&upcalled} (@ {$self.obj_dir}) {Unit} {StaticSub} {Type} {Param} {Value})) };
+    Q:CgOp { (rnull (cb_init_slave {&upcalled} (@ {$self.obj_dirs}) {Unit} {StaticSub} {Type} {Param} {Value})) };
     downcall("safemode") if $self.safemode;
     $self;
 }

@@ -3637,7 +3637,7 @@ dynamic:
                 Kernel.TraceCount = Kernel.TraceFreq = 1;
             }
             var c = (Compartment)Handle.Unbox(args[1]);
-            c.obj_dir = (string)args[2];
+            c.obj_dirs = (args[2] is string) ? new [] { (string)args[2] } : (string[]) args[2];
             c.upcall_receiver = (System.Collections.IDictionary)args[3];
             return null;
         }
@@ -3690,24 +3690,35 @@ dynamic:
             string sub = Kernel.UnboxAny<string>(Builtins.eval_perl5(code).Fetch());
             return sub;
         }
+        static RuntimeUnit ProbeLoad(Compartment setting, string oname) {
+            try {
+                return (RuntimeUnit) setting.reg.LoadUnit(oname).root;
+            } catch (Exception ex) {
+                if (Config.SerFailInfo)
+                    Console.WriteLine("Thaw {0} failed: >>>{1}<<<", oname, ex);
+            }
+
+            // if we're here, the load failed
+            // maybe a stale local cache file?
+            if (setting.reg.DeleteTopUnit(oname)) {
+                try {
+                    return (RuntimeUnit) setting.reg.LoadUnit(oname).root;
+                } catch (Exception) { }
+            }
+
+            // ok, recompilation is needed I guess
+            object r1 = Builtins.UpCall(setting, new object[] {
+                "compile_unit", oname });
+            if (r1 != null)
+                throw (Exception)r1;
+            return (RuntimeUnit) setting.reg.LoadUnit(oname).root;
+        }
         public static object unit_need_unit(object[] args) {
             // LinkUnit state is owned by the root
             RuntimeUnit ru = (RuntimeUnit)Handle.Unbox(args[1]);
             string oname   = (string)args[2];
 
-            RuntimeUnit tg;
-            try {
-                tg = (RuntimeUnit) ru.setting.reg.LoadUnit(oname).root;
-            } catch (Exception ex) {
-                if (Config.SerFailInfo)
-                    Console.WriteLine("Thaw {0} failed: >>>{1}<<<", oname, ex);
-                // assume stale at first
-                object r1 = Builtins.UpCall(ru.setting, new object[] {
-                    "compile_unit", oname });
-                if (r1 != null)
-                    return r1;
-                tg = (RuntimeUnit) ru.setting.reg.LoadUnit(oname).root;
-            }
+            RuntimeUnit tg = ProbeLoad(ru.setting, oname);
             string err = ru.owner.LinkUnit(tg);
             return err == null ? (object)new Handle(tg) : new Exception(err);
         }

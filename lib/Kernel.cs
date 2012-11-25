@@ -434,7 +434,7 @@ namespace Niecza {
                     new AssemblyName(asm_name),
                     (dll_name == null ? AssemblyBuilderAccess.Run :
                         AssemblyBuilderAccess.RunAndSave),
-                    s.obj_dir);
+                    s.obj_dirs[ s.obj_dirs.Length - 1 ]);
 
             mod_builder = dll_name == null ?
                 asm_builder.DefineDynamicModule(asm_name) :
@@ -1026,7 +1026,8 @@ namespace Niecza {
                         tb.ObjRef();
                     }
                 } else {
-                    Assembly assembly = Assembly.LoadFrom(Path.Combine(tb.setting.obj_dir, n.dll_name));
+                    Assembly assembly = Assembly.LoadFrom(Path.Combine(
+                        Path.GetDirectoryName(tb.file), n.dll_name));
                     n.type = tb.type = assembly.GetType(n.asm_name, true);
                     n.constTable = (Constants)Activator.CreateInstance(n.type);
                     n.constTable.setting = tb.setting;
@@ -4569,7 +4570,7 @@ have_v:
         [CORESaved] public BoxObject<int> FalseV;
 
         internal ObjectRegistry reg;
-        public string obj_dir = AppDomain.CurrentDomain.BaseDirectory;
+        public string[] obj_dirs = new string[] { AppDomain.CurrentDomain.BaseDirectory };
         internal System.Collections.IDictionary upcall_receiver;
 
         // SubInfo objects can be mutated at runtime by .wrap so they
@@ -6773,14 +6774,14 @@ slow:
                 string newname = args[3];
 
                 // don't try to load the assemblies (we probably can't)
-                comp.obj_dir = fromdir;
+                comp.obj_dirs = new [] { fromdir };
                 Backend.cross_level_load = true;
 
                 RuntimeUnit root = (RuntimeUnit)
                     comp.reg.LoadUnit("MAIN").root;
 
                 // reset for writing
-                comp.obj_dir = todir;
+                comp.obj_dirs = new [] { todir };
 
                 RewriteUnits(root, root, new HashSet<RuntimeUnit>());
 
