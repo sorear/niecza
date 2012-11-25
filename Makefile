@@ -113,10 +113,10 @@ help:
 	@echo 'help       this list of targets'
 	@echo ''
 
-# grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|boot/obj/Run.\1.ser: boot/obj/Run.\2.ser|' | grep -v MONKEY_TYPING
-boot/obj/Run.NieczaActions.ser: boot/obj/Run.OpHelpers.ser
-boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.STD.ser
-boot/obj/Run.NieczaFrontendSTD.ser: boot/obj/Run.NieczaGrammar.ser
-boot/obj/Run.NieczaGrammar.ser: boot/obj/Run.STD.ser
-boot/obj/Run.Operator.ser: boot/obj/Run.OpHelpers.ser
-boot/obj/Run.OptRxSimple.ser: boot/obj/Run.RxOp.ser
+# grep -r '^use' src/*.pm6 | sed 's|src/\(.*\)\.pm6:use \(.*\);|run/\1.ser: run/\2.ser|' | grep -v MONKEY_TYPING
+run/NieczaActions.ser: run/OpHelpers.ser
+run/NieczaFrontendSTD.ser: run/STD.ser
+run/NieczaFrontendSTD.ser: run/NieczaGrammar.ser
+run/NieczaGrammar.ser: run/STD.ser
+run/Operator.ser: run/OpHelpers.ser
+run/OptRxSimple.ser: run/RxOp.ser
