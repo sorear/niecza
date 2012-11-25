@@ -2,8 +2,6 @@ our $PassSimplifier;
 
 class NieczaBackendDotnet;
 
-use JSYNC;
-
 has $.safemode = False;
 has $.obj_dir;
 has $.run_args = [];
@@ -67,34 +65,29 @@ class Value { ... }
 
 method new(*%_) {
     my $self = callsame;
-    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitSlave {&upcalled} (@ {$self.obj_dir}) {Unit} {StaticSub} {Type} {Param} {Value} {Str} {Num} {True} {False} {List} {Any} {Bool})) };
+    Q:CgOp { (rnull (cb_init_slave {&upcalled} (@ {$self.obj_dir}) {Unit} {StaticSub} {Type} {Param} {Value})) };
     downcall("safemode") if $self.safemode;
     $self;
 }
 
 sub downcall(*@args) {
-    Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.DownCall {@args}) }
+    Q:CgOp { (cb_downcall {@args}) }
 }
 method make_role($name, $meth) {
     Q:CgOp { (cat_mixin_role (obj_getstr {$name}) (@ {$meth})) }
 }
 method prune_match($match) {
-    Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.PruneMatch {$match}) }
+    Q:CgOp { (cb_prune_match {$match}) }
 }
 
 method cached_but($cls, $role) {
     # TODO: Object hashes!
-    Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.CachedBut
-        (@ {&infix:<but>}) {$cls} {$role}) };
+    Q:CgOp { (cb_cached_but (@ {&infix:<but>}) {$cls} {$role}) };
 }
 
-sub gethash($str) {
-    Q:CgOp { (box Str (rawscall Niecza.Downcaller,CompilerBlob.DoHash (obj_getstr {$str}))) }
-}
+sub gethash($str) { Q:CgOp { (box Str (cb_do_hash (obj_getstr {$str}))) } }
 method gethash($str) { gethash($str) }
-sub execname() {
-    Q:CgOp { (box Str (rawscall Niecza.Downcaller,CompilerBlob.ExecName)) }
-}
+sub execname() { Q:CgOp { (box Str (cb_exec_name)) } }
 
 method accept($unit, :$filename, :$run, :$evalmode, :$repl) {
     if $run {
@@ -245,7 +238,7 @@ class StaticSub {
     method finish($ops, $done?) {
         $ops := $PassSimplifier.invoke_incr(self, $ops) unless $done;
         self.set_extend('onlystub', True) if $ops.onlystub;
-        Q:CgOp { (rawscall Niecza.Downcaller,CompilerBlob.Finish {self} {$ops.cgop(self)}) }
+        Q:CgOp { (cb_finish {self} {$ops.cgop(self)}) }
     }
 
     # helper for compile_get_pkg; handles stuff like SETTING::OUTER::Foo,
@@ -343,7 +336,7 @@ class Unit {
 
 method push_compartment() {
     my \c = downcall("push_compartment");
-    Q:CgOp { (rnull (rawscall Niecza.Downcaller,CompilerBlob.InitCompartment {c})) };
+    Q:CgOp { (rnull (cb_init_compartment {c})) };
     c;
 }
 method pop_compartment($c) { downcall("pop_compartment", $c) }

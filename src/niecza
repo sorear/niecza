@@ -76,7 +76,7 @@ output options:
       --no-include-source    # disable source-based introspection, etc
 EOM
 
-my $runobj = Q:CgOp { (box Str (rawcall get_BaseDirectory (rawscall System.AppDomain.get_CurrentDomain))) };
+my $runobj = Q:CgOp { (box Str (cb_get_basedir)) };
 my $basedir = $runobj.IO.append("..").realpath;
 
 my @lib  = $basedir.append("lib"), ".".IO.realpath;

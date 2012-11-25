@@ -6761,18 +6761,18 @@ slow:
                     }
                 }
             }
-            else if (cmd == "-gen-app" && args.Length == 3) {
+            else if (cmd == "-regenerate" && args.Length == 4) {
                 // Code regeneration: this is required for the bootstrap
                 // procedure, because initial code generation makes Run.CORE
                 // and we need to turn it into CORE for the compiler proper.
 
                 // this needs to be rethought for the new segregation model
 
-                string exename = args[1];
-                string fromdir = args[2];
+                string fromdir = args[1];
+                string todir   = args[2];
+                string newname = args[3];
 
-                // allow loading of Run. files, but don't try to load the
-                // assemblies, since we're not Run.Kernel
+                // don't try to load the assemblies (we probably can't)
                 comp.obj_dir = fromdir;
                 Backend.cross_level_load = true;
 
@@ -6780,23 +6780,22 @@ slow:
                     comp.reg.LoadUnit("MAIN").root;
 
                 // reset for writing
-                comp.obj_dir = AppDomain.CurrentDomain.BaseDirectory;
+                comp.obj_dir = todir;
 
                 RewriteUnits(root, root, new HashSet<RuntimeUnit>());
 
                 // reset for writability
                 comp.reg = new ObjectRegistry(comp);
 
-                root.dll_name = exename + ".exe";
-                root.asm_name = exename;
-                root.name = exename;
+                root.dll_name = newname + ".exe";
+                root.asm_name = newname;
+                root.name = newname;
                 root.Save();
             }
             else if (cmd == "-run" && args.Length == 2) {
                 MainHandler(args[1], new string[0]);
             } else {
-                Console.WriteLine("usage: Kernel.dll -run Unit.Name");
-                Console.WriteLine("usage: Kernel.dll -gen-app App.exe build/dir");
+                Console.WriteLine("usage: Kernel.dll -regenerate fromdir todir App.exe");
                 Console.WriteLine("usage: Kernel.dll -run Unit.Name");
             }
         }
