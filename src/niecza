@@ -161,8 +161,7 @@ elsif @*ARGS {
 else {
     my $*repl_outer;
     my $*repl_outer_frame;
-    $c.compile_string('$PROCESS::OUTPUT_USED ::= True', !$comp, :repl,
-        :evalmode);
+    $c.compile_string('$PROCESS::OUTPUT_USED ::= True', !$comp, :repl);
     while True {
         print "niecza> ";
         my $l = $*IN.get // last;
