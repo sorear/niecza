@@ -8,6 +8,13 @@ CP=cp
 WGET_O=wget --no-check-certificate -O
 #WGET_O=curl -L -o
 
+PREFIX=/usr/local
+INSTBIN=$(PREFIX)/bin
+INSTNIECZA=$(INSTBIN)/niecza
+INSTLIB=$(PREFIX)/lib/niecza/lib
+INSTEXE=$(PREFIX)/lib/niecza/bin
+INSTOBJ=$(PREFIX)/lib/niecza/obj
+
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
 	 ObjModel.cs BigInteger.cs Printf.cs CodeGen.cs \
 	 GeneratedTrigFunctions.cs Serialize.cs UCD.cs \
@@ -21,6 +28,7 @@ libunits=CORE
 srcunits=CClass CgOp Op OpHelpers Sig RxOp STD NieczaGrammar OptRxSimple \
 	 Operator NieczaActions NieczaFrontendSTD NieczaPassSimplifier \
 	 OptBeta NieczaPathSearch NieczaBackendDotnet NieczaCompiler GetOptLong
+precompunits=CORP CORN Test Threads JSYNC
 
 all: run/Niecza.exe run/Kernel.dll obj/CORE.dll
 
@@ -72,11 +80,20 @@ test: all
 spectest: all
 	@t/run_spectests
 
+precomp: all
+	$(RUN_CLR) run/Niecza.exe --obj-dir obj -C $(precompunits)
+install: all precomp
+	mkdir -p $(INSTBIN) $(INSTEXE) $(INSTLIB) $(INSTOBJ)
+	$(CP) run/*.dll run/*.ser run/MAIN.exe $(INSTEXE)
+	$(CP) $(patsubst %,obj/%.ser,CORE $(precompunits)) $(patsubst %,obj/%.dll,CORE $(precompunits)) $(INSTOBJ)
+	$(CP) lib/*.pm6 lib/*.setting $(INSTLIB)
+	echo '#! /bin/sh' > $(INSTNIECZA)
+	echo 'exec $(RUN_CLR) $(INSTEXE)/MAIN.exe "$$@"' >> $(INSTNIECZA)
+	chmod +x $(INSTNIECZA)
+
 clean:
-	@rm -f obj/*.dll obj/*.exe obj/*.nam obj/*.so
-	@rm -f run/Niecza.exe
-	@rm -f run/*.dll
-	@rm -f run/*.dll.so
+	@rm -f obj/*.dll obj/*.exe obj/*.ser obj/*.so obj/*.dylib
+	@rm -f run/*.exe run/*.dll run/*.so run/*.dylib
 	@rm -fr *~
 
 # uses the current niecza to set up a build area for the next stage
