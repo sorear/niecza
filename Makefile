@@ -11,6 +11,7 @@ WGET_O=wget --no-check-certificate -O
 PREFIX=/usr/local
 INSTBIN=$(PREFIX)/bin
 INSTNIECZA=$(INSTBIN)/niecza
+# next three will be wiped out by install!
 INSTLIB=$(PREFIX)/lib/niecza/lib
 INSTEXE=$(PREFIX)/lib/niecza/bin
 INSTOBJ=$(PREFIX)/lib/niecza/obj
@@ -53,6 +54,15 @@ run/Niecza.exe: .fetch-stamp $(patsubst %,run/%.ser,$(srcunits)) src/niecza
 	touch .fetch-stamp
 run/CORE.ser: .fetch-stamp
 
+# undocumented.  don't use
+boot-from-installed:
+	-rm -rf boot/
+	mkdir boot boot/run boot/lib boot/obj
+	$(CP) $(INSTEXE)/* boot/run
+	$(CP) $(INSTLIB)/* boot/lib
+	NIECZA_KEEP_IL=1 $(RUN_CLR) boot/run/Niecza.exe --obj-dir=run -C $(libunits)
+	touch .fetch-stamp
+
 run/Kernel.dll: $(patsubst %,lib/%,$(cskernel)) lib/unidata
 	$(CSC) /target:exe /out:run/Kernel.dll /lib:obj /unsafe+ \
 	    /res:lib/unidata $(patsubst %,lib/%,$(cskernel))
@@ -83,8 +93,9 @@ spectest: all
 precomp: all
 	$(RUN_CLR) run/Niecza.exe --obj-dir obj -C $(precompunits)
 install: all precomp
+	-rm -rf $(INSTEXE) $(INSTLIB) $(INSTOBJ)
 	mkdir -p $(INSTBIN) $(INSTEXE) $(INSTLIB) $(INSTOBJ)
-	$(CP) run/*.dll run/*.ser run/MAIN.exe $(INSTEXE)
+	$(CP) run/*.dll run/*.ser run/*.exe $(INSTEXE)
 	$(CP) $(patsubst %,obj/%.ser,CORE $(precompunits)) $(patsubst %,obj/%.dll,CORE $(precompunits)) $(INSTOBJ)
 	$(CP) lib/*.pm6 lib/*.setting $(INSTLIB)
 	echo '#! /bin/sh' > $(INSTNIECZA)
@@ -123,6 +134,7 @@ help:
 	@echo ''
 	@echo 'all        the main Niecza compiler and runtime files (default)'
 	@echo 'aot        Ahead of Time compile run/Niecza.exe and run/*.dll (increases speed)'
+	@echo 'install    Copies files to $(PREFIX) and creates a shell wrapper'
 	@echo 'test       run/Niecza.exe test.pl'
 	@echo 'spectest   t/run_spectests'
 	@echo 'clean      remove all generated files'
