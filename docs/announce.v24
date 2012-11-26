@@ -1,0 +1,68 @@
+    Announce: Niecza Perl 6 v24
+
+This is release number 24 of Niecza Perl 6, marking 24 months since the first
+public release.  How time flies.
+
+You can obtain a build of Niecza from [1].  This build contains a
+working compiler as a set of .exe and .dll files suitable for use with
+Mono or Microsoft .NET.  If you wish to follow latest developments,
+you can obtain the source from [2]; however, you still need a
+binary for bootstrapping.
+
+Niecza is a Perl 6 compiler project studying questions about the
+efficient implementability of Perl 6 features.  It currently targets
+the Common Language Runtime; both Mono and Microsoft .NET are known to
+work.  On Windows, Cygwin is required for source builds only; see the
+README for details.
+
+
+    List of changes
+
+
+
+[Bug fixes]
+
+.classify and .categorize now return hashes.  (Solomon Foster)
+
+qx// is now sandboxed.  (Solomon Foster)
+
+
+
+[Features]
+
+Added special functions gamma, expm1, log1p, erf, lgamma.  (Solomon Foster,
+using library code by John D. Cook)
+
+Export $*CUSTOM-LIB for panda's use.  (Solomon Foster)
+
+Added Parcel.Array and List.Array.  (Solomon Foster)
+
+Postfix operaters which mimic methods can now be used.  (Larry Wall)
+
+Added functionality for a "precompiled system modules" folder, eliminating
+the need for each user to separately compile the setting in a multi-user
+install.
+
+Added line editing to the REPL.
+
+Added an install target for *nixes.
+
+
+
+[Internal]
+
+Niecza has been significantly refactored to use a single instance of the
+kernel during compilation, opening the door to direct object sharing
+between the compiler and the runtime and significantly simplifying the
+bootstrap procedure.
+
+
+
+    Getting involved
+
+Contact sorear in irc.freenode.net #perl6 or via the sender address of
+this mailing.
+
+
+[1] https://github.com/downloads/sorear/niecza/niecza-24.zip
+[2] https://github.com/sorear/niecza
