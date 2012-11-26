@@ -6152,6 +6152,7 @@ slow:
         }
         internal static void SetupThreadParent(Frame f) {
             rlstack = new LastFrameNode();
+            rlstack.compartment = f.info.setting;
             rlstack.cur = f;
         }
         public static Frame GetTopFrame() {
@@ -6167,9 +6168,15 @@ slow:
             if (lfn.next == null) {
                 lfn.next = new LastFrameNode() { compartment = s, prev = lfn };
             }
-            Frame l = lfn.cur;
-            if (lfn.compartment != s)
-                l = null; // hide other objects
+            Frame l = null;
+            // use the topmost frame from the same compartment
+            for (LastFrameNode csr = lfn; csr != null; csr = csr.prev) {
+                if (csr.compartment == s) {
+                    l = csr.cur;
+                    break;
+                }
+            }
+
             rlstack = lfn.next;
             lfn.next.compartment = s;
             return lfn.next.cur = lfn.next.root = ((l == null ?
