@@ -159,12 +159,14 @@ elsif @*ARGS {
     $c.compile_file($file, !$comp);
 }
 else {
+    my $editor = $Backend.downcall("getline_init", "niecza", 300);
+    LEAVE { $Backend.downcall("getline_close", $editor) if $editor }
+
     my $*repl_outer;
     my $*repl_outer_frame;
     $c.compile_string('$PROCESS::OUTPUT_USED ::= True', !$comp, :repl);
     while True {
-        print "niecza> ";
-        my $l = $*IN.get // last;
+        my $l = $Backend.downcall("getline_edit", $editor, "niecza> ", "") // last;
         my $ok;
         try {
             $c.compile_string($l, !$comp, :repl, :evalmode,

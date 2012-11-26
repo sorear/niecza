@@ -70,6 +70,7 @@ method new(*%_) {
     $self;
 }
 
+method downcall(|args) { downcall(|args) }
 sub downcall(*@args) {
     Q:CgOp { (cb_downcall {@args}) }
 }

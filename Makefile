@@ -11,7 +11,7 @@ WGET_O=wget --no-check-certificate -O
 cskernel=Kernel.cs Builtins.cs Cursor.cs JSYNC.cs NieczaCLR.cs Utils.cs \
 	 ObjModel.cs BigInteger.cs Printf.cs CodeGen.cs \
 	 GeneratedTrigFunctions.cs Serialize.cs UCD.cs \
-	 SpecialMathFunctions.cs CompilerBinding.cs
+	 SpecialMathFunctions.cs CompilerBinding.cs GetLine.cs
 
 # Tell make to regard the following targets as not being filenames
 .PHONY: all aot test spectest clean realclean

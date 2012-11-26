@@ -12,6 +12,7 @@ using System.Text;
 using System.IO;
 
 using Niecza;
+using Mono.Terminal;
 
 namespace Niecza.CLRBackend {
     // The portable format is a subset of JSON, and is currently read
@@ -4687,6 +4688,21 @@ dynamic:
         }
         public static object get_codepoint(object[] args) {
             return Niecza.UCD.DataSet.GetCodepoint((string)args[1]);
+        }
+
+        public static object getline_init(object[] args) {
+            return new Handle( new LineEditor( (string)args[1], (int)args[2] ) );
+        }
+
+        public static object getline_edit(object[] args) {
+            var edit = (LineEditor) Handle.Unbox(args[1]);
+            return edit.Edit( (string)args[2], (string)args[3] );
+        }
+
+        public static object getline_close(object[] args) {
+            var edit = (LineEditor) Handle.Unbox(args[1]);
+            edit.SaveHistory();
+            return null;
         }
     }
 }
