@@ -3064,4 +3064,16 @@ again:
     public static Variable MakeJunction(Constants c, int type, Variable[] args) {
         return c.setting.MakeJunction(type, args);
     }
+
+    [ImplicitConsts] public static Variable concat(Constants c, params Variable[] bits) {
+        string[] sbits = new string[bits.Length];
+        for (int i = 0; i < bits.Length; i++)
+            sbits[i] = bits[i].Fetch().mo.mro_raw_Str.Get(bits[i]);
+        return c.setting.MakeStr(string.Concat(sbits));
+    }
+
+    [ImplicitConsts] public static Variable list_join(Constants c, Variable sep, Variable lst) {
+        string ssep = sep.Fetch().mo.mro_raw_Str.Get(sep);
+        return c.setting.MakeStr(string.Join(ssep, UnboxLoS(lst)));
+    }
 }

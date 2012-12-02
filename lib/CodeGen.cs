@@ -3182,9 +3182,26 @@ dynamic:
             bool implicit_frame = Attribute.IsDefined(mi, typeof(ImplicitFrameAttribute));
             bool implicit_consts = Attribute.IsDefined(mi, typeof(ImplicitConstsAttribute));
             bool force_cps = Attribute.IsDefined(mi, typeof(CpsAttribute));
+
+            ParameterInfo[] pi = mi.GetParameters();
+            int paix = pi.Length - 1;
+            bool param_array = pi.Length > 0 &&
+                Attribute.IsDefined(pi[paix], typeof(ParamArrayAttribute));
+
             return delegate(CpsOp[] cpses) {
+
                 if (implicit_consts) cpses = Utils.PrependArr(CpsOp.Constants(), cpses);
                 if (implicit_frame) cpses = Utils.PrependArr(CpsOp.CallFrame(), cpses);
+
+                if (param_array && (cpses.Length != pi.Length || !pi[paix].ParameterType.IsAssignableFrom(cpses[paix].head.Returns))) {
+                    CpsOp[] n1 = new CpsOp[pi.Length];
+                    CpsOp[] n2 = new CpsOp[cpses.Length - paix];
+                    Array.Copy(cpses, 0, n1, 0, n1.Length - 1);
+                    Array.Copy(cpses, paix, n2, 0, n2.Length);
+                    n1[n1.Length - 1] = CpsOp.NewArray(pi[paix].ParameterType.GetElementType(), n2);
+                    cpses = n1;
+                }
+
                 return CpsOp.CpsCall(force_cps ? Tokens.Variable : cps, mi, cpses);
             };
         }

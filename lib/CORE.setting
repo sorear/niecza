@@ -1276,17 +1276,9 @@ my class Bool is Int does IntBasedEnum {
 }
 # }}}
 # Fundamental scalar operators {{{
-sub infix:<~> is Niecza::absprec<r= list> is pure (\|$bits) { Q:CgOp {
-    (letn buf (strbuf_new)
-          i   (int 0)
-          ar  (unbox fvarlist (@ {$bits}))
-          max (fvarlist_length (l ar))
-      [whileloop 0 0 (< (l i) (l max)) (prog
-          [strbuf_append (l buf)
-            (obj_getstr (fvarlist_item (l i) (l ar)))]
-          [l i (+ (l i) (int 1))])]
-      [box Str (strbuf_seal (l buf))])
-} }
+sub infix:<~> is Niecza::absprec<r= list> is pure is Niecza::builtin('concat', 0) (\|$bits) {
+    Q:CgOp { (concat (unbox fvarlist (@ {$bits}))) }
+}
 
 sub infix:<max>(*@values) is pure is Niecza::absprec<k= list> { @values.max }
 sub infix:<min>(*@values) is pure is equiv<max> { @values.min }
@@ -1325,12 +1317,12 @@ sub prefix:<not> is pure is Niecza::absprec<h= unary left> (\x) { not(x) }
 
 sub infix:<x> is pure is Niecza::absprec<s=> ($str, $ct) {
     my $i = +$ct;
-    my $j = ''; # XXX use strbuf
+    my @j;
     while $i >= 1 {
         $i--;
-        $j ~= $str;
+        push @j, $str;
     }
-    $j;
+    @j.join;
 }
 
 sub infix:<leg> is pure is Niecza::absprec<n= non> is diffy ($s1, $s2) {
@@ -1660,13 +1652,7 @@ my class List is Cool does Positional {
 
     method elems()    { +self }
 
-    method join($sep = '') {
-        my $t;
-        for unitem(self) -> $x {
-            $t = (defined($t) ?? ($t ~ $sep ~ $x) !! ~$x);
-        }
-        $t // '';
-    }
+    method join($sep = '') { Q:CgOp { (list_join {$sep} {unitem(self)}) } }
 
     method ACCEPTS(\topic) {
         self // nextsame;
@@ -2708,13 +2694,13 @@ sub Niecza-trans($str, *@changes) {
         }
     }
 
-    my $r = "";
+    my @r;
     while $lsm.next_substitution {
-        $r ~= $lsm.unsubstituted_text ~ $lsm.substituted_text;
+        push @r, $lsm.unsubstituted_text ~ $lsm.substituted_text;
     }
-    $r ~= $lsm.unsubstituted_text;
+    push @r, $lsm.unsubstituted_text;
 
-    return $r;
+    return @r.join;
 }
 
 # }}}
