@@ -2917,6 +2917,20 @@ my class Grammar is Cursor {
 sub WHAT(\x) { x.WHAT }
 sub HOW(\x) { x.HOW }
 constant Inf = 1 / 0;
+my class NumericRangeIter is IterCursor {
+    has $.current;
+    has $.limit;
+    has $.exclusive;
+
+    method reify() {
+        my $c ::= $!current;
+        my \l = $!limit;
+
+        $c < l ?? ($c, NumericRangeIter.new(current => $c.succ, limit => l, exclusive => $!exclusive)) !!
+            ($c > l || $!exclusive) ?? () !! ($c,);
+    }
+}
+
 my class RangeIter is IterCursor {
     has $.current;
     has $.limit;
@@ -2960,8 +2974,11 @@ my class Range is Cool does Positional {
     method minmax($cmp = &infix:<cmp>) { self.iterator.list.minmax($cmp) }
 
     method iterator() {
-        &infix:<,>(RangeIter.new(:current($!excludes_min ?? $!min.succ !! $!min),
-                      :limit($!max), :exclusive($!excludes_max))).iterator
+        my \mn = $!min;
+        my \mx = $!max;
+        &infix:<,>((((mn ~~ Numeric) && (mx ~~ Numeric)) ?? NumericRangeIter !! RangeIter)\
+            .new(:current($!excludes_min ?? mn.succ !! mn),
+                :limit(mx), :exclusive($!excludes_max))).iterator
     }
 
     method Str() { self.list.Str }
