@@ -3853,32 +3853,40 @@ tryagain:
         public override Variable[] Get(Variable obj) {
             var nrmo = setting.NumericRangeIterMO;
             P6any o = obj.Fetch();
-            var curv = (Variable)o.GetSlot(nrmo, "$!current");
-            var endv = (Variable)o.GetSlot(nrmo, "$!limit");
-            var excl = (Variable)o.GetSlot(nrmo, "$!exclusive");
+            var cur  = ((Variable)o.GetSlot(nrmo, "$!current")).Fetch();
+            var end  = ((Variable)o.GetSlot(nrmo, "$!limit")).Fetch();
+            var excl = ((Variable)o.GetSlot(nrmo, "$!exclusive")).Fetch();
 
-            var curo = curv.Fetch();
-            var endo = endv.Fetch();
+            const int unroll = 10;
+            var buffer = new Variable[unroll + 1];
+            int wp = 0;
+            bool terminate = false;;
 
-            int cmp = Builtins.numcompare_core(setting, curv, curo, endv, endo, false);
+            while (wp < unroll && !terminate) {
+                int cmp = Builtins.numcompare_core(setting, cur, cur, end, end, false);
 
-            if (cmp == Builtins.O_IS_LESS) {
-                P6opaque newobj = new P6opaque(setting.NumericRangeIterMO);
-                newobj.slots[0] = curo.mo.mro_succ.Get(curv);
-                newobj.slots[1] = endo;
+                if (cmp == Builtins.O_IS_LESS) {
+                    buffer[wp++] = cur;
+                    cur = cur.mo.mro_succ.Get(cur);
+                }
+                else if (cmp == Builtins.O_IS_GREATER || excl.Fetch().mo.mro_raw_Bool.Get(excl)) {
+                    terminate = true;
+                }
+                else {
+                    terminate = true;
+                    buffer[wp++] = cur;
+                }
+            }
+
+            if (!terminate) {
+                P6opaque newobj = new P6opaque(nrmo);
+                newobj.slots[0] = cur;
+                newobj.slots[1] = end;
                 newobj.slots[2] = excl;
-
-                return new Variable[] {
-                    curo,
-                    newobj
-                };
+                buffer[wp++] = newobj;
             }
-            else if (cmp == Builtins.O_IS_GREATER || excl.Fetch().mo.mro_raw_Bool.Get(excl)) {
-                return new Variable[0];
-            }
-            else {
-                return new Variable[] { curo };
-            }
+            Array.Resize(ref buffer, wp);
+            return buffer;
         }
     }
 
