@@ -3849,6 +3849,39 @@ tryagain:
         }
     }
 
+    class CtxNumRangeReify : ContextHandler<Variable[]> {
+        public override Variable[] Get(Variable obj) {
+            var nrmo = setting.NumericRangeIterMO;
+            P6any o = obj.Fetch();
+            var curv = (Variable)o.GetSlot(nrmo, "$!current");
+            var endv = (Variable)o.GetSlot(nrmo, "$!limit");
+            var excl = (Variable)o.GetSlot(nrmo, "$!exclusive");
+
+            var curo = curv.Fetch();
+            var endo = endv.Fetch();
+
+            int cmp = Builtins.numcompare_core(setting, curv, curo, endv, endo, false);
+
+            if (cmp == Builtins.O_IS_LESS) {
+                P6opaque newobj = new P6opaque(setting.NumericRangeIterMO);
+                newobj.slots[0] = curo.mo.mro_succ.Get(curv);
+                newobj.slots[1] = endo;
+                newobj.slots[2] = excl;
+
+                return new Variable[] {
+                    curo,
+                    newobj
+                };
+            }
+            else if (cmp == Builtins.O_IS_GREATER || excl.Fetch().mo.mro_raw_Bool.Get(excl)) {
+                return new Variable[0];
+            }
+            else {
+                return new Variable[] { curo };
+            }
+        }
+    }
+
     class IxCallMethod : IndexHandler {
         string name;
         string adv;
@@ -4586,6 +4619,7 @@ have_v:
 
         [CORESaved] public BoxObject<int> TrueV;
         [CORESaved] public BoxObject<int> FalseV;
+        [NewSaved] [CORESaved] public STable NumericRangeIterMO;
 
         internal ObjectRegistry reg;
         public string[] obj_dirs = new string[] { AppDomain.CurrentDomain.BaseDirectory };
@@ -6456,6 +6490,10 @@ slow:
 
             s.ScalarMO = new STable(s, "Scalar");
             s.ScalarMO.FillProtoClass(s.AnyMO);
+
+            s.NumericRangeIterMO = new STable(s, "NumericIterCursor");
+            Handler_PandBox(s.NumericRangeIterMO, "reify", new CtxNumRangeReify(), s.ParcelMO);
+            s.NumericRangeIterMO.FillProtoClass(s.AnyMO);
         }
 
         // This is a library function in .NET 4

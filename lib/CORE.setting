@@ -2922,13 +2922,7 @@ my class NumericRangeIter is IterCursor {
     has $.limit;
     has $.exclusive;
 
-    method reify() {
-        my $c ::= $!current;
-        my \l = $!limit;
-
-        $c < l ?? ($c, NumericRangeIter.new(current => $c.succ, limit => l, exclusive => $!exclusive)) !!
-            ($c > l || $!exclusive) ?? () !! ($c,);
-    }
+    # reify implemented in lower-level code
 }
 
 my class RangeIter is IterCursor {

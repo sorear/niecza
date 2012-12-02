@@ -1229,14 +1229,13 @@ public partial class Builtins {
         return c.setting.MakeInt(Kernel.UnboxAny<FatRat>(a1.Fetch()).den);
     }
 
-    const int O_IS_GREATER = 1;
-    const int O_IS_LESS    = 2;
-    const int O_IS_EQUAL   = 4;
-    const int O_IS_UNORD   = 8;
-    const int O_COMPLEX_OK = 16;
+    internal const int O_IS_GREATER = 1;
+    internal const int O_IS_LESS    = 2;
+    internal const int O_IS_EQUAL   = 4;
+    internal const int O_IS_UNORD   = 8;
+    internal const int O_COMPLEX_OK = 16;
     public static Variable numcompare(Constants c, Variable a1, Variable a2, int mask,
             Func<Constants,Variable,Variable,Variable> dl) {
-        int r1, r2, res=0;
         var s = c.setting;
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any)) {
@@ -1246,27 +1245,35 @@ public partial class Builtins {
                 return jr.Fetch().mo.mro_raw_Bool.Get(jr) ? s.FalseV : s.TrueV;
             return jr;
         }
+        int res = numcompare_core(s, a1, o1, a2, o2, (mask & O_COMPLEX_OK) != 0);
+
+        return ((mask & res) != 0) ? s.TrueV : s.FalseV;
+    }
+
+    internal static int numcompare_core(Compartment s, Variable a1, P6any o1,
+            Variable a2, P6any o2, bool complex_ok) {
+        int r1, r2;
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
-            if ((mask & O_COMPLEX_OK) == 0)
+            if (!complex_ok)
                 throw new NieczaException("Complex numbers are not arithmetically ordered; use cmp if you want an arbitrary order");
             Complex v1 = PromoteToComplex(r1, n1);
             Complex v2 = PromoteToComplex(r2, n2);
             if (double.IsNaN(v1.re) || double.IsNaN(v1.im) ||
                     double.IsNaN(v2.re) || double.IsNaN(v2.im))
-                res = O_IS_UNORD;
+                return O_IS_UNORD;
             else if (v1.re != v2.re)
-                res = v1.re > v2.re ? O_IS_GREATER : O_IS_LESS;
+                return v1.re > v2.re ? O_IS_GREATER : O_IS_LESS;
             else
-                res = v1.im > v2.im ? O_IS_GREATER : v1.im < v2.im ? O_IS_LESS : O_IS_EQUAL;
+                return v1.im > v2.im ? O_IS_GREATER : v1.im < v2.im ? O_IS_LESS : O_IS_EQUAL;
         }
         else if (r1 == NR_FLOAT || r2 == NR_FLOAT) {
             double d1 = PromoteToFloat(r1, n1);
             double d2 = PromoteToFloat(r2, n2);
-            if (double.IsNaN(d1) || double.IsNaN(d2)) res = O_IS_UNORD;
-            else res =d1 > d2 ? O_IS_GREATER : d1 < d2 ? O_IS_LESS : O_IS_EQUAL;
+            if (double.IsNaN(d1) || double.IsNaN(d2)) return O_IS_UNORD;
+            else return d1 > d2 ? O_IS_GREATER : d1 < d2 ? O_IS_LESS : O_IS_EQUAL;
         }
         else if (r1 == NR_FATRAT || r2 == NR_FATRAT) {
             FatRat v1 = PromoteToFatRat(r1, n1);
@@ -1287,10 +1294,7 @@ public partial class Builtins {
         else
             r1 = PromoteToFixInt(r1, n1).CompareTo(PromoteToFixInt(r2, n2));
 
-        if (res == 0)
-            res = (r1 > 0) ? O_IS_GREATER : (r1 < 0) ? O_IS_LESS : O_IS_EQUAL;
-
-        return ((mask & res) != 0) ? s.TrueV : s.FalseV;
+        return (r1 > 0) ? O_IS_GREATER : (r1 < 0) ? O_IS_LESS : O_IS_EQUAL;
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> mul_d = mul;
