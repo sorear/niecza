@@ -73,7 +73,9 @@ namespace Niecza.Serialization {
             new Dictionary<string,object>();
 
         static readonly string signature = "Niecza-Serialized-Module";
-        static readonly int version = 31;
+        public const int VersionMin = 31;
+        public const int VersionExplicitSave = 32;
+        public const int VersionCur = 32;
 
         public ObjectRegistry(Compartment s) { setting = s; }
 
@@ -189,8 +191,9 @@ namespace Niecza.Serialization {
                 if (rsig != signature)
                     throw new ThawException("signature mismatch loading " + file);
                 int rver = tb.Int();
-                if (rver != version)
+                if (rver < VersionMin || rver > VersionCur)
                     throw new ThawException("version mismatch loading " + file);
+                tb.version = rver;
 
                 su.root = tb.ObjRef();
                 tb.RunFixups();
@@ -233,7 +236,7 @@ namespace Niecza.Serialization {
 
             try {
                 fb.String(signature);
-                fb.Int(version);
+                fb.Int(VersionCur);
                 fb.ObjRef(root);
 
                 byte[] data = fb.GetData();
@@ -587,6 +590,7 @@ namespace Niecza.Serialization {
 
         public Type type;
         public string file;
+        public int version;
 
         internal ThawBuffer(Compartment setting, ObjectRegistry reg, SerUnit unit, byte[] data) {
             this.data    = data;

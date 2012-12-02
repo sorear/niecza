@@ -400,6 +400,8 @@ namespace Niecza {
     [AttributeUsage(AttributeTargets.Field)]
     class CORESavedAttribute : Attribute { }
     [AttributeUsage(AttributeTargets.Field)]
+    class NewSavedAttribute : Attribute { } // temporary hack
+    [AttributeUsage(AttributeTargets.Field)]
     class ImmutableAttribute : Attribute { }
     [AttributeUsage(AttributeTargets.Field)]
     class TrueGlobalAttribute : Attribute { }
@@ -982,9 +984,11 @@ namespace Niecza {
                         (f1, f2) => string.CompareOrdinal(f1.Name, f2.Name));
                 foreach (FieldInfo f in kf) {
                     if (f.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0) {
+                        fb.String(f.Name);
                         fb.ObjRef(f.GetValue(setting));
                     }
                 }
+                fb.String(null);
             }
         }
 
@@ -1069,11 +1073,25 @@ namespace Niecza {
 
             if (n.name == "CORE") {
                 FieldInfo[] kf = typeof(Compartment).GetFields();
-                Array.Sort<FieldInfo>(kf,
-                        (f1, f2) => string.CompareOrdinal(f1.Name, f2.Name));
-                foreach (FieldInfo f in kf) {
-                    if (f.GetCustomAttributes(typeof(CORESavedAttribute), true).Length != 0) {
-                        f.SetValue(tb.setting, tb.ObjRef());
+                if (tb.version >= ObjectRegistry.VersionExplicitSave) {
+                    var fielddic = new Dictionary<string,FieldInfo>();
+                    foreach (FieldInfo fi in kf) {
+                        if (Attribute.IsDefined(fi, typeof(CORESavedAttribute))) {
+                            fielddic[fi.Name] = fi;
+                        }
+                    }
+                    string fieldname;
+                    while ((fieldname = tb.String()) != null) {
+                        fielddic[fieldname].SetValue(tb.setting, tb.ObjRef());
+                    }
+                } else {
+                    Array.Sort<FieldInfo>(kf,
+                            (f1, f2) => string.CompareOrdinal(f1.Name, f2.Name));
+                    foreach (FieldInfo f in kf) {
+                        if (Attribute.IsDefined(f, typeof(CORESavedAttribute)) &&
+                                !Attribute.IsDefined(f, typeof(NewSavedAttribute))) {
+                            f.SetValue(tb.setting, tb.ObjRef());
+                        }
                     }
                 }
             }
