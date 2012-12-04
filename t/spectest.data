@@ -35,9 +35,11 @@ integration/pair-in-array.t
 integration/passing-pair-class-to-sub.t
 integration/real-strings.t
 integration/role-composition-vs-attribute.t
+integration/say-crash.t
 integration/substr-after-match-in-gather-in-for.t
 integration/weird-errors.t
 S02-lexical-conventions/begin_end_pod.t
+S02-lexical-conventions/bom.t
 S02-lexical-conventions/comments.t
 S02-lexical-conventions/minimal-whitespace.t
 S02-lexical-conventions/one-pass-parsing.t
@@ -84,6 +86,7 @@ S02-names-vars/variables-and-packages.t
 S02-names-vars/varnames.t
 S02-names/caller.t
 S02-names/identifier.t
+S02-names/indirect.t
 S02-names/our.t
 S02-names/pseudo.t
 S02-names/symbolic-deref.t
@@ -141,6 +144,7 @@ S03-metaops/reverse.t
 S03-metaops/zip.t
 S03-operators/adverbial-modifiers.t
 S03-operators/also.t
+S03-operators/andthen.t
 S03-operators/arith.t
 S03-operators/assign-is-not-binding.t
 S03-operators/assign.t
@@ -229,6 +233,7 @@ S04-phasers/ascending-order.t
 S04-phasers/begin.t
 S04-phasers/descending-order.t
 S04-phasers/enter-leave.t
+S04-phasers/eval-in-begin.t
 S04-phasers/init.t
 S04-phasers/keep-undo.t
 S04-phasers/multiple.t
@@ -357,6 +362,7 @@ S06-signature/passing-hashes.t
 S06-signature/positional-placeholders.t
 S06-signature/positional.t
 S06-signature/scalar-type.t
+S06-signature/sigilless.t
 S06-signature/slurpy-and-interpolation.t
 S06-signature/slurpy-params.t
 S06-signature/slurpy-placeholders.t
