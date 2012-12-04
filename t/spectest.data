@@ -406,7 +406,9 @@ S12-construction/new.t
 S12-enums/anonymous.t
 S12-enums/basic.t
 S12-enums/misc.t
+S12-enums/non-int.t
 S12-introspection/can.t
+S12-methods/accessors.t
 S12-methods/attribute-params.t
 S12-methods/calling_syntax.t
 S12-methods/chaining.t
@@ -452,6 +454,7 @@ S16-filehandles/unlink.t
 S16-io/bare-say.t
 S16-io/basic-open.t
 S16-io/getc.t
+S16-io/print.t
 S16-io/say-and-ref.t
 S16-io/say.t
 S16-unfiled/slurp.t
