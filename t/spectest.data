@@ -231,6 +231,7 @@ S04-declarations/state.t
 S04-exceptions/control_across_runloop.t
 S04-phasers/ascending-order.t
 S04-phasers/begin.t
+S04-phasers/check.t
 S04-phasers/descending-order.t
 S04-phasers/enter-leave.t
 S04-phasers/eval-in-begin.t
@@ -322,6 +323,7 @@ S05-substitution/subst.t
 S05-transliteration/trans.t
 S05-transliteration/with-closure.t
 S06-advanced/caller.t
+S06-advanced/callframe.t
 S06-advanced/lexical-subs.t
 S06-advanced/recurse.t
 S06-advanced/return.t
