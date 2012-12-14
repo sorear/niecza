@@ -3608,7 +3608,17 @@ sub unbase(Int:D $base, Cool:D $str) is pure {
 }
 # }}}
 # I/O stuff {{{
-sub slurp($path) is unsafe { Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) } }
+sub slurp($path?) is unsafe {
+    if $path {
+        Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) }
+    } else {
+        if @*ARGS {
+            @*ARGS.map({ slurp($_) }).join;
+        } else {
+            $*IN.slurp;
+        }
+    }
+}
 
 sub spurt($path,$text) is unsafe { Q:CgOp { (rnull (spurt (unbox str (@ {$path.Str})) (unbox str (@ {$text.Str})))) } }
 
