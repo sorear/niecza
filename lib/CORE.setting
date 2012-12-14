@@ -3612,11 +3612,7 @@ sub slurp($path?) is unsafe {
     if $path {
         Q:CgOp { (box Str (slurp (unbox str (@ {$path})))) }
     } else {
-        if @*ARGS {
-            @*ARGS.map({ slurp($_) }).join;
-        } else {
-            $*IN.slurp;
-        }
+        $*ARGFILES.slurp;
     }
 }
 
@@ -3737,10 +3733,6 @@ class IO::ArgFiles {
     has $!args;
     has $!reader;
 
-    method lines() {
-        gather take my $l while ($l = self.get).defined;
-    }
-
     method get() {
         unless defined $!args {
             $!args = [ @*ARGS ];
@@ -3754,6 +3746,14 @@ class IO::ArgFiles {
             $!reader = Any;
             goto again;
         }
+    }
+
+    method lines() {
+        gather take my $l while ($l = self.get).defined;
+    }
+
+    method slurp() {
+        self.lines.join("\n");
     }
 }
 
