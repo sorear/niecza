@@ -4613,6 +4613,7 @@ have_v:
         [CORESaved] public STable RatMO;
         [CORESaved] public STable FatRatMO;
         [CORESaved] public STable ComplexMO;
+        [NewSaved][CORESaved] public STable InstantMO;
         [CORESaved] public STable ArrayMO;
         [CORESaved] public STable CursorMO;
         [CORESaved] public STable MatchMO;

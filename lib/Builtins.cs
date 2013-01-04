@@ -738,9 +738,17 @@ public partial class Builtins {
         P6any o1 = a1.Fetch(), o2 = a2.Fetch();
         if (!(o1.mo.is_any && o2.mo.is_any))
             return HandleSpecial2(c, a1,a2, o1,o2, minus_d);
+
+        var s = c.setting;
+        if (s.InstantMO != null && o1.Isa(s.InstantMO) && o2.Isa(s.InstantMO)) {
+            a1 = (Variable) o1.GetSlot(s.InstantMO, "$!val");
+            a2 = (Variable) o2.GetSlot(s.InstantMO, "$!val");
+            o1 = a1.Fetch();
+            o2 = a2.Fetch();
+        }
+
         P6any n1 = GetNumber(a1, o1, out r1);
         P6any n2 = GetNumber(a2, o2, out r2);
-        var s = c.setting;
 
         if (r1 == NR_COMPLEX || r2 == NR_COMPLEX) {
             Complex v1 = PromoteToComplex(r1, n1);
