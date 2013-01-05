@@ -1612,9 +1612,21 @@ public partial class Builtins {
         if (!(o1.mo.is_any && o2.mo.is_any))
             return HandleSpecial2(c, v1,v2, o1,o2, numlshift_d);
 
-        int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
-        int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return c.setting.MakeInt(r1 << r2);
+        int small1, small2; BigInteger big1, big2;
+        bool b1 = GetAsInteger(v1, out small1, out big1);
+        bool b2 = GetAsInteger(v2, out small2, out big2);
+        var s = c.setting;
+
+        if (b2) {
+            throw new NieczaException("Shift too many places to the right");
+        }
+
+        if (b1 || small1 == int.MinValue) {
+            if (!b1) big1 = small1;
+            return s.MakeInt(big1 << small2);
+        } else {
+            return s.MakeInt(small1 << small2);
+        }
     }
 
     static readonly Func<Constants,Variable,Variable,Variable> numrshift_d = numrshift;
@@ -1623,9 +1635,21 @@ public partial class Builtins {
         if (!(o1.mo.is_any && o2.mo.is_any))
             return HandleSpecial2(c, v1,v2, o1,o2, numrshift_d);
 
-        int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
-        int r2 = (int)o2.mo.mro_raw_Numeric.Get(v2);
-        return c.setting.MakeInt(r1 >> r2);
+        int small1, small2; BigInteger big1, big2;
+        bool b1 = GetAsInteger(v1, out small1, out big1);
+        bool b2 = GetAsInteger(v2, out small2, out big2);
+        var s = c.setting;
+
+        if (b2) {
+            throw new NieczaException("Shift too many places to the left");
+        }
+
+        if (b1 || small1 == int.MinValue) {
+            if (!b1) big1 = small1;
+            return s.MakeInt(big1 >> small2);
+        } else {
+            return s.MakeInt(small1 >> small2);
+        }
     }
 
     static readonly Func<Constants,Variable,Variable> numcompl_d = numcompl;
