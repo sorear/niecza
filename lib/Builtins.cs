@@ -1658,8 +1658,16 @@ public partial class Builtins {
         if (!o1.mo.is_any)
             return HandleSpecial1(c, v1,o1, numcompl_d);
 
-        int r1 = (int)o1.mo.mro_raw_Numeric.Get(v1);
-        return c.setting.MakeInt(~r1);
+        int small1; BigInteger big1;
+        bool b1 = GetAsInteger(v1, out small1, out big1);
+        var s = c.setting;
+
+        if (b1 || small1 == int.MinValue) {
+            if (!b1) big1 = small1;
+            return s.MakeInt(~big1);
+        } else {
+            return s.MakeInt(~small1);
+        }
     }
 
     // only called from .Rat
