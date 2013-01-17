@@ -325,7 +325,7 @@ public partial class Builtins {
                 }
             }
             else {
-                throw new NieczaException("index out of range");
+                throw new NieczaException("Not enough arguments for this format string");
             }
         }
         return result;
