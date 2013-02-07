@@ -2806,6 +2806,15 @@ my class Match is Cool does Associative does Positional {
 
         "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @pos.perl }) named({ %(self).perl })>"
     }
+    multi method gist ($d = 0) {
+        return "#<failed match>" unless self;
+        my $s = ' ' x ($d + 1);
+        my $r = ("=> " if $d) ~ "\x[FF62]{self}\x[FF63]\n";
+        for @.caps {
+            $r ~= $s ~ (.key // '?') ~ ' ' ~ .value.gist($d + 1)
+        }
+        $r;
+    }
     method CURSOR() { Q:CgOp { (cursor_unmatch (cast cursor (@ {self}))) } }
     method cursor() { Q:CgOp { (cursor_unmatch (cast cursor (@ {self}))) } }
     method reduced() { Q:CgOp { (box Str (cursor_reduced (cast cursor (@ {self})))) } }
