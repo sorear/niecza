@@ -2168,7 +2168,7 @@ method do_variable_reference($M, $v) {
 
 method docontext($M, $sigil, $term) {
     if $sigil !~~ /<[\$\@\%\&]>/ {
-        $M.CURSOR.sorry("Unhandled conext character $sigil");
+        $M.CURSOR.sorry("Unhandled context character $sigil");
     }
     my $method = ($sigil eq '$' || $sigil eq '&') ?? 'item' !!
                  ($sigil eq '@') ?? 'list' !!
