@@ -716,6 +716,9 @@ my class Cool {
     method trans(*@changes) {
         Niecza-trans(self, @changes);
     }
+
+    method set() { set self }
+    method bag() { bag self }
 }
 
 my role Positional { Any }
