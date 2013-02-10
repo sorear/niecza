@@ -1874,6 +1874,8 @@ my class Hash does Associative {
     method pairs()  { Q:CgOp { (hash_pairs  {self}) } }
     method list()   { Q:CgOp { (hash_pairs  {self}) } }
     method kv()     { Q:CgOp { (hash_kv     {self}) } }
+    method set()    { set self }
+    method bag()    { bag self }
 
     method Numeric() { +@(self) }
     method Str() { @(self).map(* ~ "\n").join }
