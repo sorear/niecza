@@ -2089,6 +2089,7 @@ class Set does Associative {
     multi to-set (KeySet $set --> Set) { Set.new: $set }
     multi to-set (Bag $bag --> Set) { Set.new: $bag }
     multi to-set (KeyBag $bag --> Set) { Set.new: $bag }
+    multi to-set (Hash $elems --> Set) { Set.new: $elems.keys }
     multi to-set (@elems --> Set) { Set.new: @elems }
     multi to-set ([*@elems] --> Set) { Set.new: @elems }
     multi to-set (%elems --> Set) { Set.new: %elems.keys }
