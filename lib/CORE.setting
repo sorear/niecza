@@ -866,12 +866,12 @@ sub Niecza::RatToStr ($rat, :$all) {
     $s ~= $i;
     if $r {
         $s ~= '.';
-        my $want = $rat.denominator < 100_000
-                   ?? 6
-                   !! $rat.denominator.Str.chars + 1;
+        my $want = $all ?? Inf
+                        !! $rat.denominator < 100_000
+                           ?? 6
+                           !! $rat.denominator.Str.chars + 1;
         my $f = '';
-        my $not-done = $all ?? { True } !! { $f.chars < $want };
-        while $r and $not-done() {
+        while $r and $f.chars < $want {
             $r *= 10;
             $i = $r.floor;
             $f ~= $i;
