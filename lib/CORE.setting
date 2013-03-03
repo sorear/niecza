@@ -857,11 +857,51 @@ my class Int does Integral {
     method expmod($power, $mod) { expmod(self, $power, $mod) }
     method is-prime($tries = 100) { is-prime(self, $tries) }
 }
+
+sub Niecza::RatToStr ($rat, :$all) {
+    my $s = $rat.numerator < 0 ?? '-' !! '';
+    my $r = $rat.abs;
+    my $i = $r.floor;
+    $r -= $i;
+    $s ~= $i;
+    if $r {
+        $s ~= '.';
+        my $want = $rat.denominator < 100_000
+                   ?? 6
+                   !! $rat.denominator.Str.chars + 1;
+        my $f = '';
+        my $not-done = $all ?? { True } !! { $f.chars < $want };
+        while $r and $not-done() {
+            $r *= 10;
+            $i = $r.floor;
+            $f ~= $i;
+            $r -= $i;
+        }
+        $f++ if  2 * $r >= 1;
+        $s ~= $f;
+    }
+    $s;
+}
+
 my class Rat does Real {
     method new($n,$d) { $n / $d }
     method immutable() { True }
     multi method WHICH(Rat:D:) { ObjAt.new(str => self.perl, ref => self.WHAT) }
-    method perl() { defined(self) ?? "<" ~ self.numerator ~ "/" ~ self.denominator ~ ">" !! self.typename }
+    multi method Str() { defined(self) ?? Niecza::RatToStr(self) !! "self.typename" }
+    method perl() {
+        return self.typename if !defined(self);
+        my $den = self.denominator;
+        $den /= 2 while $den %% 2;
+        $den /= 5 while $den %% 5;
+        if $den == 1 {
+            my $str = Niecza::RatToStr(self, :all);
+            $str ~= ".0" unless $str ~~ /\./;
+            $str;
+        } else {
+            "<" ~ self.numerator ~ "/" ~ self.denominator ~ ">";
+        }
+    }
+
     method gist() { self // nextsame; self.Str }
     method numerator() { Q:CgOp { (rat_nu {self}) } }
     method denominator() { Q:CgOp { (rat_de {self}) } }
@@ -886,6 +926,7 @@ my class FatRat does Real {
     method new($n,$d) { FatRat.succ * $n / $d }
     method immutable() { True }
     multi method WHICH(FatRat:D:) { ObjAt.new(str => self.perl, ref => self.WHAT) }
+    multi method Str() { defined(self) ?? Niecza::RatToStr(self) !! "self.typename" }
     method perl() { defined(self) ?? "FatRat.new({self.numerator}, {self.denominator})" !! self.typename }
     method FatRat() { self }
     method gist() { self // nextsame; self.Str }
