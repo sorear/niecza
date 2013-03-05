@@ -2567,35 +2567,41 @@ grammar P6 is STD {
     token quote_mod:b  { <sym> }
 
     token quote:rx {
+        :temp %*RX;
         <sym> » <!before '('>
         <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
         <!old_rx_mods>
     }
 
     token quote:m  {
+        :temp %*RX;
         <sym> » <!before '('>
         <quibble( $¢.cursor_fresh( %*LANG<Regex> ) )>
         <!old_rx_mods>
     }
 
     token quote:ms {
+        :temp %*RX;
         <sym> » <!before '('>
         <quibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s))>
         <!old_rx_mods>
     }
 
     token quote:s {
+        :temp %*RX;
         <sym> » <!before '('>
         <pat=.sibble( $¢.cursor_fresh( %*LANG<Regex> ), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
         <!old_rx_mods>
     }
 
     token quote:ss {
+        :temp %*RX;
         <sym> » <!before '('>
         <pat=.sibble( $¢.cursor_fresh( %*LANG<Regex> ).tweak(:s), $¢.cursor_fresh( %*LANG<Q> ).tweak(:qq))>
         <!old_rx_mods>
     }
     token quote:tr {
+        :temp %*RX;
         <sym> » <!before '('> <pat=.tribble( $¢.cursor_fresh( %*LANG<Q> ).tweak(:cc))>
         <!old_tr_mods>
     }
