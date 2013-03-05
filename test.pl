@@ -91,14 +91,14 @@ ok True ~~ Bool && True, "True is the right constant";
 ok Bool::False ~~ Bool && !Bool::False, "Bool::False is the right constant";
 ok Bool::True ~~ Bool && Bool::True, "Bool::True is the right constant";
 
-ok Any.gist eq "Any()", "Any.gist is Any()";
+ok Any.gist eq "(Any)", "Any.gist is (Any)";
 
 ok (2.WHAT === 3.WHAT), "different objects get the same WHAT";
 ok !(2.WHAT.defined), "WHATs are undefined type objects";
-ok (sub foo() {}).WHAT.gist eq 'Sub()', 'WHAT of a Sub is Sub()';
+ok (sub foo() {}).WHAT.gist eq '(Sub)', 'WHAT of a Sub is (Sub)';
 ok "Foo".WHAT === Str, 'WHAT of a Str *is* Str';
 
-ok "Foo".HOW.WHAT.gist eq 'ClassHOW()', 'anything.HOW is a ClassHOW';
+ok "Foo".HOW.WHAT.gist eq '(ClassHOW)', 'anything.HOW is a ClassHOW';
 ok "Foo".HOW === "Cow".HOW, 'objects of the same class have the same HOW';
 ok !("Foo".HOW === Any.HOW), 'objects of different classes have different HOWs';
 
@@ -361,7 +361,7 @@ ok (1.HOW).^isa(ClassHOW), "class objects are ClassHOW";
 
 {
     my $whatever = *;
-    ok $whatever.WHAT.gist eq 'Whatever()', "can call methods on a specific Whatever";
+    ok $whatever.WHAT.gist eq '(Whatever)', "can call methods on a specific Whatever";
     my $wwhat = *.WHAT;
     ok !($wwhat.^isa(Whatever)), "method calls against * curry, though";
 
@@ -1065,9 +1065,9 @@ rxtest /y [ [a||b] | c ]: y/, "|| exposes a declarative prefix for left only",
         ok Foo::Bar.bar == 51, "within Foo, Bar is longname accessible";
         ok GLOBAL::Foo::Bar.bar == 51, "within Foo, Bar is GLOBAL accessible";
     }
-    ok Foo.gist eq 'Foo()', "lexical lookup of our-class works";
-    ok OUR::Foo.gist eq 'Foo()', "also visible in ourpad";
-    ok GLOBAL::Foo.gist eq 'Foo()', "also visible globally";
+    ok Foo.gist eq '(Foo)', "lexical lookup of our-class works";
+    ok OUR::Foo.gist eq '(Foo)', "also visible in ourpad";
+    ok GLOBAL::Foo.gist eq '(Foo)', "also visible globally";
     ok Foo::Bar.bar == 51, "can call through nested methods";
     ok GLOBAL::Foo::Bar.bar == 51, "can call through GLOBAL nested";
 }
