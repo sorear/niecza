@@ -1260,7 +1260,7 @@ my role CommonEnum {
     method perl()  {
         defined(self) ?? (self.typename ~ "::" ~ self.key) !! self.typename
     }
-    method gist()  { defined(self) ?? self.key !! (self.typename ~ "()") }
+    method gist()  { defined(self) ?? self.key !! ("(" ~ self.typename ~ ")") }
     method key()   { self.enums._index_to_key($!index) }
     method value() { self.enums._index_to_value($!index) }
     method kv()    { self.key, self.value }
