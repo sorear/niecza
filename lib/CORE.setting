@@ -3363,8 +3363,8 @@ sub infix:<cmp> is equiv<leg> (Mu $a, Mu $b) {
         return Order::Increase if $b == Inf;
         return Order::Decrease if $b == -Inf;
     }
-    return ($a ~~ Real ?? "Real" !! $a.WHAT.gist) leg
-           ($b ~~ Real ?? "Real" !! $b.WHAT.gist)
+    return ($a ~~ Real ?? "(Real)" !! $a.WHAT.gist) leg
+           ($b ~~ Real ?? "(Real)" !! $b.WHAT.gist)
                 unless Niecza::ValueIdentity($a.WHAT, $b.WHAT);
     return 0 if !$a.defined && !$b.defined;
     return $a leg $b if $a ~~ Str;
