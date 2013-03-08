@@ -440,6 +440,23 @@ sub Niecza::autopun($pun, $name) {
 
 sub IMMUTABLE(\x) { Q:CgOp { (ternary (var_is_rw {x}) {False} {x.immutable}) } }
 
+my class Nil {
+    method new() { Nil }
+    method iterator() { ().iterator }
+    method gist() { 'Nil' }
+    # XXX the default won't work because of Nil's exotic binding behavior
+    multi method WHICH() { ObjAt.new(str => 'Nil', ref => Any) }
+    method Str() { warn "Use of Nil as a string"; '' }
+    method flat() { self.iterator.flat }
+    method list() { self.iterator.list }
+    method at_pos($key) { @(self).[$key] }
+    method Capture () { ().Capture }
+    method elems  () { 0 }
+    method Numeric() { warn "Use of Nil as a number"; 0 }
+    method Bool   () { ?0 }
+    method FALLBACK (|) { Nil }
+}
+
 my class Cool {
     method FatRat () { Niecza::NumSyntax.str2num(~self, :fatrat) }
     method Rat($eps = 1e-6) { Q:CgOp { (rat_approx {self} {$eps}) } }
@@ -542,8 +559,8 @@ my class Cool {
             $ix = $ix max $mat.to if defined $mat;
             $ix = $max + 1 if defined($pos);
         }
-        Q:CgOp { (rnull (set_status (s $/) {Match})) };
-        Match;
+        Q:CgOp { (rnull (set_status (s $/) {Nil})) };
+        Nil;
     }
     method subst(\: $matcher_, $replacement, :g(:$global), :$x,
             :c(:$continue), :th(:st(:nd(:rd(:$nth)))), :p(:$pos), :$inplace) {
@@ -723,22 +740,6 @@ my class Cool {
 
 my role Positional { Any }
 my role Associative { Any }
-
-my class Nil is Cool {
-    method new() { Nil }
-    method iterator() { ().iterator }
-    method gist() { 'Nil' }
-    # XXX the default won't work because of Nil's exotic binding behavior
-    multi method WHICH() { ObjAt.new(str => 'Nil', ref => Any) }
-    method Str() { '' }
-    method flat() { self.iterator.flat }
-    method list() { self.iterator.list }
-    method at_pos($key) { @(self).[$key] }
-    method Capture () { ().Capture }
-    method elems  () { 0 }
-    method Numeric() { 0 }
-    method Bool   () { ?0 }
-}
 
 my class Capture does Positional does Associative {
     has $!positionals;
@@ -2864,7 +2865,7 @@ my class Match is Cool does Associative does Positional {
         "#<match from({ self.from }) to({ self.to }) text({ self }) pos({ @pos.perl }) named({ %(self).perl })>"
     }
     multi method gist ($d = 0) {
-        return "#<failed match>" unless self;
+        return "(Match)" unless self;
         my $s = ' ' x ($d + 1);
         my $r = ("=> " if $d) ~ "\x[FF62]{self}\x[FF63]\n";
         for @.caps {
@@ -2962,8 +2963,8 @@ my class Regex is Method {
                     (set_status (s $/) (l val))
                     (return (newrwlistvar (@ (l val))) (l val)))
                   (prog))))
-              (set_status (s $/) {Match})
-              {Match})
+              (set_status (s $/) {Nil})
+              {Nil})
         };
     }
 }
@@ -2972,7 +2973,7 @@ my class Regex is Method {
 my class Grammar is Cursor {
     method parse($text, :$rule = "TOP", :$actions) {
         my $match = (head grep { $_.to == chars $text },
-            self.cursor_start($text, $actions)."$rule"()) // Match;
+            self.cursor_start($text, $actions)."$rule"()) // Nil;
         Q:CgOp { (rnull (set_status (s '$/') {$match})) };
         $match;
     }
