@@ -872,14 +872,14 @@ sub Niecza::RatToStr ($rat, :$all) {
                            ?? 6
                            !! $rat.denominator.Str.chars + 1;
 
-	sub CAN-HAZ-MOAR {
-	    my $den = $r.denominator;
-	    $den /= 2 while $den %% 2;
-	    $den /= 5 while $den %% 5;
-	    return False unless $den == 1;
-	    $want = Inf;
-	    return True;
-	}
+        sub CAN-HAZ-MOAR {
+            my $den = $r.denominator;
+            $den /= 2 while $den %% 2;
+            $den /= 5 while $den %% 5;
+            return False unless $den == 1;
+            $want = Inf;
+            return True;
+        }
 
         my $f = '';
         while $r and ($f.chars < $want || CAN-HAZ-MOAR) {
