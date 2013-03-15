@@ -440,6 +440,20 @@ sub Niecza::autopun($pun, $name) {
 
 sub IMMUTABLE(\x) { Q:CgOp { (ternary (var_is_rw {x}) {False} {x.immutable}) } }
 
+my class Empty {
+    method new() { Empty }
+    method iterator() { ().iterator }
+    method gist() { '()' }
+    method Str() { '' }
+    method flat() { self.iterator.flat }
+    method list() { self.iterator.list }
+    method at_pos($key) { @(self).[$key] }
+    method Capture () { ().Capture }
+    method elems  () { 0 }
+    method Numeric() { 0 }
+    method Bool   () { ?0 }
+}
+
 my class Nil {
     method new() { Nil }
     method iterator() { ().iterator }

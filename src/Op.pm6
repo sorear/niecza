@@ -429,8 +429,8 @@ class Conditional is Op {
     method code($body) {
         $CgOp.ternary(
             $CgOp.obj_getbool($.check.cgop($body)),
-            ($.true ?? $.true.cgop($body) !! $CgOp.corelex('Nil')),
-            ($.false ?? $.false.cgop($body) !! $CgOp.corelex('Nil')));
+            ($.true ?? $.true.cgop($body) !! $CgOp.corelex('Empty')),
+            ($.false ?? $.false.cgop($body) !! $CgOp.corelex('Empty')));
     }
 }
 
@@ -592,7 +592,7 @@ class When is Op {
                     $CgOp.control(6, $CgOp.null('frame'), $CgOp.int(-1),
                         $CgOp.null('str'), $.body.cgop($body))),
                 7, '', "end$id"),
-            $CgOp.corelex('Nil'));
+            $CgOp.corelex('Empty'));
     }
 }
 
