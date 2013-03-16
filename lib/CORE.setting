@@ -443,7 +443,7 @@ sub IMMUTABLE(\x) { Q:CgOp { (ternary (var_is_rw {x}) {False} {x.immutable}) } }
 my class Empty {
     method new() { Empty }
     method iterator() { ().iterator }
-    method gist() { '()' }
+    method gist() { '' }
     method Str() { '' }
     method flat() { self.iterator.flat }
     method list() { self.iterator.list }
