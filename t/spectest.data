@@ -227,6 +227,7 @@ S04-declarations/constant.t
 S04-declarations/implicit-parameter.t
 S04-declarations/multiple.t
 S04-declarations/my.t
+S04-declarations/our.t
 S04-declarations/state.t
 S04-exceptions/control_across_runloop.t
 S04-phasers/ascending-order.t
