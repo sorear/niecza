@@ -779,6 +779,15 @@ public partial class Builtins {
 
     // Untested and probably unusable in the near term
     public static BigInteger big_pow(BigInteger v1, BigInteger v2) {
+        if (v2 == BigInteger.Zero)
+            return BigInteger.One;
+        if (v1 == BigInteger.One)
+            return BigInteger.One;
+        if (v1 == BigInteger.Zero)
+            return BigInteger.Zero;
+        if (v1 == -BigInteger.One)
+            return v2 % 2 == 0 ? BigInteger.One : -BigInteger.One;
+
         int CHUNK = 2000000000;
         int margin = (int) (v2 % (BigInteger) CHUNK);
         BigInteger number_chunks = (v2 - margin) / CHUNK;
