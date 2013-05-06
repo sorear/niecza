@@ -113,7 +113,7 @@ S02-types/mixed_multi_dimensional.t
 S02-types/nan.t
 S02-types/nested_arrays.t
 S02-types/nested_pairs.t
-S02-types/nil.t
+# S02-types/nil.t
 S02-types/num.t
 S02-types/pair.t
 S02-types/parcel.t
