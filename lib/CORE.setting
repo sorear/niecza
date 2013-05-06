@@ -2046,6 +2046,19 @@ my class Pair is Enum {
     method Str() {
         $.key ~ "\t" ~ $.value
     }
+    method perl() {
+        if self.defined {
+            my $lp = "";
+            my $rp = "";
+            if self.key ~~ Pair {
+                $lp = "(";
+                $rp = ")";
+            }
+            $lp ~ self.key.perl ~ $rp ~ ' => ' ~ self.value.perl;
+        } else {
+            self.typename;
+        }
+    }
     method invert() {
         $.value => $.key
     }
