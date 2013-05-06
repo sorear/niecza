@@ -627,7 +627,7 @@ my class Cool {
             $res;
         }
     }
-    method capitalize() { self.lc.subst(:g, /\w+/, { ucfirst $/ }) }
+    method wordcase() { self.lc.subst(:g, /\w+/, { ucfirst $/ }) }
 
     method index($substring, $pos?) {
         my $str = ~self;
@@ -1404,7 +1404,7 @@ sub tc($string)    is pure { (~$string).tc }
 sub tclc($string)  is pure { (~$string).tclc }
 sub chop($string)  is pure { (~$string).chop }
 sub chomp($string) is pure { (~$string).chomp }
-sub capitalize($string) is pure { (~$string).capitalize }
+sub wordcase($string) is pure { (~$string).wordcase }
 sub p5chop(*@strs) { my $r = ''; $r = .p5chop for @strs; $r }
 sub p5chomp(*@strs) { my $r = 0; $r += .p5chomp for @strs; $r }
 sub flip($string) is pure { (~$string).flip }
