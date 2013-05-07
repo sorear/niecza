@@ -1996,6 +1996,23 @@ my class Hash does Associative {
     method fmt($format = "%s\t%s", $sep = "\n") {
          self.pairs.map({ .fmt($format) }).join($sep)
     }
+
+    method ACCEPTS($x) {
+        return $x.^does(self) unless self.defined;
+
+        sub contains-keys(%a, %b) {
+            for %a.keys -> $k { return False unless %b{$k}:exists; }
+            True;
+        }
+
+        given $x {
+            when Hash  { contains-keys(self, $x) && contains-keys($x, self); }
+            when Array { self{any @$x}:exists; }
+            when Regex { any(self.keys).match($x); }
+            when Cool  { self{$x}:exists; }
+            False;
+        }
+    }
 }
 
 my class Whatever {
