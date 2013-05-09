@@ -2190,9 +2190,9 @@ class Set does Associative {
     multi to-set (%elems --> Set) { Set.new: %elems.keys }
     multi to-set ($elem --> Set) { die "Cannot coerce $elem.perl() to a Set; use set($elem.perl()) to create a one-element set" }
 
-    submethod Str(Any:D $ : --> Str) { %!elems.keys().join(" ") }
-    submethod gist(Any:D $ : --> Str) { "set({ %!elems.keys».gist.join(', ') })" }
-    submethod perl(Any:D $ : --> Str) { 'set(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' }
+    method Str()  { %!elems.keys().join(" ") }
+    method gist() { self.defined ?? "set({ %!elems.keys».gist.join(', ') })" !! "(Set)" }
+    method perl() { self.defined ?? 'set(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "Set" }
 
     method iterator() { %!elems.keys.iterator }
     method list() { %!elems.keys }
@@ -2306,9 +2306,9 @@ class KeySet does Associative {
 
     submethod BUILD (%!elems) { }
 
-    submethod Str(Any:D $ : --> Str) { %!elems.keys().join(" ") }
-    submethod gist(Any:D $ : --> Str) { "keyset({ %!elems.keys».gist.join(', ') })" }
-    submethod perl(Any:D $ : --> Str) { 'KeySet.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' }
+    method Str()  { %!elems.keys().join(" ") }
+    method gist() { self.defined ?? "keyset({ %!elems.keys».gist.join(', ') })" !! "(KeySet)" }
+    method perl() { self.defined ?? 'keyset(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "KeySet" }
 
     method iterator() { %!elems.keys.iterator }
     method list() { %!elems.keys }
@@ -2352,9 +2352,9 @@ class Bag does Associative does Baggy {
 
     submethod BUILD (%!elems) { }
 
-    submethod Str(Any:D $ : --> Str) { %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") }
-    submethod gist(Any:D $ : --> Str) { "bag({ self.pairs>>.gist.join(', ') })" }
-    submethod perl(Any:D $ : --> Str) { 'Bag.new(' ~ %!elems.perl ~ ')' }
+    method Str()  { %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") }
+    method gist() { self.defined ?? "bag({ self.pairs>>.gist.join(', ') })" !! "(Bag)" }
+    method perl() { self.defined ?? 'Bag.new(' ~ %!elems.perl ~ ')' !! "Bag" }
 
     method iterator() { %!elems.pairs.iterator }
     method list() { %!elems.keys }
@@ -2430,9 +2430,9 @@ class KeyBag does Associative does Baggy {
 
     submethod BUILD (%!elems) { }
 
-    submethod Str(Any:D $ : --> Str) { %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") }
-    submethod gist(Any:D $ : --> Str) { "keybag({ self.pairs>>.gist.join(', ') })" }
-    submethod perl(Any:D $ : --> Str) { 'KeyBag.new(' ~ %!elems.perl ~ ')' }
+    method Str()  { %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") }
+    method gist() { self.defined ?? "keybag({ self.pairs>>.gist.join(', ') })" !! "(KeyBag)" }
+    method perl() { self.defined ?? 'KeyBag.new(' ~ %!elems.perl ~ ')' !! "KeyBag" }
 
     method iterator() { %!elems.pairs.iterator }
     method list() { %!elems.keys }
