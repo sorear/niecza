@@ -2192,7 +2192,7 @@ class Set does Associative {
 
     method Str()  { %!elems.keys().join(" ") }
     method gist() { self.defined ?? "set({ %!elems.keys».gist.join(', ') })" !! "(Set)" }
-    method perl() { self.defined ?? 'set(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "Set" }
+    method perl() { self.defined ?? 'Set.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "Set" }
 
     method iterator() { %!elems.keys.iterator }
     method list() { %!elems.keys }
@@ -2308,7 +2308,7 @@ class KeySet does Associative {
 
     method Str()  { %!elems.keys().join(" ") }
     method gist() { self.defined ?? "keyset({ %!elems.keys».gist.join(', ') })" !! "(KeySet)" }
-    method perl() { self.defined ?? 'keyset(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "KeySet" }
+    method perl() { self.defined ?? 'KeySet.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "KeySet" }
 
     method iterator() { %!elems.keys.iterator }
     method list() { %!elems.keys }
