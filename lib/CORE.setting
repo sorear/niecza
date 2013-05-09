@@ -730,7 +730,6 @@ my class Cool {
         self ~~ /^(.)(.*)$/ ?? Q:CgOp { (box Str (ucd_titlecase { $0.ord })) } ~ $1.uc !! "";
     }
     method flip() { Q:CgOp { (box Str (str_flip    (obj_getstr {self}))) }}
-    method ucfirst() { ucfirst(self) }
     method lcfirst() { lcfirst(self) }
     method ord() { ord(self) }
     method chr() { chr(self) }
