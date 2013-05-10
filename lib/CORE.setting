@@ -627,7 +627,7 @@ my class Cool {
             $res;
         }
     }
-    method wordcase() { self.lc.subst(:g, /\w+/, { ucfirst $/ }) }
+    method wordcase() { self.lc.subst(:g, /\w+/, { tclc $/ }) }
 
     method index($substring, $pos?) {
         my $str = ~self;
@@ -1408,7 +1408,6 @@ sub p5chop(*@strs) { my $r = ''; $r = .p5chop for @strs; $r }
 sub p5chomp(*@strs) { my $r = 0; $r += .p5chomp for @strs; $r }
 sub flip($string) is pure { (~$string).flip }
 sub lcfirst($o) is pure { my $s = ~$o; lc(substr($s,0,1)) ~ substr($s,1) }
-sub ucfirst($o) is pure { my $s = ~$o; uc(substr($s,0,1)) ~ substr($s,1) }
 sub trim-leading($string) is pure { $string.trim-leading };
 sub trim-trailing($string) is pure { $string.trim-trailing };
 sub trim($string) is pure { $string.trim };
