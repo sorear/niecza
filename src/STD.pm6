@@ -2092,7 +2092,7 @@ grammar P6 is STD {
     }
 
     token special_variable:sym<$@> {
-        <sym> <!before \w> ::
+        <sym> <!before \w | '(' | <sigil> > ::
         <.obs('$@ variable as eval error', '$!')>
     }
 
@@ -2108,7 +2108,7 @@ grammar P6 is STD {
         <.obs('$$ variable', '$*PID')>
     }
     token special_variable:sym<$%> {
-        <sym> <!before \w> <!sigil> ::
+        <sym> <!before \w | '(' | <sigil> > ::
         <.obs('$% variable', 'Form module')>
     }
 
@@ -2346,10 +2346,10 @@ grammar P6 is STD {
 
     token desigilname {
         [
-        | <?before '$' >
+        | <?before <.sigil> <.sigil> > <VAR=variable> 
+        | <?before <.sigil> >
             [ <?{ $*IN_DECL }> <.panic: "Cannot declare an indirect variable name"> ]?
             <variable>
-        | <?before <[\@\%\&]> <sigil>* \w > <.panic: "Invalid hard reference syntax">
         | <longname>
         ]
     }
