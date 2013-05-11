@@ -2189,7 +2189,7 @@ class Set does Associative {
     multi to-set (%elems --> Set) { Set.new: %elems.keys }
     multi to-set ($elem --> Set) { die "Cannot coerce $elem.perl() to a Set; use set($elem.perl()) to create a one-element set" }
 
-    method Str()  { %!elems.keys().join(" ") }
+    method Str()  { self.defined ?? %!elems.keys().join(" ") !! nextsame }
     method gist() { self.defined ?? "set({ %!elems.keys».gist.join(', ') })" !! "(Set)" }
     method perl() { self.defined ?? 'Set.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "Set" }
 
@@ -2305,7 +2305,7 @@ class KeySet does Associative {
 
     submethod BUILD (%!elems) { }
 
-    method Str()  { %!elems.keys().join(" ") }
+    method Str()  { self.defined ?? %!elems.keys().join(" ") !! nextsame }
     method gist() { self.defined ?? "keyset({ %!elems.keys».gist.join(', ') })" !! "(KeySet)" }
     method perl() { self.defined ?? 'KeySet.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "KeySet" }
 
@@ -2351,7 +2351,7 @@ class Bag does Associative does Baggy {
 
     submethod BUILD (%!elems) { }
 
-    method Str()  { %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") }
+    method Str()  { self.defined ?? %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") !! nextsame }
     method gist() { self.defined ?? "bag({ self.pairs>>.gist.join(', ') })" !! "(Bag)" }
     method perl() { self.defined ?? 'Bag.new(' ~ %!elems.perl ~ ')' !! "Bag" }
 
@@ -2429,7 +2429,7 @@ class KeyBag does Associative does Baggy {
 
     submethod BUILD (%!elems) { }
 
-    method Str()  { %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") }
+    method Str()  { self.defined ?? %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") !! nextsame }
     method gist() { self.defined ?? "keybag({ self.pairs>>.gist.join(', ') })" !! "(KeyBag)" }
     method perl() { self.defined ?? 'KeyBag.new(' ~ %!elems.perl ~ ')' !! "KeyBag" }
 
