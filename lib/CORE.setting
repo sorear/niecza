@@ -2146,6 +2146,7 @@ my enum Order (:Increase(-1), :Same(0), :Decrease(1));
 class Set does Associative {
     has Bool %!elems;
 
+    method default { False }
     method keys { %!elems.keys }
     method values { %!elems.values }
     method elems returns Int { %!elems.elems }
@@ -2270,6 +2271,7 @@ only  sub infix:<⊅>($a, $b --> Bool) is equiv(&infix:<==>) { $a !⊃ $b }
 class KeySet does Associative {
     has Bool %!elems;
 
+    method default { False }
     method keys { %!elems.keys }
     method values { %!elems.values }
     method elems returns Int { %!elems.elems }
@@ -2320,6 +2322,7 @@ role Baggy { Any }
 class Bag does Associative does Baggy {
     has Int %!elems; # should be UInt
 
+    method default { 0 }
     method keys { %!elems.keys }
     method values { %!elems.values }
     method elems returns Int { [+] self.values }
@@ -2394,6 +2397,7 @@ multi sub infix:<≽>(Baggy $a, Baggy $b --> Bool) { so all $b.keys.map({ $b{$_}
 class KeyBag does Associative does Baggy {
     has Int %!elems; # should be UInt
 
+    method default { 0 }
     method keys { %!elems.keys }
     method values { %!elems.values }
     method elems returns Int { [+] self.values }
