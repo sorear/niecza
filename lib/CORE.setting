@@ -870,8 +870,16 @@ my class Int does Integral {
     }
     method expmod($power, $mod) { expmod(self, $power, $mod) }
     method is-prime($tries = 100) { is-prime(self, $tries) }
-    method lsb() { self == 0 ?? Nil !! Q:CgOp { (lsb {self}) } }
-    method msb() { self == 0 ?? Nil !! Q:CgOp { (msb {self}) } }
+    method lsb() {
+        return Nil if self == 0;
+        Q:CgOp { (lsb {self.abs}) }
+    }
+    method msb() {
+        return Nil if self == 0;
+        return 0   if self == -1;
+        my $x = self < 0 ?? (self + 1) * -2 !! self;
+        Q:CgOp { (msb {$x}) }
+    }
 }
 
 sub Niecza::RatToStr ($rat, :$all) {
