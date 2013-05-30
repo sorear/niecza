@@ -871,7 +871,7 @@ my class Int does Integral {
     method expmod($power, $mod) { expmod(self, $power, $mod) }
     method is-prime($tries = 100) { is-prime(self, $tries) }
     method lsb() { self == 0 ?? Nil !! Q:CgOp { (lsb {self}) } }
-    # method msb() { +^self +& (self + 1) }
+    method msb() { self == 0 ?? Nil !! Q:CgOp { (msb {self}) } }
 }
 
 sub Niecza::RatToStr ($rat, :$all) {

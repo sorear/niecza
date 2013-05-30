@@ -1193,6 +1193,17 @@ public partial class Builtins {
         return c.setting.MakeInt(PromoteToBigInt(r1, n1).Least_Significant_Bit_Position());
     }
 
+    static readonly Func<Constants,Variable,Variable> msb_d = msb;
+    [ImplicitConsts] public static Variable msb(Constants c, Variable a1) {
+        int r1;
+        P6any o1 = a1.Fetch();
+        if (!o1.mo.is_any)
+            return HandleSpecial1(c, a1, o1, msb_d);
+        P6any n1 = GetNumber(a1, o1, out r1);
+
+        return c.setting.MakeInt(PromoteToBigInt(r1, n1).Most_Significant_Bit_Position());
+    }
+
     static readonly Func<Constants,Variable,Variable> bigrand_d = bigrand;
     [ImplicitConsts] public static Variable bigrand(Constants c, Variable a1) {
         // Assumes a1 is positive!
