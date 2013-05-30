@@ -2037,6 +2037,26 @@ namespace Niecza {
 			return res;
 		}
 
+        public int Least_Significant_Bit_Position ()
+        {
+            int result = -1;
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (data[i] != 0)
+                {
+                    uint lsb = (uint)(data[i] & -data[i]);
+                    while (lsb != 0)
+                    {
+                        result++;
+                        lsb = lsb >> 1;
+                    }
+                    return result;
+                }
+                result += 8 * sizeof (uint);
+            }
+            return -1;
+        }
+
 		static byte[] Resize (byte[] v, int len)
 		{
 			byte[] res = new byte [len];
