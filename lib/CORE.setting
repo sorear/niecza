@@ -4157,7 +4157,7 @@ INIT {
     $PROCESS::BASE_DIRECTORY ::= Q:CgOp { (sysquery (i 3)) };
     $PROCESS::OS ::= Q:CgOp { (sysquery (i 5)) };
     $PROCESS::CWD ::= Q:CgOp { (box Str (cwd_path)) };
-    $PROCESS::CUSTOM-LIB ::= Q:CgOp { (sysquery (i 7)) } ~ "/niecza" ;
+    %PROCESS::CUSTOM_LIB ::= { home => Q:CgOp { (sysquery (i 7)) } ~ "/niecza" } ;
     @GLOBAL::INC = ();
 }
 # }}}
