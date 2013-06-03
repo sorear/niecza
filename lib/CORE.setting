@@ -976,6 +976,7 @@ my class Str is Cool {
     method ACCEPTS(\t) { defined(self) ?? self eq t !! t.^does(self) }
     method chars() { chars(self) }
     method IO() { IO.new(path => self) }
+    method path() { IO.new(path => self) }
     method say() { $*OUT.say(self) }
     multi method WHICH(Str:D:) {
         ObjAt.new(str => ("str|" ~ self), ref => self.WHAT)
