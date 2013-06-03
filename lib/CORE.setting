@@ -3744,7 +3744,7 @@ sub slurp($path?) is unsafe {
 sub spurt($path,$text) is unsafe { Q:CgOp { (rnull (spurt (unbox str (@ {$path.Str})) (unbox str (@ {$text.Str})))) } }
 
 sub dir($directory = '.', Mu :$test = none('.','..')) is unsafe {
-    grep $test, Q:CgOp { (dir (obj_getstr {$directory})) };
+    Q:CgOp { (dir (obj_getstr {$directory})) }.grep($test).map(*.path);
 }
 
 my class Instant {
