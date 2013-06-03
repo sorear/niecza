@@ -80,6 +80,12 @@ my $runobj = Q:CgOp { (box Str (cb_get_basedir)) };
 my $basedir = $runobj.IO.append("..").realpath;
 
 my @lib  = $basedir.append("lib"), ".".IO.realpath, (Q:CgOp { (sysquery (i 7)) } ~ "/niecza").IO.realpath;
+if %*ENV<PERL6LIB> {
+    for %*ENV<PERL6LIB>.split(/':' | ';'/) -> $path {
+        @lib.push: $path.IO.realpath;
+    }
+}
+
 my $lang = "CORE";
 my $safe = False;
 my $bcnd = "dotnet";
