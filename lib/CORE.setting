@@ -43,6 +43,7 @@ my class Enum     { ... }
 my class Range    { ... }
 my class Whatever { ... }
 my class IO       { ... }
+our class IO::Path { ... }
 my class ObjAt    { ... }
 my class Proxy    { ... }
 my class KeySet   { ... }
@@ -976,7 +977,7 @@ my class Str is Cool {
     method ACCEPTS(\t) { defined(self) ?? self eq t !! t.^does(self) }
     method chars() { chars(self) }
     method IO() { IO.new(path => self) }
-    method path() { IO.new(path => self) }
+    method path() { IO::Path.new(self) }
     method say() { $*OUT.say(self) }
     multi method WHICH(Str:D:) {
         ObjAt.new(str => ("str|" ~ self), ref => self.WHAT)
@@ -3802,6 +3803,163 @@ my class IO {
     method copy($dest) is unsafe { Q:CgOp { (rnull (path_copy (obj_getstr {self}) (obj_getstr {$dest})))}}
     method chmod($mode) is unsafe { Q:CgOp { (box Int (path_chmod (obj_getstr {self}) (obj_getnum {$mode}))) } }
 }
+
+role IO::FileTestable {
+    method f() is unsafe { Q:CgOp { (box Bool (path_file_exists (obj_getstr {$!path}))) } }
+    method d() is unsafe { Q:CgOp { (box Bool (path_dir_exists (obj_getstr {$!path}))) } }
+    method e() is unsafe { Q:CgOp { (box Bool (path_any_exists (obj_getstr {$!path}))) } }
+    method r() is unsafe { Q:CgOp { (box Bool (path_eaccess_readable (obj_getstr {$!path}))) } }
+    method R() is unsafe { Q:CgOp { (box Bool (path_access_readable (obj_getstr {$!path}))) } }
+    method w() is unsafe { Q:CgOp { (box Bool (path_eaccess_writable (obj_getstr {$!path}))) } }
+    method W() is unsafe { Q:CgOp { (box Bool (path_access_writable (obj_getstr {$!path}))) } }
+    method x() is unsafe { Q:CgOp { (box Bool (path_eaccess_executable (obj_getstr {$!path}))) } }
+    method X() is unsafe { Q:CgOp { (box Bool (path_access_executable (obj_getstr {$!path}))) } }
+    method o() is unsafe { Q:CgOp { (box Bool (path_eaccess_owned (obj_getstr {$!path}))) } }
+    method O() is unsafe { Q:CgOp { (box Bool (path_access_owned (obj_getstr {$!path}))) } }
+
+    # method l() {
+    #     nqp::p6bool(pir::new__Ps('File').is_link(nqp::unbox_s(self.Str)))
+    # }
+
+    # method s() {
+    #     self.e
+    #       && nqp::p6box_i( nqp::stat(nqp::unbox_s(self.Str),
+    #                              nqp::const::STAT_FILESIZE) );
+    # }
+
+    method z() { self.e && self.s == 0; }
+
+    # method modified() {
+    #      nqp::p6box_i(nqp::stat(nqp::unbox_s(self.Str), nqp::const::STAT_MODIFYTIME));
+    # }
+    #
+    # method accessed() {
+    #      nqp::p6box_i(nqp::stat(nqp::unbox_s(self.Str), nqp::const::STAT_ACCESSTIME));
+    # }
+    #
+    # method changed() {
+    #      nqp::p6box_i(nqp::stat(nqp::unbox_s(self.Str), nqp::const::STAT_CHANGETIME));
+    # }
+}
+
+class IO::Path is Cool does IO::FileTestable {
+    # method SPEC { IO::Spec.MODULE };
+    has Str $.basename;
+    has Str $.directory = '.';
+    has Str $.volume = '';
+
+    method dir() {
+        die "IO::Path.dir is deprecated in favor of .directory";
+    }
+
+    submethod BUILD(:$!basename, :$!directory, :$!volume, :$dir) {
+        die "Named paramter :dir in IO::Path.new deprecated in favor of :directory"
+            if defined $dir;
+    }
+
+    multi method new(Str:D $path) {
+        # This seems hacky, but mono's GetFileName and GetDirectoryName
+        # react weirdly to '/'
+        if $path eq '/' {
+            self.bless(*, :basename(""),
+                          :directory("/"),
+                          :volume(""));
+        } else {
+            self.bless(*, :basename(Q:CgOp { (box Str (path_get_file_name (obj_getstr {$path}))) }),
+                          :directory(Q:CgOp { (box Str (path_get_directory_name (obj_getstr {$path}))) }),
+                          :volume(""));
+        }
+    }
+
+    multi method Str(IO::Path:D:) {
+        sub Combine($a, $b) {
+            Q:CgOp { (box Str (path_combine (obj_getstr {$a}) (obj_getstr {$b}))) }.IO
+        }
+        Combine(Combine($.volume, $.directory), $.basename);
+    }
+    method gist() {
+        self.defined ?? "{self.^name}<{self.Str}>" !! "(IO::Path)";
+    }
+    method perl() {
+        "IO::Path.new(:basename({ self.basename.perl }), :directory({ self.directory.perl }), :volume({ self.volume.perl }))"
+    }
+
+    # multi method Numeric(IO::Path:D:) {
+    #     self.basename.Numeric;
+    # }
+    # method Bridge(IO::Path:D:) {
+    #     self.basename.Bridge;
+    # }
+    # method Int(IO::Path:D:) {
+    #     self.basename.Int;
+    # }
+
+    method path(IO::Path:D:) {
+        self;
+    }
+
+    method IO(IO::Path:D: *%opts) {
+        # IO::Handle.new(:path(~self), |%opts);
+        IO.new(path => ~self);
+    }
+    method open(IO::Path:D: *%opts) {
+        open(~self, |%opts);
+    }
+    method contents(IO::Path:D: *%opts) {
+        dir(~self, |%opts);
+    }
+
+    # method is-absolute {
+    #     $.SPEC.is-absolute(~self);
+    # }
+    # method is-relative {
+    #     ! $.SPEC.is-absolute(~self);
+    # }
+    # method absolute ($base = $*CWD) {
+    #     return self.new($.SPEC.rel2abs(~self, $base))
+    # }
+    # method relative ($relative_to_directory = $*CWD) {
+    #     # return self.new($.SPEC.abs2rel(~self, $relative_to_directory));
+    #     $base.IO.append(~self)
+    # }
+    #
+    # method cleanup {
+    #     fail "Not Yet Implemented";
+    #     # return self.new($.SPEC.canonpath(~self));
+    # }
+    # method resolve {
+    #     fail "Not Yet Implemented: requires readlink()";
+    # }
+
+    # method parent {
+    #     if self.is-absolute {
+    #         return self.new($.SPEC.join($.volume, $.directory, ''));
+    #     }
+    #     elsif all($.basename, $.directory) eq $.SPEC.curdir {
+    #         return self.new(:$.volume, directory=>$.SPEC.curdir,
+    #                          basename=>$.SPEC.updir);
+    #     }
+    #     elsif $.basename eq $.SPEC.updir && $.directory eq $.SPEC.curdir
+    #        or !grep({$_ ne $.SPEC.updir}, $.SPEC.splitdir($.directory)) {
+    #         return self.new(    # If all updirs, then add one more
+    #             :$.volume,
+    #             directory => $.SPEC.catdir($.directory, $.SPEC.updir),
+    #             :$.basename );
+    #     }
+    #     else {
+    #         return self.new( $.SPEC.join($.volume, $.directory, '') );
+    #     }
+    # }
+
+    # method child ($childname) {
+    #     self.new($.SPEC.join: $.volume,
+    #                           $.SPEC.catdir($.directory, $.basename),
+    #                           $childname);
+    # }
+
+}
+
+
 
 my class TextReader {
     method get() {

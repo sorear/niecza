@@ -3058,6 +3058,8 @@ dynamic:
             thandlers["stab_privatemethod"] = Methody(null, Tokens.STable.GetMethod("GetPrivateMethod"));
             thandlers["path_file_exists"] = Methody(null, typeof(File).GetMethod("Exists"));
             thandlers["path_dir_exists"] = Methody(null, typeof(Directory).GetMethod("Exists"));
+            thandlers["path_get_directory_name"] = Methody(null, typeof(Path).GetMethod("GetDirectoryName", new Type[] { Tokens.String }));
+            thandlers["path_get_file_name"] = Methody(null, typeof(Path).GetMethod("GetFileName", new Type[] { Tokens.String }));
             thandlers["path_combine"] = Methody(null, typeof(Path).GetMethod("Combine", new Type[] { Tokens.String, Tokens.String }));
             thandlers["path_change_ext"] = Methody(null, typeof(Path).GetMethod("ChangeExtension", new Type[] { Tokens.String, Tokens.String }));
             thandlers["path_realpath"] = Methody(null, typeof(Path).GetMethod("GetFullPath"));
