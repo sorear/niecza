@@ -3744,7 +3744,9 @@ sub slurp($path?) is unsafe {
 sub spurt($path,$text) is unsafe { Q:CgOp { (rnull (spurt (unbox str (@ {$path.Str})) (unbox str (@ {$text.Str})))) } }
 
 sub dir($directory = '.', Mu :$test = none('.','..')) is unsafe {
-    Q:CgOp { (dir (obj_getstr {$directory})) }.grep($test).map(*.path);
+    Q:CgOp { (dir (obj_getstr {$directory})) }.grep($test).map({
+        IO::Path.new(:$directory, :basename($_), :volume(""))
+    });
 }
 
 my class Instant {
@@ -3862,7 +3864,7 @@ class IO::Path is Cool does IO::FileTestable {
         # react weirdly to '/'
         if $path eq '/' {
             self.bless(*, :basename(""),
-                          :directory("/"),
+                          :directory($path),
                           :volume(""));
         } else {
             self.bless(*, :basename(Q:CgOp { (box Str (path_get_file_name (obj_getstr {$path}))) }),
