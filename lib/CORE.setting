@@ -3807,17 +3807,17 @@ my class IO {
 }
 
 role IO::FileTestable {
-    method f() is unsafe { Q:CgOp { (box Bool (path_file_exists (obj_getstr {$!path}))) } }
-    method d() is unsafe { Q:CgOp { (box Bool (path_dir_exists (obj_getstr {$!path}))) } }
-    method e() is unsafe { Q:CgOp { (box Bool (path_any_exists (obj_getstr {$!path}))) } }
-    method r() is unsafe { Q:CgOp { (box Bool (path_eaccess_readable (obj_getstr {$!path}))) } }
-    method R() is unsafe { Q:CgOp { (box Bool (path_access_readable (obj_getstr {$!path}))) } }
-    method w() is unsafe { Q:CgOp { (box Bool (path_eaccess_writable (obj_getstr {$!path}))) } }
-    method W() is unsafe { Q:CgOp { (box Bool (path_access_writable (obj_getstr {$!path}))) } }
-    method x() is unsafe { Q:CgOp { (box Bool (path_eaccess_executable (obj_getstr {$!path}))) } }
-    method X() is unsafe { Q:CgOp { (box Bool (path_access_executable (obj_getstr {$!path}))) } }
-    method o() is unsafe { Q:CgOp { (box Bool (path_eaccess_owned (obj_getstr {$!path}))) } }
-    method O() is unsafe { Q:CgOp { (box Bool (path_access_owned (obj_getstr {$!path}))) } }
+    method f() is unsafe { Q:CgOp { (box Bool (path_file_exists (obj_getstr {~self}))) } }
+    method d() is unsafe { Q:CgOp { (box Bool (path_dir_exists (obj_getstr {~self}))) } }
+    method e() is unsafe { Q:CgOp { (box Bool (path_any_exists (obj_getstr {~self}))) } }
+    method r() is unsafe { Q:CgOp { (box Bool (path_eaccess_readable (obj_getstr {~self}))) } }
+    method R() is unsafe { Q:CgOp { (box Bool (path_access_readable (obj_getstr {~self}))) } }
+    method w() is unsafe { Q:CgOp { (box Bool (path_eaccess_writable (obj_getstr {~self}))) } }
+    method W() is unsafe { Q:CgOp { (box Bool (path_access_writable (obj_getstr {~self}))) } }
+    method x() is unsafe { Q:CgOp { (box Bool (path_eaccess_executable (obj_getstr {~self}))) } }
+    method X() is unsafe { Q:CgOp { (box Bool (path_access_executable (obj_getstr {~self}))) } }
+    method o() is unsafe { Q:CgOp { (box Bool (path_eaccess_owned (obj_getstr {~self}))) } }
+    method O() is unsafe { Q:CgOp { (box Bool (path_access_owned (obj_getstr {~self}))) } }
 
     # method l() {
     #     nqp::p6bool(pir::new__Ps('File').is_link(nqp::unbox_s(self.Str)))
