@@ -3875,7 +3875,7 @@ class IO::Path is Cool does IO::FileTestable {
 
     multi method Str(IO::Path:D:) {
         sub Combine($a, $b) {
-            Q:CgOp { (box Str (path_combine (obj_getstr {$a}) (obj_getstr {$b}))) }.IO
+            Q:CgOp { (box Str (path_combine (obj_getstr {$a}) (obj_getstr {$b}))) }
         }
         Combine(Combine($.volume, $.directory), $.basename);
     }
