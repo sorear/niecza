@@ -727,9 +727,6 @@ my class Cool {
     method tclc() {
         self ~~ /^(.)(.*)$/ ?? Q:CgOp { (box Str (ucd_titlecase { $0.ord })) } ~ $1.lc !! "";
     }
-    method tcuc() {
-        self ~~ /^(.)(.*)$/ ?? Q:CgOp { (box Str (ucd_titlecase { $0.ord })) } ~ $1.uc !! "";
-    }
     method flip() { Q:CgOp { (box Str (str_flip    (obj_getstr {self}))) }}
     method lcfirst() { lcfirst(self) }
     method ord() { ord(self) }
@@ -3900,7 +3897,7 @@ class IO::Path is Cool does IO::FileTestable {
         self;
     }
 
-    method IO(IO::Path:D: *%opts) {
+    method IO(IO::Path:D:) {
         # IO::Handle.new(:path(~self), |%opts);
         IO.new(path => ~self);
     }
