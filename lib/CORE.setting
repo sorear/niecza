@@ -46,9 +46,11 @@ my class IO       { ... }
 our class IO::Path { ... }
 my class ObjAt    { ... }
 my class Proxy    { ... }
+my class Set      { ... }
 my class KeySet   { ... }
 my class Bag      { ... }
 my class KeyBag   { ... }
+my class Pair     { ... }
 grammar Niecza::NumSyntax { ... }
 # }}}
 # Important inlinable definitions {{{
@@ -747,6 +749,24 @@ my class Cool {
 
     method set() { set self }
     method bag() { bag self }
+    method Set() {
+        my @keys;
+        for self.list() {
+            when Pair { @keys.push(.key) if .value; }
+            default   { @keys.push($_) }
+        }
+        Set.new(@keys);
+    }
+    method KeySet() {
+        my @keys;
+        for self.list() {
+            when Pair { @keys.push(.key) if .value; }
+            default   { @keys.push($_) }
+        }
+        KeySet.new(@keys);
+    }
+    method Bag()    { Bag.new-from-pairs(self.list); }
+    method KeyBag() { KeyBag.new-from-pairs(self.list); }
 }
 
 my role Positional { Any }
@@ -1949,6 +1969,10 @@ my class Hash does Associative {
     method kv()     { Q:CgOp { (hash_kv     {self}) } }
     method set()    { set self }
     method bag()    { bag self }
+    method Set()    { self.list.Set }
+    method KeySet() { self.list.KeySet }
+    method Bag()    { self.list.Bag }
+    method KeyBag() { self.list.KeyBag }
 
     method Numeric() { +@(self) }
     method Str() { @(self).map(* ~ "\n").join }
@@ -2360,6 +2384,17 @@ class Bag does Associative does Baggy {
         }
         self.bless(*, :elems(%e));
     }
+    method new-from-pairs(@pairs --> Bag) {
+        my %e;
+        for @pairs {
+            $_ ~~ Pair ?? %e{.key} += .value !! %e{$_}++;
+         }
+        for %e -> $p {
+            die "Negative values are not allowed in Bags" if $p.value < 0;
+            %e{$p.key}:delete if $p.value == 0;
+        }
+        self.bless(*, :elems(%e));
+    }
 
     submethod BUILD (%!elems) { }
 
@@ -2436,6 +2471,17 @@ class KeyBag does Associative does Baggy {
 
         for @args {
             register-arg($_);
+        }
+        self.bless(*, :elems(%e));
+    }
+    method new-from-pairs(@pairs --> Bag) {
+        my %e;
+        for @pairs {
+            $_ ~~ Pair ?? %e{.key} += .value !! %e{$_}++;
+         }
+        for %e -> $p {
+            die "Negative values are not allowed in KeyBags" if $p.value < 0;
+            %e{$p.key}:delete if $p.value == 0;
         }
         self.bless(*, :elems(%e));
     }
