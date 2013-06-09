@@ -2474,7 +2474,8 @@ class KeyBag does Associative does Baggy {
     method new-from-pairs(@pairs --> Bag) {
         my %e;
         for @pairs {
-            $_ ~~ Pair ?? %e{.key} += .value !! %e{$_}++;
+            when Pair { %e{.key} = .value + (%e{.key} // 0); }
+            %e{$_}++;
          }
         for %e -> $p {
             die "Negative values are not allowed in KeyBags" if $p.value < 0;
