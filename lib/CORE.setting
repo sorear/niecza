@@ -2365,7 +2365,7 @@ class Bag does Associative does Baggy {
         }
         self.bless(*, :elems(%e));
     }
-    method new-from-pairs(@pairs --> Bag) {
+    method new-from-pairs(*@pairs --> Bag) {
         my %e;
         for @pairs {
             when Pair { %e{.key} = .value + (%e{.key} // 0); }
@@ -2388,8 +2388,8 @@ class Bag does Associative does Baggy {
     method list() { %!elems.keys }
     method pairs() { %!elems.pairs }
 
-    method pick($count = 1) { my $kb = KeyBag.new(self); $kb.pick($count); }
-    method roll($count = 1) { my $kb = KeyBag.new(self); $kb.roll($count); }
+    method pick($count = 1) { my $kb = self.KeyBag; $kb.pick($count); }
+    method roll($count = 1) { my $kb = self.KeyBag; $kb.roll($count); }
 }
 
 sub bag(*@a) {
@@ -2454,22 +2454,12 @@ class KeyBag does Associative does Baggy {
     # Constructor
     method new(*@args --> KeyBag) {
         my %e;
-        sub register-arg($arg) {
-            given $arg {
-                when Pair { if .value { if %e{.key}:exists { %e{.key} += .value } else { %e{.key} = .value } } }
-                when Set | KeySet { for .keys -> $key { %e{$key}++; } }
-                when Associative { for .pairs -> $p { register-arg($p) } }
-                when Positional { for .list -> $p { register-arg($p) } }
-                default { %e{$_}++; }
-            }
-        }
-
         for @args {
-            register-arg($_);
+            %e{$_}++;
         }
         self.bless(*, :elems(%e));
     }
-    method new-from-pairs(@pairs --> Bag) {
+    method new-from-pairs(*@pairs --> KeyBag) {
         my %e;
         for @pairs {
             when Pair { %e{.key} = .value + (%e{.key} // 0); }
@@ -2486,7 +2476,7 @@ class KeyBag does Associative does Baggy {
 
     method Str()  { self.defined ?? %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") !! nextsame }
     method gist() { self.defined ?? "keybag({ self.pairs>>.gist.join(', ') })" !! "(KeyBag)" }
-    method perl() { self.defined ?? 'KeyBag.new(' ~ %!elems.perl ~ ')' !! "KeyBag" }
+    method perl() { self.defined ?? %!elems.perl ~ '.KeyBag' !! "KeyBag" }
 
     method iterator() { %!elems.pairs.iterator }
     method list() { %!elems.keys }
@@ -2495,7 +2485,7 @@ class KeyBag does Associative does Baggy {
     method pick($count = 1) {
         return self.roll if $count ~~ Num && $count == 1;
 
-        my $temp-bag = KeyBag.new(self);
+        my $temp-bag = KeyBag.new-from-pairs(self.hash);
         my $lc = $count ~~ Whatever ?? Inf !! $count;
         gather while $temp-bag && $lc-- {
             my $choice = $temp-bag.roll;
