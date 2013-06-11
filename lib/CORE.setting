@@ -2205,7 +2205,7 @@ class Set does Associative {
 
     submethod BUILD (%!elems) { }
 
-    method ACCEPTS($other) { $other ⊆ self and self ⊆ $other }
+    method ACCEPTS($other) { defined(self) ?? $other ⊆ self && self ⊆ $other !! $other.^does(self) }
 
     # Coercions to and from
     method postcircumfix:<( )> ($s --> Set) { to-set($s) }
@@ -2330,7 +2330,7 @@ class KeySet does Associative {
 
     submethod BUILD (%!elems) { }
 
-    method ACCEPTS($other) { $other ⊆ self and self ⊆ $other }
+    method ACCEPTS($other) { defined(self) ?? $other ⊆ self && self ⊆ $other !! $other.^does(self) }
 
     method Str()  { self.defined ?? %!elems.keys().join(" ") !! nextsame }
     method gist() { self.defined ?? "keyset({ %!elems.keys».gist.join(', ') })" !! "(KeySet)" }
@@ -2386,7 +2386,7 @@ class Bag does Associative does Baggy {
 
     submethod BUILD (%!elems) { }
 
-    method ACCEPTS($other) { $other ≼ self and self ≼ $other }
+    method ACCEPTS($other) { defined(self) ?? $other ≼ self && self ≼ $other !! $other.^does(self) }
 
     method Str()  { self.defined ?? %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") !! nextsame }
     method gist() { self.defined ?? "bag({ self.pairs>>.gist.join(', ') })" !! "(Bag)" }
@@ -2481,7 +2481,7 @@ class KeyBag does Associative does Baggy {
 
     submethod BUILD (%!elems) { }
 
-    method ACCEPTS($other) { $other ≼ self and self ≼ $other }
+    method ACCEPTS($other) { defined(self) ?? $other ≼ self && self ≼ $other !! $other.^does(self) }
 
     method Str()  { self.defined ?? %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") !! nextsame }
     method gist() { self.defined ?? "keybag({ self.pairs>>.gist.join(', ') })" !! "(KeyBag)" }
