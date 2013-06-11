@@ -2431,9 +2431,11 @@ multi sub infix:<⊎>(Bag $a, Bag $b --> Bag) {
 only  sub infix:<(+)>($a, $b --> Bag) is equiv(&infix:<&>) { $a ⊎ $b }
 
 multi sub infix:<≼>(Baggy $a, Baggy $b --> Bool) { so all $a.keys.map({ $a{$_} <= $b{$_} }) }
+multi sub infix:<≼>(Any $a, Any $b --> Bool) { $a.Bag ≼ $b.Bag }
 
 proto sub infix:<≽>($, $ --> Bool) is equiv(&infix:<==>) {*}
 multi sub infix:<≽>(Baggy $a, Baggy $b --> Bool) { so all $b.keys.map({ $b{$_} <= $a{$_} }) }
+multi sub infix:<≽>(Any $a, Any $b --> Bool) { $a.Bag ≽ $b.Bag }
 
 class KeyBag does Associative does Baggy {
     has Int %!elems; # should be UInt
