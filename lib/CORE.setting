@@ -2172,6 +2172,9 @@ my class EnumMap does Associative {
 BEGIN { $Bool::_enums ::= EnumMap.new("False" => 0, "True" => 1) }
 my enum Order (:Increase(-1), :Same(0), :Decrease(1));
 
+proto sub infix:<⊆>($, $ --> Bool) is equiv(&infix:<==>) {*}
+proto sub infix:<≼>($, $ --> Bool) is equiv(&infix:<==>) {*}
+
 class Set does Associative {
     has Bool %!elems;
 
@@ -2201,6 +2204,8 @@ class Set does Associative {
     }
 
     submethod BUILD (%!elems) { }
+
+    method ACCEPTS($other) { $other ⊆ self and self ⊆ $other }
 
     # Coercions to and from
     method postcircumfix:<( )> ($s --> Set) { to-set($s) }
@@ -2268,7 +2273,6 @@ multi sub infix:<(^)>(Set $a, Set $b --> Set) { ($a (-) $b) ∪ ($b (-) $a) }
 # multi sub infix:<eqv>(Any $a, Any $b --> Bool) { $a.Set eqv $b.Set }
 # multi sub infix:<eqv>(Set $a, Set $b --> Bool) { $a == $b and so $a.keys.all ∈ $b }
 
-proto sub infix:<⊆>($, $ --> Bool) is equiv(&infix:<==>) {*}
 multi sub infix:<⊆>(Any $a, Any $b --> Bool) { $a.Set ⊆ $b.Set }
 multi sub infix:<⊆>(Set $a, Set $b --> Bool) { $a <= $b and so $a.keys.all ∈ $b }
 only  sub infix:['(<=)']($a, $b --> Bool) is equiv(&infix:<==>) { $a ⊆ $b }
@@ -2326,6 +2330,8 @@ class KeySet does Associative {
 
     submethod BUILD (%!elems) { }
 
+    method ACCEPTS($other) { $other ⊆ self and self ⊆ $other }
+
     method Str()  { self.defined ?? %!elems.keys().join(" ") !! nextsame }
     method gist() { self.defined ?? "keyset({ %!elems.keys».gist.join(', ') })" !! "(KeySet)" }
     method perl() { self.defined ?? 'KeySet.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "KeySet" }
@@ -2380,6 +2386,8 @@ class Bag does Associative does Baggy {
 
     submethod BUILD (%!elems) { }
 
+    method ACCEPTS($other) { $other ≼ self and self ≼ $other }
+
     method Str()  { self.defined ?? %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") !! nextsame }
     method gist() { self.defined ?? "bag({ self.pairs>>.gist.join(', ') })" !! "(Bag)" }
     method perl() { self.defined ?? '(' ~ %!elems.perl ~ ').Bag' !! "Bag" }
@@ -2422,7 +2430,6 @@ multi sub infix:<⊎>(Bag $a, Bag $b --> Bag) {
 }
 only  sub infix:<(+)>($a, $b --> Bag) is equiv(&infix:<&>) { $a ⊎ $b }
 
-proto sub infix:<≼>($, $ --> Bool) is equiv(&infix:<==>) {*}
 multi sub infix:<≼>(Baggy $a, Baggy $b --> Bool) { so all $a.keys.map({ $a{$_} <= $b{$_} }) }
 
 proto sub infix:<≽>($, $ --> Bool) is equiv(&infix:<==>) {*}
@@ -2473,6 +2480,8 @@ class KeyBag does Associative does Baggy {
     }
 
     submethod BUILD (%!elems) { }
+
+    method ACCEPTS($other) { $other ≼ self and self ≼ $other }
 
     method Str()  { self.defined ?? %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") !! nextsame }
     method gist() { self.defined ?? "keybag({ self.pairs>>.gist.join(', ') })" !! "(KeyBag)" }
