@@ -2207,18 +2207,6 @@ class Set does Associative {
 
     method ACCEPTS($other) { defined(self) ?? $other ⊆ self && self ⊆ $other !! $other.^does(self) }
 
-    # Coercions to and from
-    method postcircumfix:<( )> ($s --> Set) { to-set($s) }
-    multi to-set (Set $set --> Set) { $set }
-    multi to-set (KeySet $set --> Set) { Set.new: $set }
-    multi to-set (Bag $bag --> Set) { Set.new: $bag }
-    multi to-set (KeyBag $bag --> Set) { Set.new: $bag }
-    multi to-set (Hash $elems --> Set) { Set.new: $elems.keys }
-    multi to-set (@elems --> Set) { Set.new: @elems }
-    multi to-set ([*@elems] --> Set) { Set.new: @elems }
-    multi to-set (%elems --> Set) { Set.new: %elems.keys }
-    multi to-set ($elem --> Set) { die "Cannot coerce $elem.perl() to a Set; use set($elem.perl()) to create a one-element set" }
-
     method Str()  { self.defined ?? %!elems.keys().join(" ") !! nextsame }
     method gist() { self.defined ?? "set({ %!elems.keys».gist.join(', ') })" !! "(Set)" }
     method perl() { self.defined ?? 'Set.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "Set" }
