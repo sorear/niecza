@@ -2239,15 +2239,14 @@ multi sub infix:<∋>(Set $a, $b --> Bool) { $a.exists($b) }
 only  sub infix:<(cont)>($a, $b --> Bool) is iffy { $a ∋ $b }
 only  sub infix:<∌>($a, $b --> Bool) is equiv(&infix:<==>) { $a !∋ $b }
 
-proto sub infix:<∪>($, $ --> Set) is equiv(&infix:<|>) {*}
-multi sub infix:<∪>(Any $a, Any $b --> Set) { $a.Set ∪ $b.Set }
-multi sub infix:<∪>(Set $a, Set $b --> Set) { Set.new: $a.keys, $b.keys }
-only  sub infix:<(|)>($a, $b) is equiv(&infix:<|>) { $a ∪ $b }
+only sub infix:<∪>(\|$p --> Set) is equiv(&infix:<|>) { Set.new: $p.map(*.Set.keys) }
+only sub infix:<(|)>(\|$p --> Set) is equiv(&infix:<|>) { infix:<∪>(|$p) }
 
-proto sub infix:<∩>($, $ --> Set) is equiv(&infix:<&>) {*}
-multi sub infix:<∩>(Any $a, Any $b --> Set) { $a.Set ∩ $b.Set }
-multi sub infix:<∩>(Set $a, Set $b --> Set) { Set.new: $a.keys.grep: -> $k { ?$b{$k} } }
-only  sub infix:<(&)>($a, $b) is equiv(&infix:<&>) { $a ∩ $b }
+only sub infix:<∩>(\|$p --> Set) is equiv(&infix:<&>) {
+    my @sets = $p.map(*.Set);
+    @sets ?? Set.new(@sets[0].keys.grep: -> $k { @sets>>.{$k}.all }) !! ∅;
+}
+only sub infix:<(&)>(\|$p) is equiv(&infix:<&>) { infix:<∩>(|$p) }
 
 proto sub infix:<(-)>($, $ --> Set) is equiv(&infix:<^>) {*}
 multi sub infix:<(-)>(Any $a, Any $b --> Set) { $a.Set (-) $b.Set }
