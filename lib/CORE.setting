@@ -2263,9 +2263,10 @@ only sub infix:<∩>(\|$p) is equiv(&infix:<&>) {
 }
 only sub infix:<(&)>(\|$p) is equiv(&infix:<&>) { infix:<∩>(|$p) }
 
-proto sub infix:<(-)>($, $ --> Set) is equiv(&infix:<^>) {*}
-multi sub infix:<(-)>(Any $a, Any $b --> Set) { $a.Set (-) $b.Set }
-multi sub infix:<(-)>(Set $a, Set $b --> Set) { Set.new: $a.keys.grep: * ∉ $b }
+proto sub infix:<∖>($, $ --> Set) is equiv(&infix:<^>) {*}
+multi sub infix:<∖>(Any $a, Any $b --> Set) { $a.Set ∖ $b.Set }
+multi sub infix:<∖>(Set $a, Set $b --> Set) { Set.new: $a.keys.grep: * ∉ $b }
+only  sub infix:<(-)>($a, $b --> Set) is equiv(&infix:<^>) { $a ∖ $b }
 
 proto sub infix:<(^)>($, $ --> Set) is equiv(&infix:<^>) {*}
 multi sub infix:<(^)>(Any $a, Any $b --> Set) { $a.Set (^) $b.Set }
