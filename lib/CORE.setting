@@ -2268,9 +2268,10 @@ multi sub infix:<∖>(Any $a, Any $b --> Set) { $a.Set ∖ $b.Set }
 multi sub infix:<∖>(Set $a, Set $b --> Set) { Set.new: $a.keys.grep: * ∉ $b }
 only  sub infix:<(-)>($a, $b --> Set) is equiv(&infix:<^>) { $a ∖ $b }
 
-proto sub infix:<(^)>($, $ --> Set) is equiv(&infix:<^>) {*}
-multi sub infix:<(^)>(Any $a, Any $b --> Set) { $a.Set (^) $b.Set }
-multi sub infix:<(^)>(Set $a, Set $b --> Set) { ($a (-) $b) ∪ ($b (-) $a) }
+proto sub infix:<⊖>($, $ --> Set) is equiv(&infix:<^>) {*}
+multi sub infix:<⊖>(Any $a, Any $b --> Set) { $a.Set ⊖ $b.Set }
+multi sub infix:<⊖>(Set $a, Set $b --> Set) { ($a (-) $b) ∪ ($b (-) $a) }
+only  sub infix:<(^)>($a, $b --> Set) is equiv(&infix:<^>) { $a ⊖ $b }
 
 # TODO: polymorphic eqv
 # multi sub infix:<eqv>(Any $a, Any $b --> Bool) { $a.Set eqv $b.Set }
