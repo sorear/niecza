@@ -2406,19 +2406,19 @@ sub bag(*@a) {
     Bag.new(|@a);
 }
 
-proto sub infix:<⊍>($, $ --> Bag) is equiv(&infix:<&>) {*}
-multi sub infix:<⊍>(Any $a, Any $b --> Bag) { $a.Bag ⊍ $b.Bag }
-multi sub infix:<⊍>(Bag $a, Bag $b --> Bag) {
-    Bag.new-from-pairs(($a.Set ∪ $b.Set).map({ ; $_ => $a{$_} * $b{$_} }))
+only sub infix:<⊍>(\|$p) is equiv(&infix:<|>) {
+    my $set = Set.new: $p.map(*.Set.keys);
+    my @bags = $p.map(*.Bag);
+    Bag.new-from-pairs($set.map({ ; $_ => [*] @bags>>.{$_} }));
 }
-only  sub infix:<(.)>($a, $b --> Bag) is equiv(&infix:<&>) { $a ⊍ $b }
+only  sub infix:<(.)>(\|$p) is equiv(&infix:<&>) { infix:<⊍>(|$p) }
 
-proto sub infix:<⊎>($, $ --> Bag) is equiv(&infix:<&>) {*}
-multi sub infix:<⊎>(Any $a, Any $b --> Bag) { $a.Bag ⊎ $b.Bag }
-multi sub infix:<⊎>(Bag $a, Bag $b --> Bag) {
-    Bag.new-from-pairs(($a.Set ∪ $b.Set).map({ ; $_ => $a{$_} + $b{$_} }))
+only sub infix:<⊎>(\|$p) is equiv(&infix:<|>) {
+    my $set = Set.new: $p.map(*.Set.keys);
+    my @bags = $p.map(*.Bag);
+    Bag.new-from-pairs($set.map({ ; $_ => [+] @bags>>.{$_} }));
 }
-only  sub infix:<(+)>($a, $b --> Bag) is equiv(&infix:<&>) { $a ⊎ $b }
+only  sub infix:<(+)>(\|$p) is equiv(&infix:<&>) { infix:<⊎>(|$p) }
 
 multi sub infix:<≼>(Baggy $a, Baggy $b --> Bool) { so all $a.keys.map({ $a{$_} <= $b{$_} }) }
 multi sub infix:<≼>(Any $a, Any $b --> Bool) { $a.Bag ≼ $b.Bag }
