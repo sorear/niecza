@@ -1791,17 +1791,7 @@ my class List is Cool does Positional {
         %result;
     }
 
-    method categorize(&test) {
-        my %result;
-        for @(self) {
-            my @k = test $_;
-            for @k -> $k {
-                %result{$k} //= [];
-                %result{$k}.push: $_;
-            }
-        }
-        %result;
-    }
+    method categorize ($test) { {}.categorize( $test, self.list ) }
 
     method min($cmp_ = &infix:<cmp>) {
         my $cmp = $cmp_;
@@ -2001,6 +1991,35 @@ my class Hash does Associative {
             } else {
                 $previous     = $e;
                 $has_previous = 1;
+            }
+        }
+        self;
+    }
+
+    # proto method categorize(|) { * }
+    multi method categorize( &test, *@list ) {
+        for @list {
+            for test($_) -> $k {
+                self{$k} //= [];
+                self{$k}.push: $_;
+            }
+        }
+        self;
+    }
+    multi method categorize( %test, *@list ) {
+        for @list {
+            for %test{$_} -> $k {
+                self{$k} //= [];
+                self{$k}.push: $_;
+            }
+        }
+        self;
+    }
+    multi method categorize( @test, *@list ) {
+        for @list {
+            for @test[$_] -> $k {
+                self{$k} //= [];
+                self{$k}.push: $_;
             }
         }
         self;
