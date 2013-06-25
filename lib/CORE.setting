@@ -2275,7 +2275,7 @@ only sub infix:<∖>(\|$p) is equiv(&infix:<^>) {
         Set.new: $base.keys.grep(* ∉ @sets.any );
     }
 }
-only sub infix:<(-)>($a, $b --> Set) is equiv(&infix:<^>) { $a ∖ $b }
+only sub infix:<(-)>($a, $b) is equiv(&infix:<^>) { $a ∖ $b }
 
 proto sub infix:<⊖>($, $ --> Set) is equiv(&infix:<^>) {*}
 multi sub infix:<⊖>(Any $a, Any $b --> Set) { $a.Set ⊖ $b.Set }
