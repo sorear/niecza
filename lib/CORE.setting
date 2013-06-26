@@ -435,6 +435,8 @@ my class Any is Mu {
         }
         $result;
     }
+
+    method classify($test)   { {}.classify(   $test, @(self) ) }
 }
 
 sub Niecza::autopun($pun, $name) {
