@@ -37,6 +37,8 @@ integration/real-strings.t
 integration/role-composition-vs-attribute.t
 integration/say-crash.t
 integration/substr-after-match-in-gather-in-for.t
+integration/topic_in_double_loop.t
+integration/variables-in-do.t
 integration/weird-errors.t
 S02-lexical-conventions/begin_end_pod.t
 S02-lexical-conventions/bom.t
