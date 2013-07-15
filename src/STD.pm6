@@ -1489,6 +1489,18 @@ grammar P6 is STD {
         [ <?before '(' <.EXPR>? ';' <.EXPR>? ';' <.EXPR>? ')' >
             <.obs('C-style "for (;;)" loop', '"loop (;;)"')> ]?
         <xblock>
+        <.worry_itemlist($<xblock><EXPR>)>
+    }
+    
+    method worry_itemlist($expr) {
+        my $rh = $expr.hash.<root>.hash;
+        if $rh<variable> :exists {
+            my $var = $rh<variable>.Str;
+            if substr($var,0,1) eq '$' {
+                self.cursor($expr.from).worry("'for $var' will never flatten a \$ variable;\n\tto force list interpolation, please use either 'for \@$var' or 'for $var\[]';\n\tif you just want item topicalization, use 'given $var' instead");
+            }
+        }
+        self;
     }
 
     token statement_control:foreach {
@@ -1539,7 +1551,7 @@ grammar P6 is STD {
     rule statement_mod_loop:while {<sym> <modifier_expr> }
     rule statement_mod_loop:until {<sym> <modifier_expr> }
 
-    rule statement_mod_loop:for   {<sym> <modifier_expr> }
+    rule statement_mod_loop:for   {<sym> <modifier_expr> <.worry_itemlist($<modifier_expr><EXPR>)> }
     rule statement_mod_loop:given {<sym> <modifier_expr> }
 
     ################
