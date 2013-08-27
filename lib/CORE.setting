@@ -4153,7 +4153,7 @@ sub rmdir($filename) is unsafe {
 }
 
 sub shell($command) is unsafe {
-    Q:CgOp { (box Int (command_system (obj_getstr {$command}))) };
+    Q:CgOp { (box Int (command_system (obj_getstr {$command}))) } +> 8;
 }
 
 sub run(*@argv, :%env = %*ENV) is unsafe {
