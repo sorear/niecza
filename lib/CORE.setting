@@ -277,7 +277,11 @@ my class Mu {
     method perl() { defined(self) ?? "{self.typename}.new(...)" !! self.typename }
     method so() { ?self }
     method not() { !self }
-    method bless($, *%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
+    multi method bless($, *%_) {
+        warn "Passing an object candidate to Mu.bless is deprecated";
+        Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) }
+    }
+    multi method bless(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
     method CREATE() { Q:CgOp { (obj_newblank (obj_llhow (@ {self}))) } }
     multi method new(*%_) { Q:CgOp { (default_new (@ {self}) (unbox varhash (@ {%_}))) } }
     method clone(*%_) { Q:CgOp { (repr_clone (@ {self}) (unbox varhash (@ {%_}))) } }
@@ -2158,7 +2162,7 @@ my class EnumMap does Associative {
     has $.data-type;
 
     method new(*@pairs) {
-        self := self.bless(*);
+        self := self.bless();
         my $last = -1;
         my $ixn = 0;
         my $str;
@@ -2239,7 +2243,7 @@ class Set does Associative {
         for @args {
             %e{$_} = True;
         }
-        self.bless(*, :elems(%e));
+        self.bless(:elems(%e));
     }
 
     submethod BUILD (%!elems) { }
@@ -2376,7 +2380,7 @@ class KeySet does Associative {
         for @args {
             %e{$_} = True;
         }
-        self.bless(*, :elems(%e));
+        self.bless(:elems(%e));
     }
 
     submethod BUILD (%!elems) { }
@@ -2418,7 +2422,7 @@ class Bag does Associative does Baggy {
         for @args {
             %e{$_}++;
         }
-        self.bless(*, :elems(%e));
+        self.bless(:elems(%e));
     }
     method new-from-pairs(*@pairs --> Bag) {
         my %e;
@@ -2430,7 +2434,7 @@ class Bag does Associative does Baggy {
             die "Negative values are not allowed in Bags" if $p.value < 0;
             %e{$p.key}:delete if $p.value == 0;
         }
-        self.bless(*, :elems(%e));
+        self.bless(:elems(%e));
     }
 
     submethod BUILD (%!elems) { }
@@ -2503,7 +2507,7 @@ class KeyBag does Associative does Baggy {
         for @args {
             %e{$_}++;
         }
-        self.bless(*, :elems(%e));
+        self.bless(:elems(%e));
     }
     method new-from-pairs(*@pairs --> KeyBag) {
         my %e;
@@ -2515,7 +2519,7 @@ class KeyBag does Associative does Baggy {
             die "Negative values are not allowed in KeyBags" if $p.value < 0;
             %e{$p.key}:delete if $p.value == 0;
         }
-        self.bless(*, :elems(%e));
+        self.bless(:elems(%e));
     }
 
     submethod BUILD (%!elems) { }
@@ -3154,7 +3158,7 @@ my class Range is Cool does Positional {
             $max = +$max;
         }
         $min = -Inf if $min.^isa(Whatever);
-        unitem(self.bless(*, :$min, :$max, :$excludes_min, :$excludes_max));
+        unitem(self.bless(:$min, :$max, :$excludes_min, :$excludes_max));
     }
 
     method immutable() { self // return True; $!min.immutable && $!max.immutable }
@@ -3571,7 +3575,7 @@ sub rungather($command_line) is unsafe { Q:CgOp { (box Str (command_qx (obj_gets
 my class DateTime {
     has $!now;
     method new($now) {
-        self := self.bless(*);
+        self := self.bless();
         $!now = $now;
         self;
     }
@@ -3940,13 +3944,13 @@ class IO::Path is Cool does IO::FileTestable {
         # This seems hacky, but mono's GetFileName and GetDirectoryName
         # react weirdly to '/'
         if $path eq '/' {
-            self.bless(*, :basename(""),
-                          :directory($path),
-                          :volume(""));
+            self.bless(:basename(""),
+                       :directory($path),
+                       :volume(""));
         } else {
-            self.bless(*, :basename(Q:CgOp { (box Str (path_get_file_name (obj_getstr {$path}))) }),
-                          :directory(Q:CgOp { (box Str (path_get_directory_name (obj_getstr {$path}))) }),
-                          :volume(""));
+            self.bless(:basename(Q:CgOp { (box Str (path_get_file_name (obj_getstr {$path}))) }),
+                       :directory(Q:CgOp { (box Str (path_get_directory_name (obj_getstr {$path}))) }),
+                       :volume(""));
         }
     }
 
@@ -4517,7 +4521,7 @@ class IO::Socket::INET {
         %args<listen>.=Bool if %args<listen> :exists;
 
         #TODO: Learn what protocols map to which socket types and then determine which is needed.
-        self.bless(*, |%args)!initialize()
+        self.bless(|%args)!initialize()
     }
 
     method !initialize() {
@@ -4562,7 +4566,7 @@ class IO::Socket::INET {
     }
 
     method accept() {
-        my $new_sock := self.WHAT.bless(*, :$!family, :$!proto, :$!type);
+        my $new_sock := self.WHAT.bless(:$!family, :$!proto, :$!type);
         $new_sock!setsock( Q:CgOp { (box Any (socket_accept (unbox socket {$!sock}))) } );
     }
 
