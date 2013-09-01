@@ -79,7 +79,7 @@ class Builder {
 }
 
 INIT {
-    $GLOBAL::TEST-BUILDER = Builder.bless(*);
+    $GLOBAL::TEST-BUILDER = Builder.bless();
     $GLOBAL::TEST-BUILDER.reset;
 }
 
