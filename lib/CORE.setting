@@ -377,6 +377,7 @@ my class Any is Mu {
         };
     }
     method elems() { self.flat.elems }
+    method end() { self.defined ?? self.elems - 1 !! -1 }
     method iterator() { self.flat.iterator }
     method join($sep = "") { self.flat.join($sep) }
     method chrs() { chrs(@(self)) }
@@ -1785,7 +1786,6 @@ my class List is Cool does Positional {
     }
 
     method reverse() { reverse( @(self) ); }
-    method end() { self.elems - 1 }
 
     method categorize ($test) { {}.categorize( $test, self.list ) }
     method classify ($test) { {}.classify( $test, self.list ) }
