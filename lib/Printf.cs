@@ -269,16 +269,20 @@ public partial class Builtins {
             int precision = format.precision > 0 ? format.precision : 6;
 
             String number = "??";
-            switch (format.directive) {
-                case PrintfDirective.FloatFixedDecimal:
-                    number = f.ToString("F" + precision);
-                    break;
-                case PrintfDirective.FloatScientific:
-                    number = f.ToString("e" + precision);
-                    break;
-                case PrintfDirective.FloatEF:
-                    number = f.ToString("g" + precision);
-                    break;
+            if (double.IsInfinity(f)) {
+                number = "inf";
+            } else {
+                switch (format.directive) {
+                    case PrintfDirective.FloatFixedDecimal:
+                        number = f.ToString("F" + precision);
+                        break;
+                    case PrintfDirective.FloatScientific:
+                        number = f.ToString("e" + precision);
+                        break;
+                    case PrintfDirective.FloatEF:
+                        number = f.ToString("g" + precision);
+                        break;
+                }
             }
 
             if (format.upper) {
