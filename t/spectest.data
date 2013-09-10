@@ -56,6 +56,7 @@ S02-literals/char-by-name.t
 S02-literals/char-by-number.t
 S02-literals/fmt-interpolation.t
 S02-literals/hash-interpolation.t
+S02-literals/heredocs.t
 S02-literals/hex_chars.t
 S02-literals/listquote-whitespace.t
 S02-literals/listquote.t
@@ -86,6 +87,7 @@ S02-names-vars/names.t
 S02-names-vars/perl.t
 S02-names-vars/variables-and-packages.t
 S02-names-vars/varnames.t
+S02-names/bare-sigil.t
 S02-names/caller.t
 S02-names/identifier.t
 S02-names/indirect.t
@@ -165,6 +167,7 @@ S03-operators/context-forcers.t
 S03-operators/context.t
 S03-operators/equality.t
 S03-operators/eqv.t
+S03-operators/fiddly.t
 S03-operators/flip-flop.t
 S03-operators/gcd.t
 S03-operators/identity.t
@@ -179,6 +182,7 @@ S03-operators/misc.t
 S03-operators/names.t
 S03-operators/nesting.t
 S03-operators/not.t
+S03-operators/numeric-shift.t
 S03-operators/overflow.t
 S03-operators/precedence.t
 S03-operators/range-basic.t
@@ -322,6 +326,7 @@ S05-modifier/pos.t
 S05-modifier/sigspace.t
 S05-substitution/match.t
 S05-substitution/subst.t
+S05-transliteration/79778.t
 S05-transliteration/trans.t
 S05-transliteration/with-closure.t
 S06-advanced/caller.t
@@ -340,6 +345,7 @@ S06-multi/syntax.t
 S06-multi/type-based.t
 S06-multi/unpackability.t
 S06-operator-overloading/methods.t
+S06-operator-overloading/semicolon.t
 S06-operator-overloading/sub.t
 S06-other/anon-hashes-vs-blocks.t
 S06-other/main-eval.t
@@ -387,6 +393,7 @@ S12-attributes/defaults.t
 S12-attributes/inheritance.t
 S12-attributes/instance.t
 S12-attributes/recursive.t
+S12-attributes/undeclared.t
 S12-class/anonymous.t
 S12-class/attributes.t
 S12-class/basic.t
@@ -499,10 +506,13 @@ S32-hash/pairs.t
 S32-hash/push.t
 S32-hash/slice.t
 S32-io/chdir.t
+S32-io/copy.t
 S32-io/dir.t
 S32-io/file-tests.t
 S32-io/io-path.t
 S32-io/note.t
+S32-io/other.t
+S32-io/slurp.t
 S32-list/categorize.t
 S32-list/classify.t
 S32-list/create.t
@@ -535,6 +545,7 @@ S32-num/rat.t
 S32-num/real-bridge.t
 S32-num/roots.t
 S32-num/rounders.t
+S32-num/rshift_pos_amount.t
 S32-num/sign.t
 S32-num/sqrt.t
 S32-num/stringify.t
