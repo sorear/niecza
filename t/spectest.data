@@ -276,6 +276,7 @@ S04-statements/until.t
 S04-statements/while.t
 S05-capture/caps.t
 S05-capture/match-object.t
+S05-capture/named.t
 S05-capture/subrule.t
 S05-grammar/action-stubs.t
 S05-grammar/inheritance.t
@@ -419,6 +420,7 @@ S12-enums/basic.t
 S12-enums/misc.t
 S12-enums/non-int.t
 S12-introspection/can.t
+S12-introspection/WHAT.t
 S12-methods/accessors.t
 S12-methods/attribute-params.t
 S12-methods/calling_syntax.t
