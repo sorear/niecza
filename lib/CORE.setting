@@ -47,9 +47,9 @@ our class IO::Path { ... }
 my class ObjAt    { ... }
 my class Proxy    { ... }
 my class Set      { ... }
-my class KeySet   { ... }
+my class SetHash   { ... }
 my class Bag      { ... }
-my class KeyBag   { ... }
+my class BagHash   { ... }
 my class Pair     { ... }
 grammar Niecza::NumSyntax { ... }
 # }}}
@@ -762,16 +762,16 @@ my class Cool {
         }
         Set.new(@keys);
     }
-    method KeySet() {
+    method SetHash() {
         my @keys;
         for self.list() {
             when Pair { @keys.push(.key) if .value; }
             default   { @keys.push($_) }
         }
-        KeySet.new(@keys);
+        SetHash.new(@keys);
     }
     method Bag()    { Bag.new-from-pairs(self.list); }
-    method KeyBag() { KeyBag.new-from-pairs(self.list); }
+    method BagHash() { BagHash.new-from-pairs(self.list); }
 }
 
 my role Positional { Any }
@@ -1953,9 +1953,9 @@ my class Hash does Associative {
     method list()   { Q:CgOp { (hash_pairs  {self}) } }
     method kv()     { Q:CgOp { (hash_kv     {self}) } }
     method Set()    { self.list.Set }
-    method KeySet() { self.list.KeySet }
+    method SetHash() { self.list.SetHash }
     method Bag()    { self.list.Bag }
-    method KeyBag() { self.list.KeyBag }
+    method BagHash() { self.list.BagHash }
 
     method Numeric() { +@(self) }
     method Str() { @(self).map(* ~ "\n").join }
@@ -2230,9 +2230,9 @@ class Set does Associative {
     method Numeric { %!elems.Numeric }
     method hash { %!elems.hash }
     method Set { self }
-    method KeySet { KeySet.new(self.keys) }
+    method SetHash { SetHash.new(self.keys) }
     method Bag { bag self.keys }
-    method KeyBag { KeyBag.new(self.keys) }
+    method BagHash { BagHash.new(self.keys) }
 
     method at_key($k) { ?(%!elems{$k} // False) }
     method exists_key($k) { self.exists($k) }
@@ -2351,7 +2351,7 @@ multi sub infix:<⊃>(Set $a, Set $b --> Bool) { $a > $b and so $b.keys.all ∈ 
 only  sub infix:['(>)']($a, $b --> Bool) is equiv(&infix:<==>) { $a ⊃ $b }
 only  sub infix:<⊅>($a, $b --> Bool) is equiv(&infix:<==>) { $a !⊃ $b }
 
-class KeySet does Associative {
+class SetHash does Associative {
     has Bool %!elems;
 
     method default { False }
@@ -2363,9 +2363,9 @@ class KeySet does Associative {
     method Numeric { %!elems.Numeric }
     method hash { %!elems.hash }
     method Set { set self.keys }
-    method KeySet { self }
+    method SetHash { self }
     method Bag { bag self.keys }
-    method KeyBag { KeyBag.new(self.keys) }
+    method BagHash { BagHash.new(self.keys) }
 
     method at_key($k) {
         Proxy.new(FETCH => { %!elems{$k}:exists ?? True !! False },
@@ -2375,7 +2375,7 @@ class KeySet does Associative {
     method delete_key($k) { %!elems{$k}:delete }
 
     # Constructor
-    method new(*@args --> KeySet) {
+    method new(*@args --> SetHash) {
         my %e;
         for @args {
             %e{$_} = True;
@@ -2388,8 +2388,8 @@ class KeySet does Associative {
     method ACCEPTS($other) { defined(self) ?? $other ⊆ self && self ⊆ $other !! $other.^does(self) }
 
     method Str()  { self.defined ?? %!elems.keys().join(" ") !! nextsame }
-    method gist() { self.defined ?? "keyset({ %!elems.keys».gist.join(', ') })" !! "(KeySet)" }
-    method perl() { self.defined ?? 'KeySet.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "KeySet" }
+    method gist() { self.defined ?? "sethash({ %!elems.keys».gist.join(', ') })" !! "(SetHash)" }
+    method perl() { self.defined ?? 'SetHash.new(' ~ join(', ', map { .perl }, %!elems.keys) ~ ')' !! "SetHash" }
 
     method iterator() { %!elems.keys.iterator }
     method list() { %!elems.keys }
@@ -2409,9 +2409,9 @@ class Bag does Associative does Baggy {
     method Numeric { self.elems }
     method hash { %!elems.hash }
     method Set { set self.keys }
-    method KeySet { KeySet.new(self.keys) }
+    method SetHash { SetHash.new(self.keys) }
     method Bag { self }
-    method KeyBag { KeyBag.new-from-pairs(self.hash) }
+    method BagHash { BagHash.new-from-pairs(self.hash) }
 
     method at_key($k) { +(%!elems{$k} // 0) }
     method exists_key($k) { self.exists($k) }
@@ -2449,8 +2449,8 @@ class Bag does Associative does Baggy {
     method list() { %!elems.keys }
     method pairs() { %!elems.pairs }
 
-    method pick($count = 1) { my $kb = self.KeyBag; $kb.pick($count); }
-    method roll($count = 1) { my $kb = self.KeyBag; $kb.roll($count); }
+    method pick($count = 1) { my $kb = self.BagHash; $kb.pick($count); }
+    method roll($count = 1) { my $kb = self.BagHash; $kb.roll($count); }
 }
 
 sub bag(*@a) {
@@ -2478,7 +2478,7 @@ proto sub infix:<≽>($, $ --> Bool) is equiv(&infix:<==>) {*}
 multi sub infix:<≽>(Baggy $a, Baggy $b --> Bool) { so all $b.keys.map({ $b{$_} <= $a{$_} }) }
 multi sub infix:<≽>(Any $a, Any $b --> Bool) { $a.Bag ≽ $b.Bag }
 
-class KeyBag does Associative does Baggy {
+class BagHash does Associative does Baggy {
     has Int %!elems; # should be UInt
 
     method default { 0 }
@@ -2490,9 +2490,9 @@ class KeyBag does Associative does Baggy {
     method Numeric { self.elems }
     method hash { %!elems.hash }
     method Set { set self.keys }
-    method KeySet { KeySet.new(self.keys) }
+    method SetHash { SetHash.new(self.keys) }
     method Bag { Bag.new-from-pairs(self.hash) }
-    method KeyBag { self }
+    method BagHash { self }
 
     method at_key($k) {
         Proxy.new(FETCH => { %!elems{$k}:exists ?? %!elems{$k} !! 0 },
@@ -2502,21 +2502,21 @@ class KeyBag does Associative does Baggy {
     method delete_key($k) { %!elems{$k}:delete }
 
     # Constructor
-    method new(*@args --> KeyBag) {
+    method new(*@args --> BagHash) {
         my %e;
         for @args {
             %e{$_}++;
         }
         self.bless(:elems(%e));
     }
-    method new-from-pairs(*@pairs --> KeyBag) {
+    method new-from-pairs(*@pairs --> BagHash) {
         my %e;
         for @pairs {
             when Pair { %e{.key} = .value + (%e{.key} // 0); }
             %e{$_}++;
          }
         for %e -> $p {
-            die "Negative values are not allowed in KeyBags" if $p.value < 0;
+            die "Negative values are not allowed in BagHashs" if $p.value < 0;
             %e{$p.key}:delete if $p.value == 0;
         }
         self.bless(:elems(%e));
@@ -2527,8 +2527,8 @@ class KeyBag does Associative does Baggy {
     method ACCEPTS($other) { defined(self) ?? $other ≼ self && self ≼ $other !! $other.^does(self) }
 
     method Str()  { self.defined ?? %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") !! nextsame }
-    method gist() { self.defined ?? "keybag({ self.pairs>>.gist.join(', ') })" !! "(KeyBag)" }
-    method perl() { self.defined ?? %!elems.perl ~ '.KeyBag' !! "KeyBag" }
+    method gist() { self.defined ?? "baghash({ self.pairs>>.gist.join(', ') })" !! "(BagHash)" }
+    method perl() { self.defined ?? %!elems.perl ~ '.BagHash' !! "BagHash" }
 
     method iterator() { %!elems.pairs.iterator }
     method list() { %!elems.keys }
@@ -2537,7 +2537,7 @@ class KeyBag does Associative does Baggy {
     method pick($count = 1) {
         return self.roll if $count ~~ Num && $count == 1;
 
-        my $temp-bag = KeyBag.new-from-pairs(self.hash);
+        my $temp-bag = BagHash.new-from-pairs(self.hash);
         my $lc = $count ~~ Whatever ?? Inf !! $count;
         gather while $temp-bag && $lc-- {
             my $choice = $temp-bag.roll;
