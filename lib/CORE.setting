@@ -2212,7 +2212,7 @@ my class EnumMap does Associative {
     method exists_key($k) { self{$k}:exists }
 }
 BEGIN { $Bool::_enums ::= EnumMap.new("False" => 0, "True" => 1) }
-my enum Order (:Increase(-1), :Same(0), :Decrease(1));
+my enum Order (:Less(-1), :Same(0), :More(1), :Decrease(-1), :Increase(1));
 
 proto sub infix:<⊆>($, $ --> Bool) is equiv(&infix:<==>) {*}
 proto sub infix:<≼>($, $ --> Bool) is equiv(&infix:<==>) {*}
@@ -3500,18 +3500,18 @@ multi sub exp($x) { $x.exp }
 multi sub exp($x, $base) { $base ** $x }
 
 sub infix:« <=> » is equiv<leg> ($a, $b) is pure {
-    $a < $b ?? Order::Increase !! $a > $b ?? Order::Decrease !! Order::Same
+    $a < $b ?? Order::Less !! $a > $b ?? Order::More !! Order::Same
 }
 # XXX polymorphic equality
 sub infix:<cmp> is equiv<leg> (Mu $a, Mu $b) {
     return $a <=> $b if $a ~~ Real && $b ~~ Real;
     if $a ~~ Real {
-        return Order::Increase if $a == -Inf;
-        return Order::Decrease if $a == Inf;
+        return Order::Less if $a == -Inf;
+        return Order::More if $a == Inf;
     }
     if $b ~~ Real {
-        return Order::Increase if $b == Inf;
-        return Order::Decrease if $b == -Inf;
+        return Order::Less if $b == Inf;
+        return Order::More if $b == -Inf;
     }
     return ($a ~~ Real ?? "(Real)" !! $a.WHAT.gist) leg
            ($b ~~ Real ?? "(Real)" !! $b.WHAT.gist)
@@ -3529,8 +3529,8 @@ sub infix:<cmp> is equiv<leg> (Mu $a, Mu $b) {
         my $keys = set $a.keys, $b.keys;
         my @keys = $keys.keys.sort;
         for @keys -> $k {
-            return Order::Decrease unless $a{$k} :exists;
-            return Order::Increase unless $b{$k} :exists;
+            return Order::More unless $a{$k} :exists;
+            return Order::Less unless $b{$k} :exists;
             (my $r = $a{$k} cmp $b{$k}) && return $r;
         }
         return Order::Same;
