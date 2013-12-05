@@ -122,6 +122,7 @@ S02-types/parcel.t
 S02-types/parsing-bool.t
 S02-types/range.t
 S02-types/set.t
+S02-types/sethash.t
 S02-types/sigils-and-types.t
 S02-types/subscripts_and_context.t
 S02-types/subset.t
