@@ -2484,10 +2484,11 @@ class BagHash does Associative does Baggy {
     method default { 0 }
     method keys { %!elems.keys }
     method values { %!elems.values }
-    method elems returns Int { [+] self.values }
+    method elems { %!elems.elems }
+    method total { [+] self.values }
     method exists($a) returns Bool { %!elems.exists($a) }
     method Bool { %!elems.Bool }
-    method Numeric { self.elems }
+    method Numeric { self.total }
     method hash { %!elems.hash }
     method Set { set self.keys }
     method SetHash { SetHash.new(self.keys) }
@@ -2526,7 +2527,10 @@ class BagHash does Associative does Baggy {
 
     method ACCEPTS($other) { defined(self) ?? $other ≼ self && self ≼ $other !! $other.^does(self) }
 
-    method Str()  { self.defined ?? %!elems.pairs.map({ $_.key xx $_.value }).flat.join(" ") !! nextsame }
+    method Str() {
+        self.defined ?? %!elems.pairs.map({ $_.value == 1 ?? $_.key.gist !! "{$_.key.gist}({$_.value})" }).flat.join(" ")
+                     !! nextsame
+    }
     method gist() { self.defined ?? "baghash({ self.pairs>>.gist.join(', ') })" !! "(BagHash)" }
     method perl() { self.defined ?? %!elems.perl ~ '.BagHash' !! "BagHash" }
 
@@ -2545,6 +2549,10 @@ class BagHash does Associative does Baggy {
             $temp-bag{$choice}--;
         }
     }
+    # Borrowed from Rakudo, doesn't seem to work properly in Niecza
+    # method pickpairs ($count = 1) {
+    #     (%!elems{ %!elems.keys.pick($count) }).list;
+    # }
     method roll($count = 1) {
         my @inverse-mapping;
         my $a = 0;
