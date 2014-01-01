@@ -65,17 +65,17 @@ use Test;
     multi qux(Any:U $) { "U" }
     multi qux(Any:D $) { "D" }
 
-    lives_ok { eval "foo(Int)" }, ":U allows type objects";
-    dies_ok  { eval "foo(5)" },   ":U denies concrete objects";
+    lives_ok { EVAL "foo(Int)" }, ":U allows type objects";
+    dies_ok  { EVAL "foo(5)" },   ":U denies concrete objects";
 
-    lives_ok { eval "bar(5)" },   ":D allows concrete objects";
-    dies_ok  { eval "bar(Int)" }, ":D denies type objects";
+    lives_ok { EVAL "bar(5)" },   ":D allows concrete objects";
+    dies_ok  { EVAL "bar(Int)" }, ":D denies type objects";
 
-    lives_ok { eval "moo(5)" },   ":_ allows concrete objects";
-    lives_ok { eval "moo(Int)" }, ":_ allows type objects";
+    lives_ok { EVAL "moo(5)" },   ":_ allows concrete objects";
+    lives_ok { EVAL "moo(Int)" }, ":_ allows type objects";
 
-    lives_ok { eval "cow(Int)" }, ":T allows type objects";
-    dies_ok  { eval "cow(5)" },   ":T denies concrete objects";
+    lives_ok { EVAL "cow(Int)" }, ":T allows type objects";
+    dies_ok  { EVAL "cow(5)" },   ":T denies concrete objects";
 
     is qux(Int), 'U', 'multi can discriminate on :U/:D (1)';
     is qux(5),   'D', 'multi can discriminate on :U/:D (2)';

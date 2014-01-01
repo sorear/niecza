@@ -17,14 +17,14 @@ sub mklet($value, $body) is export {
 
 sub mkcall($/, $name, *@positionals) is export {
     $/.CURSOR.mark_used($name);
-    $*CURLEX<!sub>.noninlinable if $name eq '&eval'; # HACK
+    $*CURLEX<!sub>.noninlinable if $name eq '&EVAL'; # HACK
     $OpCallSub.new(pos=>$/,
         invocant => $OpLexical.new(pos=>$/, :$name), :@positionals);
 }
 
 sub mklex($/, $name, *%_) is export {
     $/.CURSOR.mark_used($name);
-    $*CURLEX<!sub>.noninlinable if $name eq '&eval'; # HACK
+    $*CURLEX<!sub>.noninlinable if $name eq '&EVAL'; # HACK
     $OpLexical.new(pos=>$/, :$name, |%_);
 }
 

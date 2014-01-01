@@ -2080,7 +2080,7 @@ public partial class Builtins {
         if (th.info.setting.upcall_receiver == null)
             return Kernel.Die(th, "Cannot eval; no compiler available");
         SubInfo outer = th.caller.info;
-        object r = UpCall(th.info.setting, "eval",
+        object r = UpCall(th.info.setting, "EVAL",
                 str.Fetch().mo.mro_raw_Str.Get(str),
                 new Niecza.CLRBackend.Handle(outer),
                 new Niecza.CLRBackend.Handle(th.caller)
@@ -2100,7 +2100,7 @@ public partial class Builtins {
         if (!th.info.rx_compile_cache.TryGetValue(code, out main)) {
             if (th.info.setting.upcall_receiver == null)
                 throw new NieczaException("Cannot eval; no compiler available");
-            object r = UpCall(th.info.setting, "eval",
+            object r = UpCall(th.info.setting, "EVAL",
                     "regex {" + code + "}",
                     new Niecza.CLRBackend.Handle(th.info));
             if (r is Exception)

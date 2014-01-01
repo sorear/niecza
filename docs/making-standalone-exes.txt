@@ -19,7 +19,7 @@ have at least one dll.
 
 =item *
 
-It is not possible to use C<eval> or similar functionality with a precompiled
+It is not possible to use C<EVAL> or similar functionality with a precompiled
 program.
 
 =head1 METHOD

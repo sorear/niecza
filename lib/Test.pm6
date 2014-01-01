@@ -138,16 +138,16 @@ sub fails_ok($code,$why?,:$expect = <die warn fail>) is export {
     $*TEST-BUILDER.ok(?(no-control($code) eq any(@$expect)), $why);
 }
 sub eval_lives_ok($code,$why?) is export {
-    $*TEST-BUILDER.ok(no-control({ eval $code }, :diag) ne "die", $why);
+    $*TEST-BUILDER.ok(no-control({ EVAL $code }, :diag) ne "die", $why);
 }
 sub eval_dies_ok($code,$why?) is export {
-    $*TEST-BUILDER.ok(no-control({ eval $code }) eq "die", $why);
+    $*TEST-BUILDER.ok(no-control({ EVAL $code }) eq "die", $why);
 }
 sub eval_succeeds_ok($code,$why?,:$ignore = ()) is export {
-    $*TEST-BUILDER.ok(?(no-control({ eval $code }) eq any("", @$ignore)), $why);
+    $*TEST-BUILDER.ok(?(no-control({ EVAL $code }) eq any("", @$ignore)), $why);
 }
 sub eval_fails_ok($code,$why?,:$expect = <die warn fail>) is export {
-    $*TEST-BUILDER.ok(?(no-control({ eval $code }) eq any(@$expect)), $why);
+    $*TEST-BUILDER.ok(?(no-control({ EVAL $code }) eq any(@$expect)), $why);
 }
 sub diag($str) is export { $*TEST-BUILDER.note($str) }
 sub is_approx(Mu $got, Mu $expected, $desc = '') is export {

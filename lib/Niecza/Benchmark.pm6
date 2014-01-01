@@ -5,7 +5,7 @@ my ($prologue, $baseline);
 sub mktimer($code is copy) {
     $code = "$code ;" x 20;
     $code = '\qq[$prologue]; sub ($__j is copy) { my $__i = times[0]; (\qq[$code]) while --$__j; times[0] - $__i } #OK';
-    eval $code;
+    EVAL $code;
 }
 
 sub fnum($n) { $n ~~ /:i e/ ?? $n !! substr($n,0,6) }

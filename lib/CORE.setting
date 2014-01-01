@@ -744,7 +744,7 @@ my class Cool {
     method trim-leading () { self.subst(/^ \s+/, "") }
     method trim-trailing() { self.subst(/\s+ $/, "") }
     method trim         () { self.trim-leading.trim-trailing }
-    method eval() { eval(~self) }
+    method EVAL() { EVAL(~self) }
 
     method fmt(Str $format = '%s') {
         sprintf($format, self);
@@ -3573,7 +3573,7 @@ sub infix:« ==>> »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <== »(\|$args) { die "Feed ops NYI" } #OK
 sub infix:« <<== »(\|$args) { die "Feed ops NYI" } #OK
 
-sub eval($str,:$lang="perl6") is return-pass {
+sub EVAL($str,:$lang="perl6") is return-pass {
     if $lang eq "perl6" {
         Q:CgOp { (simple_eval {$str}) }
     } else {

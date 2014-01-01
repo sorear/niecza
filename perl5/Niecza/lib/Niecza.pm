@@ -24,7 +24,7 @@ use Niecza::Object;
 =head1 SYNOPSIS
 
 use v6;
-eval(:lang<perl5>,"...");
+EVAL(:lang<perl5>,"...");
 
 =head1 AUTHOR
 

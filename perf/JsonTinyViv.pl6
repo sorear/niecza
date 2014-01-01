@@ -41,6 +41,6 @@ grammar JSONGrammar {
     }
 }
 
-JSONGrammar.parse(eval 'local $/; <STDIN>')
+JSONGrammar.parse(EVAL 'local $/; <STDIN>')
 
 # vim: ft=perl6

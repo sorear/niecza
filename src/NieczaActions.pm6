@@ -3565,7 +3565,7 @@ method use_from_perl5($/,$name) {
         class      => 'Code');
 
     my $p5code = '\\&'~$func;
-    my $p5sub = $OpCallSub.new(pos=>$/,invocant=>mklex($/,'&eval'),args=>[$OpStringLiteral.new(text=>$p5code),$OpSimplePair.new(key=>'lang',value=>$OpStringLiteral.new(text=>'perl5'))]);
+    my $p5sub = $OpCallSub.new(pos=>$/,invocant=>mklex($/,'&EVAL'),args=>[$OpStringLiteral.new(text=>$p5code),$OpSimplePair.new(key=>'lang',value=>$OpStringLiteral.new(text=>'perl5'))]);
     $placeholder.add_my_name('|capture');
     my $sig = $Sig.new(params => [$SigParameter.new(flags=>$Sig::SLURPY_CAP,name=>'|capture',slot=>'|capture')]);
     $placeholder.set_signature($sig);

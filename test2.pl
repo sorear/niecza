@@ -201,7 +201,7 @@ eval_lives_ok q[
         push @frags, "is ckb(1 @$lt 2 @$gt 3), $right_br_ord, '$msg (1)';\n";
         push @frags, "is ckb(1 @$gt 2 @$lt 3), $right_br_opp, '$msg (2)';\n";
     }
-    eval @frags.join;
+    EVAL @frags.join;
 }
 
 {

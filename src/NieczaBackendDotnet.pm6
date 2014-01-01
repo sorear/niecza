@@ -26,9 +26,9 @@ sub locstr($fo, $lo, $fn, $ln) {
 sub upcalled(*@args) {
     my $v = $*compiler.verbose;
     given @args[0] {
-        when "eval" {
+        when "EVAL" {
             my $*IN_EVAL = True;
-            say "eval: @args[1] from @args[2].name()" if $v;
+            say "EVAL: @args[1] from @args[2].name()" if $v;
             return $*compiler.compile_string(@args[1], True, :evalmode,
                 :outer(@args[2]), :outer_frame(@args[3]));
         }

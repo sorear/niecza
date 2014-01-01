@@ -118,7 +118,7 @@ class Method is Operator {
             $OpInterrogative.new(pos=>$/, receiver => @args[0],
                 name => $.name);
         } else {
-            $*CURLEX<!sub>.noninlinable if $!name eq 'eval';
+            $*CURLEX<!sub>.noninlinable if $!name eq 'EVAL';
             my $pclass;
             if $.private {
                 if $.package {
