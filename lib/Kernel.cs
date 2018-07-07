@@ -1431,7 +1431,7 @@ namespace Niecza {
         public override void Init(Frame f) { }
         P6any GetSelf(Frame f) {
             SubInfo sc = owner;
-            LexInfo self;
+            LexInfo self = null;
             while (sc != null && !sc.dylex.TryGetValue("self", out self)) {
                 sc = sc.outer;
                 f  = f.outer;
@@ -1442,7 +1442,7 @@ namespace Niecza {
         }
         ClrOp GetSelfCode(SubInfo orig) {
             SubInfo sc = orig;
-            LexInfo self;
+            LexInfo self = null;
             int up = 0;
             while (sc != null && !sc.dylex.TryGetValue("self", out self)) {
                 sc = sc.outer;
